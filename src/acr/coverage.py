@@ -311,6 +311,10 @@ class CoverageLedger:
         self.read_sections: list[str] = []
         self.doc_types_touched: list[str] = []
         self.search_hit_notes: set[str] = set()
+        # Documents the runtime has DRAWN, persisted across calls. Redrawing a fresh sample
+        # on every check makes the obligation unsatisfiable: the agent reads some, the next
+        # check demands a different 25, and the debt never shrinks.
+        self.drawn: dict[str, list[str]] = {}
         self.samples: dict[str, dict[str, bool]] = {}
 
     # -- written by the toolbox ---------------------------------------------------
@@ -346,11 +350,33 @@ class CoverageLedger:
                 universe = [d for d in pool if d.note_id not in self.search_hit_notes]
             else:
                 continue
-            already = set(self.samples.get(s.name, {}))
-            remaining = [d for d in universe if d.note_id not in already]
-            if len(already) < need and remaining:
-                out[s.name] = self.sampler.draw(remaining, need - len(already))
+            drawn = self.drawn.setdefault(s.name, [])
+            if len(drawn) < need:
+                pool = [d for d in universe if d.note_id not in set(drawn)]
+                drawn.extend(d.note_id for d in self.sampler.draw(pool, need - len(drawn)))
+            by_id = {d.note_id: d for d in universe}
+            outstanding = [by_id[n] for n in drawn
+                           if n in by_id and n not in self.samples.get(s.name, {})]
+            if outstanding:
+                out[s.name] = outstanding
         return out
+
+    def resolve_sample_verdicts(self, cited: set[str]) -> int:
+        """Turn "the agent read a drawn document" into a recorded verdict.
+
+        The verdict is not a separate judgement to elicit: a drawn document that was read and
+        yielded evidence is relevant; one that was read and yielded none is not. Without this
+        bridge nothing ever populates `samples`, `pending_samples` recomputes the same debt
+        forever, and the gate cannot be satisfied by any amount of work.
+        """
+        n = 0
+        read = set(self.read_notes) | {k.split("#")[0] for k in self.read_sections}
+        for stratum, ids in self.drawn.items():
+            for nid in ids:
+                if nid in read and nid not in self.samples.get(stratum, {}):
+                    self.record_sample_verdict(stratum, nid, relevant=nid in cited)
+                    n += 1
+        return n
 
     def record_sample_verdict(self, stratum: str, note_id: str, relevant: bool) -> None:
         self.samples.setdefault(stratum, {})[note_id] = relevant

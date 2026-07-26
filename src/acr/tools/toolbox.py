@@ -72,6 +72,18 @@ TOOL_SCHEMAS: list[dict] = [
         ["note_id"],
     ),
     _tool(
+        "read_documents_batch",
+        "Read MANY documents in one step. Use this for runtime-drawn validation samples: the "
+        "obligation is sized in documents, not in turns, and reading them one per step cannot "
+        "fit in any sane budget. Returns a compact excerpt of each.",
+        {
+            "note_ids": {"type": "array", "items": {"type": "string"},
+                         "description": "note_ids to read, typically the ones the runtime drew"},
+            "chars_each": {"type": "integer", "description": "excerpt size per document, default 1200"},
+        },
+        ["note_ids"],
+    ),
+    _tool(
         "timeline",
         "Chronological list of documents, optionally filtered by type. Use to establish "
         "sequence — e.g. whether a disease-free interval preceded a later finding.",
@@ -246,6 +258,17 @@ class Toolbox:
         r = self.chart.read(note_id, offset, limit)
         self.coverage.note_read(note_id, r["doc_type"])
         return r
+
+    def _t_read_documents_batch(self, note_ids: list[str], chars_each: int = 1200) -> dict:
+        docs, unknown = [], []
+        for nid in note_ids[:60]:
+            if nid not in self.chart._docs:
+                unknown.append(nid); continue
+            r = self.chart.read(nid, 0, chars_each)
+            self.coverage.note_read(nid, r["doc_type"])
+            docs.append({"note_id": nid, "doc_type": r["doc_type"], "date": r["date"],
+                         "total_chars": r["total_chars"], "text": r["text"]})
+        return {"n_read": len(docs), "unknown_note_ids": unknown, "documents": docs}
 
     def _t_read_section(self, note_id: str, section: str = "") -> dict:
         if note_id not in self.chart._docs:

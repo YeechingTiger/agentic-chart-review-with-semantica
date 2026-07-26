@@ -1,0 +1,105 @@
+{
+  "run_id": "run-20260725-225541-d227b5",
+  "patient_id": "SYN0001",
+  "spec_id": "STORE.400_522_523.site_histology_behavior.UNSTRATIFIED",
+  "spec_version": "0.1.0",
+  "spec_hash": "4751273d44fcf0dc",
+  "model": "ollama_chat/qwen3.6:35b",
+  "answer": {
+    "status": "FOUND",
+    "value": {
+      "behavior": "3",
+      "histology": "8140",
+      "primary_site": "C341"
+    },
+    "reasoning": "The definitive Surgical Pathology Report (2023-04-27) provides the final pathologic diagnosis. The site of origin is explicitly stated as the right upper lobe of lung, which maps to ICD-O-3 topography C341. The histology is adenocarcinoma, corresponding to morphology code 8140 (without the behavior digit). Adenocarcinoma is a malignant process with invasive potential, satisfying the rule for behavior code 3 (invasive). No other pathology reports contradict this finding.",
+    "proof_basis": "UNGATED",
+    "witness_count": 3,
+    "route_to_human": true,
+    "evidence": [
+      {
+        "note_id": "Surgical-Pathology-Report_2023-04-27",
+        "doc_type": "Surgical-Pathology-Report",
+        "date": "2023-04-27",
+        "start": 461,
+        "end": 503,
+        "quote": "PSY — ADENOCARCINOMA.\n\nElectronically sign",
+        "supports": "primary_site, histology, behavior",
+        "stance": "supports"
+      },
+      {
+        "note_id": "Surgical-Pathology-Report_2023-04-27",
+        "doc_type": "Surgical-Pathology-Report",
+        "date": "2023-04-27",
+        "start": 431,
+        "end": 454,
+        "quote": " RIGHT UPPER LOBE OF LU",
+        "supports": "primary_site",
+        "stance": "supports"
+      },
+      {
+        "note_id": "Surgical-Pathology-Report_2023-04-27",
+        "doc_type": "Surgical-Pathology-Report",
+        "date": "2023-04-27",
+        "start": 465,
+        "end": 476,
+        "quote": "— ADENOCARC",
+        "supports": "histology, behavior",
+        "stance": "supports"
+      }
+    ]
+  },
+  "plan": [
+    {
+      "id": "1",
+      "goal": "List all documents to locate every Surgical-Pathology-Report and Surgical-Pathology-Document entry along with their dates.",
+      "rationale": "Identifies the definitive tissue diagnosis sources within the 11-year chart span.",
+      "status": "pending"
+    },
+    {
+      "id": "2",
+      "goal": "Retrieve and read the most definitive Surgical-Pathology-Report, prioritizing resection over initial biopsy if multiple exist.",
+      "rationale": "Proof obligation requires a pathology report establishing histology and site of origin, with resection taking precedence per conflict resolution rules.",
+      "status": "pending"
+    },
+    {
+      "id": "3",
+      "goal": "Search the entire chart for the terms 'pathology', 'biopsy', 'final diagnosis', 'specimen', and 'carcinoma'.",
+      "rationale": "Ensures compliance with proof obligation to verify evidence presence across all documents before considering an absent/negative answer.",
+      "status": "pending"
+    },
+    {
+      "id": "4",
+      "goal": "Extract primary_site, histology, and behavior from the FINAL DIAGNOSIS or MICROSCOPIC DESCRIPTION of the identified pathology report.",
+      "rationale": "Directly satisfies the extraction specification using recorded quotes from the definitive source document.",
+      "status": "pending"
+    },
+    {
+      "id": "5",
+      "goal": "Verify the diagnosis is not a hematopoietic neoplasm to rule out SPEC_INSUFFICIENT, or confirm lack of tissue confirmation for EVIDENCE_INSUFFICIENT.",
+      "rationale": "Ensures correct abstention classification per the spec's exclusion and boundary rules before finalizing the answer.",
+      "status": "pending"
+    }
+  ],
+  "plan_revisions": 1,
+  "steps": 9,
+  "negative_basis": null,
+  "gate_validated": false,
+  "rejections": [],
+  "usage": {
+    "llm_calls": 18,
+    "prompt_tokens": 90379,
+    "completion_tokens": 25713,
+    "total_tokens": 116092,
+    "reasoning_fallbacks": 9,
+    "empty_completions": 0
+  },
+  "degradation": {
+    "plan_fallbacks": 0,
+    "reflect_fallbacks": 0,
+    "finalize_defaults": 0,
+    "act_no_tool_call": 0
+  },
+  "elapsed_s": 559.8,
+  "trace": "runs/aprime_SYN0001__20260726T025541Z__7b366aa-dirty/run-20260725-225541-d227b5.jsonl"
+}

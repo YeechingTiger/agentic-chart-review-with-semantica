@@ -91,6 +91,10 @@ class RunState(TypedDict, total=False):
     reflection: dict
     answer: dict
     done: bool
+    # Declared here or LangGraph drops it. A channel set by a node but absent from this
+    # TypedDict is silently discarded, the downstream read returns the falsy default, and
+    # nothing errors — which is how an accepted answer came out labelled UNGATED.
+    gate_validated: bool
     rejections: list[dict]
     usage: dict
 

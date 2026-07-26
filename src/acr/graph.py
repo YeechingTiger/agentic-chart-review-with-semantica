@@ -506,6 +506,9 @@ class ChartReviewAgent:
             # Runtime-forced validation sampling. Drawn by the sampler, never by the agent:
             # a model choosing which unread documents to check is validating its own
             # judgement with its own judgement.
+            # Credit whatever the agent has already read against the outstanding draw before
+            # deciding it still owes anything.
+            self.coverage.resolve_sample_verdicts(self.evidence.cited_notes())
             pending = self.coverage.pending_samples()
             if pending:
                 lines = []
@@ -514,10 +517,14 @@ class ChartReviewAgent:
                         lines.append(f"  {stratum}: {d.note_id} ({d.doc_type}, {d.date})")
                 self.tracer.emit("forced_sampling", seed=self.coverage.sampler.seed,
                                  counts={k: len(v) for k, v in pending.items()})
+                ids = [d.note_id for docs in pending.values() for d in docs]
                 return {"accepted": False,
                         "why": "validation sampling not yet done — the runtime has drawn these",
-                        "missing": ["read each of these and record_evidence if any is relevant "
-                                    "(they were drawn by the runtime, not chosen by you):"] + lines}
+                        "how_to_satisfy": ("call read_documents_batch with note_ids set to the "
+                                           "list below, in one step; then record_evidence for "
+                                           "any that turn out to be relevant, then resubmit"),
+                        "note_ids": ids,
+                        "missing": ["these were drawn by the runtime, not chosen by you:"] + lines}
             gate = self._check_gate()
             if gate.verdict != "PASS":
                 return {"accepted": False,
