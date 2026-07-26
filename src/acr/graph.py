@@ -35,6 +35,38 @@ from .trace import Tracer
 
 VERDICTS = {"CONTINUE", "REPLAN", "SUFFICIENT", "STUCK"}
 
+
+class CoverageClaimError(AssertionError):
+    """An answer advertised a coverage claim it did not earn."""
+
+
+def assert_coverage_claim_is_earned(ans: dict) -> None:
+    """`coverage_attested` may appear on exactly one kind of answer.
+
+    A coverage ledger asserts "I searched the defined universe". Only a negative that passed
+    the proof obligation has established that. A witness-proved positive never claimed it; a
+    give-up and a budget exhaustion never earned it. Attaching the ledger anywhere else makes
+    the answer advertise a stronger claim than was verified, and — because it looks exactly
+    like a verified one downstream — nothing would catch it.
+
+    Checked at the point of emission rather than left as an intention, since the whole family
+    of bugs this guards against consists of intentions that the code did not keep.
+    """
+    has_ledger = "coverage_attested" in ans
+    earned = (ans.get("status") == "EVIDENCE_INSUFFICIENT"
+              and ans.get("negative_basis") == "GATE_VALIDATED")
+    if has_ledger and not earned:
+        raise CoverageClaimError(
+            f"coverage_attested attached to status={ans.get('status')!r} "
+            f"negative_basis={ans.get('negative_basis')!r} proof_basis={ans.get('proof_basis')!r}; "
+            "only a gate-validated EVIDENCE_INSUFFICIENT may carry a coverage claim"
+        )
+    if earned and not has_ledger:
+        raise CoverageClaimError(
+            "a gate-validated negative must carry its coverage_attested ledger — "
+            "the claim is only auditable if the evidence for it travels with it"
+        )
+
 SYSTEM = """You are a cancer-registry abstractor reviewing one patient's chart.
 
 You work exactly the way a careful human abstractor does: first see what documents exist \
@@ -359,24 +391,41 @@ class ChartReviewAgent:
                                       "that the agent reached that conclusion"))
             ans["status"] = "EVIDENCE_INSUFFICIENT"
 
-        # A negative has three possible bases and they demand different downstream handling.
-        # Emitting the same EVIDENCE_INSUFFICIENT for all three is how "the agent gave up"
-        # gets filed as "the chart really has nothing". Only a gate-validated negative may
-        # carry a coverage claim; the other two are routed to a human.
-        if s.get("gate_validated"):
+        # Positive and negative findings are proved differently, so they are labelled
+        # differently. A negative additionally has three possible bases demanding three
+        # different downstream owners: emitting the same EVIDENCE_INSUFFICIENT for all of
+        # them is how "the agent gave up" gets filed as "the chart really has nothing".
+        if ans.get("status") == "FOUND":
+            # Witness proof: one qualifying document settles it, and the gate for FOUND
+            # checks exactly that. It never claims the universe was searched. Attaching
+            # coverage_attested here would advertise a stronger claim than anything that was
+            # verified — the same error as a check that records but cannot refuse, committed
+            # on the way out instead of on the way in.
+            ans["proof_basis"] = "WITNESS"
+            ans["witness_count"] = len(self.evidence.items)
+            if not s.get("gate_validated"):
+                # Left without going through submit_answer, so not even the witness standard
+                # was applied. Different reason from a coverage failure, same consequence.
+                ans["proof_basis"] = "UNGATED"
+                ans["route_to_human"] = True
+                self.tracer.emit("ungated_positive", severity="warning",
+                                 termination=getattr(self, "_termination", None))
+        elif s.get("gate_validated"):
             ans["negative_basis"] = "GATE_VALIDATED"
             ans["proof_obligation"] = self._check_gate().to_dict()
             ans["coverage_attested"] = self.coverage.to_dict()
         else:
             ans["negative_basis"] = getattr(self, "_termination", None) or "BUDGET_EXHAUSTED"
             ans["route_to_human"] = True
-            # Deliberately NO coverage_attested and NO proof_obligation: this answer never
-            # passed the gate, and attaching the ledger would let it read as though it had.
+            # Deliberately withholding the ledger: this answer never passed the gate, and
+            # attaching it would let the answer read as though it had.
             ans["coverage_note"] = ("no coverage claim is made — this answer did not pass the "
                                     "proof obligation")
             self.tracer.emit("unvalidated_negative", severity="warning",
                              negative_basis=ans["negative_basis"])
+
         ans["evidence"] = self.evidence.to_list()
+        assert_coverage_claim_is_earned(ans)   # enforced at emission, not merely intended
         return {"answer": ans, "done": True}
 
     # ------------------------------------------------------------------ edges
