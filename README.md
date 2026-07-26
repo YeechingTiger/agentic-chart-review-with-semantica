@@ -47,8 +47,17 @@ your specification or go get more data.
 uv venv --python 3.12
 uv pip install -e ".[dev]"
 
-# generate the synthetic, PHI-free dev corpus (8 patients, ~166 documents, 2010-2025)
-python tools/generate_corpus.py --out corpus/patients
+# generate the synthetic, PHI-free dev corpus (12 patients, ~3.7k documents, a decade each)
+./.venv/bin/python tools/generate_corpus.py --out corpus/patients
+```
+
+**Always call the venv's interpreter directly.** The system Python here is 3.9 and cannot
+import `acr`; a bare `python3.12` on PATH has no pytest. Both failures look like a broken
+checkout and are not:
+
+```bash
+./.venv/bin/python -m pytest      # correct
+python3 -m pytest                 # ModuleNotFoundError: acr
 ```
 
 Any LiteLLM-supported provider works. Local by default:

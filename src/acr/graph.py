@@ -322,11 +322,15 @@ class ChartReviewAgent:
         return {"accepted": True, "why": "", "missing": []}
 
     # ------------------------------------------------------------------ run
-    def run(self, chart: PatientChart, run_id: str | None = None) -> dict:
+    def run(self, chart: PatientChart, run_id: str | None = None,
+            known_doc_types: list[str] | None = None) -> dict:
         self.chart = chart
         self.evidence = EvidenceLedger()
         self.coverage = CoverageLedger()
-        self.toolbox = Toolbox(chart, self.evidence, self.coverage)
+        # Corpus-wide type vocabulary keeps "this patient has none" (a finding) separable
+        # from "no such type" (a typo). Without it the toolbox says so in its own error.
+        self.toolbox = Toolbox(chart, self.evidence, self.coverage,
+                               known_doc_types=known_doc_types)
         self.tracer = Tracer.create(self.out_dir, run_id)
         self._t0 = time.time()
 

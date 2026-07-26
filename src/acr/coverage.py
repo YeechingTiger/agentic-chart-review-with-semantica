@@ -284,6 +284,149 @@ class StratumResult:
         return asdict(self)
 
 
+class CoverageLedger:
+    """The single record of what the agent actually did.
+
+    Deliberately the only one. An earlier draft kept a flat ledger in `state.py` beside this
+    stratified one; two independent accounts of "how much was covered" can disagree, nothing
+    would raise when they did, and you would be left with two numbers and no way to choose.
+    So this replaces it rather than joining it.
+
+    Written by the toolbox from real tool calls. The agent cannot address it.
+    """
+
+    def __init__(self, docs: Sequence[DocMeta], strata_specs: Sequence[StratumSpec],
+                 sampler: "ForcedSampler | None" = None, confidence: float = 0.95):
+        self.docs = list(docs)
+        self.specs = list(strata_specs)
+        self.confidence = confidence
+        self.sampler = sampler or ForcedSampler()
+        self.by_stratum = assign_strata(self.docs, self.specs) if self.specs else {}
+        self.total_documents = len(self.docs)
+
+        self.listed_documents = False
+        self.type_summary_seen = False
+        self.searched_terms: list[str] = []
+        self.read_notes: list[str] = []
+        self.read_sections: list[str] = []
+        self.doc_types_touched: list[str] = []
+        self.search_hit_notes: set[str] = set()
+        self.samples: dict[str, dict[str, bool]] = {}
+
+    # -- written by the toolbox ---------------------------------------------------
+    def note_search(self, term: str, hit_note_ids: Iterable[str] = ()) -> None:
+        t = term.strip().lower()
+        if t and t not in self.searched_terms:
+            self.searched_terms.append(t)
+        self.search_hit_notes.update(hit_note_ids)
+
+    def note_read(self, note_id: str, doc_type: str) -> None:
+        if note_id not in self.read_notes:
+            self.read_notes.append(note_id)
+        if doc_type and doc_type not in self.doc_types_touched:
+            self.doc_types_touched.append(doc_type)
+
+    def note_section(self, note_id: str, section: str, doc_type: str = "") -> None:
+        key = f"{note_id}#{section}"
+        if key not in self.read_sections:
+            self.read_sections.append(key)
+        if doc_type and doc_type not in self.doc_types_touched:
+            self.doc_types_touched.append(doc_type)
+
+    # -- forced sampling ----------------------------------------------------------
+    def pending_samples(self) -> dict[str, list[DocMeta]]:
+        """Documents the runtime will make the agent inspect before a negative is allowed."""
+        out: dict[str, list[DocMeta]] = {}
+        for s in self.specs:
+            pool = self.by_stratum.get(s.name, [])
+            if s.policy == "validate_by_sampling":
+                need, universe = s.min_sample, pool
+            elif s.policy == "search_then_read_hits_and_sample_misses":
+                need = s.min_sample_of_misses
+                universe = [d for d in pool if d.note_id not in self.search_hit_notes]
+            else:
+                continue
+            already = set(self.samples.get(s.name, {}))
+            remaining = [d for d in universe if d.note_id not in already]
+            if len(already) < need and remaining:
+                out[s.name] = self.sampler.draw(remaining, need - len(already))
+        return out
+
+    def record_sample_verdict(self, stratum: str, note_id: str, relevant: bool) -> None:
+        self.samples.setdefault(stratum, {})[note_id] = relevant
+
+    # -- results ------------------------------------------------------------------
+    def stratum_results(self) -> list[StratumResult]:
+        out: list[StratumResult] = []
+        for s in self.specs:
+            pool = self.by_stratum.get(s.name, [])
+            r = StratumResult(name=s.name, N=len(pool))
+            r.reviewed = sum(1 for d in pool if d.note_id in self.read_notes
+                             or any(k.startswith(d.note_id + "#") for k in self.read_sections))
+            r.declared_types = sorted({d.doc_type for d in pool})[:12]
+            verdicts = self.samples.get(s.name, {})
+            n_s, n_hit = len(verdicts), sum(1 for v in verdicts.values() if v)
+
+            if s.policy in ("exhaustive", "exhaustive_until_witness"):
+                r.complete = (r.reviewed >= r.N) if s.policy == "exhaustive" else (r.reviewed > 0)
+                r.elusion_upper = 0.0 if r.complete else 1.0
+            elif s.policy == "search_then_read_hits_and_sample_misses":
+                r.keywords_searched = list(self.searched_terms)
+                hits = [d for d in pool if d.note_id in self.search_hit_notes]
+                r.hits = len(hits)
+                r.hits_read = sum(1 for d in hits if d.note_id in self.read_notes)
+                r.misses = len(pool) - r.hits
+                r.misses_sampled, r.miss_sample_hits = n_s, n_hit
+                r.keyword_list_validated = n_s >= s.min_sample_of_misses and n_hit == 0
+                r.elusion_upper = clopper_pearson_upper(n_hit, n_s, self.confidence)
+            else:
+                r.sampled, r.sample_hits = n_s, n_hit
+                r.elusion_upper = clopper_pearson_upper(n_hit, n_s, self.confidence)
+            out.append(r)
+        return out
+
+    def to_dict(self) -> dict:
+        return {
+            "mode": "stratified_exclusion" if self.specs else "unstratified",
+            "sample_seed": self.sampler.seed,
+            "universe": {"n_documents": self.total_documents,
+                         "n_types": len({d.doc_type for d in self.docs})},
+            "listed_documents": self.listed_documents,
+            "searched_terms": self.searched_terms,
+            "n_read": len(self.read_notes),
+            "strata": [r.to_dict() for r in self.stratum_results()],
+        }
+
+    def render(self) -> str:
+        lines = [f"documents: {self.total_documents}   listed: {self.listed_documents}",
+                 f"searches ({len(self.searched_terms)}): {', '.join(self.searched_terms) or '-'}",
+                 f"documents read: {len(self.read_notes)}"]
+        for r in self.stratum_results():
+            bits = [f"  [{r.name}] N={r.N} reviewed={r.reviewed}"]
+            if r.name == "can_establish":
+                bits.append(f"complete={r.complete}")
+            if r.sampled or r.misses_sampled:
+                bits.append(f"sampled={r.sampled or r.misses_sampled} hits={r.sample_hits or r.miss_sample_hits}")
+            bits.append(f"elusion<={r.elusion_upper:.3f}")
+            lines.append("  ".join(bits))
+        return "\n".join(lines)
+
+
+def strata_from_spec(spec) -> list[StratumSpec]:
+    """Pull the stratum declarations out of a spec's proof_obligation.
+
+    Returns [] when the spec declares no strata — which is what the unstratified baseline
+    arm runs on, and which `to_dict()` labels `mode: unstratified` so the two arms are never
+    confused in the trace.
+    """
+    fn = getattr(spec, "proof_obligation", None)
+    fn = getattr(fn, "for_negative", {}) if fn else {}
+    raw = list(fn.get("strata") or [])
+    for claim in (fn.get("claims") or []):
+        raw.extend(claim.get("strata") or [])
+    return [StratumSpec.from_dict(s) for s in raw]
+
+
 @dataclass
 class GateResult:
     verdict: str = "FAIL"
