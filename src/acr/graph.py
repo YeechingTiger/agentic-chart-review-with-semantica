@@ -33,6 +33,8 @@ from .state import Budget, EvidenceLedger, RunState
 from .tools import Toolbox
 from .trace import Tracer
 
+VERDICTS = {"CONTINUE", "REPLAN", "SUFFICIENT", "STUCK"}
+
 SYSTEM = """You are a cancer-registry abstractor reviewing one patient's chart.
 
 You work exactly the way a careful human abstractor does: first see what documents exist \
@@ -223,6 +225,11 @@ class ChartReviewAgent:
 
         if not r.tool_calls:
             msgs.append({"role": "assistant", "content": r.content or ""})
+            self._act_no_tool_call += 1
+            self.tracer.emit("act_no_tool_call", severity="warning",
+                             content_chars=len(r.content or ""),
+                             used_reasoning_channel=r.used_reasoning_channel,
+                             message="act step produced neither a tool call nor usable text")
             msgs.append({"role": "user", "content":
                          "Continue by calling a tool. If you are ready, call submit_answer."})
             return {"messages": msgs, "step": s.get("step", 0) + 1}
@@ -267,13 +274,44 @@ class ChartReviewAgent:
             coverage=self.coverage.render(),
             step=s.get("step", 0), max_steps=self.budget.max_steps,
         )
-        r = self.llm.chat([{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}])
+        msgs_ref = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
+        r = self.llm.chat(msgs_ref)
         j = extract_json(r.content)
-        verdict = str(j.get("verdict", "CONTINUE")).upper()
-        if verdict not in {"CONTINUE", "REPLAN", "SUFFICIENT", "STUCK"}:
+        raw_verdict = j.get("verdict")
+
+        # Same trap as the planner, same model, same completion budget — and this prompt is
+        # LONGER because it carries the evidence ledger. An unparsed reply silently becoming
+        # CONTINUE is indistinguishable from a supervisor that read the evidence and judged
+        # "keep going", which makes every CONTINUE in the trace uninterpretable. Retry once,
+        # then record the degradation loudly instead of laundering it into a verdict.
+        if raw_verdict is None or str(raw_verdict).upper() not in VERDICTS:
+            self.tracer.emit("reflect_empty_retry", first_attempt_chars=len(r.content),
+                             used_reasoning_channel=r.used_reasoning_channel,
+                             completion_tokens=r.completion_tokens, raw_verdict=raw_verdict)
+            old = self.llm.cfg.max_tokens
+            self.llm.cfg.max_tokens = max(old * 2, 4096)
+            try:
+                r = self.llm.chat(msgs_ref)
+            finally:
+                self.llm.cfg.max_tokens = old
+            j = extract_json(r.content)
+            raw_verdict = j.get("verdict")
+
+        degraded = raw_verdict is None or str(raw_verdict).upper() not in VERDICTS
+        if degraded:
             verdict = "CONTINUE"
+            self._reflect_fallbacks += 1
+            self.tracer.emit("reflect_fallback_used", severity="error", raw_verdict=raw_verdict,
+                             message=("the supervisor returned nothing usable after a retry; "
+                                      "defaulting to CONTINUE. This verdict carries NO "
+                                      "information and no conclusion about reflection "
+                                      "behaviour may be drawn from this step"))
+        else:
+            verdict = str(raw_verdict).upper()
+
         self.tracer.reflect(verdict, j.get("reason", ""), len(self.evidence.items))
-        upd: dict[str, Any] = {"reflection": {"verdict": verdict, "reason": j.get("reason", "")}}
+        upd: dict[str, Any] = {"reflection": {"verdict": verdict, "reason": j.get("reason", ""),
+                                              "degraded": degraded}}
         if verdict == "REPLAN" and isinstance(j.get("revised_plan"), list) and j["revised_plan"]:
             plan = j["revised_plan"]
             for st in plan:
@@ -311,7 +349,16 @@ class ChartReviewAgent:
         if self.spec.data_source == "outside_notes":
             ans["status"] = "SPEC_INSUFFICIENT"
             ans["remedy_class"] = "WRONG_DATA_SOURCE"
-        ans.setdefault("status", "EVIDENCE_INSUFFICIENT")
+        if not ans.get("status"):
+            # For a patient whose ground truth IS EVIDENCE_INSUFFICIENT this default scores
+            # as correct while meaning nothing. Count it so a matching label can never be
+            # mistaken for a working agent.
+            self._finalize_defaults += 1
+            self.tracer.emit("finalize_status_defaulted", severity="error",
+                             message=("the model produced no status; defaulting to "
+                                      "EVIDENCE_INSUFFICIENT. This label is NOT evidence "
+                                      "that the agent reached that conclusion"))
+            ans["status"] = "EVIDENCE_INSUFFICIENT"
         ans["proof_obligation"] = gate.to_dict()
         ans["evidence"] = self.evidence.to_list()
         ans["coverage_attested"] = self.coverage.to_dict()
@@ -326,7 +373,15 @@ class ChartReviewAgent:
         return "reflect" if s.get("step", 0) % self.reflect_every == 0 else "reflect"
 
     def _after_reflect(self, s: RunState) -> str:
-        v = (s.get("reflection") or {}).get("verdict", "CONTINUE")
+        refl = s.get("reflection") or {}
+        v = refl.get("verdict")
+        if v is None:
+            # Reaching the edge with no verdict at all means the node did not run. Treating
+            # that as CONTINUE would hide a broken graph behind normal-looking behaviour.
+            self._reflect_fallbacks += 1
+            self.tracer.emit("reflect_missing_at_edge", severity="error",
+                             message="no verdict present when routing; defaulting to CONTINUE")
+            v = "CONTINUE"
         if self._over_budget(s):
             return "finalize"
         if v in ("SUFFICIENT", "STUCK"):
@@ -405,6 +460,9 @@ class ChartReviewAgent:
         self.tracer = Tracer.create(self.out_dir, run_id)
         self._t0 = time.time()
         self._plan_fallbacks = 0
+        self._reflect_fallbacks = 0
+        self._finalize_defaults = 0
+        self._act_no_tool_call = 0
 
         self.tracer.run_start(patient_id=chart.patient_id, model=self.llm.cfg.model,
                               **self.spec.identity(), n_documents=len(chart))
@@ -429,7 +487,14 @@ class ChartReviewAgent:
             "usage": self.llm.usage(),
             # If this is non-zero the planner degraded and the run's replanning behaviour
             # was never actually exercised — read any conclusion about planning accordingly.
-            "plan_fallbacks": getattr(self, "_plan_fallbacks", 0),
+            # Any non-zero entry here means a node degraded silently and the corresponding
+            # behaviour was NOT exercised. Read every conclusion against this block first.
+            "degradation": {
+                "plan_fallbacks": getattr(self, "_plan_fallbacks", 0),
+                "reflect_fallbacks": getattr(self, "_reflect_fallbacks", 0),
+                "finalize_defaults": getattr(self, "_finalize_defaults", 0),
+                "act_no_tool_call": getattr(self, "_act_no_tool_call", 0),
+            },
             "elapsed_s": round(time.time() - self._t0, 2),
             "trace": str(self.tracer.path),
         }
