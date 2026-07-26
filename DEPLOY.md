@@ -54,8 +54,19 @@ The corpus is already in the tree. To regenerate it (deterministic, byte-identic
 
 ### vLLM — recommended on a GPU box
 
-qwen3.6:35b at bf16 wants ~70 GB, so 2×A100-40G / 2×L40S / 1×H100-80G, or use an AWQ/GPTQ
-quantisation on a single 48 GB card.
+**Size it from the hardware, don't copy the flags below.** Check `nvidia-smi` first and pick:
+
+| Total VRAM | What fits | `--tensor-parallel-size` |
+|---|---|---|
+| ≥ 80 GB on one card | bf16 (~70 GB weights + KV cache) | 1 |
+| 2 × 40–48 GB | bf16 split across both | 2 |
+| 4 × 24 GB | bf16 split across four | 4 |
+| 1 × 40–48 GB | AWQ or GPTQ 4-bit (~20 GB) | 1 |
+| < 24 GB | use Ollama, or a hosted API | — |
+
+`--tensor-parallel-size` must divide the number of visible GPUs. Leave headroom for KV
+cache: at `--max-model-len 32768` budget several GB per concurrent request, and lower
+`--gpu-memory-utilization` (default 0.9) if the server shares the card with anything else.
 
 ```bash
 uv pip install vllm
@@ -176,4 +187,67 @@ means replacing that one module; nothing else changes.
 
 ```bash
 ./.venv/bin/acr run <PATIENT> --spec <SPEC> --corpus /secure/path/patients
+```
+
+---
+
+## Appendix — instruction block for an agent doing the setup
+
+Paste this to a coding agent on the target machine. It is self-contained: it says what to
+detect, what to decide, and what to report back.
+
+```text
+Deploy and run the agentic chart review project in this repo.
+
+SETUP
+1. Read DEPLOY.md and RESULTS.md first. RESULTS.md says what has and has not been
+   established; do not re-derive it.
+2. Install: uv venv --python 3.12 && uv pip install -e ".[dev]"
+   Verify with ./.venv/bin/python -m pytest -q — expect 53 passed.
+   Always invoke ./.venv/bin/python directly; a bare python3 is usually 3.9 and cannot
+   import acr, which looks like a broken checkout.
+3. The corpus is committed (12 synthetic patients, 3736 documents). Do not generate data.
+
+MODEL — detect the hardware and choose the configuration yourself
+4. Run nvidia-smi. Using the sizing table in DEPLOY.md, decide between bf16 and a 4-bit
+   quantisation, and set --tensor-parallel-size to divide the visible GPU count. Serve
+   Qwen/Qwen3.6-35B with vLLM. --enable-auto-tool-choice is mandatory: without it the agent
+   emits text, calls no tools, and the run looks hung rather than misconfigured.
+   Fall back to Ollama if there is no usable GPU.
+5. Export ACR_MODEL and ACR_API_BASE to match whatever you started, then smoke-test with a
+   single ./.venv/bin/acr chart SYN0002 before running anything long.
+
+FIRST TASK — this is the point of the exercise
+6. Run exactly this one and stop:
+     ./.venv/bin/acr run SYN0002 \
+       --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+       --max-steps 30 --reflect-every 3 --seed 1234 --out runs/b_SYN0002
+
+   It exercises the stratified proof obligation with forced validation sampling — the only
+   core mechanism never yet shown to be satisfiable. The unstratified obligation already
+   passes in 18 steps (see RESULTS.md); this one is unknown.
+
+7. Report: status and basis, gate_validated, steps_to_gate_pass, rejections, the degradation
+   block, suspected_recognition_failures, tokens and elapsed, and the per-stratum figures
+   from coverage_attested (how many drawn, how many read, any sample hits).
+
+   Read degradation FIRST. Any non-zero entry means a node silently fell back and that run's
+   conclusions about planning, reflection or finalisation do not hold — say so and stop
+   rather than continuing.
+
+THEN, only if the first run is clean
+8. The four-arm ablation: two specs (specs/STORE.400_522_523.site_histology_behavior.yaml
+   and specs/ablation/STORE.400_522_523.unstratified.yaml) crossed with two patients
+   (SYN0002, correct answer EVIDENCE_INSUFFICIENT; SYN0001, correct answer FOUND). Same
+   --seed 1234 throughout or the arms are not comparable. Concurrency is fine if VRAM allows,
+   but note in the report that it happened, since contention distorts timing even though it
+   leaves labels alone.
+
+TWO RULES THAT ARE NOT NEGOTIABLE
+- Never rm -rf anything under runs/. Use tools/archive_runs.sh, which moves rather than
+  deletes. A batch was already lost that way and two of its traces cannot be regenerated,
+  because the code path that produced them no longer exists.
+- Do not lower max_tokens from 4096. qwen3.6 spends ~1394 completion tokens thinking to emit
+  a 48-character answer; at a smaller budget the text channel returns empty and the planner
+  silently degrades to a one-line stub for every run.
 ```
