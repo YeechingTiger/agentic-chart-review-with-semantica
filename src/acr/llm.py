@@ -35,7 +35,12 @@ class LLMConfig:
     api_base: str | None = None          # e.g. http://localhost:11434 or a vLLM endpoint
     api_key: str | None = None
     temperature: float = 0.0
-    max_tokens: int = 1536
+    # Hybrid reasoning models spend most of a completion on thinking before they emit
+    # anything. Measured here: qwen3.6:35b used 1394 completion tokens to produce a
+    # 48-character JSON answer. At the old default of 1536 the thinking consumed the budget
+    # and `content` came back empty — which the planner read as "no plan" and quietly
+    # replaced with a one-line stub, in every run, undetected. Budget for the thinking.
+    max_tokens: int = 4096
     timeout: int = 600
     num_ctx: int | None = 32768          # Ollama-specific; ignored elsewhere
     extra: dict[str, Any] = field(default_factory=dict)
@@ -62,6 +67,7 @@ class LLMResponse:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     latency_s: float = 0.0
+    used_reasoning_channel: bool = False
 
     @property
     def total_tokens(self) -> int:
@@ -76,6 +82,8 @@ class LLMClient:
         self.calls = 0
         self.prompt_tokens = 0
         self.completion_tokens = 0
+        self.reasoning_fallbacks = 0   # completions that arrived only in the thinking channel
+        self.empty_completions = 0     # completions with no text AND no tool call
 
     def _kwargs(self) -> dict:
         kw: dict[str, Any] = {
@@ -121,13 +129,29 @@ class LLMClient:
         self.prompt_tokens += pt
         self.completion_tokens += ct
 
+        # Hybrid reasoning models (qwen3.x among them) can spend the whole completion budget
+        # on thinking and return `content: ""` with the reasoning in a side channel. That
+        # looks exactly like "the model had nothing to say", and a caller that falls back on
+        # empty output degrades silently — which is how this repo's planner ran on a one-line
+        # fallback plan for every run without anything going red. Recover the side channel,
+        # and when there is genuinely nothing, say so loudly rather than returning "".
+        content = msg.content or ""
+        reasoning = (getattr(msg, "reasoning_content", None)
+                     or getattr(msg, "reasoning", None) or "")
+        if not content.strip() and reasoning.strip():
+            content = reasoning
+            self.reasoning_fallbacks += 1
+        if not content.strip() and not calls:
+            self.empty_completions += 1
+
         return LLMResponse(
-            content=(msg.content or ""),
+            content=content,
             tool_calls=calls,
             raw=resp,
             prompt_tokens=pt,
             completion_tokens=ct,
             latency_s=dt,
+            used_reasoning_channel=bool(reasoning.strip() and not (msg.content or "").strip()),
         )
 
     def json_chat(self, messages: list[dict], schema_hint: str = "") -> dict:
@@ -144,6 +168,8 @@ class LLMClient:
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
             "total_tokens": self.prompt_tokens + self.completion_tokens,
+            "reasoning_fallbacks": self.reasoning_fallbacks,
+            "empty_completions": self.empty_completions,
         }
 
 

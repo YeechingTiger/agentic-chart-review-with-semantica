@@ -169,12 +169,41 @@ class ChartReviewAgent:
             date_lo=lo, date_hi=hi,
             types=", ".join(r["doc_type"] for r in summary[:24]),
         )
-        r = self.llm.chat([{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}])
-        self.tracer.llm("plan", r.content, usage={"total": r.total_tokens})
+        msgs_plan = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
+        r = self.llm.chat(msgs_plan)
+        self.tracer.llm("plan", r.content, usage={"total": r.total_tokens,
+                                                  "reasoning_channel": r.used_reasoning_channel})
         plan = extract_json(r.content).get("plan", [])
+
+        # A hybrid reasoning model can burn the whole completion budget on thinking and
+        # return empty text. Silently substituting a one-line plan makes that look like a
+        # working planner: every run in this repo did exactly that, for every replan, without
+        # anything going red. Retry once with room to answer, then fail LOUDLY.
         if not isinstance(plan, list) or not plan:
-            plan = [{"id": "1", "goal": "Identify and read the documents that could establish the answer.",
-                     "rationale": "fallback plan"}]
+            self.tracer.emit("plan_empty_retry", first_attempt_chars=len(r.content),
+                             used_reasoning_channel=r.used_reasoning_channel,
+                             completion_tokens=r.completion_tokens)
+            old = self.llm.cfg.max_tokens
+            self.llm.cfg.max_tokens = max(old * 3, 4096)
+            try:
+                r2 = self.llm.chat(msgs_plan)
+            finally:
+                self.llm.cfg.max_tokens = old
+            self.tracer.llm("plan_retry", r2.content, usage={"total": r2.total_tokens})
+            plan = extract_json(r2.content).get("plan", [])
+
+        planning_failed = not isinstance(plan, list) or not plan
+        if planning_failed:
+            plan = [{"id": "1",
+                     "goal": "Identify and read the documents that could establish the answer.",
+                     "rationale": "FALLBACK — the planner returned nothing usable"}]
+            # Loud, countable, and visible in the manifest. A degraded planner must never
+            # again be indistinguishable from a working one.
+            self.tracer.emit("plan_fallback_used", severity="error",
+                             message=("planner produced no usable plan after a retry; the run "
+                                      "is proceeding on a generic one-step goal and its "
+                                      "replanning behaviour is NOT being exercised"))
+            self._plan_fallbacks = getattr(self, "_plan_fallbacks", 0) + 1
         for st in plan:
             st.setdefault("status", "pending")
         rev = s.get("plan_revisions", 0)
@@ -375,6 +404,7 @@ class ChartReviewAgent:
                                known_doc_types=known_doc_types)
         self.tracer = Tracer.create(self.out_dir, run_id)
         self._t0 = time.time()
+        self._plan_fallbacks = 0
 
         self.tracer.run_start(patient_id=chart.patient_id, model=self.llm.cfg.model,
                               **self.spec.identity(), n_documents=len(chart))
@@ -397,6 +427,9 @@ class ChartReviewAgent:
             "steps": final.get("step", 0),
             "rejections": final.get("rejections", []),
             "usage": self.llm.usage(),
+            # If this is non-zero the planner degraded and the run's replanning behaviour
+            # was never actually exercised — read any conclusion about planning accordingly.
+            "plan_fallbacks": getattr(self, "_plan_fallbacks", 0),
             "elapsed_s": round(time.time() - self._t0, 2),
             "trace": str(self.tracer.path),
         }
