@@ -68,3 +68,28 @@ that provenance cannot be stated, the observation cannot be used.
   evidence.
 - `tools/archive_runs.sh` moves directories into `runs/_archive/<timestamp>/`.
 - README states that run output is an experimental record.
+
+---
+
+## 2026-07-26 — batch at `173f453^` (archived, not deleted)
+
+Four runs, `max_steps=20`. **4/4 labels correct, 0/4 validated** — every answer came from
+finalize on budget exhaustion and carried `route_to_human`.
+
+This batch is the reason the instrumentation exists. Without `proof_basis` /
+`negative_basis` it would have been written up as 4/4 correct, when in fact the system
+reached none of those answers. Keep it as the worked example of a label that means nothing.
+
+It also exposed three bugs, all fixed in `173f453`:
+
+- `gate_validated` was set in `graph.py` but never declared in `RunState` (which lives in
+  `state.py`), so LangGraph silently dropped it. `aprime_SYN0001` recorded three pieces of
+  evidence, submitted, was not rejected, plainly met the witness standard — and came out
+  labelled `UNGATED`.
+- Forced sampling was a deadlock, not a budget shortfall. `record_sample_verdict` was called
+  from nothing but tests, so `pending_samples()` recomputed the same fifty documents every
+  time. `b_SYN0002` submitted three times and was refused three times with an identical debt.
+- Fifty documents at one read per step cannot fit twenty steps. Fixed by batching the read,
+  not by weakening the obligation — its size is a statistical result.
+
+Archived under `runs/_archive/<timestamp>/`. Directories were moved, not removed.

@@ -316,6 +316,8 @@ class CoverageLedger:
         # check demands a different 25, and the debt never shrinks.
         self.drawn: dict[str, list[str]] = {}
         self.samples: dict[str, dict[str, bool]] = {}
+        # Reported, never gated. See resolve_sample_verdicts.
+        self.suspected_recognition_failures: list[dict] = []
 
     # -- written by the toolbox ---------------------------------------------------
     def note_search(self, term: str, hit_note_ids: Iterable[str] = ()) -> None:
@@ -361,20 +363,43 @@ class CoverageLedger:
                 out[s.name] = outstanding
         return out
 
-    def resolve_sample_verdicts(self, cited: set[str]) -> int:
+    def resolve_sample_verdicts(self, cited: set[str], keyword_hits: set[str] | None = None) -> int:
         """Turn "the agent read a drawn document" into a recorded verdict.
 
-        The verdict is not a separate judgement to elicit: a drawn document that was read and
-        yielded evidence is relevant; one that was read and yielded none is not. Without this
-        bridge nothing ever populates `samples`, `pending_samples` recomputes the same debt
-        forever, and the gate cannot be satisfied by any amount of work.
+        A drawn document that was read and yielded evidence is relevant; one read and unused
+        is not. Without this bridge nothing populates `samples`, `pending_samples` recomputes
+        the same debt forever, and no amount of work can satisfy the gate.
+
+        WHAT THIS VALIDATES, AND WHAT IT DOES NOT
+        -----------------------------------------
+        Forced sampling tests the **stratum definition** — whether "documents of this type
+        cannot establish the answer" is true. It catches a retrieval failure: a class of
+        document the agent would never have looked at.
+
+        It does NOT test the agent's reading comprehension. Because relevance is inferred
+        from whether the agent cited the document, an agent that reads a relevant document
+        and fails to recognise it registers the same as one that correctly judged it
+        irrelevant — and that agent is exactly the one worth catching. Sampling would then be
+        confirming the judgement it is supposed to be auditing.
+
+        `keyword_hits` is a partial, independent counterweight: note_ids that matched the
+        stratum's keywords without an LLM in the loop. A drawn document that matched but was
+        not cited is counted as a SUSPECTED RECOGNITION FAILURE. It is reported and never
+        gated, since keyword matching has its own false positives — but it means a run cannot
+        report "0 hits" while quietly having walked past something.
+
+        Measuring recognition properly belongs elsewhere: per-operation extraction metrics
+        against known answers, not coverage accounting.
         """
         n = 0
+        kw = keyword_hits or set()
         read = set(self.read_notes) | {k.split("#")[0] for k in self.read_sections}
         for stratum, ids in self.drawn.items():
             for nid in ids:
                 if nid in read and nid not in self.samples.get(stratum, {}):
                     self.record_sample_verdict(stratum, nid, relevant=nid in cited)
+                    if nid in kw and nid not in cited:
+                        self.suspected_recognition_failures.append({"stratum": stratum, "note_id": nid})
                     n += 1
         return n
 
@@ -421,6 +446,10 @@ class CoverageLedger:
             "searched_terms": self.searched_terms,
             "n_read": len(self.read_notes),
             "strata": [r.to_dict() for r in self.stratum_results()],
+            "suspected_recognition_failures": self.suspected_recognition_failures,
+            "sampling_validates": ("stratum definitions (retrieval), NOT the agent's reading "
+                                   "comprehension — a 0-hit sample does not mean nothing was "
+                                   "missed, only that this document class was not wrongly excluded"),
         }
 
     def render(self) -> str:

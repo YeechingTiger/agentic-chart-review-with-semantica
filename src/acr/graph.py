@@ -286,6 +286,14 @@ class ChartReviewAgent:
                     answer = self.toolbox.submitted or {}
                     done = True
                     gate_validated = True          # the ONLY place this becomes true
+                    if self._steps_to_gate_pass is None:
+                        # Answers existence and cost in one run: whether the obligation is
+                        # reachable at all, and what it costs per patient per variable. If
+                        # this lands at 23, a 20-step budget was short by 3 and no second
+                        # run is needed to learn that.
+                        self._steps_to_gate_pass = s.get("step", 0) + 1
+                        self.tracer.emit("gate_passed", step=self._steps_to_gate_pass,
+                                         rejections_before=len(rejections))
                     out = {"accepted": True}
                 else:
                     rejections.append(verdict)
@@ -497,6 +505,34 @@ class ChartReviewAgent:
         g.verdict = "PASS" if not g.missing else "FAIL"
         return g
 
+    def _keyword_hits_among_drawn(self) -> set[str]:
+        """Which drawn documents match the spec's keywords, judged without an LLM.
+
+        A counterweight to inferring relevance from what the agent cited: a drawn document
+        that matches the keywords but was never cited is a suspected recognition failure.
+        Reported, never gated — keyword matching has its own false positives — but it stops a
+        run reporting "0 hits" while having walked past something.
+        """
+        kws: list[str] = list(getattr(self.spec.proof_obligation, "required_keywords", []) or [])
+        fn = getattr(self.spec.proof_obligation, "for_negative", {}) or {}
+        for st in (fn.get("strata") or []):
+            kws.extend(st.get("required_keywords") or [])
+        kws = [k for k in {k.lower() for k in kws} if len(k) > 3]
+        if not kws:
+            return set()
+        hits: set[str] = set()
+        for ids in self.coverage.drawn.values():
+            for nid in ids:
+                if nid not in self.chart._docs:
+                    continue
+                try:
+                    txt = self.chart.read(nid, 0, 20000)["text"].lower()
+                except Exception:
+                    continue
+                if any(k in txt for k in kws):
+                    hits.add(nid)
+        return hits
+
     def _gate(self, submitted: dict) -> dict:
         status = submitted.get("status", "")
         if not self.evidence.items and status == "FOUND":
@@ -508,7 +544,8 @@ class ChartReviewAgent:
             # judgement with its own judgement.
             # Credit whatever the agent has already read against the outstanding draw before
             # deciding it still owes anything.
-            self.coverage.resolve_sample_verdicts(self.evidence.cited_notes())
+            kw_hits = self._keyword_hits_among_drawn()
+            self.coverage.resolve_sample_verdicts(self.evidence.cited_notes(), kw_hits)
             pending = self.coverage.pending_samples()
             if pending:
                 lines = []
@@ -551,6 +588,7 @@ class ChartReviewAgent:
         self._finalize_defaults = 0
         self._act_no_tool_call = 0
         self._termination = None
+        self._steps_to_gate_pass = None
 
         self.tracer.run_start(patient_id=chart.patient_id, model=self.llm.cfg.model,
                               **self.spec.identity(), n_documents=len(chart))
@@ -573,6 +611,9 @@ class ChartReviewAgent:
             "steps": final.get("step", 0),
             "negative_basis": (final.get("answer") or {}).get("negative_basis"),
             "gate_validated": bool(final.get("gate_validated")),
+            # null when the gate never passed; the manifest then says which condition blocked.
+            "steps_to_gate_pass": self._steps_to_gate_pass,
+            "suspected_recognition_failures": len(self.coverage.suspected_recognition_failures),
             "rejections": final.get("rejections", []),
             "usage": self.llm.usage(),
             # If this is non-zero the planner degraded and the run's replanning behaviour
