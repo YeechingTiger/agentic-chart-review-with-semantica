@@ -73,16 +73,22 @@ def run(
     reflect_every: int = typer.Option(2, "--reflect-every"),
     out: str = typer.Option("runs", "--out"),
     temperature: float = typer.Option(0.0, "--temperature"),
+    seed: int = typer.Option(None, "--seed",
+                             help="validation-sampling seed; fix it to make two runs comparable"),
 ):
     """Run the agent for one patient and one spec."""
     sp = load_spec(spec)
-    ch = Corpus(Path(corpus)).chart(patient)
+    c = Corpus(Path(corpus))
+    ch = c.chart(patient)
+    # Corpus-wide type vocabulary: without it, "this patient has none" and "no such type"
+    # come back looking identical, and only the first of those is a finding.
+    vocab = sorted({t for pid in c.patient_ids() for t in c.chart(pid).doc_types})
     agent = ChartReviewAgent(sp, _llm(model, api_base, temperature),
                              budget=Budget(max_steps=max_steps),
-                             reflect_every=reflect_every, out_dir=out)
+                             reflect_every=reflect_every, out_dir=out, sample_seed=seed)
     con.print(f"[bold]{sp.spec_id}[/] v{sp.spec_version} (hash {sp.spec_hash}) "
-              f"→ patient {patient} ({len(ch)} docs)")
-    res = agent.run(ch)
+              f"→ patient {patient} ({len(ch)} docs, {len(vocab)} types in corpus vocabulary)")
+    res = agent.run(ch, known_doc_types=vocab)
     _show(res)
 
 

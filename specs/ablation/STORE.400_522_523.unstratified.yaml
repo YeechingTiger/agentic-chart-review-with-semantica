@@ -1,0 +1,116 @@
+spec_id: STORE.400_522_523.site_histology_behavior.UNSTRATIFIED
+spec_version: 0.1.0
+source_authority:
+  document: CoC STORE 2025 (updated 2025-04-24)
+  items:
+  - Primary Site [400]
+  - Histology [522]
+  - Behavior Code [523]
+  applicability: cases diagnosed 2025-01-01 onward; Solid Tumor Rules apply to dx 2007-01-01 onward
+data_source: notes
+question: 'For the tumour being reported, what are the ICD-O-3 primary site (topography), the 4-digit
+  histology (morphology), and the 1-digit behaviour code?
+
+  '
+fields:
+- name: primary_site
+  type: string
+  format: C\d{3}
+  description: ICD-O-3 topography of the site of ORIGIN, no decimal point
+- name: histology
+  type: string
+  format: \d{4}
+  description: ICD-O-3 morphology, 4 digits, WITHOUT the behaviour digit
+- name: behavior
+  type: string
+  allowable_values:
+  - '0'
+  - '1'
+  - '2'
+  - '3'
+  description: 0 benign, 1 borderline, 2 in situ, 3 invasive
+decision_rule:
+- Record the ICD-O-3 topography code for the site of ORIGIN, not the site of a biopsy or a metastasis.
+- Code the FINAL pathologic diagnosis for solid tumours.
+- Code behaviour 3 if any malignant invasion is present, no matter how limited.
+- If the specimen is from a metastatic site, code the histology of the metastatic site and behaviour 3.
+- Behaviour 2 requires that the process be confined to the epithelium with no stromal invasion.
+- 8000 (cancer, NOS) and 8010 (carcinoma, NOS) are NOT interchangeable; if the physician says carcinoma,
+  code 8010.
+- A single tumour overlapping two or more subsites with unknown origin takes subcategory 8; multiple tumours
+  in different subsites of one organ take subcategory 9.
+evidence_rules:
+  counts_as_evidence:
+  - A pathology report's FINAL DIAGNOSIS or MICROSCOPIC DESCRIPTION.
+  - A cytology report may establish behaviour only when corroborated by tissue or an explicit clinical
+    diagnosis.
+  does_not_count:
+  - Imaging reports. Radiology can localise a mass; it cannot establish histology or behaviour.
+  - A problem-list entry or a restatement in a progress note, when no pathology exists in the chart.
+  - An assertion that a biopsy was done elsewhere, when that report is not in the record.
+when_not_to_use:
+- Lymphoma, leukaemia and other haematopoietic neoplasms — those follow the Hematopoietic and Lymphoid
+  Neoplasm rules.
+- Cases diagnosed before 2007-01-01 (Solid Tumor Rules do not apply).
+conflict_rules:
+- if: the final pathologic diagnosis is less specific than the microscopic description
+  then: 'take the more specific one (STORE example: microscopic ''adenocarcinoma'' over final ''carcinoma
+    NOS'' -> 8140)'
+- if: two pathology reports disagree
+  then: prefer the definitive resection over the initial biopsy; cite both
+- if: a consult note restates a finding that the primary report contradicts
+  then: prefer the primary report and record the contradiction as evidence with stance=contradicts
+proof_obligation:
+  for_positive: One pathology report establishing the histology, plus a statement of the site of origin.
+  for_negative:
+    mode: enumerated
+    required_coverage:
+    - List the patient's documents so you know what pathology exists
+    - Search for tissue-diagnosis terms across the whole chart
+    - Review every document whose type indicates pathology
+    required_keywords:
+    - pathology
+    - biopsy
+    - final diagnosis
+    - specimen
+    - carcinoma
+    required_doc_types_read:
+    - Pathology
+    statement: 'If no pathology is present in the record you must NOT infer histology from imaging or
+      from a clinical assertion. Answer EVIDENCE_INSUFFICIENT for histology and behaviour, and say plainly
+      that the diagnosis is radiographic/clinical without tissue confirmation. You may still report primary_site
+      if the site of origin is documented.
+
+      '
+abstention:
+  EVIDENCE_INSUFFICIENT: No pathology in the chart, or pathology present but the histology is not stated.
+  SPEC_INSUFFICIENT: A haematopoietic neoplasm, or a case this spec explicitly excludes.
+special_codes_not_mar:
+- 'Missing behaviour is not missing-at-random: it clusters on outside-hospital biopsies and declined biopsies,
+  which differ prognostically.'
+boundary_cases:
+- case: Intraductal carcinoma with focal areas of invasion
+  behavior: '3'
+  why: Any invasion, however limited, forces behaviour 3.
+- case: Urothelial carcinoma in situ, no stromal invasion identified
+  behavior: '2'
+- case: Atypical meningioma invading skull bone
+  behavior: '1'
+  why: Meninges can invade bone without being malignant; do not upgrade unless explicitly stated.
+- case: CT shows a sigmoid mass; GI note says 'known colon cancer'; biopsy was done at an outside hospital
+    and is not in the chart
+  answer: EVIDENCE_INSUFFICIENT for histology and behaviour; primary_site may still be coded
+search_hints:
+- pathology
+- biopsy
+- final diagnosis
+- specimen
+- carcinoma
+- adenocarcinoma
+- resection
+- cytology
+_ablation_note: A-prime arm. Identical to the stratified spec in every respect EXCEPT that it declares
+  no strata, so the runtime builds an unstratified ledger and draws no forced validation samples. Same
+  keyword obligation, same decision rules, same boundary cases. Paired with the stratified spec on the
+  same patient and the same seed, the difference between the two runs is attributable to stratification
+  alone.
