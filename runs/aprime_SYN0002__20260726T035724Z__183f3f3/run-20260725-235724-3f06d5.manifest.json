@@ -1,0 +1,121 @@
+{
+  "run_id": "run-20260725-235724-3f06d5",
+  "patient_id": "SYN0002",
+  "spec_id": "STORE.400_522_523.site_histology_behavior.UNSTRATIFIED",
+  "spec_version": "0.1.0",
+  "spec_hash": "4751273d44fcf0dc",
+  "model": "ollama_chat/qwen3.6:35b",
+  "answer": {
+    "status": "EVIDENCE_INSUFFICIENT",
+    "value": {
+      "primary_site": "C186"
+    },
+    "reasoning": "All required searches completed: 'pathology' (1 hit), 'biopsy' (1 hit), 'final diagnosis' (0 hits), 'specimen' (0 hits), 'carcinoma' (1 hit). No Pathology document type exists in the chart (document_type_summary confirms 17 types, none is Pathology). The GI-Gen-MD-OP-Progress-Note_2022-09-06 explicitly states: 'biopsy was performed at the outside facility; the pathology report is NOT available in our system.' All 14 Endoscopy documents only note 'Mucosal lesion noted in the sigmoid colon. Biopsies obtained.' without histology results. All 7 Procedure-Note documents are generic with no histology. Imaging (Abd-Pelvis-CT-W-Contr_2022-08-31) shows a mass in the sigmoid colon but per specification rules, radiology cannot establish histology or behavior. Therefore, histology and behavior are EVIDENCE_INSUFFICIENT. However, the site of origin is documented as sigmoid colon across multiple Endoscopy reports and the CT, so primary_site is coded as C186 (sigmoid colon, ICD-O-3).",
+    "negative_basis": "GATE_VALIDATED",
+    "proof_obligation": {
+      "verdict": "PASS",
+      "checks": {
+        "exhaustive_strata_complete": true,
+        "exclusion_validated": true,
+        "keyword_list_validated": true
+      },
+      "missing": []
+    },
+    "coverage_attested": {
+      "mode": "unstratified",
+      "sample_seed": 1234,
+      "universe": {
+        "n_documents": 293,
+        "n_types": 17
+      },
+      "listed_documents": true,
+      "searched_terms": [
+        "pathology",
+        "biopsy",
+        "final diagnosis",
+        "specimen",
+        "sigmoid",
+        "carcinoma"
+      ],
+      "n_read": 22,
+      "strata": [],
+      "suspected_recognition_failures": [],
+      "sampling_validates": "stratum definitions (retrieval), NOT the agent's reading comprehension — a 0-hit sample does not mean nothing was missed, only that this document class was not wrongly excluded"
+    },
+    "evidence": [
+      {
+        "note_id": "GI-Gen-MD-OP-Progress-Note_2022-09-06",
+        "doc_type": "GI-Gen-MD-OP-Progress-Note",
+        "date": "2022-09-06",
+        "start": 341,
+        "end": 450,
+        "quote": "biopsy was performed at the outside facility;\n     the pathology report is NOT available in our system. Reque",
+        "supports": "no pathology report in chart; biopsy done outside hospital and not available",
+        "stance": "supports"
+      }
+    ]
+  },
+  "plan": [
+    {
+      "id": "1",
+      "goal": "List all patient documents to verify the complete absence of a 'Pathology' document type.",
+      "rationale": "The proof obligation requires listing documents first; confirming no pathology reports exist dictates subsequent steps.",
+      "status": "pending"
+    },
+    {
+      "id": "2",
+      "goal": "Search the entire chart for keywords 'biopsy', 'pathology', 'final diagnosis', and 'specimen'.",
+      "rationale": "Required by the proof obligation to ensure no pathology evidence is hidden in progress notes or procedure reports.",
+      "status": "pending"
+    },
+    {
+      "id": "3",
+      "goal": "Review Endoscopy and Procedure-Note documents for embedded biopsy results or histologic descriptions.",
+      "rationale": "Biopsy results are sometimes documented within procedure reports when formal pathology reports are missing from the chart shape.",
+      "status": "pending"
+    },
+    {
+      "id": "4",
+      "goal": "Extract documentation of the primary site of origin from imaging (CT/PET) or clinical notes.",
+      "rationale": "The specification allows coding primary_site even if histology and behavior cannot be determined due to lack of tissue confirmation.",
+      "status": "pending"
+    },
+    {
+      "id": "5",
+      "goal": "Apply EVIDENCE_INSUFFICIENT for histology and behavior, citing the absence of pathology per proof obligation.",
+      "rationale": "Prevents inferring histology from imaging or clinical assertions when tissue diagnosis is not in the record.",
+      "status": "pending"
+    }
+  ],
+  "plan_revisions": 4,
+  "steps": 18,
+  "negative_basis": "GATE_VALIDATED",
+  "gate_validated": true,
+  "steps_to_gate_pass": 18,
+  "suspected_recognition_failures": 0,
+  "rejections": [
+    {
+      "accepted": false,
+      "why": "the proof obligation for asserting absence is not yet met",
+      "missing": [
+        "required search not performed: 'carcinoma'"
+      ]
+    }
+  ],
+  "usage": {
+    "llm_calls": 39,
+    "prompt_tokens": 255739,
+    "completion_tokens": 57661,
+    "total_tokens": 313400,
+    "reasoning_fallbacks": 14,
+    "empty_completions": 0
+  },
+  "degradation": {
+    "plan_fallbacks": 0,
+    "reflect_fallbacks": 0,
+    "finalize_defaults": 0,
+    "act_no_tool_call": 0
+  },
+  "elapsed_s": 1218.16,
+  "trace": "runs/aprime_SYN0002__20260726T035724Z__183f3f3/run-20260725-235724-3f06d5.jsonl"
+}

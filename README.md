@@ -43,6 +43,8 @@ your specification or go get more data.
 
 ## Install
 
+Running on a server (vLLM, GPU, the ablation): see **[DEPLOY.md](DEPLOY.md)**.
+
 ```bash
 uv venv --python 3.12
 uv pip install -e ".[dev]"
