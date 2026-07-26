@@ -241,6 +241,7 @@ class ChartReviewAgent:
                                     for c in r.tool_calls]})
         rejections = list(s.get("rejections", []))
         done = False
+        gate_validated = bool(s.get("gate_validated"))
         answer = s.get("answer") or {}
 
         for c in r.tool_calls:
@@ -252,6 +253,7 @@ class ChartReviewAgent:
                 if verdict["accepted"]:
                     answer = self.toolbox.submitted or {}
                     done = True
+                    gate_validated = True          # the ONLY place this becomes true
                     out = {"accepted": True}
                 else:
                     rejections.append(verdict)
@@ -262,6 +264,7 @@ class ChartReviewAgent:
                          "content": json.dumps(out, ensure_ascii=False, default=str)[:6000]})
 
         return {"messages": msgs, "step": s.get("step", 0) + 1, "done": done,
+                "gate_validated": gate_validated,
                 "answer": answer, "rejections": rejections,
                 "evidence": self.evidence.to_list(), "coverage": self.coverage.to_dict()}
 
@@ -345,23 +348,35 @@ class ChartReviewAgent:
             self.tracer.llm("finalize", r.content, usage={"total": r.total_tokens})
             ans = extract_json(r.content)
 
-        gate = self._check_gate()
         if self.spec.data_source == "outside_notes":
             ans["status"] = "SPEC_INSUFFICIENT"
             ans["remedy_class"] = "WRONG_DATA_SOURCE"
         if not ans.get("status"):
-            # For a patient whose ground truth IS EVIDENCE_INSUFFICIENT this default scores
-            # as correct while meaning nothing. Count it so a matching label can never be
-            # mistaken for a working agent.
             self._finalize_defaults += 1
             self.tracer.emit("finalize_status_defaulted", severity="error",
                              message=("the model produced no status; defaulting to "
                                       "EVIDENCE_INSUFFICIENT. This label is NOT evidence "
                                       "that the agent reached that conclusion"))
             ans["status"] = "EVIDENCE_INSUFFICIENT"
-        ans["proof_obligation"] = gate.to_dict()
+
+        # A negative has three possible bases and they demand different downstream handling.
+        # Emitting the same EVIDENCE_INSUFFICIENT for all three is how "the agent gave up"
+        # gets filed as "the chart really has nothing". Only a gate-validated negative may
+        # carry a coverage claim; the other two are routed to a human.
+        if s.get("gate_validated"):
+            ans["negative_basis"] = "GATE_VALIDATED"
+            ans["proof_obligation"] = self._check_gate().to_dict()
+            ans["coverage_attested"] = self.coverage.to_dict()
+        else:
+            ans["negative_basis"] = getattr(self, "_termination", None) or "BUDGET_EXHAUSTED"
+            ans["route_to_human"] = True
+            # Deliberately NO coverage_attested and NO proof_obligation: this answer never
+            # passed the gate, and attaching the ledger would let it read as though it had.
+            ans["coverage_note"] = ("no coverage claim is made — this answer did not pass the "
+                                    "proof obligation")
+            self.tracer.emit("unvalidated_negative", severity="warning",
+                             negative_basis=ans["negative_basis"])
         ans["evidence"] = self.evidence.to_list()
-        ans["coverage_attested"] = self.coverage.to_dict()
         return {"answer": ans, "done": True}
 
     # ------------------------------------------------------------------ edges
@@ -383,8 +398,24 @@ class ChartReviewAgent:
                              message="no verdict present when routing; defaulting to CONTINUE")
             v = "CONTINUE"
         if self._over_budget(s):
+            self._termination = "BUDGET_EXHAUSTED"
             return "finalize"
-        if v in ("SUFFICIENT", "STUCK"):
+        if v == "SUFFICIENT":
+            # NOT to finalize. There must be exactly one route by which an answer is
+            # produced, and it runs through submit_answer, because that is where the gate
+            # lives. Routing SUFFICIENT to finalize gave the graph a second inbound edge to
+            # the answer and the proof obligation was simply skipped — the run still printed
+            # a proof_obligation field, computed but unable to refuse, which is a comment
+            # wearing the costume of a check. reflect keeps its judgement; it expresses it as
+            # "go submit", not as "we are done".
+            self.tracer.emit("reflect_sufficient_routed_to_submit",
+                             message="supervisor judged the evidence sufficient; routing to "
+                                     "submit_answer so the proof obligation still applies")
+            return "act"
+        if v == "STUCK":
+            # A give-up is not an answer and must NOT be asked to prove coverage: it asserts
+            # no coverage. It goes straight out, labelled as unvalidated.
+            self._termination = "AGENT_GAVE_UP"
             return "finalize"
         if v == "REPLAN" and s.get("plan_revisions", 0) < self.budget.max_plan_revisions:
             return "plan"
@@ -463,6 +494,7 @@ class ChartReviewAgent:
         self._reflect_fallbacks = 0
         self._finalize_defaults = 0
         self._act_no_tool_call = 0
+        self._termination = None
 
         self.tracer.run_start(patient_id=chart.patient_id, model=self.llm.cfg.model,
                               **self.spec.identity(), n_documents=len(chart))
@@ -483,6 +515,8 @@ class ChartReviewAgent:
             "plan": final.get("plan", []),
             "plan_revisions": final.get("plan_revisions", 0),
             "steps": final.get("step", 0),
+            "negative_basis": (final.get("answer") or {}).get("negative_basis"),
+            "gate_validated": bool(final.get("gate_validated")),
             "rejections": final.get("rejections", []),
             "usage": self.llm.usage(),
             # If this is non-zero the planner degraded and the run's replanning behaviour
