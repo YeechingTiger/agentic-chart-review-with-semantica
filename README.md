@@ -167,6 +167,19 @@ Ground truth for each lives in `_ground_truth.json` next to the notes.
 
 ---
 
+## Run output is data, not build product
+
+`runs/` holds experimental records. A trace that documented a bug in code that has since
+been fixed **cannot be regenerated** — the path that produced it no longer exists. One batch
+was already lost this way; see `runs/_archive/NOTES.md`.
+
+- Directories are `runs/<label>__<UTC>__<code-sha>/`, created with `exist_ok=False`. The same
+  configuration under different code is not the same experiment, so the sha is part of the
+  identity and names are never reused.
+- `manifest.json` is committed to git (~2KB, evidence). Traces are not (large).
+- To clear runs, use `tools/archive_runs.sh <dir>...`, which moves them under
+  `runs/_archive/<timestamp>/`. **Never `rm -rf runs/...`.**
+
 ## Traces
 
 Every run appends JSONL: plan revisions, every tool call with full input and output, every

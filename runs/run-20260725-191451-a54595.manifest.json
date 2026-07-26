@@ -1,0 +1,74 @@
+{
+  "run_id": "run-20260725-191451-a54595",
+  "patient_id": "SYN0002",
+  "spec_id": "STORE.400_522_523.site_histology_behavior",
+  "spec_version": "0.1.0",
+  "spec_hash": "fdeb5cdbfacdb1d9",
+  "model": "ollama_chat/qwen3.6:35b",
+  "answer": {
+    "__unparsed__": "",
+    "status": "EVIDENCE_INSUFFICIENT",
+    "proof_obligation": {
+      "satisfied": false,
+      "missing": [
+        "required document type not reviewed: 'Pathology'"
+      ]
+    },
+    "evidence": [
+      {
+        "note_id": "GI-Gen-MD-OP-Progress-Note_2022-09-06",
+        "doc_type": "GI-Gen-MD-OP-Progress-Note",
+        "date": "2022-09-06",
+        "start": 329,
+        "end": 458,
+        "quote": "carcinoma — biopsy was performed at the outside facility;\n     the pathology report is NOT available in our system. Requested by ",
+        "supports": "No pathology report available in chart; diagnosis is clinical/radiographic from outside facility",
+        "stance": "supports"
+      }
+    ],
+    "coverage_attested": {
+      "listed_documents": true,
+      "total_documents": 18,
+      "type_summary_seen": true,
+      "searched_terms": [
+        "pathology",
+        "biopsy",
+        "carcinoma"
+      ],
+      "read_notes": [
+        "GI-Gen-MD-OP-Progress-Note_2022-09-06"
+      ],
+      "read_sections": [],
+      "doc_types_touched": [
+        "GI-Gen-MD-OP-Progress-Note"
+      ]
+    }
+  },
+  "plan": [
+    {
+      "id": "1",
+      "goal": "Identify and read the documents that could establish the answer.",
+      "rationale": "fallback plan",
+      "status": "pending"
+    }
+  ],
+  "plan_revisions": 1,
+  "steps": 12,
+  "rejections": [
+    {
+      "accepted": false,
+      "why": "the proof obligation for asserting absence is not yet met",
+      "missing": [
+        "required document type not reviewed: 'Pathology'"
+      ]
+    }
+  ],
+  "usage": {
+    "llm_calls": 25,
+    "prompt_tokens": 73086,
+    "completion_tokens": 28626,
+    "total_tokens": 101712
+  },
+  "elapsed_s": 630.98,
+  "trace": "runs/run-20260725-191451-a54595.jsonl"
+}

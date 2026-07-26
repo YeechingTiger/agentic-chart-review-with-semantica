@@ -1,0 +1,65 @@
+{
+  "run_id": "run-20260725-210646-cf3a19",
+  "patient_id": "SYN0002",
+  "spec_id": "STORE.400_522_523.site_histology_behavior",
+  "spec_version": "0.1.0",
+  "spec_hash": "195f18470122a3ca",
+  "model": "ollama_chat/qwen3.6:35b",
+  "answer": {
+    "__unparsed__": "",
+    "status": "EVIDENCE_INSUFFICIENT",
+    "proof_obligation": {
+      "satisfied": true,
+      "missing": []
+    },
+    "evidence": [
+      {
+        "note_id": "GI-Gen-MD-OP-Progress-Note_2022-09-06",
+        "doc_type": "GI-Gen-MD-OP-Progress-Note",
+        "date": "2022-09-06",
+        "start": 315,
+        "end": 405,
+        "quote": "sigmoid colon carcinoma — biopsy was performed at the outside facility;\n     the pathology",
+        "supports": "absence of pathology report in chart",
+        "stance": "supports"
+      }
+    ],
+    "coverage_attested": {
+      "listed_documents": false,
+      "total_documents": 0,
+      "type_summary_seen": true,
+      "searched_terms": [
+        "final diagnosis",
+        "carcinoma",
+        "pathology",
+        "histology"
+      ],
+      "read_notes": [
+        "GI-Gen-MD-OP-Progress-Note_2022-09-06"
+      ],
+      "read_sections": [],
+      "doc_types_touched": [
+        "GI-Gen-MD-OP-Progress-Note"
+      ]
+    }
+  },
+  "plan": [
+    {
+      "id": "1",
+      "goal": "Identify and read the documents that could establish the answer.",
+      "rationale": "fallback plan",
+      "status": "pending"
+    }
+  ],
+  "plan_revisions": 5,
+  "steps": 20,
+  "rejections": [],
+  "usage": {
+    "llm_calls": 45,
+    "prompt_tokens": 163965,
+    "completion_tokens": 53485,
+    "total_tokens": 217450
+  },
+  "elapsed_s": 1203.92,
+  "trace": "runs/run-20260725-210646-cf3a19.jsonl"
+}

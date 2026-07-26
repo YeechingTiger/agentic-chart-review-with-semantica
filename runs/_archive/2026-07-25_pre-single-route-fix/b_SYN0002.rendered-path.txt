@@ -1,0 +1,34 @@
+SALVAGED — RENDERED VIEW ONLY, NOT THE RAW TRACE.
+The raw JSONL and manifest for this run were destroyed by `rm -rf` before archiving.
+Recovered from a session transcript. It is a printed summary: reflect reasons are
+truncated to ~90 chars, tool arguments and results are elided, per-call token counts
+are absent, and the plan text is cut at 72 chars. Secondary evidence only.
+
+Why it cannot be regenerated: this run took the reflect-SUFFICIENT -> finalize bypass,
+and that edge was removed in commit 306e88a. The same configuration now routes through
+submit_answer instead, so no future run can reproduce this path.
+==============================================================================
+
+=== b_SYN0002 full path ===
+    38s PLAN rev0 (5 steps)
+         - Search for all Pathology and Biopsy reports.
+         - Review Endoscopy and Procedure-Note documents for embedded biopsy result
+         - Identify the primary site of origin from the definitive diagnosis or cli
+         - Extract ICD-O-3 topography, morphology, and behavior codes while applyin
+         - Conclude EVIDENCE_INSUFFICIENT for histology and behavior if no tissue c
+    42s TOOL document_type_summary({}) -> ok
+    64s REFLECT CONTINUE :: No evidence has been gathered yet; executing the planned search for path
+    70s TOOL list_documents({"doc_type_contains": "Pathology", "limit": 60}) -> 0
+    79s REFLECT CONTINUE :: No evidence has been gathered yet; the current plan correctly prioritize
+    85s TOOL list_documents({"doc_type_contains": "Biopsy", "limit": 60}) -> UNKNOWN_DOC_TYPE
+   103s REFLECT CONTINUE :: No evidence has been gathered yet; the current plan correctly prioritize
+   109s TOOL list_documents({"doc_type_contains": "Surgical-Pathology", "limit) -> 0
+   148s REFLECT CONTINUE :: The current plan correctly prioritizes searching for pathology and biops
+   159s TOOL search_notes({"query": "pathology", "max_hits": 25}) -> 1
+   195s REFLECT CONTINUE :: The search for pathology reports has been executed, but zero documents h
+   203s TOOL search_notes({"query": "biopsy", "max_hits": 25}) -> 1
+   252s REFLECT CONTINUE :: Searches have been executed but zero documents have been reviewed. I mus
+   261s TOOL read_document({"note_id": "GI-Gen-MD-OP-Progress-Note_2022-09-06) -> ok
+   312s REFLECT SUFFICIENT :: Coverage confirms zero documents capable of establishing histology or be
+   341s FINALIZE-LLM chars=536
+   341s RUN_END status=EVIDENCE_INSUFFICIENT steps=7

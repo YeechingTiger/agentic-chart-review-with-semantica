@@ -9,9 +9,12 @@ venv/
 .coverage
 htmlcov/
 
-# Runs & traces (regenerate; never commit PHI-adjacent output)
-runs/
+# Run output is an EXPERIMENTAL RECORD, not a build product. Deleting it destroys data.
+# Traces are large, so they stay out of git; manifests are ~2KB of evidence and go in.
+runs/**/*.jsonl
 *.jsonl.gz
+!runs/**/*.manifest.json
+!runs/_archive/**
 
 # Real corpora must never be committed. Synthetic dev corpus IS committed
 # (corpus/patients/) because it is fabricated and PHI-free.

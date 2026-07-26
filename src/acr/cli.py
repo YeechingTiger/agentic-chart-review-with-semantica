@@ -9,6 +9,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+import subprocess
+from datetime import datetime, timezone
+
 from .corpus import Corpus
 from .graph import ChartReviewAgent
 from .llm import LLMClient, LLMConfig
@@ -22,6 +25,32 @@ con = Console()
 CORPUS = typer.Option("corpus/patients", "--corpus", help="root directory of patient directories")
 MODEL = typer.Option(None, "--model", "-m", help="LiteLLM model string, e.g. ollama_chat/qwen3.6:35b")
 API_BASE = typer.Option(None, "--api-base", help="override provider base URL (vLLM, proxy, …)")
+
+
+def _code_sha() -> str:
+    """Short git sha, or 'dirty'/'nogit'. A run is only reproducible against the code that
+    produced it, so the code identity belongs in the run's name."""
+    try:
+        sha = subprocess.run(["git", "rev-parse", "--short=7", "HEAD"],
+                             capture_output=True, text=True, timeout=5).stdout.strip()
+        dirty = subprocess.run(["git", "status", "--porcelain"],
+                               capture_output=True, text=True, timeout=5).stdout.strip()
+        return (sha or "nogit") + ("-dirty" if dirty else "")
+    except Exception:
+        return "nogit"
+
+
+def _unique_run_dir(base: str) -> Path:
+    """runs/<label>__<utc>__<sha>/ — never reused.
+
+    Reusing a directory name across code versions silently replaces one experiment's record
+    with another's, and nothing records that a substitution happened. The same configuration
+    under different code is not the same experiment, so the sha is part of the identity.
+    """
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    d = Path(f"{base}__{stamp}__{_code_sha()}")
+    d.mkdir(parents=True, exist_ok=False)
+    return d
 
 
 def _llm(model, api_base, temperature=0.0) -> LLMClient:
@@ -85,7 +114,8 @@ def run(
     vocab = sorted({t for pid in c.patient_ids() for t in c.chart(pid).doc_types})
     agent = ChartReviewAgent(sp, _llm(model, api_base, temperature),
                              budget=Budget(max_steps=max_steps),
-                             reflect_every=reflect_every, out_dir=out, sample_seed=seed)
+                             reflect_every=reflect_every, out_dir=_unique_run_dir(out),
+                             sample_seed=seed)
     con.print(f"[bold]{sp.spec_id}[/] v{sp.spec_version} (hash {sp.spec_hash}) "
               f"→ patient {patient} ({len(ch)} docs, {len(vocab)} types in corpus vocabulary)")
     res = agent.run(ch, known_doc_types=vocab)
