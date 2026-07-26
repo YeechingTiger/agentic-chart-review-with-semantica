@@ -27,7 +27,9 @@ from langgraph.graph import END, START, StateGraph
 from .corpus import PatientChart
 from .llm import LLMClient, extract_json
 from .spec import ExtractionSpec
-from .state import (Budget, CoverageLedger, EvidenceLedger, RunState, check_proof_obligation)
+from .coverage import (CoverageLedger, ForcedSampler, GateResult, evaluate_gate,
+                       strata_from_spec)
+from .state import Budget, EvidenceLedger, RunState
 from .tools import Toolbox
 from .trace import Tracer
 
@@ -127,12 +129,16 @@ class ChartReviewAgent:
         budget: Budget | None = None,
         reflect_every: int = 3,
         out_dir: str | Path = "runs",
+        sample_seed: int | None = None,
     ):
         self.spec = spec
         self.llm = llm
         self.budget = budget or Budget()
         self.reflect_every = reflect_every
         self.out_dir = Path(out_dir)
+        # Recorded in the trace so an audit can confirm which documents were drawn, and so
+        # a run replays deterministically. Two ablation arms must share it to be comparable.
+        self.sample_seed = sample_seed
         self._graph = self._build()
 
     # ------------------------------------------------------------------ graph
@@ -257,9 +263,9 @@ class ChartReviewAgent:
         if s.get("answer") and s.get("done"):
             ans = s["answer"]
         else:
-            gate = check_proof_obligation(self.spec, self.coverage)
+            gate = self._check_gate()
             note = ("The proof obligation for a negative answer is SATISFIED."
-                    if gate.satisfied else
+                    if gate.verdict == "PASS" else
                     "The proof obligation for a negative answer is NOT satisfied; outstanding: "
                     + "; ".join(gate.missing)
                     + ". You may not assert a confident negative — prefer EVIDENCE_INSUFFICIENT.")
@@ -272,9 +278,10 @@ class ChartReviewAgent:
             self.tracer.llm("finalize", r.content, usage={"total": r.total_tokens})
             ans = extract_json(r.content)
 
-        gate = check_proof_obligation(self.spec, self.coverage)
+        gate = self._check_gate()
         if self.spec.data_source == "outside_notes":
             ans["status"] = "SPEC_INSUFFICIENT"
+            ans["remedy_class"] = "WRONG_DATA_SOURCE"
         ans.setdefault("status", "EVIDENCE_INSUFFICIENT")
         ans["proof_obligation"] = gate.to_dict()
         ans["evidence"] = self.evidence.to_list()
@@ -308,14 +315,47 @@ class ChartReviewAgent:
         return bool(why)
 
     # ------------------------------------------------------------------ gate
+    def _check_gate(self) -> GateResult:
+        """Evaluate the spec's proof obligation against the stratified ledger."""
+        fn = getattr(self.spec.proof_obligation, "for_negative", {}) or {}
+        gate_spec = dict(fn.get("gate") or {})
+        if not gate_spec and fn.get("required_coverage"):
+            # A spec written before stratification: fall back to the keyword checks it does
+            # declare, rather than silently passing everything.
+            gate_spec = {"required_keywords_all_searched": True}
+        strata = self.coverage.stratum_results()
+        g = evaluate_gate(gate_spec, strata)
+        for kw in getattr(self.spec.proof_obligation, "required_keywords", []) or []:
+            if not any(kw.lower() in t or t in kw.lower() for t in self.coverage.searched_terms):
+                g.missing.append(f"required search not performed: {kw!r}")
+        if not self.coverage.listed_documents:
+            g.missing.append("must list the patient's documents before asserting absence")
+        g.verdict = "PASS" if not g.missing else "FAIL"
+        return g
+
     def _gate(self, submitted: dict) -> dict:
         status = submitted.get("status", "")
         if not self.evidence.items and status == "FOUND":
             return {"accepted": False, "why": "no evidence recorded",
                     "missing": ["record at least one verbatim quote with record_evidence before answering FOUND"]}
         if status == "EVIDENCE_INSUFFICIENT":
-            gate = check_proof_obligation(self.spec, self.coverage)
-            if not gate.satisfied:
+            # Runtime-forced validation sampling. Drawn by the sampler, never by the agent:
+            # a model choosing which unread documents to check is validating its own
+            # judgement with its own judgement.
+            pending = self.coverage.pending_samples()
+            if pending:
+                lines = []
+                for stratum, docs in pending.items():
+                    for d in docs:
+                        lines.append(f"  {stratum}: {d.note_id} ({d.doc_type}, {d.date})")
+                self.tracer.emit("forced_sampling", seed=self.coverage.sampler.seed,
+                                 counts={k: len(v) for k, v in pending.items()})
+                return {"accepted": False,
+                        "why": "validation sampling not yet done — the runtime has drawn these",
+                        "missing": ["read each of these and record_evidence if any is relevant "
+                                    "(they were drawn by the runtime, not chosen by you):"] + lines}
+            gate = self._check_gate()
+            if gate.verdict != "PASS":
                 return {"accepted": False,
                         "why": "the proof obligation for asserting absence is not yet met",
                         "missing": gate.missing}
@@ -326,7 +366,9 @@ class ChartReviewAgent:
             known_doc_types: list[str] | None = None) -> dict:
         self.chart = chart
         self.evidence = EvidenceLedger()
-        self.coverage = CoverageLedger()
+        docs, _ = chart.list_documents(limit=100_000)
+        strata = strata_from_spec(self.spec)
+        self.coverage = CoverageLedger(docs, strata, ForcedSampler(self.sample_seed))
         # Corpus-wide type vocabulary keeps "this patient has none" (a finding) separable
         # from "no such type" (a typo). Without it the toolbox says so in its own error.
         self.toolbox = Toolbox(chart, self.evidence, self.coverage,

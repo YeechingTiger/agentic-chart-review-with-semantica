@@ -5,7 +5,8 @@ import time
 from typing import Any, Sequence
 
 from ..corpus import PatientChart
-from ..state import CoverageLedger, Evidence, EvidenceLedger
+from ..coverage import CoverageLedger          # the only coverage ledger — see note in state.py
+from ..state import Evidence, EvidenceLedger
 
 
 def _tool(name: str, description: str, properties: dict, required: list[str] | None = None) -> dict:

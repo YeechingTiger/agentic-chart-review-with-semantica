@@ -16,7 +16,8 @@ from pathlib import Path
 import pytest
 
 from acr.corpus import Corpus
-from acr.state import CoverageLedger, EvidenceLedger
+from acr.coverage import CoverageLedger
+from acr.state import EvidenceLedger
 from acr.tools import Toolbox
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus" / "patients"
@@ -32,7 +33,7 @@ def vocabulary() -> list[str]:
 def tb(vocabulary):
     # SYN0002's biopsy was done at an outside hospital, so it has NO pathology documents.
     chart = Corpus(CORPUS).chart("SYN0002")
-    return Toolbox(chart, EvidenceLedger(), CoverageLedger(), known_doc_types=vocabulary)
+    return Toolbox(chart, EvidenceLedger(), CoverageLedger(list(chart._docs.values()), []), known_doc_types=vocabulary)
 
 
 def test_out_of_domain_type_is_an_error_not_an_empty_list(tb):
@@ -62,8 +63,8 @@ def test_domain_is_corpus_wide_not_patient_scoped(vocabulary):
     """Without a corpus vocabulary the two cases become indistinguishable again — so the
     fallback has to admit that in the error rather than pretend to be authoritative."""
     chart = Corpus(CORPUS).chart("SYN0002")
-    narrow = Toolbox(chart, EvidenceLedger(), CoverageLedger())          # no vocabulary
-    wide = Toolbox(chart, EvidenceLedger(), CoverageLedger(), known_doc_types=vocabulary)
+    narrow = Toolbox(chart, EvidenceLedger(), CoverageLedger(list(chart._docs.values()), []))          # no vocabulary
+    wide = Toolbox(chart, EvidenceLedger(), CoverageLedger(list(chart._docs.values()), []), known_doc_types=vocabulary)
 
     n_out, _ = narrow.dispatch("list_documents", {"doc_type_contains": "Pathology"})
     w_out, _ = wide.dispatch("list_documents", {"doc_type_contains": "Pathology"})

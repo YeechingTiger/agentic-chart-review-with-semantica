@@ -62,75 +62,12 @@ class EvidenceLedger:
         return "\n".join(out)
 
 
-@dataclass
-class CoverageLedger:
-    """Computed from real tool calls — the agent cannot write to it directly."""
-    listed_documents: bool = False
-    total_documents: int = 0
-    type_summary_seen: bool = False
-    searched_terms: list[str] = field(default_factory=list)
-    read_notes: list[str] = field(default_factory=list)      # full or paginated reads
-    read_sections: list[str] = field(default_factory=list)   # "note_id#SECTION"
-    doc_types_touched: list[str] = field(default_factory=list)
-
-    def note_search(self, term: str) -> None:
-        t = term.strip().lower()
-        if t and t not in self.searched_terms:
-            self.searched_terms.append(t)
-
-    def note_read(self, note_id: str, doc_type: str) -> None:
-        if note_id not in self.read_notes:
-            self.read_notes.append(note_id)
-        if doc_type and doc_type not in self.doc_types_touched:
-            self.doc_types_touched.append(doc_type)
-
-    def note_section(self, note_id: str, section: str, doc_type: str = "") -> None:
-        key = f"{note_id}#{section}"
-        if key not in self.read_sections:
-            self.read_sections.append(key)
-        if doc_type and doc_type not in self.doc_types_touched:
-            self.doc_types_touched.append(doc_type)
-
-    def to_dict(self) -> dict:
-        return asdict(self)
-
-    def render(self) -> str:
-        return (
-            f"documents listed: {self.listed_documents} (total {self.total_documents})\n"
-            f"type summary seen: {self.type_summary_seen}\n"
-            f"searches run ({len(self.searched_terms)}): {', '.join(self.searched_terms) or '-'}\n"
-            f"notes read ({len(self.read_notes)}): {', '.join(self.read_notes[:20]) or '-'}\n"
-            f"sections read ({len(self.read_sections)}): {', '.join(self.read_sections[:20]) or '-'}\n"
-            f"doc types touched: {', '.join(self.doc_types_touched) or '-'}"
-        )
-
-
-@dataclass
-class ObligationCheck:
-    satisfied: bool
-    missing: list[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        return asdict(self)
-
-
-def check_proof_obligation(spec, coverage: CoverageLedger) -> ObligationCheck:
-    """Code-enforced gate. Called before any negative/absent answer is accepted."""
-    missing: list[str] = []
-    po = spec.proof_obligation
-
-    if po.required_coverage:
-        if not coverage.listed_documents:
-            missing.append("must list the patient's documents before asserting absence")
-        for kw in po.required_keywords:
-            if not any(kw.lower() in t or t in kw.lower() for t in coverage.searched_terms):
-                missing.append(f"required search not performed: {kw!r}")
-        for dt in po.required_doc_types:
-            touched = any(dt.lower() in t.lower() for t in coverage.doc_types_touched)
-            present = any(dt.lower() in n.lower() for n in coverage.read_notes)
-            if not (touched or present):
-                missing.append(f"required document type not reviewed: {dt!r}")
-    return ObligationCheck(satisfied=not missing, missing=missing)
+# CoverageLedger and the proof-obligation gate used to live here as a flat record
+# (listed_documents / searched_terms / read_notes). They now live in `coverage.py`, where
+# the stratified accounting, forced sampling and Clopper-Pearson bounds are — and there is
+# deliberately only ONE of them. Two independent accounts of "how much was covered" can
+# disagree, nothing raises when they do, and you are left with two numbers and no way to
+# choose. Import from `acr.coverage`.
 
 
 class PlanStep(TypedDict, total=False):

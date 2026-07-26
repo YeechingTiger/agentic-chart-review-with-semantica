@@ -444,10 +444,19 @@ def evaluate_gate(gate_spec: dict, strata: Sequence[StratumResult],
     by = {s.name: s for s in strata}
 
     if gate_spec.get("require_can_establish_nonempty") or gate_spec.get("per_claim_can_establish_nonempty"):
-        ok = "can_establish" in by and by["can_establish"].N > 0
-        c["can_establish_nonempty"] = ok
+        # SPEC-level, not instance-level. This rule exists to catch a specification in which
+        # no document type could establish the answer even in principle — a design fault,
+        # whose honest output is SPEC_INSUFFICIENT. It must NOT fire merely because this
+        # patient has none of those documents: that is the finding, and its honest output is
+        # EVIDENCE_INSUFFICIENT. Reading an empty stratum as a missing stratum collapses the
+        # two — the same inversion as treating an unknown document type and an absent one as
+        # the same empty list.
+        ok = "can_establish" in by
+        c["can_establish_declared"] = ok
         if not ok:
-            miss.append("no can_establish stratum: stratified exclusion is not a legal mode here")
+            miss.append("the spec declares no can_establish stratum — stratified exclusion is "
+                        "not a legal mode for this criterion (that is SPEC_INSUFFICIENT, "
+                        "not a finding about this patient)")
 
     if gate_spec.get("exhaustive_strata_complete", True):
         ce = by.get("can_establish")
