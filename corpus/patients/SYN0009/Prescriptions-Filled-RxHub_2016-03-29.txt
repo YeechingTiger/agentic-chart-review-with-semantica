@@ -1,0 +1,12 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2016-03-29
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2016-03-29   METFORMIN HCL 500MG TAB          qty 60
+  2016-03-29   ATORVASTATIN 20MG TAB            qty 60
+  2016-03-29   LISINOPRIL 10MG TAB              qty 30
+

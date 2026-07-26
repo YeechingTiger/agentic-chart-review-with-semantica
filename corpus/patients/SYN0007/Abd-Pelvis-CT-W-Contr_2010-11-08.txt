@@ -1,0 +1,9 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2010-11-08
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

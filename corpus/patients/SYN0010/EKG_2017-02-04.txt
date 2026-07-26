@@ -1,0 +1,9 @@
+MRN: SYN0010
+Patient: Reese Lindqvist
+DOB: 1958-03-21   Sex: F
+Document Type: EKG
+Service Date: 2017-02-04
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 86. No acute ST-T changes.
+

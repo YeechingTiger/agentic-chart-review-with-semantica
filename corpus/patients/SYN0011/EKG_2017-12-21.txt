@@ -1,0 +1,9 @@
+MRN: SYN0011
+Patient: Quinn Alvarez
+DOB: 1945-10-11   Sex: M
+Document Type: EKG
+Service Date: 2017-12-21
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 84. No acute ST-T changes.
+

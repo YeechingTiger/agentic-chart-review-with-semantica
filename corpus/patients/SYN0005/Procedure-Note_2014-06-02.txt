@@ -1,0 +1,9 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Procedure Note
+Service Date: 2014-06-02
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

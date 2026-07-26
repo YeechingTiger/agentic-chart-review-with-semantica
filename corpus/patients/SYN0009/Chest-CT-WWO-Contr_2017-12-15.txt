@@ -1,0 +1,9 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: Chest CT WWO Contr
+Service Date: 2017-12-15
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

@@ -1,0 +1,20 @@
+MRN: SYN0010
+Patient: Reese Lindqvist
+DOB: 1958-03-21   Sex: F
+Document Type: Chest CT W Contr
+Service Date: 2023-06-18
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Follow-up left breast lesion.
+
+TECHNIQUE:
+  Chest CT W Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the left breast, measuring 23 x 43 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the left breast, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Runs & traces (regenerate; never commit PHI-adjacent output)
+runs/
+*.jsonl.gz
+
+# Real corpora must never be committed. Synthetic dev corpus IS committed
+# (corpus/patients/) because it is fabricated and PHI-free.
+corpus_real/
+data_real/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Reference copy of the prior platform (not ours to redistribute)
+_chartreview_ref/

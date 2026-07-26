@@ -1,0 +1,9 @@
+MRN: SYN0006
+Patient: Riley Okafor
+DOB: 1957-06-13   Sex: M
+Document Type: Chest CT W Contr
+Service Date: 2016-04-23
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

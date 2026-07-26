@@ -1,0 +1,9 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: EKG
+Service Date: 2017-04-01
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 98. No acute ST-T changes.
+

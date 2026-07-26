@@ -1,0 +1,12 @@
+MRN: SYN0001
+Patient: Reese Okafor
+DOB: 1946-07-02   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2022-12-19
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2022-12-19   METFORMIN HCL 500MG TAB          qty 30
+  2022-12-19   OXYCODONE 5MG TAB                qty 60
+  2022-12-19   ATORVASTATIN 20MG TAB            qty 30
+

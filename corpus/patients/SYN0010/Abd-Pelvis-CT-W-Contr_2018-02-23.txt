@@ -1,0 +1,9 @@
+MRN: SYN0010
+Patient: Reese Lindqvist
+DOB: 1958-03-21   Sex: F
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2018-02-23
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

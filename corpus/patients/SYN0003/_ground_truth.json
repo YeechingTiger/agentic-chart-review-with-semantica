@@ -1,0 +1,48 @@
+{
+  "patient_id": "SYN0003",
+  "evidence_pattern": "never disease-free \u2014 metastatic at presentation",
+  "designer_notes": "Distant metastasis at diagnosis -> STORE [1880] code 70 (never disease-free). An agent that codes 00 here is wrong: there was never a disease-free interval.",
+  "n_documents": 298,
+  "date_range": [
+    "2011-01-21",
+    "2021-07-17"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20210118",
+      "status": "FOUND",
+      "why": "EUS-FNA pathology 2021-01-18 is the first diagnosis of record."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C250",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "70",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2011-01-21",
+        "end": "2021-07-17"
+      },
+      "expected_through_date": "2021-07-17",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {}
+}

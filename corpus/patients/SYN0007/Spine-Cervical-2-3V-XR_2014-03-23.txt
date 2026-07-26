@@ -1,0 +1,9 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2014-03-23
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

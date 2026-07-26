@@ -1,0 +1,14 @@
+MRN: SYN0006
+Patient: Riley Okafor
+DOB: 1957-06-13   Sex: M
+Document Type: Endo Diab MD OP Progress Note
+Service Date: 2021-09-26
+----------------------------------------------------------------
+SUBJECTIVE:
+  Interval visit. Tolerating therapy. Labs reviewed.
+
+ASSESSMENT AND PLAN:
+  1. Continue current regimen. RTC 4 wks.
+
+MEDS: metformin, ondansetron, dexamethasone
+

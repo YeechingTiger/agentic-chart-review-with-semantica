@@ -1,0 +1,9 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: Procedure Note
+Service Date: 2014-01-16
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

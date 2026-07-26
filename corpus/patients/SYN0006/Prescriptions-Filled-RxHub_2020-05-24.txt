@@ -1,0 +1,12 @@
+MRN: SYN0006
+Patient: Riley Okafor
+DOB: 1957-06-13   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2020-05-24
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2020-05-24   PANTOPRAZOLE 40MG TAB            qty 60
+  2020-05-24   ONDANSETRON 8MG TAB              qty 60
+  2020-05-24   ATORVASTATIN 20MG TAB            qty 90
+

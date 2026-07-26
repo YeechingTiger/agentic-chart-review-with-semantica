@@ -1,0 +1,14 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2020-07-31
+----------------------------------------------------------------
+SUBJECTIVE:
+  Interval visit. Tolerating therapy. Labs reviewed.
+
+ASSESSMENT AND PLAN:
+  1. Continue current regimen. RTC 4 wks.
+
+MEDS: atorvastatin, pantoprazole, metformin
+

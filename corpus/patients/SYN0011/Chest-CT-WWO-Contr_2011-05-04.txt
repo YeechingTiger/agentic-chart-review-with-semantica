@@ -1,0 +1,9 @@
+MRN: SYN0011
+Patient: Quinn Alvarez
+DOB: 1945-10-11   Sex: M
+Document Type: Chest CT WWO Contr
+Service Date: 2011-05-04
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

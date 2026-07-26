@@ -1,0 +1,12 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2009-04-13
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2009-04-13   OXYCODONE 5MG TAB                qty 30
+  2009-04-13   PANTOPRAZOLE 40MG TAB            qty 60
+  2009-04-13   ATORVASTATIN 20MG TAB            qty 90
+

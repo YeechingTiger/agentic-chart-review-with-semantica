@@ -1,0 +1,12 @@
+MRN: SYN0008
+Patient: Quinn Nakamura
+DOB: 1968-02-18   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2020-06-24
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2020-06-24   METFORMIN HCL 500MG TAB          qty 90
+  2020-06-24   OXYCODONE 5MG TAB                qty 90
+  2020-06-24   ATORVASTATIN 20MG TAB            qty 30
+

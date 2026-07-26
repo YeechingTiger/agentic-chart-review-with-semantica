@@ -1,0 +1,9 @@
+MRN: SYN0010
+Patient: Reese Lindqvist
+DOB: 1958-03-21   Sex: F
+Document Type: Procedure Note
+Service Date: 2016-07-17
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

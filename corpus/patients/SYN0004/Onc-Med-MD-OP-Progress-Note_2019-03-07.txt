@@ -1,0 +1,16 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2019-03-07
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt seen today to discuss recent imaging of the left breast, upper outer quadrant.
+  Reports fatigue, appetite down. No fevers.
+
+ASSESSMENT AND PLAN:
+  1. Mass, left breast, upper outer quadrant. Clinically this represents malignancy;
+     proceeding to tissue sampling for confirmation.
+
+MEDS: ondansetron, pantoprazole, dexamethasone
+

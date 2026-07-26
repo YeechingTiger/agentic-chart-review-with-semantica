@@ -1,0 +1,12 @@
+MRN: SYN0001
+Patient: Reese Okafor
+DOB: 1946-07-02   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2015-06-22
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2015-06-22   OXYCODONE 5MG TAB                qty 90
+  2015-06-22   ONDANSETRON 8MG TAB              qty 30
+  2015-06-22   PANTOPRAZOLE 40MG TAB            qty 30
+

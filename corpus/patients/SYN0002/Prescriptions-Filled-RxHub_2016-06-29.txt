@@ -1,0 +1,12 @@
+MRN: SYN0002
+Patient: Casey Lindqvist
+DOB: 1967-06-11   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2016-06-29
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2016-06-29   OXYCODONE 5MG TAB                qty 30
+  2016-06-29   LISINOPRIL 10MG TAB              qty 60
+  2016-06-29   PANTOPRAZOLE 40MG TAB            qty 90
+

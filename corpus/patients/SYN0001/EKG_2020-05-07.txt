@@ -1,0 +1,9 @@
+MRN: SYN0001
+Patient: Reese Okafor
+DOB: 1946-07-02   Sex: F
+Document Type: EKG
+Service Date: 2020-05-07
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 100. No acute ST-T changes.
+

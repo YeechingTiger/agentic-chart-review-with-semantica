@@ -1,0 +1,9 @@
+MRN: SYN0011
+Patient: Quinn Alvarez
+DOB: 1945-10-11   Sex: M
+Document Type: Fluoroscopy Up to 1 Hr
+Service Date: 2016-09-08
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

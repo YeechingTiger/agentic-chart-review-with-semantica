@@ -1,0 +1,149 @@
+spec_id: STORE.1860_1880.first_recurrence
+spec_version: 0.1.0
+source_authority:
+  document: "CoC STORE 2025 (updated 2025-04-24)"
+  items: ["Date of First Recurrence [1860]", "Type of First Recurrence [1880]"]
+data_source: notes
+
+question: >
+  Did this patient have a FIRST recurrence after a documented disease-free interval? If so,
+  on what date and of what type?
+
+fields:
+  - name: recurrence_type
+    type: string
+    allowable_values: ["00","04","06","10","13","14","15","16","17","20","21","22","25","26","27","30","36","40","46","51","52","53","54","55","56","57","58","59","60","62","70","88","99"]
+    description: "STORE [1880] code"
+  - name: recurrence_date
+    type: string
+    format: "CCYYMMDD"
+    nullable: true
+    description: "date of first recurrence; null when there is none or it is unknown"
+
+decision_rule:
+  - "A recurrence is the first progression, metastasis or recurrence AFTER a documented disease-free interval."
+  - "Codes 00 through 70 are hierarchical: record the highest-numbered applicable response."
+  - "Once a first recurrence is recorded, later recurrences are NOT recorded."
+  - "If the tumour was originally in situ, only 06, 16, 17, 26, 27, 36 or 46 may be used."
+  - "Lymphoma or leukaemia in remission is 00; relapse is 59."
+  - "00 means the patient became disease-free after treatment AND has not recurred."
+  - "70 means that since diagnosis the patient has NEVER been disease-free — including distant metastasis at diagnosis, systemic disease, or untreated minimal disease."
+  - "99 means it is unknown whether disease recurred or whether the patient was ever disease-free."
+  - "Distant recurrence codes 51-59 apply only when all first occurrences were in a single category: 52 lung only, 54 liver only, 55 bone only, 56 CNS only, 58 distant nodes only, 59 systemic. 62 is multiple distant sites."
+
+evidence_rules:
+  counts_as_evidence:
+    - "An explicit statement of no evidence of disease, remission, or disease-free status — this establishes the disease-free interval."
+    - "An explicit statement of recurrence, relapse, progression or new metastasis after that interval."
+  does_not_count:
+    - "Absence of any mention of recurrence in the last note. Silence is not remission."
+    - "Metastasis documented at or before diagnosis — that is code 70 territory, not a recurrence."
+
+conflict_rules:
+  - if: "metastatic disease is present at diagnosis and no disease-free interval is ever documented"
+    then: "code 70, never 00 and never a recurrence code"
+  - if: "a disease-free statement exists but there is no later follow-up at all"
+    then: "prefer 99 over 00 unless the chart affirmatively shows continued disease-free status"
+
+proof_obligation:
+  for_positive: "For a recurrence code: evidence of a disease-free interval AND evidence of the later event."
+  # Code 00 is a CONJUNCTION: (a) a disease-free interval existed AND (b) nothing recurred
+  # after it. The two halves have different proof modes, so they are separate claims, each
+  # with its own exhaustive stratum (P3d). (a) is a witness claim stratified by document
+  # type; (b) is a coverage claim stratified by TIME. The witness from (a) supplies the
+  # left edge of (b)'s window — without (a) there is no denominator for (b), which is also
+  # semantically right: "no recurrence" is only meaningful relative to a disease-free point.
+  for_negative:
+    mode: conjunctive
+    confidence: 0.95
+    claims:
+      - id: disease_free_interval_existed
+        proof_mode: witness
+        strata:
+          - name: can_establish
+            match: {doc_type_matches: ["Onc-", "Imaging", "CT", "PET", "Discharge"]}
+            policy: exhaustive_until_witness      # one qualifying note is enough; then stop
+            required_keywords: ["no evidence of disease", "disease free", "remission", "NED"]
+        yields: anchor.t_ned
+
+      - id: no_recurrence_since_anchor
+        proof_mode: coverage
+        requires_anchor: anchor.t_ned             # unevaluable without (a)
+        # "No recurrence" is not a proposition. "No recurrence through 2022-11-03" is.
+        # The window closes at the end of the OBSERVABLE PERIOD — not at today, not at the
+        # snapshot date. Everything after last contact was never observable, so it is
+        # clipped, not counted as a gap.
+        window: {from: anchor.t_ned, to: observable_period.end}
+        observable_period:
+          start: STORE.580.date_of_first_contact
+          end:   STORE.1750.date_of_last_contact
+        claim_scope_must_be_reported: true        # answer MUST carry through_date
+        mode: stratified_exclusion
+        strata:
+          - name: can_establish
+            partition_by: time_window             # TIME, not document type
+            # PLACEHOLDER — clinical input, not an engineering choice. A constant window is
+            # indefensible: too coarse in years 1-2, too fine after year 5.
+            surveillance_schedule: PLACEHOLDER_REQUIRES_CLINICAL_INPUT
+            qualifying_doc_types: [Imaging, CT, PET, Onc-, Pathology]
+            policy: exhaustive_per_window
+            # Scoped: only an INTERIOR gap implies care happened elsewhere. Loss to
+            # follow-up is the norm in oncology and must not fail the claim.
+            empty_window_policy:
+              interior: reject
+              before_anchor: out_of_scope
+              after_observable_end: out_of_scope
+          - name: cannot_establish
+            match: {rest: true}
+            policy: validate_by_sampling
+            min_sample: 25
+            max_tolerated_hits: 0
+        required_keywords: ["recurrence", "recurrent", "relapse", "progression", "metastas", "restaging"]
+    gate:
+      all_claims_satisfied: true
+      per_claim_can_establish_nonempty: true      # checked per claim, not per criterion
+      required_keywords_all_searched: true
+      exclusion_validated: true
+      max_elusion_upper: 0.12
+    on_failure:
+      status: EVIDENCE_INSUFFICIENT               # the spec is clear; THIS chart cannot close
+      value: {recurrence_type: "99"}
+      must_report:
+        - blocking_reason.claim
+        - blocking_reason.empty_windows           # which windows, and how long
+        - blocking_reason.total_uncovered_days
+    statement: >
+      Coding 00 requires proving TWO things: (a) the patient became disease-free, and
+      (b) no recurrence followed. Evidence for (b) alone is not enough. If you cannot show
+      (a), the answer is 70 or 99 — never 00. This is the most common error on this variable.
+      A follow-up window containing NO documents is an evidence gap, never an absence of
+      events: the likeliest explanation for a gap is that the patient was seen elsewhere,
+      which is also the circumstance in which recurrence is most likely. Reading a gap as
+      "nothing happened" biases hardest against the patients whose care is most fragmented.
+
+abstention:
+  EVIDENCE_INSUFFICIENT: "Follow-up is too sparse to establish either the disease-free interval or its absence — report 99."
+  SPEC_INSUFFICIENT: "The chart describes a second primary rather than a recurrence, which this spec does not adjudicate."
+
+special_codes_not_mar:
+  - "70 and 99 are NOT events and NOT ordinary censoring. 70 patients never entered the at-risk set; 99 is pure missingness."
+
+boundary_cases:
+  - case: "Pancreatic adenocarcinoma with hepatic metastases on the staging CT at diagnosis"
+    recurrence_type: "70"
+    why: "Never disease-free."
+  - case: "Breast cancer, two years of 'no evidence of disease' notes, then pulmonary metastases"
+    recurrence_type: "52"
+    why: "Disease-free interval established, then distant recurrence in lung only."
+  - case: "Colon cancer, care transferred, one sparse follow-up note that does not address disease status"
+    recurrence_type: "99"
+
+search_hints:
+  - recurrence
+  - recurrent
+  - relapse
+  - progression
+  - "no evidence of disease"
+  - "disease free"
+  - metastas
+  - restaging

@@ -1,0 +1,20 @@
+MRN: SYN0001
+Patient: Reese Okafor
+DOB: 1946-07-02   Sex: F
+Document Type: PET CT Skull Base Thigh
+Service Date: 2023-04-07
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Follow-up right upper lobe of lung lesion.
+
+TECHNIQUE:
+  PET CT Skull Base Thigh performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the right upper lobe of lung, measuring 57 x 25 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the right upper lobe of lung, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

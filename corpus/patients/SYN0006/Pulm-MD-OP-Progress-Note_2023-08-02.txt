@@ -1,0 +1,15 @@
+MRN: SYN0006
+Patient: Riley Okafor
+DOB: 1957-06-13   Sex: M
+Document Type: Pulm MD OP Progress Note
+Service Date: 2023-08-02
+----------------------------------------------------------------
+SUBJECTIVE:
+  Discussed biopsy at length. Pt declines bronchoscopic sampling.
+
+ASSESSMENT AND PLAN:
+  1. Right lung mass, radiographically suspicious for NSCLC.
+     Pt DECLINED biopsy. No tissue diagnosis available. Dx is clinical/radiographic.
+
+MEDS: dexamethasone, atorvastatin, pantoprazole
+

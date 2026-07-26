@@ -1,0 +1,12 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2018-01-07
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2018-01-07   OXYCODONE 5MG TAB                qty 60
+  2018-01-07   METFORMIN HCL 500MG TAB          qty 90
+  2018-01-07   ATORVASTATIN 20MG TAB            qty 60
+

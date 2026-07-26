@@ -1,0 +1,9 @@
+MRN: SYN0006
+Patient: Riley Okafor
+DOB: 1957-06-13   Sex: M
+Document Type: Procedure Note
+Service Date: 2018-01-07
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

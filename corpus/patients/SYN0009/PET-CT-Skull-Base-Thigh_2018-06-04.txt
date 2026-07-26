@@ -1,0 +1,9 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: PET CT Skull Base Thigh
+Service Date: 2018-06-04
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

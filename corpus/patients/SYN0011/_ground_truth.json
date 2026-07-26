@@ -1,0 +1,54 @@
+{
+  "patient_id": "SYN0011",
+  "evidence_pattern": "follow-up truncated; no recurrence before truncation",
+  "designer_notes": "ACCEPTANCE TEST for the clipping fix. Surveillance is clean, then the patient simply stops coming. Everything after last contact is out of scope, NOT a gap. Must yield a valid negative with through_date = last contact. A one-size 'reject every empty window' implementation fails this.",
+  "n_documents": 315,
+  "date_range": [
+    "2009-02-24",
+    "2021-02-25"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20190222",
+      "status": "FOUND",
+      "why": "Colonoscopic biopsy pathology 2019-02-22."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C187",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2009-02-24",
+        "end": "2021-02-25"
+      },
+      "expected_through_date": "2021-02-25",
+      "followup_shape": "truncated"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "recurrence_status": "FOUND",
+    "recurrence_type": "00",
+    "through_date": "last_contact",
+    "finality": "Provisional",
+    "finality_reason": "OBSERVATION_TRUNCATED"
+  }
+}

@@ -1,0 +1,9 @@
+MRN: SYN0006
+Patient: Riley Okafor
+DOB: 1957-06-13   Sex: M
+Document Type: EKG
+Service Date: 2018-04-13
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 68. No acute ST-T changes.
+

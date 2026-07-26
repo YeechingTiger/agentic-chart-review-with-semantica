@@ -1,0 +1,20 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: PET CT Skull Base Thigh
+Service Date: 2019-02-28
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Restaging for left breast, upper outer quadrant lesion.
+
+TECHNIQUE:
+  PET CT Skull Base Thigh performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the left breast, upper outer quadrant, measuring 28 x 32 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the left breast, upper outer quadrant, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

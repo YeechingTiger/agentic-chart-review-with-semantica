@@ -1,0 +1,12 @@
+MRN: SYN0001
+Patient: Reese Okafor
+DOB: 1946-07-02   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2021-07-01
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2021-07-01   METFORMIN HCL 500MG TAB          qty 90
+  2021-07-01   LISINOPRIL 10MG TAB              qty 60
+  2021-07-01   PANTOPRAZOLE 40MG TAB            qty 60
+

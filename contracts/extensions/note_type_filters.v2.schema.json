@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "acr/extensions/note_type_filters.v2.schema.json",
+  "title": "NoteTypeFilters v2 (extension X5)",
+  "description": "Replaces note_type_filters.schema.json v1. The only substantive change is that `unknown` is no longer a legal value. v1 allowed `high: [unknown]`, which made two different things indistinguishable in the data structure: a determination that succeeded and found no identifiable type, versus a determination that never ran. A pure wiring failure therefore wore the costume of a legitimate conclusion and survived unnoticed for over two months. Fixing the wiring fixes that one instance; fixing the schema is what stops the next wiring bug failing the same silent way.",
+  "$comment": "HOST: replaces note_type_filters.schema.json. Consumers must migrate: v1 `unknown` -> either null or UNDETERMINABLE, and the two are not interchangeable.",
+
+  "type": "object",
+  "required": ["filters", "derived_from", "informativeness"],
+  "properties": {
+    "description": { "type": "string" },
+    "version": { "const": "2" },
+
+    "filters": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/criterionFilter" }
+    },
+
+    "derived_from": {
+      "type": "object",
+      "required": ["cohort_size", "codified_at", "guideline_manual_version"],
+      "properties": {
+        "cohort_size": { "type": "integer" },
+        "cohort_oracle_done_count": { "type": "integer" },
+        "codified_at": { "type": "string" },
+        "guideline_manual_version": { "type": "string" },
+        "note_type_source": {
+          "enum": ["filename", "evidence_doc_type", "metadata_catalog", "NOT_WIRED"],
+          "description": "Where note types actually came from. NOT_WIRED is the honest value when no source was supplied — v1 had no way to say this, which is precisely how the failure hid."
+        }
+      }
+    },
+
+    "informativeness": { "$ref": "#/$defs/informativeness" }
+  },
+
+  "$defs": {
+    "criterionFilter": {
+      "type": "object",
+      "description": "Per-priority lists of note types. A priority key may be null (not determined) but must never contain the string 'unknown'.",
+      "properties": {
+        "high": { "$ref": "#/$defs/typeList" },
+        "medium": { "$ref": "#/$defs/typeList" },
+        "low": { "$ref": "#/$defs/typeList" }
+      },
+      "additionalProperties": false
+    },
+
+    "typeList": {
+      "oneOf": [
+        {
+          "type": "null",
+          "description": "NOT DETERMINED. The derivation did not run, or could not run. This is a pipeline fault: fix the code."
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "not": { "enum": ["unknown", "Unknown", "UNKNOWN"] },
+            "$comment": "UNDETERMINABLE is permitted as an explicit member: the determination ran and this document genuinely has no classifiable type. That is a property of the data, not a fault."
+          }
+        }
+      ]
+    },
+
+    "informativeness": {
+      "type": "object",
+      "required": ["non_null_type_fraction", "criteria_with_high_priority_type", "criteria_total", "verdict"],
+      "description": "Computed at derivation time. null and UNDETERMINABLE are counted SEPARATELY and never summed: one means fix the code, the other means accept the data or change the source. Merging them reproduces the exact defect this schema exists to prevent.",
+      "properties": {
+        "criteria_total": { "type": "integer" },
+        "criteria_with_high_priority_type": { "type": "integer" },
+        "non_null_type_fraction": { "type": "number", "minimum": 0, "maximum": 1 },
+        "n_null_lists": { "type": "integer", "description": "Pipeline faults." },
+        "n_undeterminable_entries": { "type": "integer", "description": "Genuine data property." },
+        "distinct_types_observed": { "type": "integer" },
+        "verdict": { "enum": ["OK", "RED"] },
+        "red_reasons": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

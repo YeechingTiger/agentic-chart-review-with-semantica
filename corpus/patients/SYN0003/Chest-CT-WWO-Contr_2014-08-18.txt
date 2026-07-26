@@ -1,0 +1,9 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: Chest CT WWO Contr
+Service Date: 2014-08-18
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

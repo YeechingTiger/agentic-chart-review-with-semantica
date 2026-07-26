@@ -1,0 +1,12 @@
+MRN: SYN0011
+Patient: Quinn Alvarez
+DOB: 1945-10-11   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2019-05-18
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2019-05-18   LISINOPRIL 10MG TAB              qty 90
+  2019-05-18   ATORVASTATIN 20MG TAB            qty 90
+  2019-05-18   METFORMIN HCL 500MG TAB          qty 30
+

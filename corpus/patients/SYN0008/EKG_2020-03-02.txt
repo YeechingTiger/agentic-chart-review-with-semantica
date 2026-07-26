@@ -1,0 +1,9 @@
+MRN: SYN0008
+Patient: Quinn Nakamura
+DOB: 1968-02-18   Sex: F
+Document Type: EKG
+Service Date: 2020-03-02
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 83. No acute ST-T changes.
+

@@ -1,0 +1,15 @@
+MRN: SYN0002
+Patient: Casey Lindqvist
+DOB: 1967-06-11   Sex: M
+Document Type: GI Gen MD OP Progress Note
+Service Date: 2022-09-06
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt transferred care to us. Records from outside hospital are incomplete.
+
+ASSESSMENT AND PLAN:
+  1. Known sigmoid colon carcinoma — biopsy was performed at the outside facility;
+     the pathology report is NOT available in our system. Requested by ROI.
+
+MEDS: dexamethasone, ondansetron, atorvastatin
+

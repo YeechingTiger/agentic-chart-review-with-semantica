@@ -1,0 +1,9 @@
+MRN: SYN0011
+Patient: Quinn Alvarez
+DOB: 1945-10-11   Sex: M
+Document Type: Procedure Note
+Service Date: 2018-11-30
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

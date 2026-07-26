@@ -1,0 +1,53 @@
+{
+  "patient_id": "SYN0009",
+  "evidence_pattern": "interior follow-up gap; genuinely no recurrence",
+  "designer_notes": "Two-year hole in the middle of surveillance. Nothing recurred, but the chart cannot show that. Must be Unknown (99).",
+  "n_documents": 314,
+  "date_range": [
+    "2008-06-16",
+    "2023-06-18"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20180614",
+      "status": "FOUND",
+      "why": "Lumpectomy pathology 2018-06-14."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C504",
+      "histology": "8500",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "99",
+      "date": null,
+      "status": "EVIDENCE_INSUFFICIENT",
+      "observable_period": {
+        "start": "2008-06-16",
+        "end": "2023-06-18"
+      },
+      "expected_through_date": "2023-06-18",
+      "followup_shape": "interior"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "recurrence_status": "EVIDENCE_INSUFFICIENT",
+    "recurrence_type": "99",
+    "reason": "interior_gap",
+    "indistinguishable_from": "SYN0010"
+  }
+}

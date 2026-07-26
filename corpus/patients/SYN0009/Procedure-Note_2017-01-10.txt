@@ -1,0 +1,9 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: Procedure Note
+Service Date: 2017-01-10
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

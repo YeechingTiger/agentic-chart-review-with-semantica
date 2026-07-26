@@ -1,0 +1,9 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: Endoscopy
+Service Date: 2017-12-01
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the pancreatic head. Biopsies obtained.
+

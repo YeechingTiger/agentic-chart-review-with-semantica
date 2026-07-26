@@ -1,0 +1,12 @@
+MRN: SYN0012
+Patient: Alex Ferris
+DOB: 1963-05-03   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2012-07-19
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2012-07-19   OXYCODONE 5MG TAB                qty 60
+  2012-07-19   PANTOPRAZOLE 40MG TAB            qty 60
+  2012-07-19   METFORMIN HCL 500MG TAB          qty 60
+

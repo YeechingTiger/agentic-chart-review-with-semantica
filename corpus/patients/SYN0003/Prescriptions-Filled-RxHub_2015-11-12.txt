@@ -1,0 +1,12 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2015-11-12
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2015-11-12   ONDANSETRON 8MG TAB              qty 90
+  2015-11-12   LISINOPRIL 10MG TAB              qty 90
+  2015-11-12   METFORMIN HCL 500MG TAB          qty 30
+

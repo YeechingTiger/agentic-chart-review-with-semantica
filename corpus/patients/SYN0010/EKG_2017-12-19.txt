@@ -1,0 +1,9 @@
+MRN: SYN0010
+Patient: Reese Lindqvist
+DOB: 1958-03-21   Sex: F
+Document Type: EKG
+Service Date: 2017-12-19
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 72. No acute ST-T changes.
+

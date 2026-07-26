@@ -1,0 +1,14 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: Transfusion MD OP Progress Note
+Service Date: 2019-12-22
+----------------------------------------------------------------
+SUBJECTIVE:
+  Interval visit. Tolerating therapy. Labs reviewed.
+
+ASSESSMENT AND PLAN:
+  1. Continue current regimen. RTC 4 wks.
+
+MEDS: dexamethasone, pantoprazole, metformin
+

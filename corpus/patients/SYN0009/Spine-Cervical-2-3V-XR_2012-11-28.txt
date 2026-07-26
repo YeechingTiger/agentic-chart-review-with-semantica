@@ -1,0 +1,9 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2012-11-28
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

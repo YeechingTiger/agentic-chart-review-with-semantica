@@ -1,0 +1,9 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Chest CT WWO Contr
+Service Date: 2021-11-09
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

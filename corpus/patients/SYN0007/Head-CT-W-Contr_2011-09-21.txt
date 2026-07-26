@@ -1,0 +1,9 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: Head CT W Contr
+Service Date: 2011-09-21
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

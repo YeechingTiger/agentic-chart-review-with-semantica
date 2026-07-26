@@ -1,0 +1,48 @@
+{
+  "patient_id": "SYN0004",
+  "evidence_pattern": "documented recurrence after a disease-free interval",
+  "designer_notes": "Requires the agent to establish BOTH (a) a disease-free interval and (b) the later pulmonary recurrence. Distant recurrence in lung only -> 52.",
+  "n_documents": 322,
+  "date_range": [
+    "2009-03-07",
+    "2022-07-14"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20190305",
+      "status": "FOUND",
+      "why": "Lumpectomy pathology 2019-03-05."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C504",
+      "histology": "8500",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "52",
+      "date": "20220714",
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2009-03-07",
+        "end": "2022-07-14"
+      },
+      "expected_through_date": "2022-07-14",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {}
+}

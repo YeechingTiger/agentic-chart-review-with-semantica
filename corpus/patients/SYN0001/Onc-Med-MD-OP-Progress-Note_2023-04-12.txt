@@ -1,0 +1,16 @@
+MRN: SYN0001
+Patient: Reese Okafor
+DOB: 1946-07-02   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2023-04-12
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt seen today to discuss recent imaging of the right upper lobe of lung.
+  Reports fatigue, appetite down. No fevers.
+
+ASSESSMENT AND PLAN:
+  1. Mass, right upper lobe of lung. Clinically this represents malignancy;
+     proceeding to tissue sampling for confirmation.
+
+MEDS: dexamethasone, pantoprazole, lisinopril
+

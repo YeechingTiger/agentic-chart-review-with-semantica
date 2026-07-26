@@ -1,0 +1,12 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2016-11-16
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2016-11-16   ONDANSETRON 8MG TAB              qty 30
+  2016-11-16   ATORVASTATIN 20MG TAB            qty 30
+  2016-11-16   LISINOPRIL 10MG TAB              qty 60
+

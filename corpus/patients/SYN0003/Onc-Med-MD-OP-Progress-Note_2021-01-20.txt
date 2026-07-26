@@ -1,0 +1,16 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2021-01-20
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt seen today to discuss recent imaging of the pancreatic head.
+  Reports fatigue, appetite down. No fevers.
+
+ASSESSMENT AND PLAN:
+  1. Mass, pancreatic head. Clinically this represents malignancy;
+     proceeding to tissue sampling for confirmation.
+
+MEDS: ondansetron, metformin, atorvastatin
+

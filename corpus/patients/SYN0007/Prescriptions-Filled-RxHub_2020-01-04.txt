@@ -1,0 +1,12 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2020-01-04
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2020-01-04   METFORMIN HCL 500MG TAB          qty 60
+  2020-01-04   ONDANSETRON 8MG TAB              qty 60
+  2020-01-04   OXYCODONE 5MG TAB                qty 60
+

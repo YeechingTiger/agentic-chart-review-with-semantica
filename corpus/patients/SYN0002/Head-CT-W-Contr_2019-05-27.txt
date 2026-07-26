@@ -1,0 +1,9 @@
+MRN: SYN0002
+Patient: Casey Lindqvist
+DOB: 1967-06-11   Sex: M
+Document Type: Head CT W Contr
+Service Date: 2019-05-27
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

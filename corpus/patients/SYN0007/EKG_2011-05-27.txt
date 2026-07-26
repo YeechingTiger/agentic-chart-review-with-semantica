@@ -1,0 +1,9 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: EKG
+Service Date: 2011-05-27
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 66. No acute ST-T changes.
+

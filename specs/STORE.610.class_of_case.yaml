@@ -1,0 +1,59 @@
+spec_id: STORE.610.class_of_case
+spec_version: 0.1.0
+source_authority:
+  document: "CoC STORE 2025 (updated 2025-04-24)"
+  items: ["Class of Case [610]"]
+data_source: outside_notes
+
+question: "What is the Class of Case for this tumour at the reporting facility?"
+
+agent_policy: >
+  Class of Case encodes the PATIENT'S RELATIONSHIP TO THE REPORTING FACILITY — where the
+  diagnosis was made and where first-course treatment was delivered. That information lives
+  in the facility's registration, referral and billing systems, not in clinical notes.
+  You must answer SPEC_INSUFFICIENT. You may, and should, report clues you found as
+  evidence: which institution issued the pathology report, where surgery or systemic therapy
+  was delivered, and any documented transfer of care. A human registrar assigns the code.
+  Do not assign one yourself, and do not guess from the fact that notes exist in this chart.
+
+fields:
+  - name: class_of_case
+    type: string
+    allowable_values: ["00","10","11","12","13","14","20","21","22","30","31","32","33","34","35","36","37","38","40","41","42","43","49","99"]
+    nullable: true
+    description: "left null by the agent; assigned by a human registrar"
+
+decision_rule:
+  - "Analytic classes are 00-22; nonanalytic are 30-99."
+  - "Code 00 applies only when it is KNOWN the patient went elsewhere for all treatment; if that is not known, the code is 10."
+  - "Treatment given in the office of a physician with admitting privileges counts as 'elsewhere'."
+
+proof_obligation:
+  for_positive: "Not applicable — the agent does not assign this code."
+  # No coverage model applies. This is not a case of "the chart might not contain it" —
+  # the variable is not a property of the chart at all, so no amount of searching could
+  # ever close it. Stratified exclusion is therefore not just unnecessary but meaningless
+  # here: there is no can_establish stratum, and per P3d/§2c that forbids the mode.
+  for_negative:
+    mode: not_applicable
+    reason: >
+      Class of Case encodes the patient's administrative relationship to the reporting
+      facility. It lives in registration, referral and billing systems. A coverage proof
+      over clinical notes cannot establish it however complete that coverage is.
+    required_coverage:
+      - "List the patient's documents (so the clue report is scoped)"
+    statement: "Report clues as evidence and abstain with SPEC_INSUFFICIENT."
+
+abstention:
+  SPEC_INSUFFICIENT: "Always, for this variable, when working from notes alone."
+  EVIDENCE_INSUFFICIENT: "Not used for this variable."
+
+downstream_warning:
+  - "Survival analysis must be restricted to Class of Case 10-22, not 00-22: STORE does not require Class of Case 00 to be staged or followed."
+  - "Class of Case 49 (death certificate only) and 38 (autopsy) take the date of death as the date of diagnosis, producing zero survival time. Exclude them explicitly."
+
+search_hints:
+  - "outside hospital"
+  - "transferred care"
+  - referral
+  - "records from"

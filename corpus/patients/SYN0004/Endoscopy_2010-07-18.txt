@@ -1,0 +1,9 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: Endoscopy
+Service Date: 2010-07-18
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the left breast, upper outer quadrant. Biopsies obtained.
+

@@ -1,0 +1,20 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: Chest CT W Contr
+Service Date: 2020-09-11
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Eval of right breast lesion.
+
+TECHNIQUE:
+  Chest CT W Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the right breast, measuring 39 x 24 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the right breast, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

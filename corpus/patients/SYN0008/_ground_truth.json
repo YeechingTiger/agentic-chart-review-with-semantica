@@ -1,0 +1,48 @@
+{
+  "patient_id": "SYN0008",
+  "evidence_pattern": "conflicting notes \u2014 consult contradicts the imaging impression",
+  "designer_notes": "Oncology consult claims 'CT shows liver metastases' while the CT IMPRESSION explicitly says no hepatic lesions. Tests conflict handling and whether the agent cites the primary report over the downstream restatement.",
+  "n_documents": 306,
+  "date_range": [
+    "2012-11-19",
+    "2023-07-01"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20221103",
+      "status": "FOUND",
+      "why": "Endoscopic biopsy pathology 2022-11-03."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C163",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "99",
+      "date": null,
+      "status": "EVIDENCE_INSUFFICIENT",
+      "observable_period": {
+        "start": "2012-11-19",
+        "end": "2023-07-01"
+      },
+      "expected_through_date": "2023-07-01",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {}
+}

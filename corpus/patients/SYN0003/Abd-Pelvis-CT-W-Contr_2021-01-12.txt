@@ -1,0 +1,20 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2021-01-12
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Restaging for pancreatic head lesion.
+
+TECHNIQUE:
+  Abd Pelvis CT W Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the pancreatic head, measuring 20 x 55 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  Multiple hypodense hepatic lesions compatible with metastatic disease.
+
+IMPRESSION:
+  1. Mass in the pancreatic head, as above. Neoplasm is favored.
+  2. Hepatic metastases.

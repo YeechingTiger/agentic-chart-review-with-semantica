@@ -1,0 +1,12 @@
+MRN: SYN0002
+Patient: Casey Lindqvist
+DOB: 1967-06-11   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2016-04-07
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2016-04-07   LISINOPRIL 10MG TAB              qty 60
+  2016-04-07   ATORVASTATIN 20MG TAB            qty 90
+  2016-04-07   METFORMIN HCL 500MG TAB          qty 60
+

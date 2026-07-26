@@ -1,0 +1,9 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: PET CT Skull Base Thigh
+Service Date: 2015-10-24
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

@@ -1,0 +1,9 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: EKG
+Service Date: 2020-12-17
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 91. No acute ST-T changes.
+

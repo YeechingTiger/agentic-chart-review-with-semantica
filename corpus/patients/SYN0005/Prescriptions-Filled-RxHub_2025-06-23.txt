@@ -1,0 +1,12 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2025-06-23
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2025-06-23   PANTOPRAZOLE 40MG TAB            qty 30
+  2025-06-23   ONDANSETRON 8MG TAB              qty 60
+  2025-06-23   OXYCODONE 5MG TAB                qty 90
+

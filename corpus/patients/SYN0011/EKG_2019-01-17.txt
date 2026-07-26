@@ -1,0 +1,9 @@
+MRN: SYN0011
+Patient: Quinn Alvarez
+DOB: 1945-10-11   Sex: M
+Document Type: EKG
+Service Date: 2019-01-17
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 80. No acute ST-T changes.
+

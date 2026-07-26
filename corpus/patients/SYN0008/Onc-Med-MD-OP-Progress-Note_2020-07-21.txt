@@ -1,0 +1,14 @@
+MRN: SYN0008
+Patient: Quinn Nakamura
+DOB: 1968-02-18   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2020-07-21
+----------------------------------------------------------------
+SUBJECTIVE:
+  Interval visit. Tolerating therapy. Labs reviewed.
+
+ASSESSMENT AND PLAN:
+  1. Continue current regimen. RTC 4 wks.
+
+MEDS: dexamethasone, metformin, pantoprazole
+

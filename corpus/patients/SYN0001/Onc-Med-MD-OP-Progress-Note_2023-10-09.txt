@@ -1,0 +1,15 @@
+MRN: SYN0001
+Patient: Reese Okafor
+DOB: 1946-07-02   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2023-10-09
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt doing well. Denies new sx. Completed adjuvant therapy.
+
+ASSESSMENT AND PLAN:
+  1. No evidence of disease on todays exam and recent imaging.
+     Pt is disease free. Continue surveillance q6mo.
+
+MEDS: pantoprazole, dexamethasone, lisinopril
+

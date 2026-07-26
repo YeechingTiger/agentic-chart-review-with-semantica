@@ -1,0 +1,12 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2023-12-20
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2023-12-20   METFORMIN HCL 500MG TAB          qty 90
+  2023-12-20   LISINOPRIL 10MG TAB              qty 90
+  2023-12-20   ONDANSETRON 8MG TAB              qty 30
+

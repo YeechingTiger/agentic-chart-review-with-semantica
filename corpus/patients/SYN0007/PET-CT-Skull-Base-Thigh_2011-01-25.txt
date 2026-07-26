@@ -1,0 +1,9 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: PET CT Skull Base Thigh
+Service Date: 2011-01-25
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

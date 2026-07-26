@@ -1,0 +1,12 @@
+MRN: SYN0010
+Patient: Reese Lindqvist
+DOB: 1958-03-21   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2012-03-08
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2012-03-08   LISINOPRIL 10MG TAB              qty 60
+  2012-03-08   OXYCODONE 5MG TAB                qty 90
+  2012-03-08   ATORVASTATIN 20MG TAB            qty 30
+

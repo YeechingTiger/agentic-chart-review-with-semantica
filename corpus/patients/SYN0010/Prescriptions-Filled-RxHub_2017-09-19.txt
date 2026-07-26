@@ -1,0 +1,12 @@
+MRN: SYN0010
+Patient: Reese Lindqvist
+DOB: 1958-03-21   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2017-09-19
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2017-09-19   OXYCODONE 5MG TAB                qty 90
+  2017-09-19   METFORMIN HCL 500MG TAB          qty 60
+  2017-09-19   ONDANSETRON 8MG TAB              qty 90
+

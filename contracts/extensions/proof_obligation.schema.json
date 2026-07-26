@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "acr/extensions/proof_obligation.schema.json",
+  "title": "ProofObligation (extension X1 + X2)",
+  "description": "Extends criterion-file.schema.json with a top-level `proof_obligation`. States what must be demonstrably true before a negative/absent answer is permitted. Enforced in code against a runtime-computed coverage ledger, never self-reported. X2 adds claim-level decomposition: a conjunctive criterion splits into claims, each carrying its own proof_mode and its own exhaustive stratum; a witness claim yields the anchor a later coverage claim needs.",
+  "$comment": "HOST: criterion-file.schema.json -> add property `proof_obligation`.",
+
+  "type": "object",
+  "required": ["for_positive", "for_negative"],
+  "properties": {
+    "for_positive": {
+      "type": "string",
+      "description": "Usually a single sufficient witness."
+    },
+    "for_negative": { "$ref": "#/$defs/forNegative" }
+  },
+
+  "$defs": {
+    "forNegative": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["stratified_exclusion", "conjunctive", "enumerated", "not_applicable"],
+          "description": "not_applicable = no coverage proof over notes could ever close this variable (it is not a property of the chart). enumerated = small universes only."
+        },
+        "confidence": { "type": "number", "default": 0.95 },
+        "reason": { "type": "string", "description": "Required when mode = not_applicable." },
+        "strata": { "type": "array", "items": { "$ref": "#/$defs/stratum" } },
+        "claims": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/claim" },
+          "description": "X2. Required when mode = conjunctive."
+        },
+        "gate": { "$ref": "#/$defs/gate" },
+        "on_failure": { "$ref": "#/$defs/onFailure" },
+        "statement": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "conjunctive" } }, "required": ["mode"] },
+          "then": { "required": ["claims"] }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "stratified_exclusion" } }, "required": ["mode"] },
+          "then": { "required": ["strata"] }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "not_applicable" } }, "required": ["mode"] },
+          "then": { "required": ["reason"] }
+        }
+      ]
+    },
+
+    "claim": {
+      "type": "object",
+      "required": ["id", "proof_mode"],
+      "properties": {
+        "id": { "type": "string" },
+        "proof_mode": {
+          "enum": ["witness", "coverage"],
+          "description": "P3d. This governs how the exhaustive stratum is partitioned: witness -> by document type (one qualifying document ends it); coverage -> by time/event window (every window must be covered)."
+        },
+        "strata": { "type": "array", "items": { "$ref": "#/$defs/stratum" } },
+        "yields": {
+          "type": "string",
+          "description": "Anchor name this claim produces, e.g. anchor.t_ned. Consumed by a later claim's requires_anchor."
+        },
+        "requires_anchor": {
+          "type": "string",
+          "description": "This claim is unevaluable until the named anchor exists."
+        },
+        "window": {
+          "type": "object",
+          "required": ["from", "to"],
+          "properties": {
+            "from": { "type": "string", "description": "anchor reference, e.g. anchor.t_ned" },
+            "to": { "type": "string", "description": "must resolve to observable_period.end, NOT snapshot_date and NOT today" }
+          }
+        },
+        "observable_period": {
+          "type": "object",
+          "required": ["start", "end"],
+          "description": "REQUIRED on every coverage claim. A coverage claim has no truth value without it: 'no recurrence' is not a proposition, 'no recurrence through 2022-11-03' is. Windows generated from the surveillance schedule are CLIPPED at both ends by this period before empty_window_policy is applied; clipped-away windows enter neither the gate nor the elusion computation.",
+          "properties": {
+            "start": { "type": "string", "description": "e.g. STORE.580.date_of_first_contact" },
+            "end": {
+              "type": "string",
+              "description": "e.g. STORE.1750.date_of_last_contact. Absence of this field is not a loss of precision — it makes every negative conclusion unscopeable, and therefore truth-valueless."
+            }
+          }
+        },
+        "claim_scope_must_be_reported": {
+          "type": "boolean", "default": true,
+          "description": "The answer must carry through_date. 'No recurrence through 2019' and 'no recurrence through 2025' are conclusions of very different strength and the consumer has to see which one they were handed."
+        },
+        "mode": { "enum": ["stratified_exclusion", "enumerated"] },
+        "required_keywords": { "type": "array", "items": { "type": "string" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "proof_mode": { "const": "coverage" } }, "required": ["proof_mode"] },
+          "then": { "required": ["observable_period"] }
+        }
+      ]
+    },
+
+    "stratum": {
+      "type": "object",
+      "required": ["name", "policy"],
+      "properties": {
+        "name": { "enum": ["can_establish", "may_mention", "cannot_establish"] },
+        "match": {
+          "type": "object",
+          "properties": {
+            "doc_type_matches": { "type": "array", "items": { "type": "string" } },
+            "rest": { "type": "boolean" }
+          }
+        },
+        "policy": {
+          "enum": [
+            "exhaustive",
+            "exhaustive_until_witness",
+            "exhaustive_per_window",
+            "search_then_read_hits_and_sample_misses",
+            "validate_by_sampling"
+          ]
+        },
+        "required_keywords": { "type": "array", "items": { "type": "string" } },
+        "min_sample": { "type": "integer", "minimum": 1 },
+        "min_sample_of_misses": {
+          "type": "integer", "minimum": 1,
+          "description": "The misses of a keyword search are themselves a null set. Sampling them is what falsifies an incomplete keyword list. Omitting this was a real defect: it recorded an unvalidated assumption (elusion = 0) as if it were a measurement."
+        },
+        "max_tolerated_hits": {
+          "type": "integer", "default": 0,
+          "description": "A single hit falsifies the declaration and forces the stratum to be promoted / the keyword list extended."
+        },
+        "partition_by": { "enum": ["time_window"] },
+        "surveillance_schedule": {
+          "oneOf": [
+            { "const": "PLACEHOLDER_REQUIRES_CLINICAL_INPUT" },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["from", "interval"],
+                "properties": {
+                  "from": { "type": "string" },
+                  "to": { "type": ["string", "null"] },
+                  "interval": { "type": "string" }
+                }
+              }
+            }
+          ],
+          "description": "Segmented by time since diagnosis. A constant window is clinically indefensible: too coarse in years 1-2, too fine after year 5. This value is CLINICAL INPUT; the compiler must refuse a spec still carrying the placeholder rather than fall back to a default."
+        },
+        "qualifying_doc_types": {
+          "type": "array", "items": { "type": "string" },
+          "description": "A window counts as covered only if it holds a document that WOULD HAVE DETECTED the event. A pharmacy fill does not qualify; a chest CT does."
+        },
+        "empty_window_policy": {
+          "type": "object",
+          "required": ["interior", "before_anchor", "after_observable_end"],
+          "description": "P3e, scoped. 'Reject every empty window' is wrong: it would fail every patient who is simply lost to follow-up, and loss to follow-up is the norm in oncology surveillance. Only an INTERIOR gap — records before it, records after it, nothing in between — carries the inference that care happened elsewhere. Windows outside the observable period were never in scope and must be clipped, not rejected.",
+          "properties": {
+            "interior": {
+              "const": "reject",
+              "description": "Documents exist on both sides but not within. This is a true gap: the likeliest explanation is care received elsewhere, which is also when recurrence is most likely. Reading it as 'nothing happened' biases hardest against the most fragmented patients. No interpolation from neighbouring windows."
+            },
+            "before_anchor": {
+              "const": "out_of_scope",
+              "description": "Earlier than the anchor the claim is defined against. Never in scope."
+            },
+            "after_observable_end": {
+              "const": "out_of_scope",
+              "description": "Later than last contact. The patient stopped being observable; that is not a gap, and the correct response is to narrow through_date, not to downgrade the answer."
+            }
+          }
+        }
+      }
+    },
+
+    "gate": {
+      "type": "object",
+      "properties": {
+        "require_can_establish_nonempty": { "type": "boolean" },
+        "per_claim_can_establish_nonempty": { "type": "boolean" },
+        "all_claims_satisfied": { "type": "boolean" },
+        "exhaustive_strata_complete": { "type": "boolean" },
+        "required_keywords_all_searched": { "type": "boolean" },
+        "exclusion_validated": { "type": "boolean" },
+        "keyword_list_validated": { "type": "boolean" },
+        "max_elusion_upper": { "type": "number", "default": 0.12 }
+      }
+    },
+
+    "onFailure": {
+      "type": "object",
+      "properties": {
+        "status": { "const": "EVIDENCE_INSUFFICIENT" },
+        "value": { "type": "object" },
+        "must_report": { "type": "array", "items": { "type": "string" } }
+      },
+      "description": "Gate failure is EVIDENCE_INSUFFICIENT, not SPEC_INSUFFICIENT: the specification is clear, this patient's record cannot be closed. The report must name the blocking windows and how long, so a human gets an actionable gap list rather than a shrug."
+    }
+  }
+}

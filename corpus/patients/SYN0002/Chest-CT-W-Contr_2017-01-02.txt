@@ -1,0 +1,9 @@
+MRN: SYN0002
+Patient: Casey Lindqvist
+DOB: 1967-06-11   Sex: M
+Document Type: Chest CT W Contr
+Service Date: 2017-01-02
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

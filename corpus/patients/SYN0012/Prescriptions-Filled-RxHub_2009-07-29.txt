@@ -1,0 +1,12 @@
+MRN: SYN0012
+Patient: Alex Ferris
+DOB: 1963-05-03   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2009-07-29
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2009-07-29   ATORVASTATIN 20MG TAB            qty 60
+  2009-07-29   LISINOPRIL 10MG TAB              qty 90
+  2009-07-29   OXYCODONE 5MG TAB                qty 30
+

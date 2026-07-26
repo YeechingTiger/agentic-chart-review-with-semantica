@@ -1,0 +1,12 @@
+MRN: SYN0012
+Patient: Alex Ferris
+DOB: 1963-05-03   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2013-05-15
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2013-05-15   METFORMIN HCL 500MG TAB          qty 30
+  2013-05-15   ONDANSETRON 8MG TAB              qty 60
+  2013-05-15   ATORVASTATIN 20MG TAB            qty 90
+

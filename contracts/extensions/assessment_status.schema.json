@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "acr/extensions/assessment_status.schema.json",
+  "title": "AssessmentStatus + remedy_class (extension X3)",
+  "description": "Extends review_record.schema.json -> criterion_assessments[] with the agent's output status and, for SPEC_INSUFFICIENT, the class of remedy required. mode is a construct of spec-authoring time; status is what the downstream consumer sees. If four distinct modes all collapse back to one SPEC_INSUFFICIENT, the distinction dies at the delivery boundary.",
+  "$comment": "HOST: review_record.schema.json -> criterion_assessments[] items -> add `status` and `remedy_class`.",
+
+  "type": "object",
+  "required": ["status"],
+  "properties": {
+    "status": {
+      "enum": ["FOUND", "EVIDENCE_INSUFFICIENT", "SPEC_INSUFFICIENT"],
+      "description": "EVIDENCE_INSUFFICIENT: the spec is clear, this chart lacks the evidence. Owner is always the Adjudicator, so it needs no subdivision. SPEC_INSUFFICIENT: something upstream of this patient is wrong — see remedy_class."
+    },
+    "remedy_class": {
+      "enum": ["FIX_SPEC", "WRONG_DATA_SOURCE", "REQUIRES_HUMAN_AUTHORITY"],
+      "description": "Required iff status = SPEC_INSUFFICIENT. Decision rule: does the remedy affect one case, every case of this criterion, or the pipeline? FIX_SPEC -> Definer edits the spec once, all affected cases rerun. WRONG_DATA_SOURCE -> the field must come from elsewhere; the agent should never be asked this variable again (and the compiler should refuse to emit the task at all). REQUIRES_HUMAN_AUTHORITY -> the spec is clear but deliberately withholds discretion from the agent; route to a registrar who holds it."
+    },
+    "blocking_reason": {
+      "type": "object",
+      "description": "Populated on gate failure so a human receives an actionable gap list.",
+      "properties": {
+        "claim": { "type": "string" },
+        "empty_windows": {
+          "type": "array",
+          "items": { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2 }
+        },
+        "total_uncovered_days": { "type": "integer" },
+        "missing": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "required_fields": {
+      "type": "array", "items": { "type": "string" },
+      "description": "For WRONG_DATA_SOURCE: which external fields would answer this, e.g. 'NAACCR 610 Class of Case'."
+    }
+  },
+
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "SPEC_INSUFFICIENT" } }, "required": ["status"] },
+      "then": { "required": ["remedy_class"] }
+    }
+  ],
+
+  "$comment_relationship": "NOT the same thing as review_record.reviewer_overrides[].error_category (missed_evidence / misinterpreted / wrong_rule / criterion_ambiguous / other). That is a human's post-hoc attribution of what went wrong; remedy_class is the agent's own output state saying who must act next. Complementary, not redundant — do not merge them."
+}

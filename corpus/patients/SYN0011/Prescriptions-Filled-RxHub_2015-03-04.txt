@@ -1,0 +1,12 @@
+MRN: SYN0011
+Patient: Quinn Alvarez
+DOB: 1945-10-11   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2015-03-04
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2015-03-04   ONDANSETRON 8MG TAB              qty 90
+  2015-03-04   METFORMIN HCL 500MG TAB          qty 60
+  2015-03-04   ATORVASTATIN 20MG TAB            qty 90
+

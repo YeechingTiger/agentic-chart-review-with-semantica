@@ -1,0 +1,20 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: Surgical Pathology Report
+Service Date: 2018-06-14
+----------------------------------------------------------------
+SPECIMEN:
+  A. left breast — biopsy
+
+GROSS DESCRIPTION:
+  Received in formalin, multiple tan-pink soft tissue fragments aggregating 1.2 cm.
+
+MICROSCOPIC DESCRIPTION:
+  Sections demonstrate infiltrating ductal carcinoma.
+
+FINAL DIAGNOSIS:
+  A. LEFT BREAST, BIOPSY — INFILTRATING DUCTAL CARCINOMA.
+
+Electronically signed by Pathology.
+

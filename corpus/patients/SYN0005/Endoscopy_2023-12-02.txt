@@ -1,0 +1,9 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Endoscopy
+Service Date: 2023-12-02
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the urinary bladder. Biopsies obtained.
+

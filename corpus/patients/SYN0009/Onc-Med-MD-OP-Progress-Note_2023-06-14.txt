@@ -1,0 +1,15 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2023-06-14
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt doing well. Denies new sx. Completed adjuvant therapy.
+
+ASSESSMENT AND PLAN:
+  1. No evidence of disease on todays exam and recent imaging.
+     Pt is disease free. Continue surveillance q6mo.
+
+MEDS: dexamethasone, pantoprazole, ondansetron
+

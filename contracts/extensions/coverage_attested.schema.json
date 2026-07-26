@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "acr/extensions/coverage_attested.schema.json",
+  "title": "CoverageAttested (extension X4)",
+  "description": "Extends trace.schema.json with the runtime-computed coverage ledger. Every field here is derived from real tool calls; none of it is reported by the model. Prompting a model to 'be sure you looked everywhere' is a wish — checking this ledger is a control.",
+  "$comment": "HOST: trace.schema.json -> add a `coverage_attested` block per criterion assessment.",
+
+  "type": "object",
+  "required": ["mode", "universe", "sample_seed"],
+  "properties": {
+    "mode": { "enum": ["stratified_exclusion", "conjunctive", "enumerated", "not_applicable"] },
+    "sample_seed": {
+      "type": "integer",
+      "description": "Sampling is forced by the runtime, never chosen by the agent — letting the agent pick its own validation sample is the runtime version of the circularity the evidence-universe service exists to prevent. The seed is recorded so an audit can confirm which documents were drawn, and so a run replays deterministically."
+    },
+    "universe": {
+      "type": "object",
+      "required": ["n_documents"],
+      "properties": {
+        "n_documents": { "type": "integer" },
+        "n_types": { "type": "integer" },
+        "date_range": { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2 }
+      }
+    },
+    "strata": { "type": "array", "items": { "$ref": "#/$defs/stratumResult" } },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "proof_mode": { "enum": ["witness", "coverage"] },
+          "satisfied": { "type": "boolean" },
+          "anchor_value": { "type": ["string", "null"] },
+          "observable_period": {
+            "type": "object",
+            "properties": { "start": { "type": ["string", "null"] }, "end": { "type": ["string", "null"] } }
+          },
+          "through_date": {
+            "type": ["string", "null"],
+            "description": "The date this negative conclusion actually reaches — normally observable_period.end. A negative claim without it is unscopeable and has no truth value. Must be surfaced to the consumer, not buried in the trace."
+          },
+          "through_date_lag_days": {
+            "type": ["integer", "null"],
+            "description": "snapshot_date minus through_date. A large lag means the conclusion is old news; flag it rather than let it pass as equivalent to a current one."
+          },
+          "windows": { "type": "array", "items": { "$ref": "#/$defs/windowResult" } },
+          "windows_clipped": {
+            "type": "integer",
+            "description": "Windows dropped as out_of_scope (before anchor / after observable end). These enter neither the gate nor the elusion computation."
+          },
+          "strata": { "type": "array", "items": { "$ref": "#/$defs/stratumResult" } }
+        }
+      }
+    },
+    "gate_result": {
+      "type": "object",
+      "properties": {
+        "verdict": { "enum": ["PASS", "FAIL"] },
+        "checks": { "type": "object", "additionalProperties": { "type": "boolean" } },
+        "missing": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "finality": {
+      "type": "object",
+      "required": ["value"],
+      "description": "P9 once more. 'Provisional' has two causes whose remedies differ, so it must carry a reason; collapsing them means scheduling reruns that can never resolve.",
+      "properties": {
+        "value": { "enum": ["Final", "Provisional"] },
+        "reason": {
+          "type": "array",
+          "items": { "enum": ["PENDING_FILING", "OBSERVATION_TRUNCATED"] },
+          "description": "PENDING_FILING: the event happened and the document exists but has not landed — waiting fixes it, so schedule a rerun. OBSERVATION_TRUNCATED: the patient stopped being observed — waiting fixes nothing unless they return; accept the truncated scope or go to an external source. Both can hold at once, hence an array."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "value": { "const": "Provisional" } }, "required": ["value"] },
+          "then": { "required": ["reason"] }
+        }
+      ]
+    },
+    "est_missed_upper": {
+      "type": ["number", "null"],
+      "description": "Reported, NOT gated."
+    },
+    "recall_lower_bound": {
+      "type": ["number", "null"],
+      "description": "Reported, NOT gated. Unstable when k is small: with k=2, U=400, m=50 the bound is ~0.08, and reaching 0.95 would need m of roughly 11,000 — larger than the whole pool. The gate therefore rests on whether the exclusion declaration and the keyword list survived sampling, not on recall."
+    }
+  },
+
+  "$defs": {
+    "stratumResult": {
+      "type": "object",
+      "required": ["name", "N"],
+      "properties": {
+        "name": { "type": "string" },
+        "N": { "type": "integer" },
+        "reviewed": { "type": "integer" },
+        "complete": { "type": "boolean" },
+        "keywords_searched": { "type": "array", "items": { "type": "string" } },
+        "hits": { "type": "integer" },
+        "hits_read": { "type": "integer" },
+        "misses": { "type": "integer" },
+        "misses_sampled": { "type": "integer" },
+        "miss_sample_hits": { "type": "integer" },
+        "keyword_list_validated": { "type": "boolean" },
+        "declared_types": { "type": "array", "items": { "type": "string" } },
+        "sampled": { "type": "integer" },
+        "sample_hits": { "type": "integer" },
+        "elusion_upper": {
+          "type": "number",
+          "description": "Clopper-Pearson one-sided upper bound on the relevance rate of the unreviewed remainder. Exhaustively reviewed strata are genuinely 0. A searched stratum is NOT 0 unless its misses were sampled."
+        }
+      }
+    },
+    "windowResult": {
+      "type": "object",
+      "required": ["from", "to", "covered"],
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "covered": { "type": "boolean" },
+        "disposition": {
+          "enum": ["covered", "interior_gap", "out_of_scope_before_anchor", "out_of_scope_after_observable_end"],
+          "description": "Only interior_gap blocks the gate. The two out_of_scope values are clipped away and are not evidence gaps — treating a lost-to-follow-up patient as a gap would fail nearly every real surveillance record."
+        },
+        "qualifying_docs": { "type": "array", "items": { "type": "string" } },
+        "n_documents_any_type": { "type": "integer" }
+      }
+    }
+  }
+}

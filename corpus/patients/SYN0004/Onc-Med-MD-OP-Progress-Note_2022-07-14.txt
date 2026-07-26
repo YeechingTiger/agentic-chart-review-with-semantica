@@ -1,0 +1,16 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2022-07-14
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt reports new cough x 6 wks. Restaging obtained.
+
+ASSESSMENT AND PLAN:
+  1. Recurrent disease, now with pulmonary metastases. Prior disease-free interval
+     since completion of therapy. Recurrence confined to lung.
+  2. Will initiate systemic therapy.
+
+MEDS: atorvastatin, lisinopril, pantoprazole
+

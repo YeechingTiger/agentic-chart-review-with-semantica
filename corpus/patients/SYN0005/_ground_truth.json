@@ -1,0 +1,48 @@
+{
+  "patient_id": "SYN0005",
+  "evidence_pattern": "in situ disease \u2014 behavior 2",
+  "designer_notes": "Behavior must be 2, not 3. Tests that the agent reads the behavior off the pathology wording rather than defaulting to invasive.",
+  "n_documents": 322,
+  "date_range": [
+    "2014-02-22",
+    "2025-08-13"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20240220",
+      "status": "FOUND",
+      "why": "TURBT pathology 2024-02-20."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C679",
+      "histology": "8120",
+      "behavior": "2",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2014-02-22",
+        "end": "2025-08-13"
+      },
+      "expected_through_date": "2025-08-13",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {}
+}

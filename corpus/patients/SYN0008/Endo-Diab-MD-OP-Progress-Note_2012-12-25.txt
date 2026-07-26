@@ -1,0 +1,14 @@
+MRN: SYN0008
+Patient: Quinn Nakamura
+DOB: 1968-02-18   Sex: F
+Document Type: Endo Diab MD OP Progress Note
+Service Date: 2012-12-25
+----------------------------------------------------------------
+SUBJECTIVE:
+  Interval visit. Tolerating therapy. Labs reviewed.
+
+ASSESSMENT AND PLAN:
+  1. Continue current regimen. RTC 4 wks.
+
+MEDS: atorvastatin, metformin, ondansetron
+

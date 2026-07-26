@@ -1,0 +1,9 @@
+MRN: SYN0006
+Patient: Riley Okafor
+DOB: 1957-06-13   Sex: M
+Document Type: Fluoroscopy Up to 1 Hr
+Service Date: 2019-06-25
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

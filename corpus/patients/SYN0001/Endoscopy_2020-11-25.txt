@@ -1,0 +1,9 @@
+MRN: SYN0001
+Patient: Reese Okafor
+DOB: 1946-07-02   Sex: F
+Document Type: Endoscopy
+Service Date: 2020-11-25
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the right upper lobe of lung. Biopsies obtained.
+

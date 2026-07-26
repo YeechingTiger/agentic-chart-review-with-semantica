@@ -1,0 +1,12 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2012-05-29
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2012-05-29   ONDANSETRON 8MG TAB              qty 90
+  2012-05-29   OXYCODONE 5MG TAB                qty 60
+  2012-05-29   METFORMIN HCL 500MG TAB          qty 30
+

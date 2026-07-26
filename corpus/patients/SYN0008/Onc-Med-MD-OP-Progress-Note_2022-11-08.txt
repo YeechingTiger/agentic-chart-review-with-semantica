@@ -1,0 +1,15 @@
+MRN: SYN0008
+Patient: Quinn Nakamura
+DOB: 1968-02-18   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2022-11-08
+----------------------------------------------------------------
+SUBJECTIVE:
+  Interval hx reviewed.
+
+ASSESSMENT AND PLAN:
+  1. Stomach, antrum adenocarcinoma. CT shows liver mets — stage IV.
+     (Note: attending restatement; see radiology IMPRESSION of record.)
+
+MEDS: atorvastatin, lisinopril, pantoprazole
+

@@ -1,0 +1,9 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: Procedure Note
+Service Date: 2016-02-03
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

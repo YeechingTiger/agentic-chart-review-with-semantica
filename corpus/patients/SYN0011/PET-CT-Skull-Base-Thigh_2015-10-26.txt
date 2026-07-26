@@ -1,0 +1,9 @@
+MRN: SYN0011
+Patient: Quinn Alvarez
+DOB: 1945-10-11   Sex: M
+Document Type: PET CT Skull Base Thigh
+Service Date: 2015-10-26
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

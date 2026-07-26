@@ -1,0 +1,9 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: Fluoroscopy Up to 1 Hr
+Service Date: 2014-02-14
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

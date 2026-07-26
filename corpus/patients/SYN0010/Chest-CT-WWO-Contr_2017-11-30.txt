@@ -1,0 +1,9 @@
+MRN: SYN0010
+Patient: Reese Lindqvist
+DOB: 1958-03-21   Sex: F
+Document Type: Chest CT WWO Contr
+Service Date: 2017-11-30
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

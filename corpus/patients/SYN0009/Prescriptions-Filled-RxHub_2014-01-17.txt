@@ -1,0 +1,12 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2014-01-17
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2014-01-17   LISINOPRIL 10MG TAB              qty 90
+  2014-01-17   PANTOPRAZOLE 40MG TAB            qty 90
+  2014-01-17   ATORVASTATIN 20MG TAB            qty 90
+

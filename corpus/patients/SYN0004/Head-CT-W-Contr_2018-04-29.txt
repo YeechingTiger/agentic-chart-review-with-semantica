@@ -1,0 +1,9 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: Head CT W Contr
+Service Date: 2018-04-29
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

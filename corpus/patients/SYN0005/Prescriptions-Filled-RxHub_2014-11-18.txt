@@ -1,0 +1,12 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2014-11-18
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2014-11-18   PANTOPRAZOLE 40MG TAB            qty 90
+  2014-11-18   ATORVASTATIN 20MG TAB            qty 90
+  2014-11-18   METFORMIN HCL 500MG TAB          qty 90
+

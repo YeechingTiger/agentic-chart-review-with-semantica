@@ -1,0 +1,12 @@
+MRN: SYN0002
+Patient: Casey Lindqvist
+DOB: 1967-06-11   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2018-06-04
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2018-06-04   METFORMIN HCL 500MG TAB          qty 60
+  2018-06-04   ONDANSETRON 8MG TAB              qty 30
+  2018-06-04   PANTOPRAZOLE 40MG TAB            qty 60
+

@@ -1,0 +1,9 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: Endoscopy
+Service Date: 2017-12-09
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the left breast. Biopsies obtained.
+

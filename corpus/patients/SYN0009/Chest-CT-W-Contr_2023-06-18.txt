@@ -1,0 +1,20 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: Chest CT W Contr
+Service Date: 2023-06-18
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Restaging for left breast lesion.
+
+TECHNIQUE:
+  Chest CT W Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the left breast, measuring 56 x 16 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the left breast, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

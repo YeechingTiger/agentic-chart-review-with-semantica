@@ -1,0 +1,48 @@
+{
+  "patient_id": "SYN0007",
+  "evidence_pattern": "focal invasion inside an in-situ lesion \u2014 behavior 3",
+  "designer_notes": "STORE [523] boundary case: 'Code 3 if any malignant invasion is present, no matter how limited.' The prose says intraductal (which reads in situ) but reports focal invasion.",
+  "n_documents": 319,
+  "date_range": [
+    "2010-09-20",
+    "2022-03-11"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20200917",
+      "status": "FOUND",
+      "why": "Excisional biopsy pathology 2020-09-17."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C509",
+      "histology": "8500",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2010-09-20",
+        "end": "2022-03-11"
+      },
+      "expected_through_date": "2022-03-11",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {}
+}

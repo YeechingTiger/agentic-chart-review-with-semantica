@@ -1,0 +1,12 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2013-11-08
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2013-11-08   LISINOPRIL 10MG TAB              qty 60
+  2013-11-08   ATORVASTATIN 20MG TAB            qty 30
+  2013-11-08   OXYCODONE 5MG TAB                qty 90
+

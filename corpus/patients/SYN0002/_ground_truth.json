@@ -1,0 +1,48 @@
+{
+  "patient_id": "SYN0002",
+  "evidence_pattern": "evidence gap \u2014 biopsy performed at outside hospital",
+  "designer_notes": "Histology must come back EVIDENCE_INSUFFICIENT: the diagnosis is asserted in prose but the confirming pathology was done elsewhere and is not in the record. Recurrence status is genuinely unknown (99), not 00.",
+  "n_documents": 293,
+  "date_range": [
+    "2012-09-08",
+    "2023-05-04"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20220906",
+      "status": "FOUND",
+      "why": "CT 2022-09-06 shows obstructing mass; GI note same day states 'known colon cancer'."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C187",
+      "histology": null,
+      "behavior": null,
+      "status": "EVIDENCE_INSUFFICIENT",
+      "why": "No pathology in the record; histology must NOT be inferred from imaging."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "99",
+      "date": null,
+      "status": "EVIDENCE_INSUFFICIENT",
+      "observable_period": {
+        "start": "2012-09-08",
+        "end": "2023-05-04"
+      },
+      "expected_through_date": "2023-05-04",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {}
+}

@@ -1,0 +1,12 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2015-12-09
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2015-12-09   LISINOPRIL 10MG TAB              qty 30
+  2015-12-09   ONDANSETRON 8MG TAB              qty 90
+  2015-12-09   ATORVASTATIN 20MG TAB            qty 30
+

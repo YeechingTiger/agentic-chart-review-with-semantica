@@ -1,0 +1,16 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2020-09-19
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt seen today to discuss recent imaging of the right breast.
+  Reports fatigue, appetite down. No fevers.
+
+ASSESSMENT AND PLAN:
+  1. Mass, right breast. Clinically this represents malignancy;
+     proceeding to tissue sampling for confirmation.
+
+MEDS: pantoprazole, ondansetron, atorvastatin
+

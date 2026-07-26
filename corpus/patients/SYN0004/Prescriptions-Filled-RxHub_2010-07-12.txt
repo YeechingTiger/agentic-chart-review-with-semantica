@@ -1,0 +1,12 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2010-07-12
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2010-07-12   ATORVASTATIN 20MG TAB            qty 90
+  2010-07-12   ONDANSETRON 8MG TAB              qty 90
+  2010-07-12   OXYCODONE 5MG TAB                qty 30
+

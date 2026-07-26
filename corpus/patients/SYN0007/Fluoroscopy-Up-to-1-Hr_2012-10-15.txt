@@ -1,0 +1,9 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: Fluoroscopy Up to 1 Hr
+Service Date: 2012-10-15
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

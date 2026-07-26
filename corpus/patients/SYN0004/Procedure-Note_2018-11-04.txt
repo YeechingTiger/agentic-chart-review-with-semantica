@@ -1,0 +1,9 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: Procedure Note
+Service Date: 2018-11-04
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

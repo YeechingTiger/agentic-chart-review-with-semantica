@@ -1,0 +1,12 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2017-02-24
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2017-02-24   OXYCODONE 5MG TAB                qty 90
+  2017-02-24   PANTOPRAZOLE 40MG TAB            qty 60
+  2017-02-24   METFORMIN HCL 500MG TAB          qty 60
+

@@ -1,0 +1,9 @@
+MRN: SYN0010
+Patient: Reese Lindqvist
+DOB: 1958-03-21   Sex: F
+Document Type: Endoscopy
+Service Date: 2009-06-02
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the left breast. Biopsies obtained.
+

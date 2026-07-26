@@ -1,0 +1,16 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2024-02-22
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt seen today to discuss recent imaging of the urinary bladder.
+  Reports fatigue, appetite down. No fevers.
+
+ASSESSMENT AND PLAN:
+  1. Mass, urinary bladder. Clinically this represents malignancy;
+     proceeding to tissue sampling for confirmation.
+
+MEDS: atorvastatin, metformin, pantoprazole
+

@@ -1,0 +1,9 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2018-04-28
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

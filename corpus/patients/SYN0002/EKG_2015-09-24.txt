@@ -1,0 +1,9 @@
+MRN: SYN0002
+Patient: Casey Lindqvist
+DOB: 1967-06-11   Sex: M
+Document Type: EKG
+Service Date: 2015-09-24
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 93. No acute ST-T changes.
+

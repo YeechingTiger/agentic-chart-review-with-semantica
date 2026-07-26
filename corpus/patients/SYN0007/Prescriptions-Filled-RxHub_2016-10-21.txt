@@ -1,0 +1,12 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2016-10-21
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2016-10-21   PANTOPRAZOLE 40MG TAB            qty 90
+  2016-10-21   ATORVASTATIN 20MG TAB            qty 90
+  2016-10-21   LISINOPRIL 10MG TAB              qty 90
+

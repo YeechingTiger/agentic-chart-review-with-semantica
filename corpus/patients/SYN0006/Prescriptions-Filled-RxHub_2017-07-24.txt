@@ -1,0 +1,12 @@
+MRN: SYN0006
+Patient: Riley Okafor
+DOB: 1957-06-13   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2017-07-24
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2017-07-24   ONDANSETRON 8MG TAB              qty 30
+  2017-07-24   METFORMIN HCL 500MG TAB          qty 60
+  2017-07-24   OXYCODONE 5MG TAB                qty 30
+

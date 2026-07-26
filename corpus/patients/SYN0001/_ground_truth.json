@@ -1,0 +1,48 @@
+{
+  "patient_id": "SYN0001",
+  "evidence_pattern": "tissue-confirmed; cytology precedes pathology",
+  "designer_notes": "Exercises the [390] cytology-vs-pathology boundary case and a clean 00 (disease-free, no recurrence).",
+  "n_documents": 321,
+  "date_range": [
+    "2013-04-14",
+    "2024-10-03"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20230412",
+      "status": "FOUND",
+      "why": "Cytology 2023-04-12 read as 'suspicious for adenocarcinoma' AND an oncology note of the same admission records a clinical impression of malignancy, so the cytology date is diagnostic per STORE [390]. Core biopsy 2023-04-27 confirms."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C341",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2013-04-14",
+        "end": "2024-10-03"
+      },
+      "expected_through_date": "2024-10-03",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {}
+}

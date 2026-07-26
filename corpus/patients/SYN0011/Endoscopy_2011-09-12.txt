@@ -1,0 +1,9 @@
+MRN: SYN0011
+Patient: Quinn Alvarez
+DOB: 1945-10-11   Sex: M
+Document Type: Endoscopy
+Service Date: 2011-09-12
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the sigmoid colon. Biopsies obtained.
+

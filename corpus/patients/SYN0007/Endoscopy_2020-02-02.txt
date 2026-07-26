@@ -1,0 +1,9 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: Endoscopy
+Service Date: 2020-02-02
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the right breast. Biopsies obtained.
+

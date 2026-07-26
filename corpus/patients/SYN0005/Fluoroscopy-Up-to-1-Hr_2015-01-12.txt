@@ -1,0 +1,9 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Fluoroscopy Up to 1 Hr
+Service Date: 2015-01-12
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

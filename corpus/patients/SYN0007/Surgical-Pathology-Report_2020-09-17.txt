@@ -1,0 +1,21 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: Surgical Pathology Report
+Service Date: 2020-09-17
+----------------------------------------------------------------
+SPECIMEN:
+  A. right breast — biopsy
+
+GROSS DESCRIPTION:
+  Received in formalin, multiple tan-pink soft tissue fragments aggregating 1.2 cm.
+
+MICROSCOPIC DESCRIPTION:
+  Sections demonstrate intraductal carcinoma with focal invasion.
+  Focal stromal invasion is identified, limited in extent but unequivocal.
+
+FINAL DIAGNOSIS:
+  A. RIGHT BREAST, BIOPSY — INTRADUCTAL CARCINOMA WITH FOCAL INVASION.
+
+Electronically signed by Pathology.
+

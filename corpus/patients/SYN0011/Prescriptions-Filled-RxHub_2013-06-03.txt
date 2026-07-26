@@ -1,0 +1,12 @@
+MRN: SYN0011
+Patient: Quinn Alvarez
+DOB: 1945-10-11   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2013-06-03
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2013-06-03   ATORVASTATIN 20MG TAB            qty 30
+  2013-06-03   PANTOPRAZOLE 40MG TAB            qty 30
+  2013-06-03   LISINOPRIL 10MG TAB              qty 30
+

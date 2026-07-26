@@ -1,0 +1,20 @@
+MRN: SYN0001
+Patient: Reese Okafor
+DOB: 1946-07-02   Sex: F
+Document Type: Chest CT W Contr
+Service Date: 2023-04-06
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Restaging for right upper lobe of lung lesion.
+
+TECHNIQUE:
+  Chest CT W Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the right upper lobe of lung, measuring 40 x 20 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the right upper lobe of lung, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

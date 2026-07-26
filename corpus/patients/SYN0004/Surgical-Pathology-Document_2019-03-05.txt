@@ -1,0 +1,20 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: Surgical Pathology Report
+Service Date: 2019-03-05
+----------------------------------------------------------------
+SPECIMEN:
+  A. left breast, upper outer quadrant — biopsy
+
+GROSS DESCRIPTION:
+  Received in formalin, multiple tan-pink soft tissue fragments aggregating 1.2 cm.
+
+MICROSCOPIC DESCRIPTION:
+  Sections demonstrate infiltrating ductal carcinoma.
+
+FINAL DIAGNOSIS:
+  A. LEFT BREAST, UPPER OUTER QUADRANT, BIOPSY — INFILTRATING DUCTAL CARCINOMA.
+
+Electronically signed by Pathology.
+

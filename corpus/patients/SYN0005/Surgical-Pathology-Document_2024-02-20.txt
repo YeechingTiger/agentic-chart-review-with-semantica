@@ -1,0 +1,22 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Surgical Pathology Report
+Service Date: 2024-02-20
+----------------------------------------------------------------
+SPECIMEN:
+  A. urinary bladder — biopsy
+
+GROSS DESCRIPTION:
+  Received in formalin, multiple tan-pink soft tissue fragments aggregating 1.2 cm.
+
+MICROSCOPIC DESCRIPTION:
+  Sections demonstrate urothelial carcinoma in situ.
+  No stromal invasion is identified. The process is confined to the epithelium.
+
+FINAL DIAGNOSIS:
+  A. URINARY BLADDER, BIOPSY — UROTHELIAL CARCINOMA IN SITU.
+     No invasive carcinoma identified.
+
+Electronically signed by Pathology.
+

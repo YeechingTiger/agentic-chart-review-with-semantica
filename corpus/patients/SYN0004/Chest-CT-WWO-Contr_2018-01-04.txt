@@ -1,0 +1,9 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: Chest CT WWO Contr
+Service Date: 2018-01-04
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

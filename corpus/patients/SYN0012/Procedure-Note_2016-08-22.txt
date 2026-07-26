@@ -1,0 +1,9 @@
+MRN: SYN0012
+Patient: Alex Ferris
+DOB: 1963-05-03   Sex: F
+Document Type: Procedure Note
+Service Date: 2016-08-22
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

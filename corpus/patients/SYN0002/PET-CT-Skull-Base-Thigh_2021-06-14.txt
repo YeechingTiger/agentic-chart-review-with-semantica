@@ -1,0 +1,9 @@
+MRN: SYN0002
+Patient: Casey Lindqvist
+DOB: 1967-06-11   Sex: M
+Document Type: PET CT Skull Base Thigh
+Service Date: 2021-06-14
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

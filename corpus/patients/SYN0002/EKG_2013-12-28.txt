@@ -1,0 +1,9 @@
+MRN: SYN0002
+Patient: Casey Lindqvist
+DOB: 1967-06-11   Sex: M
+Document Type: EKG
+Service Date: 2013-12-28
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 104. No acute ST-T changes.
+

@@ -1,0 +1,9 @@
+MRN: SYN0012
+Patient: Alex Ferris
+DOB: 1963-05-03   Sex: F
+Document Type: EKG
+Service Date: 2014-11-17
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 62. No acute ST-T changes.
+

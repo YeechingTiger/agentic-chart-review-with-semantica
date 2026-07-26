@@ -1,0 +1,48 @@
+{
+  "patient_id": "SYN0006",
+  "evidence_pattern": "patient declined biopsy \u2014 radiographic diagnosis only",
+  "designer_notes": "Second evidence-gap probe with a different mechanism (patient refusal, documented in prose).",
+  "n_documents": 306,
+  "date_range": [
+    "2013-08-04",
+    "2024-03-29"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20230802",
+      "status": "FOUND",
+      "why": "CT chest 2023-08-02 spiculated mass; pulmonary note asserts probable NSCLC."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C349",
+      "histology": null,
+      "behavior": null,
+      "status": "EVIDENCE_INSUFFICIENT",
+      "why": "No pathology in the record; histology must NOT be inferred from imaging."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "99",
+      "date": null,
+      "status": "EVIDENCE_INSUFFICIENT",
+      "observable_period": {
+        "start": "2013-08-04",
+        "end": "2024-03-29"
+      },
+      "expected_through_date": "2024-03-29",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {}
+}

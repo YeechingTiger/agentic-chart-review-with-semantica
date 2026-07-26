@@ -1,0 +1,16 @@
+MRN: SYN0001
+Patient: Reese Okafor
+DOB: 1946-07-02   Sex: F
+Document Type: Surgical Pathology Document
+Service Date: 2023-04-12
+----------------------------------------------------------------
+SPECIMEN:
+  Fine needle aspirate, right upper lobe of lung
+
+INTERPRETATION:
+  Atypical cells present, suspicious for adenocarcinoma.
+  Correlation with tissue biopsy recommended.
+
+IMPRESSION:
+  SUSPICIOUS FOR ADENOCARCINOMA.
+

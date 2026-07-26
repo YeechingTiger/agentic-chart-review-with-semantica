@@ -1,0 +1,12 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2016-07-09
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2016-07-09   ATORVASTATIN 20MG TAB            qty 60
+  2016-07-09   PANTOPRAZOLE 40MG TAB            qty 30
+  2016-07-09   OXYCODONE 5MG TAB                qty 90
+

@@ -1,0 +1,20 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2024-02-14
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Restaging for urinary bladder lesion.
+
+TECHNIQUE:
+  Abd Pelvis CT W Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the urinary bladder, measuring 32 x 47 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the urinary bladder, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

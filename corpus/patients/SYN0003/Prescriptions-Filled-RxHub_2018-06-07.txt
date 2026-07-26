@@ -1,0 +1,12 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2018-06-07
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2018-06-07   PANTOPRAZOLE 40MG TAB            qty 60
+  2018-06-07   LISINOPRIL 10MG TAB              qty 90
+  2018-06-07   OXYCODONE 5MG TAB                qty 30
+

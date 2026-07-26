@@ -1,0 +1,20 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: Chest CT W Contr
+Service Date: 2021-01-13
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Eval of pancreatic head lesion.
+
+TECHNIQUE:
+  Chest CT W Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the pancreatic head, measuring 48 x 38 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the pancreatic head, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

@@ -1,0 +1,9 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: Head CT WWO Contr
+Service Date: 2008-12-26
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

@@ -1,0 +1,9 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Head CT W Contr
+Service Date: 2019-01-30
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

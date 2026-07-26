@@ -1,0 +1,20 @@
+MRN: SYN0011
+Patient: Quinn Alvarez
+DOB: 1945-10-11   Sex: M
+Document Type: Surgical Pathology Report
+Service Date: 2019-02-22
+----------------------------------------------------------------
+SPECIMEN:
+  A. sigmoid colon — biopsy
+
+GROSS DESCRIPTION:
+  Received in formalin, multiple tan-pink soft tissue fragments aggregating 1.2 cm.
+
+MICROSCOPIC DESCRIPTION:
+  Sections demonstrate adenocarcinoma.
+
+FINAL DIAGNOSIS:
+  A. SIGMOID COLON, BIOPSY — ADENOCARCINOMA.
+
+Electronically signed by Pathology.
+

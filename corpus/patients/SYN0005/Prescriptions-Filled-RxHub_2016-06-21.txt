@@ -1,0 +1,12 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2016-06-21
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2016-06-21   ONDANSETRON 8MG TAB              qty 90
+  2016-06-21   ATORVASTATIN 20MG TAB            qty 60
+  2016-06-21   OXYCODONE 5MG TAB                qty 60
+

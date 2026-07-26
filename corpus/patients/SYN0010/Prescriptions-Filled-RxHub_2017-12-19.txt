@@ -1,0 +1,12 @@
+MRN: SYN0010
+Patient: Reese Lindqvist
+DOB: 1958-03-21   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2017-12-19
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2017-12-19   ONDANSETRON 8MG TAB              qty 60
+  2017-12-19   LISINOPRIL 10MG TAB              qty 60
+  2017-12-19   PANTOPRAZOLE 40MG TAB            qty 30
+

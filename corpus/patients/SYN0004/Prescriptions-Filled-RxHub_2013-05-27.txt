@@ -1,0 +1,12 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2013-05-27
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2013-05-27   PANTOPRAZOLE 40MG TAB            qty 60
+  2013-05-27   METFORMIN HCL 500MG TAB          qty 60
+  2013-05-27   ONDANSETRON 8MG TAB              qty 30
+

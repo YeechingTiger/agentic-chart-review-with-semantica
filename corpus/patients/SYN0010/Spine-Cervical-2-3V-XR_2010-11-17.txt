@@ -1,0 +1,9 @@
+MRN: SYN0010
+Patient: Reese Lindqvist
+DOB: 1958-03-21   Sex: F
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2010-11-17
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

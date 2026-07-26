@@ -1,0 +1,20 @@
+MRN: SYN0006
+Patient: Riley Okafor
+DOB: 1957-06-13   Sex: M
+Document Type: Chest CT WWO Contr
+Service Date: 2023-07-27
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Follow-up right lung lesion.
+
+TECHNIQUE:
+  Chest CT WWO Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the right lung, measuring 37 x 49 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the right lung, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

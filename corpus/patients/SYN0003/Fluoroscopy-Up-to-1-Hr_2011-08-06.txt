@@ -1,0 +1,9 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: Fluoroscopy Up to 1 Hr
+Service Date: 2011-08-06
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

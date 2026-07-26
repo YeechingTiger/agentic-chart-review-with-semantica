@@ -1,0 +1,12 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2025-01-05
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2025-01-05   ONDANSETRON 8MG TAB              qty 90
+  2025-01-05   METFORMIN HCL 500MG TAB          qty 90
+  2025-01-05   OXYCODONE 5MG TAB                qty 30
+

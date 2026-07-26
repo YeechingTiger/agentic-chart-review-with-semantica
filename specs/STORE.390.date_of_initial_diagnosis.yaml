@@ -1,0 +1,105 @@
+spec_id: STORE.390.date_of_initial_diagnosis
+spec_version: 0.1.0
+source_authority:
+  document: "CoC STORE 2025 (updated 2025-04-24)"
+  items: ["Date of Initial Diagnosis [390]"]
+data_source: notes
+
+question: "On what date was this tumour first diagnosed by a physician?"
+
+fields:
+  - name: date_of_initial_diagnosis
+    type: string
+    format: "CCYYMMDD"
+    nullable: false
+    description: "8 digits; blanks are not allowed by the registry standard"
+  - name: month_day_imputed
+    type: boolean
+    description: "true if month or day came from a seasonal/approximate phrase rather than an explicit date"
+
+decision_rule:
+  - "Use the FIRST date of diagnosis, whether clinically or histologically established."
+  - "If a physician states that in retrospect the patient had cancer at an earlier date, use the earlier date."
+  - "If first-course treatment began before a diagnosis was documented, use the treatment start date."
+  - "For a case diagnosed at autopsy or by death certificate only, the date of death is the date of diagnosis."
+  - "If the year cannot be identified it must be approximated, and month and day are then unknown."
+
+evidence_rules:
+  counts_as_evidence:
+    - "A pathology or cytology report whose interpretation establishes the diagnosis."
+    - "A physician's clinical impression of cancer, which can establish a clinical diagnosis without tissue."
+  does_not_count:
+    - "Cytology carrying only an ambiguous term, UNLESS a positive biopsy or a physician's clinical impression of cancer supports it."
+    - "A radiology report that merely describes a suspicious mass, absent a physician's diagnostic statement."
+
+conflict_rules:
+  - if: "cytology with an ambiguous term precedes a confirmatory biopsy AND a physician's clinical impression of cancer exists at the cytology date"
+    then: "use the cytology date"
+  - if: "cytology with an ambiguous term precedes a confirmatory biopsy AND no clinical impression supports it"
+    then: "use the biopsy date"
+  - if: "documents disagree on the date"
+    then: "take the earliest that satisfies the decision rules and cite every conflicting source"
+
+proof_obligation:
+  for_positive: "One document establishing diagnosis, with its date."
+  # Asserting "no diagnosis date exists anywhere in this chart" is a coverage claim, but the
+  # documents that could carry the earliest date are type-identifiable, so this stays a
+  # type-stratified exclusion (P3d, witness-style strata) rather than a time-partitioned one.
+  for_negative:
+    mode: stratified_exclusion
+    confidence: 0.95
+    strata:
+      - name: can_establish
+        match: {doc_type_matches: ["Pathology", "Cytology", "Onc-"]}
+        policy: exhaustive
+      - name: may_mention
+        match: {doc_type_matches: ["Progress-Note", "Consult", "Discharge", "Endoscopy", "Procedure-Note"]}
+        policy: search_then_read_hits_and_sample_misses
+        required_keywords: ["diagnosis", "diagnosed", "carcinoma", "biopsy", "malignancy"]
+        min_sample_of_misses: 25
+        max_tolerated_hits: 0
+      - name: cannot_establish
+        match: {rest: true}
+        policy: validate_by_sampling
+        min_sample: 25
+        max_tolerated_hits: 0
+    gate:
+      require_can_establish_nonempty: true
+      exhaustive_strata_complete: true
+      required_keywords_all_searched: true
+      exclusion_validated: true
+      keyword_list_validated: true
+      max_elusion_upper: 0.12
+    statement: >
+      This field does not permit a blank. If you genuinely cannot establish a date, answer
+      EVIDENCE_INSUFFICIENT rather than guessing — but only after the coverage above is done.
+
+abstention:
+  EVIDENCE_INSUFFICIENT: "No document in the chart establishes a diagnosis date."
+  SPEC_INSUFFICIENT: "The chart shows multiple primaries and it is unclear which tumour is being reported."
+
+date_imputation:
+  spring: "04"
+  summer_or_midyear: "07"
+  fall_or_autumn: "10"
+  winter: "12 or 01 — decide whether the phrasing means late or early in the year"
+  rule: "Whenever a seasonal phrase is used, set month_day_imputed true and quote the original wording."
+
+boundary_cases:
+  - case: "Cytology 2010-06-12 'suspicious for cancer'; pathology positive 2010-07-02; an oncology note of 2010-06-12 records a clinical impression of malignancy"
+    answer: "20100612"
+  - case: "Pathology 2010-05-17 'suspicious'; confirmed positive 2010-05-22"
+    answer: "20100517"
+  - case: "Referral note dated 2010-07-05 says the patient was diagnosed in the spring of 2010"
+    answer: "20100499"
+    month_day_imputed: true
+
+search_hints:
+  - diagnosis
+  - diagnosed
+  - biopsy
+  - pathology
+  - "final diagnosis"
+  - carcinoma
+  - malignancy
+  - impression

@@ -1,0 +1,9 @@
+MRN: SYN0004
+Patient: Quinn Ferris
+DOB: 1938-04-12   Sex: F
+Document Type: EKG
+Service Date: 2013-03-18
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 70. No acute ST-T changes.
+

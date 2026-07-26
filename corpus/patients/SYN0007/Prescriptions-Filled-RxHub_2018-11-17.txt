@@ -1,0 +1,12 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2018-11-17
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2018-11-17   LISINOPRIL 10MG TAB              qty 30
+  2018-11-17   ONDANSETRON 8MG TAB              qty 90
+  2018-11-17   PANTOPRAZOLE 40MG TAB            qty 90
+

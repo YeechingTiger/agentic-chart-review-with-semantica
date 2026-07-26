@@ -1,0 +1,12 @@
+MRN: SYN0002
+Patient: Casey Lindqvist
+DOB: 1967-06-11   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2014-11-02
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2014-11-02   OXYCODONE 5MG TAB                qty 60
+  2014-11-02   METFORMIN HCL 500MG TAB          qty 90
+  2014-11-02   ATORVASTATIN 20MG TAB            qty 30
+

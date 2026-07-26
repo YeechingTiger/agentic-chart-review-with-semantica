@@ -1,0 +1,12 @@
+MRN: SYN0007
+Patient: Jordan Moreau
+DOB: 1943-03-14   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2021-08-01
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2021-08-01   ATORVASTATIN 20MG TAB            qty 60
+  2021-08-01   OXYCODONE 5MG TAB                qty 90
+  2021-08-01   METFORMIN HCL 500MG TAB          qty 30
+

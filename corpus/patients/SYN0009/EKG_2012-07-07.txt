@@ -1,0 +1,9 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: EKG
+Service Date: 2012-07-07
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 99. No acute ST-T changes.
+

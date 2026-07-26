@@ -1,0 +1,16 @@
+MRN: SYN0011
+Patient: Quinn Alvarez
+DOB: 1945-10-11   Sex: M
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2019-02-24
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt seen today to discuss recent imaging of the sigmoid colon.
+  Reports fatigue, appetite down. No fevers.
+
+ASSESSMENT AND PLAN:
+  1. Mass, sigmoid colon. Clinically this represents malignancy;
+     proceeding to tissue sampling for confirmation.
+
+MEDS: lisinopril, pantoprazole, metformin
+

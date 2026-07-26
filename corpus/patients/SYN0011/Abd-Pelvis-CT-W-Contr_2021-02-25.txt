@@ -1,0 +1,20 @@
+MRN: SYN0011
+Patient: Quinn Alvarez
+DOB: 1945-10-11   Sex: M
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2021-02-25
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Follow-up sigmoid colon lesion.
+
+TECHNIQUE:
+  Abd Pelvis CT W Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the sigmoid colon, measuring 41 x 37 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the sigmoid colon, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

@@ -1,0 +1,12 @@
+MRN: SYN0012
+Patient: Alex Ferris
+DOB: 1963-05-03   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2015-08-01
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2015-08-01   PANTOPRAZOLE 40MG TAB            qty 30
+  2015-08-01   LISINOPRIL 10MG TAB              qty 30
+  2015-08-01   ONDANSETRON 8MG TAB              qty 30
+

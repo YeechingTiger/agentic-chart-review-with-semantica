@@ -1,0 +1,9 @@
+MRN: SYN0012
+Patient: Alex Ferris
+DOB: 1963-05-03   Sex: F
+Document Type: Head CT WWO Contr
+Service Date: 2017-10-16
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

@@ -1,0 +1,12 @@
+MRN: SYN0008
+Patient: Quinn Nakamura
+DOB: 1968-02-18   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2016-09-08
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2016-09-08   ONDANSETRON 8MG TAB              qty 90
+  2016-09-08   PANTOPRAZOLE 40MG TAB            qty 90
+  2016-09-08   OXYCODONE 5MG TAB                qty 60
+

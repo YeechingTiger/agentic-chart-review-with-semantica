@@ -1,0 +1,9 @@
+MRN: SYN0009
+Patient: Avery Moreau
+DOB: 1956-06-22   Sex: M
+Document Type: EKG
+Service Date: 2008-10-21
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 103. No acute ST-T changes.
+

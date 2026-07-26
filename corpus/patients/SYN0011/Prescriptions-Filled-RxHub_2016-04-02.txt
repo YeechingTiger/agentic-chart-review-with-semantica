@@ -1,0 +1,12 @@
+MRN: SYN0011
+Patient: Quinn Alvarez
+DOB: 1945-10-11   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2016-04-02
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2016-04-02   OXYCODONE 5MG TAB                qty 90
+  2016-04-02   METFORMIN HCL 500MG TAB          qty 60
+  2016-04-02   ATORVASTATIN 20MG TAB            qty 90
+

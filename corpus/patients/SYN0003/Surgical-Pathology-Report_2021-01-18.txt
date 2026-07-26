@@ -1,0 +1,20 @@
+MRN: SYN0003
+Patient: Reese Okafor
+DOB: 1969-04-03   Sex: M
+Document Type: Surgical Pathology Report
+Service Date: 2021-01-18
+----------------------------------------------------------------
+SPECIMEN:
+  A. pancreatic head — biopsy
+
+GROSS DESCRIPTION:
+  Received in formalin, multiple tan-pink soft tissue fragments aggregating 1.2 cm.
+
+MICROSCOPIC DESCRIPTION:
+  Sections demonstrate adenocarcinoma.
+
+FINAL DIAGNOSIS:
+  A. PANCREATIC HEAD, BIOPSY — ADENOCARCINOMA.
+
+Electronically signed by Pathology.
+

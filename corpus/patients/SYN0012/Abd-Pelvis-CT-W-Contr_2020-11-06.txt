@@ -1,0 +1,20 @@
+MRN: SYN0012
+Patient: Alex Ferris
+DOB: 1963-05-03   Sex: F
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2020-11-06
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Follow-up sigmoid colon lesion.
+
+TECHNIQUE:
+  Abd Pelvis CT W Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the sigmoid colon, measuring 54 x 30 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  Multiple hypodense hepatic lesions compatible with metastatic disease.
+
+IMPRESSION:
+  1. Mass in the sigmoid colon, as above. Neoplasm is favored.
+  2. Hepatic metastases.

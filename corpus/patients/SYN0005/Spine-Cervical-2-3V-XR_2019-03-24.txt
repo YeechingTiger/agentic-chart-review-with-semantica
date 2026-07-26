@@ -1,0 +1,9 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2019-03-24
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

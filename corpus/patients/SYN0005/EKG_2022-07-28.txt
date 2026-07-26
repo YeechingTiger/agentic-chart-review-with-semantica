@@ -1,0 +1,9 @@
+MRN: SYN0005
+Patient: Morgan Okafor
+DOB: 1952-11-18   Sex: F
+Document Type: EKG
+Service Date: 2022-07-28
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 88. No acute ST-T changes.
+

@@ -1,0 +1,12 @@
+MRN: SYN0002
+Patient: Casey Lindqvist
+DOB: 1967-06-11   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2017-03-13
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2017-03-13   METFORMIN HCL 500MG TAB          qty 60
+  2017-03-13   PANTOPRAZOLE 40MG TAB            qty 60
+  2017-03-13   LISINOPRIL 10MG TAB              qty 90
+

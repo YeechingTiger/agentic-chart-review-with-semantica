@@ -1,0 +1,20 @@
+MRN: SYN0002
+Patient: Casey Lindqvist
+DOB: 1967-06-11   Sex: M
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2022-08-31
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Follow-up sigmoid colon lesion.
+
+TECHNIQUE:
+  Abd Pelvis CT W Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the sigmoid colon, measuring 39 x 41 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the sigmoid colon, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.
