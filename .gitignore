@@ -33,3 +33,15 @@ data_real/
 
 # Reference copy of the prior platform (not ours to redistribute)
 _chartreview_ref/
+
+# Second venv for the deepagents runtime
+.venv-deep/
+
+# Document-type vocabulary cache, rebuilt on demand (39min -> 10s)
+corpus/patients/.doc_type_vocab.json
+
+# Second venv for the deepagents runtime
+.venv-deep/
+
+# Document-type vocabulary cache, rebuilt on demand
+corpus/patients/.doc_type_vocab.json
