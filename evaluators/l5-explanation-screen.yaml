@@ -1,0 +1,54 @@
+# A SCREEN IN FRONT OF THE HUMAN ADJUDICATOR, NEVER INSTEAD OF ONE.
+#
+# L5 asks WHY a case is non-concordant, and there is no label for why - by construction, not
+# by neglect. Validating that layer needs a clinician reading a stratified sample. This
+# evaluator does not decide anything; it orders the reading queue so the clinician's scarce
+# hour lands on the explanations most likely to be wrong.
+#
+# It is trace_only: everything it needs is already in the run record, so it grants no tools
+# and opens no chart. The loader refuses a trace_only file that declares tools, and refuses
+# `documents_not_read` here, because assembling that list means opening documents and this
+# file would then be under-declaring what it costs and what it touches.
+evaluator_id: l5-explanation-screen
+dimension: l5_explanation_quality
+cost_class: trace_only
+
+prompt:
+  role: >-
+    You are screening one L5 explanation for a clinician who will adjudicate it. The
+    explanation names causes for a non-concordant case. You are ranking, not ruling: your
+    score decides reading order and nothing else. Judge only what is in the packet.
+  dimensions:
+    - Is every asserted cause grounded in a ledger fact or a cited document in the packet
+    - Are the rival causes ruled out, or merely not mentioned
+    - Does the stated confidence exceed what the coverage proof supports
+  scale: 5-point
+  checklist:
+    - For each cause the explanation asserts, name the ledger fact or cited document that
+      supports it. Assertions with none are the finding.
+    - Name each candidate cause the explanation does not address, and what in the packet
+      would have let it be ruled out.
+    - Compare the stated confidence with the gate verdict and the coverage ledger. Quote any
+      sentence that claims more than the proof supports.
+    - A fluent explanation resting on facts that are not in the packet scores lowest. Correct
+      cause with unearned certainty is a separate failure and also scores low.
+
+context:
+  - trace
+  - cited_evidence
+  - coverage_ledger
+  - gate_verdict
+  - spec
+  # No expected_output: shown the registry's own answer, this judge scores whether the
+  # explanation named the cause the key implies - which is exactly the judgement the human
+  # adjudicator is there to make, and the reason this layer has no ground truth.
+
+tools: []                               # trace_only. Nothing here opens a chart.
+
+output: {score: required, reason: required, cot: optional}
+
+must_pass:
+  - SYN-L5-001-every-cause-tied-to-a-ledger-fact
+must_fail:
+  - SYN-L5-002-fluent-cause-with-no-fact-behind-it
+  - SYN-L5-003-certainty-beyond-a-partial-coverage-proof

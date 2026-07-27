@@ -1,0 +1,49 @@
+# ORDERING A POOL OF KNOWN-BAD CASES. The one dimension allowed the answer key.
+#
+# Every case in the pool is here BECAUSE a deterministic evaluator disagreed with the key.
+# Withholding that disagreement would leave nothing to sort, so `expected_output` is declared
+# and permitted - and it is permitted for this dimension only. The same line in the other two
+# files is a load error. That is enforcement 2 working in both directions: withholding the
+# key is a property of the file, and so is being allowed it.
+#
+# Getting this order wrong costs reading time and nothing else, which is why a judge is the
+# right instrument here and why the verdict may rank and screen but never gate.
+evaluator_id: bad-case-reading-order
+dimension: bad_case_triage
+cost_class: trace_only
+
+prompt:
+  role: >-
+    You are ordering a queue of already-known-wrong abstractions for one human reviewer who
+    has an hour. Each case is wrong; that is settled and is not what you are scoring. Score
+    how much a human would learn from reading THIS one first.
+  dimensions:
+    - Would a human learn something not already stated in the packet
+    - Does this failure look like a class that recurs, or a one-off
+    - If the diagnosis is right, what would actually change
+  scale: 5-point
+  checklist:
+    - State what the packet already tells you about why this case is wrong. If the answer is
+      complete, the case is merely confirmed-wrong and scores low however dramatic it looks.
+    - Decide whether the failure names a class that would recur across patients - a spec rule
+      that reads two ways, a document type never searched - or is idiosyncratic to this chart.
+    - "Say what a correct diagnosis would change: a spec rule, an evidence rule, a prompt,
+       or nothing. Interesting-but-unfixable ranks below boring-but-fixable."
+    - Score 5 for a recurring, fixable, not-yet-understood failure; 1 for a one-off that the
+      packet already explains.
+
+context:
+  - trace
+  - cited_evidence
+  - gate_verdict
+  - expected_output                     # permitted HERE and nowhere else: the disagreement
+                                        # with the key is the material being sorted.
+
+tools: []
+
+output: {score: required, reason: required, cot: optional}
+
+must_pass:
+  - SYN-TRI-001-recurring-spec-ambiguity-nobody-has-diagnosed
+must_fail:
+  - SYN-TRI-002-one-off-typo-the-packet-already-explains

@@ -1,0 +1,71 @@
+# THE EVALUATOR THAT JUSTIFIES AN AGENT-JUDGE AT ALL.
+#
+# Everything else a judge does here, code does better: the quote is sliced out of the
+# document by offset, the code is compared to the key with `==`, the gate verdict is counted.
+# This one asks a question no deterministic check can even formulate:
+#
+#   the run cited D to establish the value. Open D — does it hold? Now open WHAT IT NEVER
+#   OPENED. Is there anything in there that contradicts, supersedes or amends the citation?
+#
+# That is the care-gap-versus-documentation-gap question at trajectory level. A run can be
+# fully gate-validated, cite an admissible document, quote it exactly, and still be wrong,
+# because the addendum that reversed the impression was in a document the run never read.
+# The coverage gate proves the SCOPE was searched; it cannot read what was skipped.
+#
+# The deterministic half of this dimension is NOT here and may not be: whether a document
+# class may establish this field at all is decided by acr.coverage.admissibility_for_citations
+# from the spec's evidence_rules, and the loader refuses `evidence_support` (the parent) or
+# `evidence_support.deterministic` outright. This file declares the judged sub-question only.
+evaluator_id: contradiction-in-documents-not-read
+dimension: evidence_support.judged
+cost_class: reads_documents            # it opens the chart; it is not free and does not pretend to be
+
+prompt:
+  role: >-
+    You are a cancer registry quality auditor reviewing one abstraction after the fact. You
+    have the run's cited evidence and a list of documents the run never opened. Your job is
+    not to re-abstract the case and not to say whether the coded value is right. It is to
+    answer one question: does anything in the unread record disagree with what was cited?
+    You may open documents for this patient and no other.
+  dimensions:
+    - Does the cited passage state the coded value, or only mention the topic near it
+    - Does anything in the documents not read contradict, supersede or amend the citation
+    - Was a hedge (favor, suspicious for, cannot exclude, consistent with) read as a fact
+  scale: 3-point                        # 1 contradicted · 2 unresolved tension · 3 holds up
+  checklist:
+    - Read the cited passage in full, with the sentence before and after it. Hedges and
+      negations live in the neighbouring sentence more often than in the quoted one.
+    - List the documents not read, newest first. An addendum or amended report that
+      post-dates the cited document is the highest-yield thing on the list.
+    - Open the highest-yield unread documents for THIS PATIENT ONLY. Stop when the question
+      is settled; you are not re-reading the chart.
+    - Name every statement found there that disagrees with the citation, with document and
+      sentence. Say explicitly if you found none - "nothing contradicts it" is a finding.
+    - Score 1 if the record contradicts the citation, 2 if a tension is unresolved, 3 if the
+      citation holds up against everything you opened.
+
+context:                                # DECLARED, and only these are injected
+  - trace
+  - cited_evidence
+  - documents_not_read                  # the one that makes an agent-judge worth paying for
+  - spec
+  # expected_output is deliberately absent, and the loader would refuse it here: shown the
+  # key, this stops being "does the record disagree" and becomes a noisy copy of accuracy,
+  # which is already measured exactly.
+
+tools:                                  # DECLARED and scoped. This is a PHI access path.
+  - name: read_document
+    scope: patient_under_review
+  - name: list_documents
+    scope: patient_under_review
+
+output: {score: required, reason: required, cot: optional}
+
+# At least one of each, or this file does not load - and certify_evaluator runs them.
+# The must_fail case is the point: a judge that returns "3, looks fine" on everything is
+# indistinguishable from a system with no contradictions in it.
+must_pass:
+  - SYN-EVD-001-citation-holds-against-the-whole-record
+must_fail:
+  - SYN-EVD-002-addendum-reverses-the-cited-impression
+  - SYN-EVD-003-hedged-favor-coded-as-definite
