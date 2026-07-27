@@ -325,12 +325,31 @@ tests.
 - The quarantine is **not a boundary**. The spelling class is closed and pinned by 62 tests,
   but one process holds both credentials and the answer key ships in the payload of the very
   call that quarantines. Damage limitation, not separation.
-- The first true end-to-end run **deadlocked**. The agent correctly identified a truncated
-  pathology report as its blocker, said so in twelve consecutive reflections, read to the end
-  of the document — and then re-opened the same thread thirteen times, because nothing
-  connects *"I read it"* to *"the thread is settled"*. It exhausted a 400k-token budget.
-- `replan_rate` in the manifest read `0.0` where the trace held thirteen applied revisions.
-  A conclusion was drawn from that reading before the instrument was checked.
+- Coupling did not fall. Splitting the hubs took modules 27 → 41 and import edges 62 → 121
+  while total lines held at ~24k: it moved coupling from inside files to between them. What
+  improved is narrower — one hub stopped being the only route to a judgement three other
+  modules need.
+
+**Fixed by running it, on 2026-07-27.** The first true end-to-end run deadlocked: the agent
+identified a truncated pathology report as its blocker, said so in twelve consecutive
+reflections, read to the end of the document, and then re-opened the same thread thirteen
+times because nothing connected *"I read it"* to *"the thread is settled"*. A `truncated`
+thread now settles when the runtime's own read extents cover the document contiguously from
+zero, and is not opened at all against a document already seen whole. Same patient, before
+and after:
+
+| | steps | reflections | tokens | outcome |
+|---|---|---|---|---|
+| before | 19 | 18 | 434,584 | ungated `FOUND`, thread outstanding |
+| after | 7 | 6 | 81,897 | **`gate_validated: true`** |
+
+`replan_rate` read `0.0` on that run and was written up as "the model ignores the replanning
+channel". The number was arithmetically right and answered a question nobody asked: the trace
+counts *admissible* revisions, the manifest counted only those that *moved retrieval*, and no
+field recorded that the agent had asked at all. It had asked on 14 of 18 reflections, and
+could move nothing because the up-front planner had already expanded the plan to its maximum
+before the loop began. First non-zero rate this project has measured: SYN0002,
+`request_rate 0.467`, `replan_rate 0.267`.
 
 **Not validated against real charts. No clinical use.**
 
