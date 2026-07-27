@@ -38,13 +38,16 @@ from pathlib import Path
 
 import pytest
 
+import acr.answer_contract as AC
 import acr.graph as G
 from acr.concordance import variables_from_answer
 from acr.corpus import Corpus
 from acr.coverage import CoverageLedger, ForcedSampler, strata_from_spec
-from acr.graph import (SPEC_SECTIONS, ChartReviewAgent, CoverageClaimError, SpecGapError,
-                       assert_answer_is_reportable, assert_spec_gap_is_reported,
-                       build_spec_gap, gate_answer)
+from acr.answer_contract import (SPEC_SECTIONS, CoverageClaimError, SpecGapError,
+                                 assert_answer_is_reportable, assert_spec_gap_is_reported,
+                                 build_spec_gap)
+from acr.answer_gate import gate_answer
+from acr.graph import ChartReviewAgent
 from acr.llm import LLMClient, LLMConfig, LLMResponse
 from acr.spec import load_spec
 from acr.state import Budget, EvidenceLedger
@@ -231,7 +234,7 @@ def test_a_report_that_cannot_be_routed_says_so_and_is_counted(shb, chart, tmp_p
                   finalize={"status": "SPEC_INSUFFICIENT", "value": {},
                             "reasoning": "the spec does not address this"})
     gap = res["answer"]["spec_gap"]
-    assert gap["spec_section"] == G.SPEC_SECTION_UNATTRIBUTED
+    assert gap["spec_section"] == AC.SPEC_SECTION_UNATTRIBUTED
     assert gap["routable"] is False
     assert res["degradation"]["spec_gaps_unroutable"] == 1, (
         "an unroutable report is the channel half-working, and half-working has historically "
@@ -248,7 +251,7 @@ def test_a_runtime_forced_abstention_is_not_filed_as_an_agent_signal(outside, ch
                             "reasoning": "coded from the face sheet"})
     ans = res["answer"]
     assert ans["status"] == "SPEC_INSUFFICIENT"
-    assert ans["remedy_class"] == G.REMEDY_WRONG_DATA_SOURCE
+    assert ans["remedy_class"] == AC.REMEDY_WRONG_DATA_SOURCE
     assert ans["spec_gap"]["reported_by"] == "runtime"
     assert ans["spec_gap"]["spec_section"] == "data_source"
     assert ans["spec_gap"]["forced_over_status"] == "FOUND"
@@ -261,7 +264,7 @@ def test_an_excluded_case_is_not_filed_as_a_gap(shb):
     _, remedy = build_spec_gap(shb, {"reasoning": "explicitly excluded",
                                      "spec_section": "when_not_to_use"},
                                reported_by="agent", gate_validated=True)
-    assert remedy == G.REMEDY_CASE_EXCLUDED
+    assert remedy == AC.REMEDY_CASE_EXCLUDED
 
 
 # ======================================================== 3. the category error, both ways
@@ -473,7 +476,7 @@ def test_the_mcp_surface_reports_it_too(shb, chart, tmp_path):
     assert gap["agent_words"] == GOOD_SUBMIT["reasoning"]
     assert "decision_rule.1" in gap["invoked_rules"]
     assert "coverage_attested" not in ok["answer"]
-    assert ok["answer"]["remedy_class"] == G.REMEDY_SPEC_DOES_NOT_COVER
+    assert ok["answer"]["remedy_class"] == AC.REMEDY_SPEC_DOES_NOT_COVER
 
 
 def test_the_mcp_surface_will_not_sign_a_caller_supplied_gap_block(shb):
@@ -590,7 +593,7 @@ def test_extract_writes_the_gap_into_the_artifact_and_exits_clean(monkeypatch, t
 
     llm = ScriptedLLM(GOOD_SUBMIT, {"status": "EVIDENCE_INSUFFICIENT", "value": {},
                                     "reasoning": "n/a"})
-    monkeypatch.setattr("acr.cli._llm", lambda *a, **k: llm)
+    monkeypatch.setattr("acr.cli_common.llm_client", lambda *a, **k: llm)
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
 
     r = CliRunner().invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
@@ -605,7 +608,7 @@ def test_extract_writes_the_gap_into_the_artifact_and_exits_clean(monkeypatch, t
     row = doc["patients"][0]["runs"][0]
     assert row["status"] == "SPEC_INSUFFICIENT"
     assert row["spec_gap"]["spec_section"] == "decision_rule"
-    assert row["remedy_class"] == G.REMEDY_SPEC_DOES_NOT_COVER
+    assert row["remedy_class"] == AC.REMEDY_SPEC_DOES_NOT_COVER
     # Countable at the top level, so "zero spec gaps" is a number someone looked at rather
     # than an absence nobody noticed for 38 runs.
     assert doc["spec_gaps"]["total"] == 1
@@ -625,7 +628,7 @@ def test_a_crashed_run_is_distinguishable_from_one_that_never_happened(monkeypat
         def chat(self, messages, tools=None):
             raise RuntimeError("simulated provider failure")
 
-    monkeypatch.setattr("acr.cli._llm", lambda *a, **k: Boom(None, {}))
+    monkeypatch.setattr("acr.cli_common.llm_client", lambda *a, **k: Boom(None, {}))
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
 
     r = CliRunner().invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),

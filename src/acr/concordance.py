@@ -225,9 +225,9 @@ class Guideline:
     #: patient whose stage was never established comes out NOT_APPLICABLE — determinately
     #: outside the population — instead of NOT_ASSESSABLE. That is the inflation this whole
     #: layer exists to refuse, arriving disguised as a value. It is the same bug
-    #: `informativeness.py` was written for: v1 of the note-type filters allowed the literal
-    #: `unknown` as a list member, which made "the derivation did not run" indistinguishable
-    #: from "there is nothing here" and hid a wiring failure for over two months.
+    #: `contracts/extensions/note_type_filters.v2.schema.json` was written for: v1 allowed the
+    #: literal `unknown` as a list member, which made "the derivation did not run"
+    #: indistinguishable from "there is nothing here" and hid a wiring failure for two months.
     unknown_value_codes: dict[str, tuple[str, ...]] = field(default_factory=dict)
     recommendations: tuple[Recommendation, ...] = ()
     raw: dict = field(default_factory=dict)

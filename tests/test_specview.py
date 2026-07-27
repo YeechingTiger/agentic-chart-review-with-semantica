@@ -143,13 +143,36 @@ def test_an_unattributed_element_is_model_authored_and_appears_in_what_we_made_u
     assert "rule.1" in made_up
 
 
-def test_declared_provenance_takes_an_element_out_of_what_we_made_up(tmp_path):
-    p = _fixture(tmp_path, {"provenance": {"rule.1": "source_authority"}})
-    els = elements(load_spec(p), source_path=p)
-    assert next(e for e in els if e.element_id == "rule.1").provenance == "source_authority"
-    doc = review(p)
-    made_up = doc.split(f"## {SECTION_TITLES[5]}")[1].split(f"## {SECTION_TITLES[6]}")[0]
-    assert "rule.1" not in made_up
+# DELETED 2026-07-27: `test_declared_provenance_takes_an_element_out_of_what_we_made_up`.
+#
+# It wrote `provenance: {"rule.1": "source_authority"}` and expected rule.1 to leave WHAT WE
+# MADE UP. It had been red all day, and it could never have been made green without breaking
+# the thing it was testing, because that fixture is stopped by three separate guards and each
+# one is the point of the provenance system:
+#
+#   1. `provenance:` is a LIST of records, not an {element: origin} map. A map has nowhere to
+#      put the basis, and an origin with no basis is a label -- which is the marking these
+#      specs already had and the reason the field was added.
+#   2. `rule.1` is a `decision_rule` item. No code path branches on a decision rule, so it is
+#      not an enforced element and the enforced channel refuses it by construction. Widening
+#      that channel to accept it would declare a runtime dependency that does not exist --
+#      the conflated-channels bug `editorial_provenance` was added to end.
+#   3. `source_authority` with no citation is the laundering itself. Naming the CoC manual at
+#      the top of a file is not evidence that the sentence three hundred lines down came out
+#      of it, and honouring the label would let a physician approve a fabricated rule
+#      believing a standards body wrote it.
+#
+# The property it was reaching for -- a declared origin takes a statement off the made-up list
+# -- is real, and both halves of it are asserted immediately below, through the channel that
+# can carry an editorial statement:
+#   * `test_an_editorial_citation_takes_an_element_out_of_what_we_made_up` is the positive
+#     half, and its docstring already said it was this test rewritten;
+#   * `test_a_label_with_no_locator_does_not_shrink_what_we_made_up` is the negative half, and
+#     asserts the exact behaviour the deleted test demanded, refused.
+# So there was nothing left to rewrite it into. A permanently red test is worse than a missing
+# one: it teaches the room that red is background noise, and this suite found five real
+# defects today. `acr.spec` now answers all three refusals in words, at the point of refusal,
+# so the next author who reaches for the enforced channel is told which one to use instead.
 
 
 def _made_up(p: Path) -> str:

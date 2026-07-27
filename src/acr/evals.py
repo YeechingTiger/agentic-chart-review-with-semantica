@@ -143,7 +143,7 @@ REGISTRY: dict[str, Dimension] = {d.name: d for d in (
               "a judge calling C341 'basically right' against a key of C349 has absorbed "
               "the entire error being measured"),
     Dimension("task_completion", True, "the gate verdict recorded on the run",
-              "acr.graph.check_gate", "task-completion / goal-achievement judge",
+              "acr.answer_gate.check_gate", "task-completion / goal-achievement judge",
               "THE LOAD-BEARING ROW: a completion judge scores a correct abstention as a "
               "failure, and correct abstentions are not missing at random"),
     Dimension("answer_format_validity", True, "the spec's declared per-field `format` regex "

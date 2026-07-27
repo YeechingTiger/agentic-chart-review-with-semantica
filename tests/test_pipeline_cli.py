@@ -322,7 +322,7 @@ class ScriptedLLM(LLMClient):
 @pytest.fixture
 def scripted(monkeypatch):
     llm = ScriptedLLM({"primary_site": "C341", "histology": "8140", "behavior": "3"})
-    monkeypatch.setattr("acr.cli._llm", lambda *a, **k: llm)
+    monkeypatch.setattr("acr.cli_common.llm_client", lambda *a, **k: llm)
     return llm
 
 
@@ -620,8 +620,15 @@ def test_the_three_artifacts_chain_by_recorded_path(pipeline):
 
 
 def test_the_existing_commands_still_work():
-    """The pipeline was added beside them, not over them."""
-    names = {c.name for c in app.registered_commands}
+    """The pipeline was added beside them, not over them.
+
+    Read off the COMPOSED click group rather than `app.registered_commands`. Since the split
+    into one module per command group, the parent Typer registers no commands of its own —
+    every name below arrives through a nameless sub-app — and `registered_commands` would be
+    empty while `acr patients` still worked perfectly. This asks the question the user asks:
+    what can I actually type.
+    """
+    names = set(typer.main.get_command(app).commands)
     assert {"patients", "chart", "specs", "run", "batch", "consistency", "trace"} <= names
     assert {"extract", "concord", "explain"} <= names
     assert runner.invoke(app, ["specs"]).exit_code == 0

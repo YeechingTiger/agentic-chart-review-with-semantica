@@ -450,10 +450,18 @@ def bind_provenance(spec: "ExtractionSpec") -> None:
         seen.add(rec.element)
         element = by_path.get(rec.element)
         if element is None:
+            # Two different mistakes land here and the repair for one is wrong for the other:
+            # a stale record is deleted, an editorial one is MOVED. Say which, or the natural
+            # fix looks like widening `enforced_elements()` to admit `decision_rule` — the
+            # conflated-channels bug, declaring the runtime to read a line it does not read.
             raise StaleProvenanceError(
                 f"{spec.spec_id}: provenance record for {rec.element!r}, which is not an "
                 f"enforced element of this spec (renamed? deleted?). A record left behind by "
                 f"a rename is a signature attached to nothing that still reads as a signature."
+                f"\n  If it names a statement a REVIEWER reads rather than one the runtime "
+                f"applies — a decision_rule, an evidence rule, a conflict rule, a boundary "
+                f"case — it is editorial and belongs in `editorial_provenance`, where a "
+                f"missing or malformed record is a finding rather than an unloadable file."
                 f"\n  enforced elements: {sorted(by_path)}")
         rec.element_hash = element.hash
         rec.element_kind = element.kind
@@ -598,6 +606,27 @@ class ExtractionSpec(BaseModel):
     applicability_guard: dict[str, Any] = Field(default_factory=dict)
     agent_policy: str = ""
     downstream_warning: list[str] = Field(default_factory=list)
+
+    @field_validator("provenance", mode="before")
+    @classmethod
+    def _refuse_the_editorial_shorthand(cls, v: Any) -> Any:
+        """A `{element: origin}` mapping here is a reach for the other channel, said in words.
+
+        The editorial validator below normalises that shorthand and reports its missing basis;
+        this one cannot, because a bare label is what `provenance` was added to replace. It is
+        refused either way — but pydantic's own "Input should be a valid list" sends the author
+        to check their YAML syntax, and the mistake is never in the syntax.
+        """
+        if isinstance(v, dict):
+            raise ValueError(
+                "provenance must be a LIST of records, each naming an ENFORCED element with an "
+                "origin AND a basis. A {element: origin} mapping has nowhere to put the basis, "
+                "and an origin with no basis is a label — the marking this field replaced. If "
+                "the element is a statement a reviewer reads rather than one the runtime "
+                "applies (a decision_rule, an evidence rule, a conflict rule, a boundary case), "
+                "write it in `editorial_provenance`, which takes this shorthand and reports "
+                "what is missing instead of refusing the file.")
+        return v
 
     @field_validator("editorial_provenance", mode="before")
     @classmethod

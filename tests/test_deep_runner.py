@@ -39,7 +39,7 @@ import re
 import pytest
 
 import acr.deep_runner as D
-from acr.graph import CoverageClaimError, assert_answer_is_reportable
+from acr.answer_contract import CoverageClaimError, assert_answer_is_reportable
 
 MAIN = inspect.getsource(D.main)
 SRC = inspect.getsource(D)

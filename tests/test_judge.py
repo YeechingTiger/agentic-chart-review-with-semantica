@@ -485,7 +485,7 @@ def test_the_real_registry_answers_the_protocol_the_judge_requires():
     assert isinstance(GATE, E.PrecedenceGate)
     for dim in JUDGEABLE_DIMENSIONS:
         assert GATE.deterministic_evaluator_for(dim) is None, dim
-    assert GATE.deterministic_evaluator_for("task_completion") == "acr.graph.check_gate"
+    assert GATE.deterministic_evaluator_for("task_completion") == "acr.answer_gate.check_gate"
 
 
 @pytest.mark.parametrize("dim", JUDGEABLE_DIMENSIONS)
@@ -574,7 +574,7 @@ def test_a_new_evaluation_need_is_a_new_file_and_not_a_code_change():
 
 # --- 1. the precedence fence, at load, PER SUB-QUESTION --------------------------------
 @pytest.mark.parametrize("dim,expect", [("correctness", "evals.score"),
-                                        ("task_completion", "graph.check_gate"),
+                                        ("task_completion", "answer_gate.check_gate"),
                                         ("hallucination", "record_evidence")])
 def test_an_evaluator_for_a_deterministic_dimension_is_refused_naming_the_method(dim, expect):
     with pytest.raises(DeterministicEvaluatorExists, match=expect):

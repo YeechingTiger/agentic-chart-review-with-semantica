@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from acr.graph import CoverageClaimError, assert_coverage_claim_is_earned
+from acr.answer_contract import CoverageClaimError, assert_coverage_claim_is_earned
 
 
 def test_gate_validated_negative_may_carry_the_ledger():

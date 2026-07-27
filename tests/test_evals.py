@@ -170,7 +170,7 @@ def test_the_seam_check_reports_a_deterministic_dimension_as_not_permitted():
     problems = E.unknown_dimensions(["task_completion", "vibes", "evidence_support",
                                      "trajectory_quality"])
     assert set(problems) == {"task_completion", "vibes", "evidence_support"}
-    assert "acr.graph.check_gate" in problems["task_completion"]
+    assert "acr.answer_gate.check_gate" in problems["task_completion"]
     assert "split" in problems["evidence_support"]
 
 
@@ -212,7 +212,7 @@ def _defines(path: Path, dotted: str) -> bool:
 def test_every_deterministic_verifier_names_code_that_actually_exists(dim):
     """The registry is only worth anything if its claims resolve.
 
-    Checked by AST rather than by import: resolving `acr.graph.check_gate` through the
+    Checked by AST rather than by import: resolving `acr.answer_gate.check_gate` through the
     import system would drag a provider SDK into this test process for no benefit.
     """
     parts = E.REGISTRY[dim].verifier.split(".")
