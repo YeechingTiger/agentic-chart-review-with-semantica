@@ -114,3 +114,68 @@ _ablation_note: A-prime arm. Identical to the stratified spec in every respect E
   keyword obligation, same decision rules, same boundary cases. Paired with the stratified spec on the
   same patient and the same seed, the difference between the two runs is attributable to stratification
   alone.
+
+# ------------------------------------------------------------------------------ provenance
+# WHY THIS BLOCK EXISTS, and it is a fact about this file rather than about the software.
+# All four original specs in this tree were written by a language model in ONE commit --
+# e5229b0, 2026-07-25 -- from whatever manual text happened to be in its context, and were
+# committed under a human author's name. The stage spec was written by an agent on
+# 2026-07-26. NO REGISTRAR OR PHYSICIAN HAS READ A LINE OF ANY OF THEM. Transcribed lines,
+# inferred lines and invented lines are all present, mixed, and to a reader they are
+# identical: they are all just YAML.
+#
+# One record per ENFORCED element -- the lines some code path changes behaviour on. Missing
+# one makes this file refuse to load. The advisory half for the sentences a human reads
+# rather than the runtime lives in `editorial_provenance`, where a missing record is a
+# finding printed in the review document instead of an error.
+#
+# origin: model_authored is not modesty. It is the accurate answer for every element below.
+# `store_manual` and `ajcc_manual` require a section, item or rule number IN THE BASIS, and
+# nothing here has one, because nothing here is a line a manual states: these are regexes,
+# coverage-gate switches, document-type groupings and sample sizes, all invented in this
+# repository. The four code tables come closest, and they were recalled by a model, not
+# copied out of the manual -- so they say so, and they name the item a human should check
+# them against.
+provenance:
+  - element: "fields[primary_site].format"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; produced in commit 8529586 (2026-07-25) by transforming the stratified
+      spec, which a language model wrote in commit e5229b0 (2026-07-25). Copied unchanged from
+      the stratified criterion this arm is paired with. Constrains a topography code to a letter
+      and three digits: a shape check, not a validity check.
+  - element: "fields[histology].format"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; produced in commit 8529586 (2026-07-25) by transforming the stratified
+      spec, which a language model wrote in commit e5229b0 (2026-07-25). Copied unchanged from
+      the stratified criterion. Constrains a morphology code to four digits and nothing else.
+  - element: "fields[behavior].allowable_values"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; produced in commit 8529586 (2026-07-25) by transforming the stratified
+      spec, which a language model wrote in commit e5229b0 (2026-07-25). Copied unchanged from
+      the stratified criterion, where it is recorded as a code table a language model recalled
+      rather than transcribed.
+  - element: "proof_obligation.for_negative.required_coverage"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; produced in commit 8529586 (2026-07-25) by transforming the stratified
+      spec, which a language model wrote in commit e5229b0 (2026-07-25). Three prose steps that
+      must be done before an absence may be claimed. This arm exists to be WORSE than its pair
+      on purpose -- it declares no document groups, so nothing forces a random sample -- and
+      these three sentences are what stands in for that. Written by a language model.
+  - element: "proof_obligation.for_negative.required_keywords"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; produced in commit 8529586 (2026-07-25) by transforming the stratified
+      spec, which a language model wrote in commit e5229b0 (2026-07-25). The same five terms as
+      the criterion this arm is paired with, kept identical so that the difference between the
+      two runs is attributable to grouping alone. That list has been measured on the whole
+      corpus and it fails; it is left unchanged here for the same reason it is left unchanged
+      there.

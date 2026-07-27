@@ -234,3 +234,64 @@ class Corpus:
 
     def chart(self, patient_id: str) -> PatientChart:
         return PatientChart(self.root / patient_id)
+
+    # -- corpus-wide document-type vocabulary -------------------------------------
+    VOCAB_CACHE = ".doc_type_vocab.json"
+
+    def doc_type_vocabulary(self, use_cache: bool = True) -> list[str]:
+        """Every document type appearing anywhere in the corpus.
+
+        Needed so that "this patient has no pathology report" (a finding) stays separable
+        from "no such document type exists" (a typo). But it is a property of the CORPUS,
+        not of the patient under review, so it must not be recomputed per run.
+
+        The obvious implementation — building a PatientChart for every patient and unioning
+        `.doc_types` — costs one stat() PER FILE, because PatientChart records
+        `p.stat().st_size` for each document. On the real corpus that is ~276,000 stats,
+        and Lustre metadata here runs ~8.5 ms per op: about 39 minutes, to run ONE patient.
+        Measured: a single-patient run sat 17+ minutes in stat() before its first API call.
+
+        A document's type comes from `parse_filename(p.stem)` — the NAME alone. So this
+        reads directory entries and never stats them, then caches the result next to the
+        corpus. Cold: seconds. Warm: a file read.
+
+        Delete `<root>/.doc_type_vocab.json` if documents are added with new types.
+        """
+        import json
+        import os
+
+        cache = self.root / self.VOCAB_CACHE
+        if use_cache and cache.is_file():
+            try:
+                v = json.loads(cache.read_text())
+                if isinstance(v, list) and v:
+                    return v
+            except (json.JSONDecodeError, OSError):
+                pass  # a corrupt cache should be rebuilt, not fatal
+
+        types: set[str] = set()
+        with os.scandir(self.root) as patients:
+            for pent in patients:
+                if not pent.is_dir():
+                    continue
+                try:
+                    with os.scandir(pent.path) as docs:
+                        for dent in docs:
+                            name = dent.name
+                            if not name.endswith(".txt"):
+                                continue
+                            parsed = parse_filename(name[:-4])
+                            if parsed is not None:
+                                types.add(parsed[0])
+                except OSError:
+                    continue  # unreadable patient dir is not a reason to fail the run
+
+        vocab = sorted(types)
+        if use_cache:
+            try:
+                tmp = cache.with_suffix(".tmp")
+                tmp.write_text(json.dumps(vocab, indent=0))
+                os.replace(tmp, cache)   # atomic: never leave a half-written cache
+            except OSError:
+                pass  # a read-only corpus is fine; we just pay the scan next time
+        return vocab

@@ -23,7 +23,8 @@ from pathlib import Path
 import pytest
 
 from acr.corpus import Corpus
-from acr.coverage import (CoverageLedger, ForcedSampler, evaluate_gate, strata_from_spec)
+from acr.coverage import (CoverageLedger, ForcedSampler, evaluate_gate, keyword_was_searched,
+                          strata_from_spec)
 from acr.spec import load_spec
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -115,3 +116,96 @@ def test_ablation_needs_a_found_case():
         "test of whether the agent actually succeeds"
     )
     assert gt1["ground_truth"][key]["histology"] == "8140"
+
+
+# ------------------------------------------------- doing less work must not be worth more
+def _may_mention(led):
+    return next(r for r in led.stratum_results() if r.name == "may_mention")
+
+
+def test_zero_searches_does_not_validate_the_keyword_list():
+    """The gate inversion, at the ledger rather than over MCP.
+
+    `may_mention` is `search_then_read_hits_and_sample_misses`. With no search at all,
+    `search_hit_notes` is empty, so every document in the stratum counts as a MISS; the
+    sampler draws its 25 misses from the entire stratum; none is cited; and
+    `keyword_list_validated` used to come back True. Skipping the search bought a cleaner
+    sample than running it, which is the check paying out for the work it exists to demand.
+    """
+    spec = load_spec(STRATIFIED)
+    led = _fresh_ledger(spec)
+    led.listed_documents = True
+    for docs in led.pending_samples().values():
+        for d in docs:
+            led.note_read(d.note_id, d.doc_type)
+    led.resolve_sample_verdicts(cited=set())
+
+    r = _may_mention(led)
+    assert led.searched_terms == [], "precondition: nothing was searched"
+    assert r.misses_sampled >= 25 and r.miss_sample_hits == 0, "precondition: a clean sample"
+    assert r.keywords_unsearched == r.required_keywords != [], (
+        "precondition: the stratum does declare a search obligation"
+    )
+    assert r.keyword_list_validated is False, (
+        "no search ran, so there is no keyword list under test and nothing to validate"
+    )
+
+    gate_spec = (spec.proof_obligation.for_negative or {}).get("gate") or {}
+    g = evaluate_gate(gate_spec, led.stratum_results())
+    assert g.checks["required_keywords_all_searched"] is False
+    assert g.checks["keyword_list_validated"] is False
+    assert g.verdict == "FAIL"
+
+
+def test_a_one_character_search_does_not_discharge_the_required_list():
+    """`kw.lower() in t or t in kw.lower()` matched in BOTH directions, and the second half
+    is free to satisfy: "t" is a substring of "pathology", "biopsy", "final diagnosis",
+    "specimen" and "carcinoma", so a single one-character search discharged every required
+    keyword the site spec declares."""
+    spec = load_spec(STRATIFIED)
+    led = _fresh_ledger(spec)
+    led.note_search("t", [])
+    r = _may_mention(led)
+    assert r.required_keywords, "precondition: the stratum declares required keywords"
+    assert r.keywords_unsearched == r.required_keywords, (
+        "a search for 't' covers none of them"
+    )
+    assert not keyword_was_searched("carcinoma", led.searched_terms)
+    # The direction that does mean something still works.
+    assert keyword_was_searched("carcinoma", ["invasive ductal carcinoma"])
+
+
+def test_an_unread_search_hit_is_reviewed_by_nothing():
+    """A hit is removed from the miss-sampling frame, so if it is never read it is audited by
+    nothing: not read, and not eligible to be drawn.
+
+    That made searching pay for itself the wrong way round -- every extra search shrank the
+    population the sample was drawn from without anyone opening the documents it removed.
+    `hits_read` was computed for exactly this and then read by no one.
+    """
+    spec = load_spec(STRATIFIED)
+    led = _fresh_ledger(spec)
+    led.listed_documents = True
+    chart = Corpus(ROOT / "corpus" / "patients").chart("SYN0002")
+    for kw in ["pathology", "biopsy", "final diagnosis", "specimen", "carcinoma"]:
+        led.note_search(kw, [h.note_id for h in chart.search(kw, max_hits=40)])
+    for docs in led.pending_samples().values():
+        for d in docs:
+            led.note_read(d.note_id, d.doc_type)
+    led.resolve_sample_verdicts(cited=set())
+
+    r = _may_mention(led)
+    assert not r.keywords_unsearched, "precondition: every required search ran"
+    assert r.misses_sampled >= 25 and r.miss_sample_hits == 0, "precondition: a clean sample"
+    assert r.hits_unread, "precondition: the search flagged a document nobody opened"
+    assert r.hits_read < r.hits
+    assert r.keyword_list_validated is False, (
+        "the search flagged this document as relevant and it was never opened"
+    )
+
+    # Reading the hits it flagged is what discharges it -- the obligation is satisfiable.
+    for nid in list(r.hits_unread):
+        led.note_read(nid, "")
+    done = _may_mention(led)
+    assert done.hits_unread == [] and done.hits_read == done.hits
+    assert done.keyword_list_validated is True

@@ -64,15 +64,29 @@ proof_obligation:
         # Pathology/cytology can single-handedly establish histology -> witness-style
         # stratification by DOCUMENT TYPE (P3d). Small stratum, so exhaustive is affordable
         # and it contributes exactly zero elusion.
+        #
+        # `establishes` scopes the stratum to the fields it actually speaks to. Without it
+        # one stratification serves all three fields, and every CT and PET lands in a
+        # stratum named `cannot_establish` — which is true of histology and behaviour and
+        # FALSE of primary_site, since this spec says plainly that radiology can localise a
+        # mass. Patient P03 was coded C349 (lung NOS) on 2026-07-26 while
+        # "right upper lobe" sat in seven other note types.
+        establishes: [histology, behavior, primary_site]
         match: {doc_type_matches: ["Pathology", "Cytology"]}
         policy: exhaustive
       - name: may_mention
+        establishes: [histology, behavior, primary_site]
         match: {doc_type_matches: ["Progress-Note", "Consult", "Discharge", "Endoscopy", "Procedure-Note"]}
         policy: search_then_read_hits_and_sample_misses
         required_keywords: ["pathology", "biopsy", "final diagnosis", "specimen", "carcinoma"]
         min_sample_of_misses: 25
         max_tolerated_hits: 0        # a hit falsifies the keyword list
       - name: cannot_establish
+        # Cannot establish HISTOLOGY or BEHAVIOUR. It is not silent on primary_site:
+        # cross-sectional imaging localises the tumour, and evidence_rules below say so
+        # outright. Declaring that here stops the stratum name from teaching the agent the
+        # opposite of what the spec says.
+        establishes: [primary_site]
         match: {rest: true}          # RxHub fills, EKG, fluoroscopy, unrelated imaging
         policy: validate_by_sampling
         min_sample: 25
@@ -118,3 +132,312 @@ search_hints:
   - adenocarcinoma
   - resection
   - cytology
+
+# Deterministic post-checks on a submitted answer, enforced in code (src/acr/answer_checks.py)
+# rather than hoped for in the prompt. Every rule below is already stated in decision_rule or
+# conflict_rules above; these three were nonetheless broken on real charts on 2026-07-26, so
+# they are now mechanically decided and rejected through the same loop as the coverage gate.
+# The clinical content lives here, in the spec, where a registrar can review it -- the checker
+# itself contains no oncology.
+answer_checks:
+  - field: primary_site
+    kind: not_less_specific
+    nos_values: ["C349"]
+    contradicted_by:
+      ["upper lobe", "middle lobe", "lower lobe", "main bronchus",
+       "RUL", "RML", "RLL", "LUL", "LLL"]
+    message: >
+      A documented lobe or main bronchus gives a specific ICD-O-3 subsite; C349 asserts the
+      subsite is unknown. Radiology may be used for this -- it localises, it just cannot
+      establish histology or behaviour.
+
+  - field: primary_site
+    kind: nos_requires_search
+    nos_values: ["C349"]
+    required_searches: ["lobe", "bronchus"]
+    message: >
+      C349 asserts no subsite is documented. Radiology and operative notes routinely state
+      the lobe even when pathology says only "right lung", and this spec permits radiology
+      for localisation. Search for it before claiming it is absent.
+
+  - field: primary_site
+    kind: origin_not_specimen
+    specimen_markers: ["specimen received", "specimen:", ", biopsy:", "fine needle", "fna"]
+    message: >
+      Rule 1: code the site of ORIGIN, not the site of a biopsy or a metastasis. A specimen
+      taken from the main bronchus does not make the main bronchus the origin.
+
+  - field: histology
+    kind: not_less_specific
+    nos_values: ["8000", "8010", "8046"]
+    contradicted_by:
+      ["squamous", "adenocarcinoma", "small cell", "large cell",
+       "favor squamous", "adenosquamous"]
+    message: >
+      Conflict rule: where the record is more specific than the summary line, take the more
+      specific reading. "favor squamous cell carcinoma" supports 8070 over 8046.
+
+# ------------------------------------------------------------------------------ provenance
+# WHY THIS BLOCK EXISTS, and it is a fact about this file rather than about the software.
+# All four original specs in this tree were written by a language model in ONE commit --
+# e5229b0, 2026-07-25 -- from whatever manual text happened to be in its context, and were
+# committed under a human author's name. The stage spec was written by an agent on
+# 2026-07-26. NO REGISTRAR OR PHYSICIAN HAS READ A LINE OF ANY OF THEM. Transcribed lines,
+# inferred lines and invented lines are all present, mixed, and to a reader they are
+# identical: they are all just YAML.
+#
+# One record per ENFORCED element -- the lines some code path changes behaviour on. Missing
+# one makes this file refuse to load. The advisory half for the sentences a human reads
+# rather than the runtime lives in `editorial_provenance`, where a missing record is a
+# finding printed in the review document instead of an error.
+#
+# origin: model_authored is not modesty. It is the accurate answer for every element below.
+# `store_manual` and `ajcc_manual` require a section, item or rule number IN THE BASIS, and
+# nothing here has one, because nothing here is a line a manual states: these are regexes,
+# coverage-gate switches, document-type groupings and sample sizes, all invented in this
+# repository. The four code tables come closest, and they were recalled by a model, not
+# copied out of the manual -- so they say so, and they name the item a human should check
+# them against.
+provenance:
+  - element: "fields[primary_site].format"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Constrains a topography code to a letter and three
+      digits and nothing else. It accepts codes that name no real site and rejects the
+      punctuated form the manual writes, so it is a shape check, not a validity check.
+  - element: "fields[histology].format"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Constrains a morphology code to four digits and
+      nothing else. It cannot tell a real morphology from a well-formed invented one, and it
+      does not know which morphologies are possible in the lung.
+  - element: "fields[behavior].allowable_values"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. A code table. Nobody compared this list against the
+      published table for item Behavior Code [523], which is named at the top of this file, so
+      it is a language model's recollection of that table rather than a transcription of it. It
+      may be missing codes, and it may contain codes the table does not have. Check it against
+      the manual before relying on it -- and note that this record is NOT a citation of the
+      manual, precisely because that check has not been done.
+  - element: "answer_checks[primary_site.not_less_specific.C349]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Rejects the site-not-stated topography code when
+      the quoted evidence names a lobe or the main bronchus. The rule restates a coding rule
+      stated in prose above; the list of lobe wordings it matches on was written from a model's
+      idea of how radiologists and surgeons write, and has never been measured against real
+      notes.
+  - element: "answer_checks[primary_site.nos_requires_search.C349]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Refuses the site-not-stated code unless the chart
+      was first searched for a lobe and for the bronchus. The two search terms were chosen by a
+      language model; nobody has measured whether they find a documented lobe when one exists.
+  - element: "answer_checks[primary_site.origin_not_specimen]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Refuses a site coded from a quote that describes
+      the tissue taken rather than where the tumour started. The wordings it recognises were
+      invented for this file; a note that phrases it any other way passes the check unexamined.
+  - element: "answer_checks[histology.not_less_specific.8000]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Refuses the three vaguest morphology codes when the
+      quoted evidence is more specific. The list of more-specific wordings was invented; nobody
+      has measured how often it fires, or how often it fires wrongly.
+  - element: "proof_obligation.for_negative.gate.require_can_establish_nonempty"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that the chart hold at least one document
+      of a type this file says can settle the answer, before any absence claim is accepted. A
+      switch on this repository's coverage gate, read by acr/coverage.py. The gate is this
+      repository's construct end to end; no registry manual defines one, and nobody clinical has
+      agreed that passing it means the chart was adequately searched.
+  - element: "proof_obligation.for_negative.gate.exhaustive_strata_complete"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that every document in the groups marked
+      read-everything was actually read. A switch on this repository's coverage gate, read by
+      acr/coverage.py. The gate is this repository's construct end to end; no registry manual
+      defines one, and nobody clinical has agreed that passing it means the chart was adequately
+      searched.
+  - element: "proof_obligation.for_negative.gate.required_keywords_all_searched"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that every term in the criterion-level
+      required list has been searched. For THIS file that list is empty -- the criterion-level
+      list is not set, only the per-group one is -- so this switch currently enforces nothing at
+      all. That is a finding about the file, not a design.
+  - element: "proof_obligation.for_negative.gate.exclusion_validated"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that the random sample drawn from the
+      groups treated as silent turned up nothing relevant. A switch on this repository's
+      coverage gate, read by acr/coverage.py. The gate is this repository's construct end to
+      end; no registry manual defines one, and nobody clinical has agreed that passing it means
+      the chart was adequately searched.
+  - element: "proof_obligation.for_negative.gate.keyword_list_validated"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that searching the group that may mention
+      the answer turned up no unread document -- which is how a bad list of search terms is
+      supposed to be caught. It did not catch this list: measured on the whole corpus the terms
+      miss the diagnosis for 31.7% of patients while the gate stays clean, because the check
+      only sees documents the search already found. A switch on this repository's coverage gate,
+      read by acr/coverage.py. The gate is this repository's construct end to end; no registry
+      manual defines one, and nobody clinical has agreed that passing it means the chart was
+      adequately searched.
+  - element: "proof_obligation.for_negative.gate.max_elusion_upper"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. The largest residual chance of a missed document
+      the run may finish with. 25 documents drawn with no relevant hit supports 11.3% at 95%
+      confidence, so this is the nearest round number above the floor the sample size makes
+      reachable -- arithmetic about the sample size, not a measurement of this corpus. No
+      clinician has said that a 12% chance of a missed document is acceptable for this variable.
+      A switch on this repository's coverage gate, read by acr/coverage.py. The gate is this
+      repository's construct end to end; no registry manual defines one, and nobody clinical has
+      agreed that passing it means the chart was adequately searched.
+  - element: "proof_obligation.for_negative.strata[can_establish].match"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Pathology and cytology reports, selected by
+      matching those two words against document type names. Substring matching is blunt: on the
+      real corpus the same technique pulls in speech-language pathology notes and misses several
+      real pathology type names. Nobody has checked what it selects here.
+  - element: "proof_obligation.for_negative.strata[can_establish].establishes"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Says pathology and cytology may settle all three
+      answers on their own. That is a clinical ruling written as a list of field names, and no
+      registrar has been shown it.
+  - element: "proof_obligation.for_negative.strata[may_mention].match"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Progress notes, consults, discharge summaries,
+      endoscopy and procedure notes, selected by substring against document type names. The set
+      was chosen by a language model without looking at what document types the corpus actually
+      contains.
+  - element: "proof_obligation.for_negative.strata[may_mention].establishes"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Says an ordinary clinical note may settle all three
+      answers. It sits directly against the prose above, which says a restatement in a progress
+      note does not count when no pathology exists in the chart. Nobody clinical has reconciled
+      the two.
+  - element: "proof_obligation.for_negative.strata[may_mention].required_keywords"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. The five terms that must be searched before this
+      group of documents may be called silent. A language model chose them. THEY HAVE SINCE BEEN
+      MEASURED AND THEY FAIL -- see the measurement recorded beside this record. The list itself
+      is deliberately left as it is: changing it is a development-plane change that has to go
+      through split, evolve and certify on held-out patients, and hand-editing it here would be
+      exactly the shortcut that process exists to prevent.
+    measured:
+      verdict: "falsified"
+      run: >-
+        exhaustive keyword-recall pass over the full de-identified corpus, 2026-07-27. No
+        sampling, no model calls, no cost. The document stratifier used to scope the pass was
+        validated against ground_truth.csv at 1787 of 1787 exact matches first. The pass wrote
+        no run directory under runs/, so this record is the only place the numbers are kept.
+      n_patients: 1787
+      n_documents: 276054
+      model: >-
+        none. This measurement is deterministic string matching against ground_truth.csv and no
+        language model was in the loop, so unlike an evolved artifact it does not expire when
+        the model changes. Recorded explicitly because the absence of a model is a fact about
+        the measurement, not a field nobody filled in.
+      measured_on: "2026-07-27"
+      list_recall_on_answer_bearing_documents: 0.8738
+      answer_bearing_documents_missed: 4005
+      patients_with_at_least_one_missed_document: 567
+      patients_pct: 31.7
+      inert_group_documents_missed: 2743
+      inert_group_patients: 517
+      inert_group_patients_pct: 28.9
+      patients_affected_in_either_group: 701
+      patients_affected_in_either_group_pct: 39.2
+      root_cause: >-
+        the list has 'carcinoma' and not 'cancer'. Pathologists write carcinoma; clinicians
+        write 'small cell lung cancer'. Adding 'cancer' would rescue 3605 of the 4005 missed
+        documents.
+      dead_term: >-
+        'final diagnosis' is the sole retriever for 6 documents out of 90121. It is a
+        pathology-report heading required in a group of documents that holds no pathology
+        reports.
+      remediation: >-
+        NOT applied here. Adding 'cancer' is a development-plane change and has to go through
+        split, evolve and certify on held-out patients. Hand-editing the list in this file would
+        be the exact shortcut that process exists to prevent, and would also void any sign-off
+        on it. The finding is recorded; the list is left alone.
+  - element: "proof_obligation.for_negative.strata[may_mention].min_sample_of_misses"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. How many of the documents the search did NOT match
+      are read anyway. 25 is a round number a language model picked; it fixes the tightest
+      provable residual rate at 11.3%, and nobody has decided whether that is good enough here.
+  - element: "proof_obligation.for_negative.strata[cannot_establish].match"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Everything not matched above -- medication fills,
+      cardiology tracings, unrelated imaging. Catch-all by construction, so any document type
+      nobody thought about lands here and is treated as inert.
+  - element: "proof_obligation.for_negative.strata[cannot_establish].establishes"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Says these documents can still say where the tumour
+      started, even though they cannot say what it is. Added on 2026-07-26 after a real patient
+      was coded lung-not-otherwise-specified while the lobe sat in seven other note types. The
+      correction was made by an agent, not by a clinician, and it is a clinical ruling.
+  - element: "proof_obligation.for_negative.strata[cannot_establish].min_sample"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. How many of the documents treated as inert are read
+      at random to check that they really are. 25 is a round number a language model picked; it
+      fixes the tightest provable residual rate at 11.3%.

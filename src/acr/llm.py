@@ -173,18 +173,48 @@ class LLMClient:
         }
 
 
-def extract_json(text: str) -> dict:
-    """Best-effort JSON extraction from a model reply."""
+def extract_json(text: str, require: str | None = None) -> dict:
+    """Best-effort JSON extraction from a model reply.
+
+    `require` names a key the caller needs. When given, EVERY top-level {...} block is
+    considered and the first one carrying that key wins; without it the first parseable
+    block wins, which is the historical behaviour.
+
+    Why this is not a cosmetic nicety: a reply may legitimately contain more than one JSON
+    object, and then "first parseable" is simply the wrong one. Observed with
+    gpt-5.6-luna, which leaks its tool-call channel into the text channel and emits a
+    preamble object before the answer:
+
+         to=record_evidence code
+        {"search":"pathology OR biopsy ...","document_types":[...]}
+        {"verdict":"CONTINUE","reason":"...","revised_plan":[]}
+
+    The old code returned the {"search":...} object, so `.get("verdict")` was None and the
+    reflect node recorded a degradation — while the correct verdict sat in the very next
+    object, every time. That misreads a working supervisor as a broken one, which is the
+    most expensive kind of wrong: it discredits runs that were actually fine.
+    """
     t = text.strip()
     if t.startswith("```"):
         t = t.split("```")[1] if len(t.split("```")) > 1 else t
         t = t[4:].lstrip() if t.lower().startswith("json") else t
     t = t.strip()
-    try:
-        v = json.loads(t)
-        return v if isinstance(v, dict) else {"value": v}
-    except json.JSONDecodeError:
-        pass
+
+    if require is None:
+        try:
+            v = json.loads(t)
+            return v if isinstance(v, dict) else {"value": v}
+        except json.JSONDecodeError:
+            pass
+    else:
+        try:
+            v = json.loads(t)
+            if isinstance(v, dict) and require in v:
+                return v
+        except json.JSONDecodeError:
+            pass
+
+    first: dict | None = None
     depth, start = 0, None
     for i, ch in enumerate(t):
         if ch == "{":
@@ -195,7 +225,19 @@ def extract_json(text: str) -> dict:
             depth -= 1
             if depth == 0 and start is not None:
                 try:
-                    return json.loads(t[start : i + 1])
+                    obj = json.loads(t[start : i + 1])
                 except json.JSONDecodeError:
                     start = None
+                    continue
+                if isinstance(obj, dict):
+                    if require is None:
+                        return obj
+                    if require in obj:
+                        return obj
+                    if first is None:
+                        first = obj
+                start = None
+
+    if first is not None:
+        return first
     return {"__unparsed__": text}

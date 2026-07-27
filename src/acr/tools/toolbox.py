@@ -108,11 +108,31 @@ TOOL_SCHEMAS: list[dict] = [
         "Submit the final answer. status must be FOUND, EVIDENCE_INSUFFICIENT (spec is clear "
         "but the chart lacks the evidence) or SPEC_INSUFFICIENT (the specification does not "
         "cover this case, or the variable is not derivable from notes). A negative or absent "
-        "answer is REJECTED unless the specification's proof obligation has been met.",
+        "answer is REJECTED unless the specification's proof obligation has been met. "
+        "SPEC_INSUFFICIENT is a report about the SPECIFICATION, not about this chart: it is "
+        "rejected unless it names the part at fault, and it may not carry a value.",
         {
             "status": {"type": "string", "enum": ["FOUND", "EVIDENCE_INSUFFICIENT", "SPEC_INSUFFICIENT"]},
             "value": {"type": "object", "description": "object keyed by the spec's output field names"},
             "reasoning": {"type": "string", "description": "how the decision rules were applied"},
+            # SPEC_INSUFFICIENT only. These three exist because the status alone told the
+            # improvement loop nothing: it has to know WHICH text to go and change, and a
+            # model asked to infer that from a bare status code will guess the most
+            # rewritable paragraph. See graph.SPEC_SECTIONS.
+            "spec_section": {"type": "string", "description":
+                             "SPEC_INSUFFICIENT only: the part of the specification that "
+                             "does not cover this case — one of decision_rule, "
+                             "evidence_rules, conflict_rules, when_not_to_use, "
+                             "boundary_cases, abstention, fields, proof_obligation, "
+                             "data_source"},
+            "spec_quote": {"type": "string", "description":
+                           "SPEC_INSUFFICIENT only: the sentence you mean, quoted verbatim "
+                           "from the specification. Omit it if no such sentence exists — "
+                           "that the specification is SILENT is itself the report."},
+            "uncovered_fields": {"type": "array", "items": {"type": "string"},
+                                 "description": "SPEC_INSUFFICIENT only: which output "
+                                                "fields it fails to cover. Omit if the "
+                                                "whole answer is affected."},
         },
         ["status", "reasoning"],
     ),
@@ -307,6 +327,13 @@ class Toolbox:
                                    quote, supports, "contradicts" if stance == "contradicts" else "supports"))
         return {"recorded": True, "n_evidence": len(self.evidence.items), "quote": quote[:300]}
 
-    def _t_submit_answer(self, status: str, reasoning: str, value: dict | None = None) -> dict:
-        self.submitted = {"status": status, "value": value or {}, "reasoning": reasoning}
+    def _t_submit_answer(self, status: str, reasoning: str, value: dict | None = None,
+                         spec_section: str = "", spec_quote: str = "",
+                         uncovered_fields: list | None = None) -> dict:
+        # The SPEC_INSUFFICIENT fields are carried verbatim and judged by the gate, not here.
+        # A toolbox that quietly dropped them would make the gate's rejection unanswerable:
+        # the agent would supply a section, be told it supplied none, and have no way to win.
+        self.submitted = {"status": status, "value": value or {}, "reasoning": reasoning,
+                          "spec_section": spec_section, "spec_quote": spec_quote,
+                          "uncovered_fields": list(uncovered_fields or [])}
         return {"received": True, "status": status, "note": "pending validation"}

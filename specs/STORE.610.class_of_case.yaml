@@ -57,3 +57,46 @@ search_hints:
   - "transferred care"
   - referral
   - "records from"
+
+# ------------------------------------------------------------------------------ provenance
+# WHY THIS BLOCK EXISTS, and it is a fact about this file rather than about the software.
+# All four original specs in this tree were written by a language model in ONE commit --
+# e5229b0, 2026-07-25 -- from whatever manual text happened to be in its context, and were
+# committed under a human author's name. The stage spec was written by an agent on
+# 2026-07-26. NO REGISTRAR OR PHYSICIAN HAS READ A LINE OF ANY OF THEM. Transcribed lines,
+# inferred lines and invented lines are all present, mixed, and to a reader they are
+# identical: they are all just YAML.
+#
+# One record per ENFORCED element -- the lines some code path changes behaviour on. Missing
+# one makes this file refuse to load. The advisory half for the sentences a human reads
+# rather than the runtime lives in `editorial_provenance`, where a missing record is a
+# finding printed in the review document instead of an error.
+#
+# origin: model_authored is not modesty. It is the accurate answer for every element below.
+# `store_manual` and `ajcc_manual` require a section, item or rule number IN THE BASIS, and
+# nothing here has one, because nothing here is a line a manual states: these are regexes,
+# coverage-gate switches, document-type groupings and sample sizes, all invented in this
+# repository. The four code tables come closest, and they were recalled by a model, not
+# copied out of the manual -- so they say so, and they name the item a human should check
+# them against.
+provenance:
+  - element: "fields[class_of_case].allowable_values"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. A code table. Nobody compared this list against the
+      published table for item Class of Case [610], which is named at the top of this file, so
+      it is a language model's recollection of that table rather than a transcription of it. It
+      may be missing codes, and it may contain codes the table does not have. Check it against
+      the manual before relying on it -- and note that this record is NOT a citation of the
+      manual, precisely because that check has not been done.
+  - element: "proof_obligation.for_negative.required_coverage"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. The single step required before this criterion may
+      report: list the patient's documents, so that the clues it reports are scoped to
+      something. Written by a language model. It is not a coverage proof and is not meant to be
+      -- this variable is not a property of the chart at all.

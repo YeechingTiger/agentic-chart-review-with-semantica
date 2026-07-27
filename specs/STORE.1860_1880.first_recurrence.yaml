@@ -147,3 +147,133 @@ search_hints:
   - "disease free"
   - metastas
   - restaging
+
+# ------------------------------------------------------------------------------ provenance
+# WHY THIS BLOCK EXISTS, and it is a fact about this file rather than about the software.
+# All four original specs in this tree were written by a language model in ONE commit --
+# e5229b0, 2026-07-25 -- from whatever manual text happened to be in its context, and were
+# committed under a human author's name. The stage spec was written by an agent on
+# 2026-07-26. NO REGISTRAR OR PHYSICIAN HAS READ A LINE OF ANY OF THEM. Transcribed lines,
+# inferred lines and invented lines are all present, mixed, and to a reader they are
+# identical: they are all just YAML.
+#
+# One record per ENFORCED element -- the lines some code path changes behaviour on. Missing
+# one makes this file refuse to load. The advisory half for the sentences a human reads
+# rather than the runtime lives in `editorial_provenance`, where a missing record is a
+# finding printed in the review document instead of an error.
+#
+# origin: model_authored is not modesty. It is the accurate answer for every element below.
+# `store_manual` and `ajcc_manual` require a section, item or rule number IN THE BASIS, and
+# nothing here has one, because nothing here is a line a manual states: these are regexes,
+# coverage-gate switches, document-type groupings and sample sizes, all invented in this
+# repository. The four code tables come closest, and they were recalled by a model, not
+# copied out of the manual -- so they say so, and they name the item a human should check
+# them against.
+provenance:
+  - element: "fields[recurrence_type].allowable_values"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. A code table. Nobody compared this list against the
+      published table for item Type of First Recurrence [1880], which is named at the top of
+      this file, so it is a language model's recollection of that table rather than a
+      transcription of it. It may be missing codes, and it may contain codes the table does not
+      have. Check it against the manual before relying on it -- and note that this record is NOT
+      a citation of the manual, precisely because that check has not been done.
+  - element: "fields[recurrence_date].format"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. The value written here is registry notation for an
+      eight-digit date, NOT a pattern -- but the software applies it as one, with a full match,
+      so this field rejects every valid date it is ever given. The bug is real, known, and still
+      unfixed; it is reported in the review document rather than paraphrased away.
+  - element: "proof_obligation.for_negative.gate.all_claims_satisfied"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that BOTH halves of a no-recurrence answer
+      are proved: that the patient became disease-free, and that nothing happened afterwards.
+      The conjunction is the right shape and it was a language model that chose it.
+  - element: "proof_obligation.for_negative.gate.per_claim_can_establish_nonempty"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires the check for a settling document to be
+      applied to each half separately rather than to the criterion as a whole.
+  - element: "proof_obligation.for_negative.gate.required_keywords_all_searched"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that every term in the criterion-level
+      required list has been searched. A switch on this repository's coverage gate, read by
+      acr/coverage.py. The gate is this repository's construct end to end; no registry manual
+      defines one, and nobody clinical has agreed that passing it means the chart was adequately
+      searched.
+  - element: "proof_obligation.for_negative.gate.exclusion_validated"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that the random sample drawn from the
+      groups treated as silent turned up nothing relevant. A switch on this repository's
+      coverage gate, read by acr/coverage.py. The gate is this repository's construct end to
+      end; no registry manual defines one, and nobody clinical has agreed that passing it means
+      the chart was adequately searched.
+  - element: "proof_obligation.for_negative.gate.max_elusion_upper"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. The largest residual chance of a missed document
+      the run may finish with. 25 documents drawn with no relevant hit supports 11.3% at 95%
+      confidence, so this is the nearest round number above the floor the sample size makes
+      reachable -- arithmetic about the sample size, not a measurement of this corpus. No
+      clinician has said that a 12% chance of a missed document is acceptable for this variable.
+      A switch on this repository's coverage gate, read by acr/coverage.py. The gate is this
+      repository's construct end to end; no registry manual defines one, and nobody clinical has
+      agreed that passing it means the chart was adequately searched.
+  - element: "proof_obligation.for_negative.claims[disease_free_interval_existed].strata[can_establish].match"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Oncology notes, imaging and discharge summaries,
+      selected by substring against document type names. Which document types may establish that
+      a patient was disease-free is a clinical question, answered here by a language model.
+  - element: "proof_obligation.for_negative.claims[disease_free_interval_existed].strata[can_establish].required_keywords"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Four phrasings of disease-free status. Chosen by a
+      language model from what it expected oncologists to write, never measured against a note.
+  - element: "proof_obligation.for_negative.claims[no_recurrence_since_anchor].strata[can_establish].partition_by"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Divides the follow-up period by time rather than by
+      document type -- the right shape for a claim that nothing happened over an interval. The
+      schedule that would give the intervals their length is an explicit placeholder in this
+      file and requires clinical input; until it is filled in, this half of the criterion cannot
+      run.
+  - element: "proof_obligation.for_negative.claims[no_recurrence_since_anchor].strata[cannot_establish].match"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Everything not placed in a follow-up interval.
+      Catch-all by construction.
+  - element: "proof_obligation.for_negative.claims[no_recurrence_since_anchor].strata[cannot_establish].min_sample"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. How many of the documents treated as inert are read
+      at random. 25 is a round number a language model picked.

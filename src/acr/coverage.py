@@ -14,6 +14,17 @@ with 50 samples gives a recall bound near 0.08, and reaching 0.95 would need a s
 than the pool. So recall is reported and never gated. The gate asks a different, answerable
 question: did the exclusion declaration and the keyword list survive being sampled?
 
+A SAMPLE IS TIED TO THE FRAME IT WAS DRAWN FROM, and that is enforced here rather than
+assumed. The miss-sampling frame is "this stratum, minus whatever the searches hit", so it
+MOVES whenever the term list grows — and a run may grow the term list mid-flight. Measured on
+SYN0001 under STORE.400_522_523: 112 misses, 25 clean draws, elusion 0.1129, gate PASS
+against a 0.12 cap; one added term turned 20 of those 25 draws into search hits, leaving 5
+draws inside a 92-document frame and an earned bound of 0.4507, while the ledger went on
+reporting 0.1129 and passing. No verdict had been overturned and nothing had been found — the
+population the sample described had simply been replaced underneath it. So `sampling_frame`
+is computed once and consulted by both `pending_samples` and `stratum_results`: draws that
+left the frame are struck from the bound, counted in `draws_invalidated`, and replaced.
+
 **Windows.** For coverage claims the exhaustive stratum is partitioned by time, not by type.
 Windows are generated from a surveillance schedule, then clipped at both ends by the
 observable period, and only then judged. The clipping is not a detail: without it, every
@@ -23,6 +34,9 @@ the inference that care happened somewhere else.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
+import os
 import random
 from dataclasses import dataclass, field, asdict
 from datetime import date, timedelta
@@ -82,6 +96,20 @@ class StratumSpec:
     surveillance_schedule: Any = None
     qualifying_doc_types: list[str] = field(default_factory=list)
     empty_window_policy: dict[str, str] = field(default_factory=dict)
+    # Which of the spec's fields this stratum speaks to. Empty = all of them.
+    #
+    # A criterion can carry fields with DIFFERENT evidence rules. STORE.400_522_523 is the
+    # case in point: histology and behaviour require pathology, but primary_site does not --
+    # the spec says outright "Radiology can localise a mass; it cannot establish histology or
+    # behaviour." One stratification serving all three fields therefore files every CT and
+    # PET under a stratum literally named `cannot_establish`, and the agent reads that as
+    # "these documents are useless".
+    #
+    # Observed: patient P03 was coded C349 (lung NOS) when "right upper lobe"
+    # was documented across seven imaging and oncology note types. The pathology said only
+    # "Right Lung", and the agent would not use the imaging that would have given it C341.
+    # The architecture taught it that error; the spec text said the opposite.
+    establishes: list[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, d: dict) -> "StratumSpec":
@@ -98,6 +126,7 @@ class StratumSpec:
             surveillance_schedule=d.get("surveillance_schedule"),
             qualifying_doc_types=list(d.get("qualifying_doc_types") or []),
             empty_window_policy=dict(d.get("empty_window_policy") or {}),
+            establishes=list(d.get("establishes") or []),
         )
 
     def matches(self, doc: DocMeta) -> bool:
@@ -119,6 +148,37 @@ def assign_strata(docs: Sequence[DocMeta], specs: Sequence[StratumSpec]) -> dict
 
 
 # ---------------------------------------------------------------------------- sampling
+#: Domain separator for the derived sampling seed. Public on purpose: on the CLI the seed
+#: does not need to be unguessable, it needs to be NON-NEGOTIABLE. Set
+#: ACR_SAMPLE_SEED_SECRET to make it unguessable as well; the MCP server does exactly that.
+SEED_DOMAIN = b"acr.sample_seed/1"
+
+#: Recorded next to every derived seed so a reader can tell a derivation from a draw.
+SEED_DERIVED = "derived:hmac(patient,spec_id)"
+SEED_CALLER = "caller_supplied"
+
+
+def derive_sample_seed(patient_id: str, spec_id: str, secret: bytes | None = None) -> int:
+    """The sampling seed for one (patient, spec) question, derived rather than drawn.
+
+    `mcp_server` already worked this way and documented why: a caller that can supply a seed
+    — or a runtime that draws a fresh random one per invocation — can rerun the same question
+    until the validation draw looks convenient, which restores the exact circularity
+    `ForcedSampler` exists to prevent. Deriving from (patient, spec_id) means asking the same
+    question twice gets the same documents, so there is nothing to shop for.
+
+    The agent front end was drawing `random.randrange(2**31)` for every run that did not pass
+    `--seed` (graph.py:289 via ForcedSampler; `batch` and `consistency` never passed one), so
+    the same patient and spec sampled different documents on every invocation and no run was
+    reproducible. Same construction here as `ChartReviewService._seed_for`, in one place, so
+    the two front ends cannot drift apart.
+    """
+    key = secret if secret is not None else (
+        os.environ.get("ACR_SAMPLE_SEED_SECRET", "").encode() or SEED_DOMAIN)
+    mac = hmac.new(key, f"{patient_id}|{spec_id}".encode(), hashlib.sha256)
+    return int.from_bytes(mac.digest()[:4], "big") % (2**31)
+
+
 class ForcedSampler:
     """Draws validation samples. The agent never chooses these.
 
@@ -262,6 +322,24 @@ def clip_and_judge(
 
 
 # ---------------------------------------------------------------------------- results
+def keyword_was_searched(keyword: str, searched_terms: Iterable[str]) -> bool:
+    """Did a search that actually ran cover `keyword`?
+
+    Containment in ONE direction: the required keyword must appear inside a term the agent
+    searched. The test used to be bidirectional -- `kw.lower() in t or t in kw.lower()` -- and
+    the second half is a hole rather than a convenience. `t` is chosen by the caller, so the
+    single character "t" is a substring of "pathology", "biopsy", "specimen", "metasta" and
+    "final diagnosis" at once: one search discharged an entire required list. The surviving
+    direction is the one that means something, because it is the one where the search really
+    did cover the term -- searching "invasive ductal carcinoma" does cover "carcinoma", while
+    searching "carcinoma" does not establish that anybody looked for "final diagnosis".
+    """
+    k = (keyword or "").strip().lower()
+    if not k:
+        return False
+    return any(k in (t or "").strip().lower() for t in searched_terms)
+
+
 @dataclass
 class StratumResult:
     name: str
@@ -269,8 +347,15 @@ class StratumResult:
     reviewed: int = 0
     complete: bool = False
     keywords_searched: list[str] = field(default_factory=list)
+    #: The stratum's declared search obligation, and the part of it nobody ran. Reported so a
+    #: reader can tell "the keyword list survived a sample" from "no keyword list was tried".
+    required_keywords: list[str] = field(default_factory=list)
+    keywords_unsearched: list[str] = field(default_factory=list)
     hits: int = 0
     hits_read: int = 0
+    #: Documents the agent's OWN search flagged and then never opened. A hit is removed from
+    #: the miss-sampling frame, so an unread one is reviewed by nothing at all.
+    hits_unread: list[str] = field(default_factory=list)
     misses: int = 0
     misses_sampled: int = 0
     miss_sample_hits: int = 0
@@ -279,6 +364,15 @@ class StratumResult:
     sampled: int = 0
     sample_hits: int = 0
     elusion_upper: float = 1.0
+    establishes: list[str] = field(default_factory=list)
+    #: Draws that were inside the sampling frame when they were made and are not any more,
+    #: because a later search moved them out of it. Their verdicts are kept — the obligation
+    #: to have looked at them is never cancelled — but they are struck from the bound, which
+    #: is a statement about the population they have left.
+    draws_invalidated: list[str] = field(default_factory=list)
+    #: How many fresh draws the CURRENT frame still owes before n is restored. Non-zero after
+    #: a frame revision is the run saying, in one number, that it has not earned its bound.
+    replacement_draws_required: int = 0
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -340,23 +434,51 @@ class CoverageLedger:
             self.doc_types_touched.append(doc_type)
 
     # -- forced sampling ----------------------------------------------------------
+    def sampling_frame(self, s: StratumSpec) -> tuple[list[DocMeta], int] | None:
+        """The population a draw for this stratum is a sample OF, and how many are needed.
+
+        None for the exhaustive policies, which sample nothing.
+
+        Computed in ONE place because two callers need the same answer and used to derive it
+        separately: `pending_samples` decided what to draw from the post-search miss
+        universe, and `stratum_results` computed the bound from every verdict on record
+        regardless of which universe it came from. That disagreement is the whole defect —
+        the frame is recomputed on every call, so it silently tracks the term list, while the
+        bound inherited a number earned against a frame that no longer exists.
+        """
+        pool = self.by_stratum.get(s.name, [])
+        if s.policy == "validate_by_sampling":
+            # Frame = the stratum. Fixed at construction, so no search can move a document
+            # out of it and no draw here is ever invalidated.
+            return list(pool), s.min_sample
+        if s.policy == "search_then_read_hits_and_sample_misses":
+            # Frame = the stratum MINUS the search hits, and it moves whenever a term is added.
+            return ([d for d in pool if d.note_id not in self.search_hit_notes],
+                    s.min_sample_of_misses)
+        return None
+
     def pending_samples(self) -> dict[str, list[DocMeta]]:
         """Documents the runtime will make the agent inspect before a negative is allowed."""
         out: dict[str, list[DocMeta]] = {}
         for s in self.specs:
-            pool = self.by_stratum.get(s.name, [])
-            if s.policy == "validate_by_sampling":
-                need, universe = s.min_sample, pool
-            elif s.policy == "search_then_read_hits_and_sample_misses":
-                need = s.min_sample_of_misses
-                universe = [d for d in pool if d.note_id not in self.search_hit_notes]
-            else:
+            frame = self.sampling_frame(s)
+            if frame is None:
                 continue
-            drawn = self.drawn.setdefault(s.name, [])
-            if len(drawn) < need:
-                pool = [d for d in universe if d.note_id not in set(drawn)]
-                drawn.extend(d.note_id for d in self.sampler.draw(pool, need - len(drawn)))
+            universe, need = frame
             by_id = {d.note_id: d for d in universe}
+            drawn = self.drawn.setdefault(s.name, [])
+            # SURVIVING, not merely DRAWN. This test used to be `len(drawn) < need`, which
+            # counts a draw the frame has since lost: adding a term that turns 20 of 25 draws
+            # into search hits left `n_s >= need` true, so the runtime demanded no
+            # replacement and the run kept a 25-draw bound over a 5-draw frame. A draw is
+            # tied to the frame it came from, so a revision that changes the frame is a
+            # revision that owes replacements.
+            surviving = [n for n in drawn if n in by_id]
+            if len(surviving) < need:
+                # Never redraw something already drawn: an inspected document is not fresh
+                # evidence about the frame it has left, and a redraw would look like one.
+                fresh = [d for d in universe if d.note_id not in set(drawn)]
+                drawn.extend(d.note_id for d in self.sampler.draw(fresh, need - len(surviving)))
             outstanding = [by_id[n] for n in drawn
                            if n in by_id and n not in self.samples.get(s.name, {})]
             if outstanding:
@@ -411,27 +533,83 @@ class CoverageLedger:
         out: list[StratumResult] = []
         for s in self.specs:
             pool = self.by_stratum.get(s.name, [])
-            r = StratumResult(name=s.name, N=len(pool))
+            r = StratumResult(name=s.name, N=len(pool), establishes=list(s.establishes))
             r.reviewed = sum(1 for d in pool if d.note_id in self.read_notes
                              or any(k.startswith(d.note_id + "#") for k in self.read_sections))
             r.declared_types = sorted({d.doc_type for d in pool})[:12]
             verdicts = self.samples.get(s.name, {})
-            n_s, n_hit = len(verdicts), sum(1 for v in verdicts.values() if v)
+            # ONLY THE SURVIVING DRAWS. `n_s = len(verdicts)` credited every verdict ever
+            # recorded to a bound over whatever the frame happens to be NOW, so an expansion
+            # that emptied the frame of 20 of its 25 draws left the reported bound untouched.
+            # A verdict is evidence about the population the document was drawn from; once
+            # the document is no longer in that population the verdict is not evidence about
+            # it. Struck from the bound, kept in `draws_invalidated`, and replaced by
+            # `pending_samples`.
+            frame = self.sampling_frame(s)
+            if frame is None:
+                surviving = dict(verdicts)
+            else:
+                frame_ids = {d.note_id for d in frame[0]}
+                surviving = {k: v for k, v in verdicts.items() if k in frame_ids}
+                r.draws_invalidated = sorted(k for k in verdicts if k not in frame_ids)
+            n_s, n_hit = len(surviving), sum(1 for v in surviving.values() if v)
 
             if s.policy in ("exhaustive", "exhaustive_until_witness"):
                 r.complete = (r.reviewed >= r.N) if s.policy == "exhaustive" else (r.reviewed > 0)
                 r.elusion_upper = 0.0 if r.complete else 1.0
             elif s.policy == "search_then_read_hits_and_sample_misses":
                 r.keywords_searched = list(self.searched_terms)
+                r.required_keywords = list(s.required_keywords)
+                r.keywords_unsearched = [k for k in s.required_keywords
+                                         if not keyword_was_searched(k, self.searched_terms)]
                 hits = [d for d in pool if d.note_id in self.search_hit_notes]
                 r.hits = len(hits)
-                r.hits_read = sum(1 for d in hits if d.note_id in self.read_notes)
+                # Sections count as having read the document, exactly as `reviewed` above
+                # counts them; `read_notes` alone would re-demand a document already opened.
+                seen = set(self.read_notes) | {k.split("#")[0] for k in self.read_sections}
+                r.hits_read = sum(1 for d in hits if d.note_id in seen)
+                r.hits_unread = [d.note_id for d in hits if d.note_id not in seen]
                 r.misses = len(pool) - r.hits
                 r.misses_sampled, r.miss_sample_hits = n_s, n_hit
-                r.keyword_list_validated = n_s >= s.min_sample_of_misses and n_hit == 0
+                # A DOCUMENT IS ONLY A "MISS" RELATIVE TO A SEARCH THAT ACTUALLY RAN.
+                #
+                # This line used to read `n_s >= s.min_sample_of_misses and n_hit == 0`, and
+                # that is the worst inversion the gate has had. Run no searches at all and
+                # `search_hit_notes` stays empty, so every document in the stratum is a miss;
+                # the sampler draws its 25 from the whole stratum; the agent reads them,
+                # cites none, and the ledger announces that the keyword list is validated.
+                # Doing LESS work made the gate EASIER to pass, which is precisely backwards
+                # for a check whose whole purpose is to price the work.
+                #
+                # The searches are a precondition of the verdict, not a separate line item
+                # somebody might forget to read: with an unsearched required keyword there is
+                # no keyword list under test, so there is nothing for a clean sample to
+                # validate.
+                # `min(..., r.misses)` keeps the obligation satisfiable when the search left
+                # fewer misses than the spec's sample size: inspecting all 4 of 4 remaining
+                # misses is a census, which is strictly stronger than a sample of 25, and
+                # demanding 25 anyway is an obligation no amount of work discharges.
+                need = min(s.min_sample_of_misses, r.misses)
+                r.replacement_draws_required = max(0, need - n_s)
+                # ...AND THE HITS HAVE TO BE READ. The policy is spelled
+                # `search_then_READ_HITS_and_sample_misses`, but only the searching and the
+                # sampling were ever enforced: `hits_read` was computed here and read by
+                # nothing. A hit is excluded from the miss frame, so an unread hit is
+                # reviewed by nothing at all -- neither read, nor eligible to be sampled.
+                # That makes searching HARDER to fail the more of it you do: every extra
+                # search retires more documents from the audited population without anyone
+                # opening them. Measured on SYN0002, the one document the required searches
+                # flagged was the one document the passing run never read.
+                r.keyword_list_validated = (
+                    bool(r.required_keywords)
+                    and not r.keywords_unsearched
+                    and not r.hits_unread
+                    and n_s >= need
+                    and n_hit == 0)
                 r.elusion_upper = clopper_pearson_upper(n_hit, n_s, self.confidence)
             else:
                 r.sampled, r.sample_hits = n_s, n_hit
+                r.replacement_draws_required = max(0, min(s.min_sample, r.N) - n_s)
                 r.elusion_upper = clopper_pearson_upper(n_hit, n_s, self.confidence)
             out.append(r)
         return out
@@ -450,6 +628,12 @@ class CoverageLedger:
             "sampling_validates": ("stratum definitions (retrieval), NOT the agent's reading "
                                    "comprehension — a 0-hit sample does not mean nothing was "
                                    "missed, only that this document class was not wrongly excluded"),
+            "sample_frame_rule": ("a sample is tied to the frame it was drawn from. Adding a "
+                                  "term moves the miss frame, so draws that became search "
+                                  "hits are struck from the bound (draws_invalidated), the "
+                                  "bound is recomputed over the surviving draws, and "
+                                  "replacement_draws_required must reach 0 before the gate "
+                                  "will accept it"),
         }
 
     def render(self) -> str:
@@ -463,6 +647,13 @@ class CoverageLedger:
             if r.sampled or r.misses_sampled:
                 bits.append(f"sampled={r.sampled or r.misses_sampled} hits={r.sample_hits or r.miss_sample_hits}")
             bits.append(f"elusion<={r.elusion_upper:.3f}")
+            if r.draws_invalidated:
+                # Never silent. A bound that quietly loosened because the frame moved reads
+                # like a bound that was always this loose, and the two need different fixes.
+                bits.append(f"frame revised: {len(r.draws_invalidated)} draw(s) left it, "
+                            f"{r.replacement_draws_required} replacement(s) owed")
+            if r.establishes:
+                bits.append("speaks to: " + ", ".join(r.establishes))
             lines.append("  ".join(bits))
         return "\n".join(lines)
 
@@ -480,6 +671,101 @@ def strata_from_spec(spec) -> list[StratumSpec]:
     for claim in (fn.get("claims") or []):
         raw.extend(claim.get("strata") or [])
     return [StratumSpec.from_dict(s) for s in raw]
+
+
+# --------------------------------------------------------------- admissibility, written down
+#: What `establishes` verdicts mean. Three values, not two, and the third is the point.
+ADMITTED = "ADMITTED"
+REFUSED = "REFUSED"
+UNDECLARED = "UNDECLARED"
+
+
+def admissibility_for_citations(spec, coverage: "CoverageLedger", evidence: Sequence[dict],
+                                fields: Sequence[str] = ()) -> list[dict]:
+    """Which evidence rule admitted or refused each cited document, per field.
+
+    THE GATE ALREADY KNOWS THIS AND HAS NEVER WRITTEN IT DOWN. Every document is assigned to
+    a stratum the moment the ledger is built, and each stratum declares `establishes` — the
+    spec's `evidence_rules.does_not_count` in the form code can read ("Radiology can localise
+    a mass; it cannot establish histology or behaviour"). So at gate time the admissibility
+    of every citation is a computed fact, and it was being discarded. Recovering it after the
+    run means re-deriving the stratification from the spec and hoping it matches; recording it
+    means the answer to "was the agent allowed to use that document for that field" is in the
+    run, not reconstructed from one.
+
+    The FIELD SCOPING is deliberately the answer's coded fields and NOT the evidence item's
+    `supports` label. That label is model-authored free text, and scoping by it is the exact
+    bug documented in `answer_checks._evidence_for`: three quotes labelled in three different
+    styles, two silently dropped, and a check that then validated nothing.
+
+    Three verdicts because `establishes: []` is genuinely ambiguous and must not be resolved
+    here by fiat. The runtime's convention (`derive.py`) is that an empty list means the
+    stratum speaks for EVERY field; STORE.700_880 declares `establishes: []` on a stratum it
+    named `cannot_establish` and filled with EKGs and prescription lists, which means the
+    opposite. Reporting UNDECLARED, with the convention the code would apply spelled out
+    alongside, is how that authoring fault reaches a reader instead of being averaged away —
+    and divergent readings of one passage is exactly the FORM evidence §6b permits.
+    """
+    want = [f for f in fields if f] or [getattr(f, "name", "") for f in
+                                        (getattr(spec, "fields", []) or [])]
+    want = [f for f in want if f]
+    by_note: dict[str, str] = {}
+    for name, docs in (coverage.by_stratum or {}).items():
+        for d in docs:
+            by_note[d.note_id] = name
+    specs = {s.name: s for s in coverage.specs}
+    witness = {}
+    po = getattr(spec, "proof_obligation", None)
+    if po is not None:
+        witness = dict(getattr(po, "witness_strata", None) or {})
+
+    out: list[dict] = []
+    seen: set[str] = set()
+    for item in evidence or []:
+        nid = str(item.get("note_id", ""))
+        if not nid or nid in seen:
+            continue
+        seen.add(nid)
+        stratum = by_note.get(nid)
+        s = specs.get(stratum) if stratum else None
+        declared = list(s.establishes) if s else []
+        rec: dict = {
+            "note_id": nid,
+            "doc_type": str(item.get("doc_type", "")),
+            "stratum": stratum,
+            "rule_id": (f"evidence_rule.stratum.{stratum}.establishes" if stratum
+                        else "evidence_rule.stratum.UNMATCHED"),
+            "declared_establishes": declared,
+            # False on every record today, and it says so rather than being omitted. Nothing
+            # in `gate_answer` refuses a citation for coming from a stratum that cannot
+            # establish the field; a reader who assumed it did would conclude the ledger had
+            # already been filtered and stop looking for the failure that is still in it.
+            "enforced_by_gate": False,
+            "by_field": {},
+        }
+        for f in want:
+            if not stratum:
+                verdict, why = UNDECLARED, "no stratum matched this document"
+            elif f in declared:
+                verdict, why = ADMITTED, f"stratum {stratum!r} declares it establishes {f}"
+            elif declared:
+                verdict, why = REFUSED, (f"stratum {stratum!r} establishes {declared} and not "
+                                         f"{f}")
+            else:
+                verdict, why = UNDECLARED, (
+                    f"stratum {stratum!r} declares no `establishes` list. The runtime "
+                    f"convention reads an empty list as 'every field'; a stratum named for "
+                    f"what it cannot establish means the opposite. Ambiguous as written.")
+            row = {"verdict": verdict, "why": why}
+            if f in witness:
+                # The other admissibility rule: `for_positive.witness` names, per field, the
+                # strata a citation may come from at all.
+                row["witness_rule_id"] = f"evidence_rule.witness.{f}"
+                row["witness_strata"] = list(witness[f])
+                row["witness_satisfied"] = stratum in set(witness[f])
+            rec["by_field"][f] = row
+        out.append(rec)
+    return out
 
 
 @dataclass
@@ -530,15 +816,72 @@ def evaluate_gate(gate_spec: dict, strata: Sequence[StratumResult],
                 "a hit overturns the declaration; promote that type to may_mention and rerun"
             )
 
+    if gate_spec.get("required_keywords_all_searched", True):
+        # This key is declared by every stratified spec in the tree and, until now, was read
+        # by nothing: `grep required_keywords_all_searched src/acr/coverage.py` returned
+        # nothing at all, so the flag documented an obligation the gate never checked.
+        unsearched = [(s.name, k) for s in strata for k in s.keywords_unsearched]
+        ok = not unsearched
+        c["required_keywords_all_searched"] = ok
+        if not ok:
+            for name, k in unsearched:
+                miss.append(f"required search not performed for stratum {name!r}: {k!r}")
+
+    # FRAME REVALIDATION. Deliberately NOT behind a `gate_spec` key: every other check here
+    # asks whether enough work was done, and this one asks whether the arithmetic still
+    # describes the population it claims to. A spec cannot opt out of that, and one that
+    # could would be opting out of the meaning of its own cap. It can only fire on a run that
+    # revised its frame after drawing, which is exactly the case that used to pass silently.
+    revised = [s for s in strata if s.draws_invalidated and s.replacement_draws_required > 0]
+    c["sample_frames_intact"] = not revised
+    frame_reported = {s.name for s in revised}
+    for s in revised:
+        n_left = len(s.draws_invalidated)
+        earned = s.misses_sampled or s.sampled
+        miss.append(
+            f"the sampling frame for stratum {s.name!r} was revised after the draw: "
+            f"{n_left} of {n_left + earned} drawn document(s) left it when the term list "
+            f"grew, so the reported bound (elusion <= {s.elusion_upper:.3f}) is earned by "
+            f"{earned} surviving draw(s), not by {n_left + earned} — draw and inspect "
+            f"{s.replacement_draws_required} replacement(s) to restore n. A sample is tied "
+            "to the frame it was drawn from; inheriting the bound across a revision is the "
+            "one way expansion can make an absence claim weaker while looking stronger"
+        )
+
     if gate_spec.get("keyword_list_validated", True):
         s = by.get("may_mention")
-        ok = s is None or (s.misses_sampled >= 1 and s.miss_sample_hits == 0)
+        # Read the stratum's own verdict rather than recomputing a weaker one here. The
+        # recomputation accepted `misses_sampled >= 1`, so a single inspected document
+        # discharged a stratum whose spec asks for 25, and it ignored the searches entirely.
+        ok = s is None or s.keyword_list_validated
         c["keyword_list_validated"] = ok
         if not ok and s:
-            miss.append(
-                f"keyword list not validated (misses sampled {s.misses_sampled}, "
-                f"hits {s.miss_sample_hits}) — extend the keywords and re-search this stratum"
-            )
+            if s.keywords_unsearched:
+                miss.append(
+                    f"keyword list not validated: {len(s.keywords_unsearched)} of "
+                    f"{len(s.required_keywords)} required searches never ran "
+                    f"({', '.join(repr(k) for k in s.keywords_unsearched)}) — with no search "
+                    "there are no misses to sample, so a clean sample validates nothing"
+                )
+            elif s.hits_unread:
+                miss.append(
+                    f"{len(s.hits_unread)} of {s.hits} search hit(s) in stratum {s.name!r} "
+                    f"were never read ({', '.join(s.hits_unread[:5])}"
+                    f"{', …' if len(s.hits_unread) > 5 else ''}) — a hit is excluded from the "
+                    "miss sample, so an unread one is reviewed by nothing at all"
+                )
+            elif s.name in frame_reported:
+                pass    # already refused above, in the vocabulary that fits the cause
+            elif not s.required_keywords:
+                miss.append(
+                    f"stratum {s.name!r} is search-validated but declares no required_keywords "
+                    "— there is no keyword list to validate (that is SPEC_INSUFFICIENT)"
+                )
+            else:
+                miss.append(
+                    f"keyword list not validated (misses sampled {s.misses_sampled}, "
+                    f"hits {s.miss_sample_hits}) — extend the keywords and re-search this stratum"
+                )
 
     cap = gate_spec.get("max_elusion_upper")
     if cap is not None:

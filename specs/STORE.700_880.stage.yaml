@@ -1,0 +1,779 @@
+spec_id: STORE.700_880.stage
+spec_version: 0.1.0
+source_authority:
+  document: "AJCC Cancer Staging Manual 8th edition (Lung) + CoC STORE 2025 (updated 2025-04-24)"
+  items:
+    - "TNM Clin T / N / M and Clinical Stage Group"
+    - "TNM Path T / N / M and Pathologic Stage Group"
+    - "Summary Stage 2018"
+  applicability: "lung primaries diagnosed 2018-01-01 onward (AJCC 8th)"
+  note: >
+    The numeric identifiers in spec_id follow this repository's file-naming convention.
+    Reconcile them against the NAACCR data dictionary before this spec is used to populate a
+    registry field. Nothing in the runtime reads source_authority; it is here for the human
+    who has to approve the spec.
+data_source: notes
+
+question: >
+  For the lung primary being reported, what are the AJCC 8th edition clinical stage
+  (cT, cN, cM and clinical stage group), the AJCC 8th edition pathologic stage (pT, pN, pM
+  and pathologic stage group), and the SEER Summary Stage 2018 code?
+
+# Nine fields, because staging really is nine registry items. The clinical set and the
+# pathologic set are DIFFERENT VARIABLES with different evidence, different timing and
+# different owners; a single `stage` field would make the commonest error in this criterion
+# -- conflating them -- unrepresentable and therefore invisible.
+#
+# Every `format` below is a Python regex (re.fullmatch), not registry notation. Writing
+# "CCYYMMDD" here is what makes check_field_formats reject every valid value, as it currently
+# does in STORE.390 and STORE.1860_1880.
+fields:
+  - name: clinical_t
+    type: string
+    format: "cT(X|0|is|1mi|1a|1b|1c|1|2a|2b|2|3|4)"
+    description: "AJCC 8th clinical T, with the c prefix, e.g. cT2a. cTX means not assessable."
+  - name: clinical_n
+    type: string
+    format: "cN(X|0|1|2|3)"
+    description: "AJCC 8th clinical N, with the c prefix, e.g. cN2."
+  - name: clinical_m
+    type: string
+    # No cMX. AJCC 8th assigns M0 clinically whenever there is no evidence of metastasis, so
+    # "M could not be assessed" is not a clinical category. Excluding it from the pattern is
+    # free enforcement of a real staging rule: an agent that wants to say "unknown" must leave
+    # the field null and take the abstention, rather than hide behind an X.
+    format: "cM(0|1a|1b|1c|1)"
+    description: "AJCC 8th clinical M, e.g. cM1b. There is no cMX; leave null if undetermined."
+  - name: clinical_stage_group
+    type: string
+    allowable_values:
+      ["0", "OCCULT", "IA1", "IA2", "IA3", "IB", "IIA", "IIB",
+       "IIIA", "IIIB", "IIIC", "IVA", "IVB", "99"]
+    description: >
+      AJCC 8th clinical stage group. OCCULT is cTX cN0 cM0 (positive cytology, tumour never
+      visualised). 99 = documented nowhere in the record -- a negative claim, not a default.
+  - name: pathologic_t
+    type: string
+    format: "pT(X|0|is|1mi|1a|1b|1c|1|2a|2b|2|3|4)"
+    description: "AJCC 8th pathologic T from the resection specimen, with the p prefix."
+  - name: pathologic_n
+    type: string
+    format: "pN(X|0|1|2|3)"
+    description: "AJCC 8th pathologic N from the nodes actually removed and examined."
+  - name: pathologic_m
+    type: string
+    # There is no pM0: absence of metastasis cannot be established by a specimen, only by the
+    # clinical workup. A run that writes pM0 has copied cM0 across the c/p boundary, which is
+    # exactly the conflation this spec exists to prevent -- so the regex refuses it.
+    format: "pM1(a|b|c)?"
+    description: "Only pM1, pM1a, pM1b, pM1c exist. There is no pM0 and no pMX; leave null."
+  - name: pathologic_stage_group
+    type: string
+    allowable_values:
+      ["0", "IA1", "IA2", "IA3", "IB", "IIA", "IIB",
+       "IIIA", "IIIB", "IIIC", "IVA", "IVB", "99"]
+    description: >
+      AJCC 8th pathologic stage group. Requires resection of the primary; a biopsy alone
+      never produces one. OCCULT is clinical-only and is absent here by design.
+  - name: summary_stage
+    type: string
+    allowable_values: ["0", "1", "2", "3", "4", "7", "9"]
+    description: >
+      SEER Summary Stage 2018. 0 in situ, 1 localised, 2 regional by direct extension,
+      3 regional lymph nodes only, 4 regional both, 7 distant, 9 unknown.
+
+# Read by tests/test_stage_spec.py, not by the runtime. `proof_obligation` requires the agent
+# to have searched for the terms below before any absence claim is accepted; this mapping is
+# what makes "the keyword list covers every field" a checkable statement instead of a hope.
+# Verified in test_every_field_is_reachable_by_a_required_search.
+keyword_field_coverage:
+  clinical_t: ["tnm", "tumor size", "pleural"]
+  clinical_n: ["tnm", "lymph node"]
+  clinical_m: ["tnm", "metasta"]
+  clinical_stage_group: ["stage"]
+  pathologic_t: ["tnm", "tumor size", "pleural"]
+  pathologic_n: ["tnm", "lymph node"]
+  pathologic_m: ["tnm", "metasta"]
+  pathologic_stage_group: ["stage"]
+  summary_stage: ["stage", "metasta"]
+
+agent_policy: >
+  Fill the clinical fields and the pathologic fields independently. A field you cannot
+  support with a quote must be left null -- never borrow a value across the c/p boundary,
+  never round a bounded ("at least") statement to a determined one, and do not report a
+  stage group you have not seen stated unless you can quote all three of its categories.
+
+decision_rule:
+  - "Clinical stage and pathologic stage are separate data items. Never copy one into the other, and never mix a c-category and a p-category inside one stage group."
+  - "Clinical stage uses all information acquired BEFORE the first treatment: examination, imaging, endoscopy, biopsy and surgical staging. It is fixed at that point and is not revised by what the resection later shows."
+  - "Pathologic stage requires resection of the primary tumour; pN requires the nodes that were actually removed. A needle or endoscopic biopsy alone never produces a pathologic stage group."
+  - "For the PATHOLOGIC categories the resection specimen supersedes imaging. It does not overwrite the clinical categories: both are recorded."
+  - "There is no pM0 and no cMX. Absence of metastasis is a clinical determination (cM0); non-assessability is not a clinical M category."
+  - "A bounded statement -- 'at least cT2a', 'at minimum stage IIB', 'T2 or greater' -- is a lower bound, not a determination. Record the categories that are determined and abstain on the rest."
+  - "TX, NX and stage group 99 are positive claims that the value could not be assessed or is documented nowhere. They carry the same proof burden as EVIDENCE_INSUFFICIENT and must not be used as a shortcut for not having looked."
+  - "A stage group must be consistent with its own T, N and M. Where a stated group contradicts the stated categories, prefer the categories and record the contradiction."
+  - "Summary Stage is derived from the extent of disease documented anywhere in the record, not by translating the AJCC group."
+
+evidence_rules:
+  counts_as_evidence:
+    - "The staging or synoptic section of a resection pathology report (pT, pN, 'AJCC pathologic stage')."
+    - "An explicit stage statement by the treating medical oncologist, radiation oncologist, thoracic surgeon or tumour board, where the c/p qualifier is stated or unambiguous from the timing."
+    - "Imaging establishes distant metastasis (M1) and supplies tumour size and nodal measurements. Those are inputs to a category, not the category itself."
+  does_not_count:
+    - "Imaging alone for a T, N or stage GROUP. Radiology measures; the category is a clinician's assignment. Distant metastasis is the one exception, and it is stated above."
+    - "A stage carried forward in a problem list, note header or template when the record shows the workup has since changed the value."
+    - "A stage stated for a different primary. A patient with two cancers has two stages and only one of them is being reported."
+    - "A stage attributed to an outside facility whose report is not in this record."
+    - "A bounded statement, and any stage group derived from one."
+
+when_not_to_use:
+  - "Post-neoadjuvant staging (yc / yp prefixes). Those are further separate data items and this spec does not define them."
+  - "Small cell lung carcinoma staged in the record only as limited or extensive: that is not an AJCC group."
+  - "Lymphoma and other haematopoietic neoplasms, which use Ann Arbor / Lugano."
+  - "Cases diagnosed before 2018-01-01, where AJCC 7th applies and the group definitions differ."
+
+conflict_rules:
+  - if: "the resection pathology and the pre-treatment imaging disagree on T or N"
+    then: "the resection governs the PATHOLOGIC categories only; the clinical categories stay as they were staged before treatment. Cite both."
+  - if: "two clinicians state different clinical stage groups"
+    then: "prefer the assessment made once the staging workup was complete, and record the earlier one with stance=contradicts"
+  - if: "the stated stage group is inconsistent with the stated T, N and M"
+    then: "prefer the categories, report the group you can justify, and record the contradiction"
+  - if: "the only stage statement in the record is bounded ('at least cT2a')"
+    then: "report the determinable categories and EVIDENCE_INSUFFICIENT for the group; do not round the bound"
+
+proof_obligation:
+  for_positive: >
+    One document stating the stage, with the c/p qualifier established by its timing relative
+    to first treatment -- plus, for a pathologic group, evidence that the primary was resected.
+  for_negative:
+    mode: stratified_exclusion
+    confidence: 0.95
+
+    # THE ONLY REQUIRED-SEARCH ENFORCEMENT IN THE SYSTEM LIVES AT THIS KEY.
+    # graph._check_gate loops over proof_obligation.required_keywords and fails the gate for
+    # any term absent from coverage.searched_terms. Stratum-level required_keywords do NOT
+    # feed the gate -- they only feed _keyword_hits_among_drawn. All four previously shipped
+    # specs left this list empty, so `required_keywords_all_searched: true` in their gates
+    # enforced nothing. Six terms, chosen so that none is a substring of another (the match is
+    # bidirectional, so "stage" would otherwise silently discharge "pathologic stage" too).
+    # Field coverage is asserted in keyword_field_coverage above.
+    required_keywords:
+      - stage        # both stage groups, summary_stage
+      - tnm          # every T, N and M category
+      - "tumor size" # T
+      - pleural      # T (visceral pleural invasion is what makes a <=3 cm tumour T2a)
+      - "lymph node" # N
+      - metasta      # M, summary_stage
+
+    strata:
+      - name: can_establish
+        # Documents that ASSIGN a stage rather than supply an input to one: the resection and
+        # biopsy pathology family, and the oncology / thoracic-surgery / tumour-board
+        # assessments where the clinical group is actually decided. Both halves are needed --
+        # pathology alone cannot establish a clinical stage, and a patient who never had
+        # surgery has no pathologic stage at all, so a pathology-only stratum would teach the
+        # agent that an unresected patient is unstageable.
+        #
+        # Enumerated rather than matched on "Pathology", because doc_type_matches is a
+        # case-insensitive SUBSTRING: "Pathology" pulls in Speech-Language-Pathology-Note and
+        # misses Fine-Needle-Report, Core-Needle-Biopsy and IMMUNOHISTOLOGY-RPT. Measured on
+        # the real corpus 2026-07-26; measured again here -- this list selects 53 of the 1,516
+        # real document types and Speech-Language-Pathology-Note is not one of them.
+        establishes:
+          [clinical_t, clinical_n, clinical_m, clinical_stage_group,
+           pathologic_t, pathologic_n, pathologic_m, pathologic_stage_group, summary_stage]
+        match:
+          doc_type_matches:
+            ["Surgical-Pathology", "Anatomic-Pathology", "Tissue-Pathology", "Medical-Pathology",
+             "Pathology-Report", "MOLECULAR-PATHOLOGY", "IMMUNOHISTOLOGY", "Cytology",
+             "Fine-Needle", "Core-Needle", "Needle-Bx",
+             "Tumor-Board", "Thoracic-Tumor", "Thoracic-Surg",
+             "Onc-Med", "Hem-Onc", "Rad-Onc", "Radiation-Oncology", "Radiation-Therapy",
+             "General-Onc", "Operative-Note", "OPERATIVE-REPORT", "Gen-Surgery-OP-Letter"]
+        policy: exhaustive
+
+      - name: cannot_establish
+        # Declared BEFORE may_mention and enumerated, so that may_mention can take `rest`.
+        # An unrecognised document type then defaults to "search it and sample the misses"
+        # rather than to "assume it is irrelevant and sample 25". Unmentioned means unjudged,
+        # and the safe default for unjudged is to look -- the same rule coverage_planner
+        # applies to a type the planner did not mention.
+        #
+        # This inverts STORE.400_522_523, where `rest` was cannot_establish. That shape is
+        # fragile here: exclusion_validated fails the moment a drawn document turns out to be
+        # citable, and under this criterion a spine film showing a bone metastasis IS citable
+        # (it establishes M1b). Every type below is inert for all nine fields.
+        establishes: []          # genuinely silent on every field -- see the caveat below
+        match:
+          doc_type_matches:
+            ["EKG", "Electrocardiogram", "ELECTRONYSTAGMOGRAM",
+             "Prescriptions-Filled-RxHub", "DISCHARGE-PRESCRIPTIONS", "Discharge-Meds",
+             "Med-Reconciliation", "Medication-Reconciliation-Note",
+             "Fluoroscopy-Up-to-1-Hr",
+             "Aud-Speech-Path", "Speech-Language-Pathology", "Dental-MD"]
+        policy: validate_by_sampling
+        min_sample: 25
+        max_tolerated_hits: 0    # a hit overturns the exclusion declaration
+
+      - name: may_mention
+        # Everything else: cross-sectional imaging, PET, plain films, endoscopy, procedure
+        # notes, discharge summaries and every non-oncology progress note. These restate a
+        # stage constantly and imaging supplies the measurements behind T, N and M, so the
+        # obligation is to SEARCH them and then sample what the search missed.
+        establishes:
+          [clinical_t, clinical_n, clinical_m, clinical_stage_group,
+           pathologic_t, pathologic_n, pathologic_m, pathologic_stage_group, summary_stage]
+        match: {rest: true}
+        policy: search_then_read_hits_and_sample_misses
+        # Feeds _keyword_hits_among_drawn only, which lowercases and drops terms of length
+        # <= 3 -- so "tnm" is invisible here however it is written. It is still gated at
+        # for_negative.required_keywords above, which has no length filter.
+        required_keywords:
+          ["stage", "staging", "ajcc", "tumor size", "pleural", "lymph node",
+           "mediastinal", "metasta", "nodal", "extent of disease"]
+        min_sample_of_misses: 25
+        max_tolerated_hits: 0    # a hit falsifies the keyword list
+
+    gate:
+      require_can_establish_nonempty: true
+      exhaustive_strata_complete: true
+      exclusion_validated: true
+      keyword_list_validated: true
+      # 25 documents sampled with zero hits gives a Clopper-Pearson upper bound of 0.1129,
+      # so any cap below that makes the gate unpassable no matter how much work is done.
+      max_elusion_upper: 0.12
+    statement: >
+      Do not assign a stage group from imaging alone, from a bounded statement, or from a
+      stage recorded for a different primary. If the record carries no stage for this primary,
+      answer EVIDENCE_INSUFFICIENT and say which categories, if any, are determinable. If the
+      primary was never resected there is no pathologic stage and that is a finding, not a gap.
+
+abstention:
+  EVIDENCE_INSUFFICIENT: >
+    No stage documented for this primary; or only a bounded ('at least') statement; or the
+    only stage in the record belongs to a different primary; or the primary was never resected
+    and only the pathologic fields are missing.
+  SPEC_INSUFFICIENT: >
+    Post-neoadjuvant yc/yp staging, small cell staged only as limited/extensive, a
+    haematopoietic neoplasm, or a case diagnosed before 2018-01-01 under AJCC 7th.
+
+special_codes_not_mar:
+  - >
+    Unknown stage is not missing at random: it clusters on patients who never reached an
+    oncology consultation and on workups done at an outside facility, and both groups differ
+    in survival from the staged population. Report the abstention, do not minimise it.
+
+boundary_cases:
+  - case: "Synoptic report reads 'pT2a pN1 cM0, AJCC pathologic stage IIB'; no pre-treatment stage is stated anywhere"
+    answer: "pathologic_* filled; clinical_* EVIDENCE_INSUFFICIENT"
+    why: "cM0 inside a pathologic synoptic is the clinical M being carried into the p-group. It is not a clinical stage group."
+  - case: "Oncology note: 'clinically at least T2a, N status pending mediastinoscopy'"
+    answer: "clinical_stage_group EVIDENCE_INSUFFICIENT; clinical_t EVIDENCE_INSUFFICIENT"
+    why: "A lower bound is not a determination, and a pending N cannot be read as cN0."
+  - case: "3.2 cm upper lobe mass with visceral pleural invasion, no nodes, no metastasis, no resection"
+    answer: "clinical_t cT2a, clinical_n cN0, clinical_m cM0, clinical_stage_group IB, summary_stage 1"
+    why: "All three categories quotable, so the group may be reported. No resection means no pathologic stage."
+  - case: "Separate tumour nodule in a different ipsilateral lobe"
+    answer: "T4"
+    why: "Same lobe is T3, different ipsilateral lobe is T4, contralateral lung is M1a."
+  - case: "Malignant pleural effusion"
+    answer: "cM1a, summary_stage 7"
+    why: "Pleural or pericardial effusion or nodules are M1a, not a T descriptor."
+  - case: "PET-CT reports a solitary adrenal metastasis; no clinician has ever written a stage"
+    answer: "clinical_m cM1b, summary_stage 7; clinical_stage_group EVIDENCE_INSUFFICIENT"
+    why: "Imaging establishes M. It does not assign a group, and IVA cannot be inferred without T and N."
+
+search_hints:
+  - stage
+  - staging
+  - AJCC
+  - TNM
+  - "pathologic stage"
+  - "clinical stage"
+  - "tumor size"
+  - pleural
+  - "lymph node"
+  - mediastinal
+  - metasta
+  - metastasis
+  - resection
+  - lobectomy
+  - "tumor board"
+  - "extent of disease"
+
+# Deterministic post-checks, enforced in src/acr/answer_checks.py against a FOUND answer.
+# Every rule below is also stated in decision_rule or conflict_rules above; these are the ones
+# that are mechanically decidable, so they are decided rather than hoped for. The clinical
+# content lives here where a registrar can review it; the checker contains no oncology.
+#
+# The three kinds carry their measured pedigree from STORE.400_522_523 and each transfers to a
+# structurally identical staging failure:
+#   not_less_specific   <- coding 8046 over "favor squamous"     -> coding cT2 over cT2a
+#   nos_requires_search <- coding C349 having run zero searches  -> coding 99 / cTX / cNX
+#   origin_not_specimen <- coding the biopsy site as the origin  -> reading the clinical stage
+#                                                                   off the resection specimen
+answer_checks:
+  # --- unknown and X values are negative claims -------------------------------------------
+  - field: clinical_stage_group
+    kind: not_less_specific
+    nos_values: ["99"]
+    contradicted_by:
+      ["clinical stage", "ajcc stage", "stage i", "stage ii", "stage iii", "stage iv"]
+    message: >
+      99 asserts that no stage is documented anywhere in the record. A cited quote that states
+      a stage falsifies that outright.
+
+  - field: clinical_stage_group
+    kind: nos_requires_search
+    nos_values: ["99"]
+    required_searches: ["stage", "tnm"]
+    message: >
+      99 is a claim of absence and carries the same burden as EVIDENCE_INSUFFICIENT. The stage
+      is stated in an oncology assessment or a tumour board note far more often than in
+      pathology. Search before claiming it is nowhere.
+
+  - field: pathologic_stage_group
+    kind: nos_requires_search
+    nos_values: ["99"]
+    required_searches: ["stage", "resection"]
+    message: >
+      Before coding 99, establish whether the primary was ever resected. If it was not, there
+      is no pathologic stage to find and the honest answer is EVIDENCE_INSUFFICIENT with that
+      reason, not an unknown code.
+
+  - field: clinical_t
+    kind: nos_requires_search
+    nos_values: ["cTX"]
+    required_searches: ["tumor size", "pleural"]
+    message: >
+      cTX asserts the primary tumour could not be assessed. Size and visceral pleural invasion
+      are what separate cT1a from cT2a and they are routinely in the imaging report, not the
+      pathology. Look there before asserting non-assessability.
+
+  - field: clinical_n
+    kind: nos_requires_search
+    nos_values: ["cNX"]
+    required_searches: ["lymph node", "mediastin"]
+    message: >
+      cNX asserts the regional nodes could not be assessed. A staging CT or PET reporting node
+      stations is an assessment; cNX is not the code for "I did not read it".
+
+  - field: summary_stage
+    kind: nos_requires_search
+    nos_values: ["9"]
+    required_searches: ["stage", "metasta"]
+    message: >
+      Summary Stage 9 claims the extent of disease is undocumented. Extent is assembled from
+      the whole record, so it survives a missing AJCC group.
+
+  - field: summary_stage
+    kind: not_less_specific
+    nos_values: ["9"]
+    contradicted_by:
+      ["distant metasta", "metastatic disease", "regional lymph node", "confined to",
+       "localized", "in situ"]
+    message: >
+      Summary Stage is derived from documented extent of disease, not from the presence of an
+      AJCC group. The quote you cited states the extent.
+
+  # --- do not take the less specific category when a more specific one is documented -------
+  # One entry per NOS value rather than one per field: contradicted_by is a flat list, so
+  # folding cT1 and cT2 together would make "ct1a" in the blob reject a correctly coded cT2.
+  - field: clinical_t
+    kind: not_less_specific
+    nos_values: ["cT1"]
+    contradicted_by: ["ct1mi", "ct1a", "ct1b", "ct1c"]
+    message: "AJCC 8th subdivides T1 by size; cT1 undivided asserts the size is undocumented."
+  - field: clinical_t
+    kind: not_less_specific
+    nos_values: ["cT2"]
+    contradicted_by: ["ct2a", "ct2b"]
+    message: "T2a and T2b are different stage groups at the same N. cT2 undivided is not a category AJCC 8th assigns."
+  - field: pathologic_t
+    kind: not_less_specific
+    nos_values: ["pT1"]
+    contradicted_by: ["pt1mi", "pt1a", "pt1b", "pt1c"]
+    message: "A resection specimen is measured. An undivided pT1 over a documented subcategory discards that measurement."
+  - field: pathologic_t
+    kind: not_less_specific
+    nos_values: ["pT2"]
+    contradicted_by: ["pt2a", "pt2b"]
+    message: "T2a and T2b are different stage groups at the same N."
+
+  # --- clinical stage must not be read off the resection specimen --------------------------
+  # answer_checks._evidence_for deliberately ignores the field and returns the WHOLE ledger,
+  # so this fires only when every quote in the run is specimen text -- i.e. exactly the run
+  # that derived its clinical stage from the pathology. Declaring the same check on
+  # clinical_t/clinical_n would not catch anything further; it would emit the identical
+  # message three more times.
+  - field: clinical_stage_group
+    kind: origin_not_specimen
+    specimen_markers:
+      ["specimen received", "specimen:", "gross description", "microscopic description",
+       "synoptic", "final pathologic diagnosis", "resection specimen",
+       "lobectomy specimen", "segmentectomy specimen", "pneumonectomy specimen"]
+    message: >
+      Every quote supporting this answer is resection or specimen text. The specimen reports
+      what was found after treatment began; the clinical stage is what was known before it.
+      Cite the pre-treatment workup -- imaging, endoscopy, the oncology or tumour board
+      assessment -- or leave the clinical group null.
+
+downstream_warning:
+  - >
+    A clinical and a pathologic stage group are not interchangeable inputs to a concordance
+    rule. A guideline recommendation keyed on "stage IIIA" means one of them specifically, and
+    silently substituting the other changes which patients are judged non-concordant.
+
+# ------------------------------------------------------------------------------ provenance
+# WHY THIS BLOCK EXISTS, and it is a fact about this file rather than about the software.
+# All four original specs in this tree were written by a language model in ONE commit --
+# e5229b0, 2026-07-25 -- from whatever manual text happened to be in its context, and were
+# committed under a human author's name. The stage spec was written by an agent on
+# 2026-07-26. NO REGISTRAR OR PHYSICIAN HAS READ A LINE OF ANY OF THEM. Transcribed lines,
+# inferred lines and invented lines are all present, mixed, and to a reader they are
+# identical: they are all just YAML.
+#
+# One record per ENFORCED element -- the lines some code path changes behaviour on. Missing
+# one makes this file refuse to load. The advisory half for the sentences a human reads
+# rather than the runtime lives in `editorial_provenance`, where a missing record is a
+# finding printed in the review document instead of an error.
+#
+# origin: model_authored is not modesty. It is the accurate answer for every element below.
+# `store_manual` and `ajcc_manual` require a section, item or rule number IN THE BASIS, and
+# nothing here has one, because nothing here is a line a manual states: these are regexes,
+# coverage-gate switches, document-type groupings and sample sizes, all invented in this
+# repository. The four code tables come closest, and they were recalled by a model, not
+# copied out of the manual -- so they say so, and they name the item a human should check
+# them against.
+provenance:
+  - element: "fields[clinical_t].format"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. The pattern is a Python regular expression, applied with a full match by
+      acr/answer_checks.py. No manual states a pattern; this one was written to fit the
+      description beside it, and it constrains the SHAPE of a value only -- it cannot tell a
+      real code from a well-formed invented one.
+  - element: "fields[clinical_n].format"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. The pattern is a Python regular expression, applied with a full match by
+      acr/answer_checks.py. No manual states a pattern; this one was written to fit the
+      description beside it, and it constrains the SHAPE of a value only -- it cannot tell a
+      real code from a well-formed invented one.
+  - element: "fields[clinical_m].format"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. Deliberately admits no not-assessable value for distant spread, on the reading that
+      absence of metastasis is always a clinical determination. That reading is a staging rule
+      and it is enforced here by the shape of a pattern, which means a run that disagrees cannot
+      say so -- it can only leave the field empty. A language model made that call.
+  - element: "fields[clinical_stage_group].allowable_values"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A code table. Nobody compared this list against the published table for item
+      Clinical Stage Group, which is named at the top of this file, so it is a language model's
+      recollection of that table rather than a transcription of it. It may be missing codes, and
+      it may contain codes the table does not have. Check it against the manual before relying
+      on it -- and note that this record is NOT a citation of the manual, precisely because that
+      check has not been done. The staging manual edition is named at the top of this file, and
+      this file's own note warns that the identifiers in it may not match the registry data
+      dictionary.
+  - element: "fields[pathologic_t].format"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. The pattern is a Python regular expression, applied with a full match by
+      acr/answer_checks.py. No manual states a pattern; this one was written to fit the
+      description beside it, and it constrains the SHAPE of a value only -- it cannot tell a
+      real code from a well-formed invented one.
+  - element: "fields[pathologic_n].format"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. The pattern is a Python regular expression, applied with a full match by
+      acr/answer_checks.py. No manual states a pattern; this one was written to fit the
+      description beside it, and it constrains the SHAPE of a value only -- it cannot tell a
+      real code from a well-formed invented one.
+  - element: "fields[pathologic_m].format"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. Deliberately admits no zero and no not-assessable value, on the reading that a
+      specimen cannot establish the absence of distant spread. Same as the clinical counterpart:
+      a staging judgement enforced through the shape of a pattern, made by a language model.
+  - element: "fields[pathologic_stage_group].allowable_values"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A code table. Nobody compared this list against the published table for item
+      Pathologic Stage Group, which is named at the top of this file, so it is a language
+      model's recollection of that table rather than a transcription of it. It may be missing
+      codes, and it may contain codes the table does not have. Check it against the manual
+      before relying on it -- and note that this record is NOT a citation of the manual,
+      precisely because that check has not been done.
+  - element: "fields[summary_stage].allowable_values"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A code table. Nobody compared this list against the published table for item Summary
+      Stage 2018, which is named at the top of this file, so it is a language model's
+      recollection of that table rather than a transcription of it. It may be missing codes, and
+      it may contain codes the table does not have. Check it against the manual before relying
+      on it -- and note that this record is NOT a citation of the manual, precisely because that
+      check has not been done.
+  - element: "answer_checks[clinical_stage_group.not_less_specific.99]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A deterministic post-check invented for this repository; no manual has such a
+      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
+      file, but the wordings it matches on were written from a model's idea of how clinicians
+      write, and have never been measured against real notes.
+  - element: "answer_checks[clinical_stage_group.nos_requires_search.99]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A deterministic post-check invented for this repository; no manual has such a
+      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
+      file, but the wordings it matches on were written from a model's idea of how clinicians
+      write, and have never been measured against real notes.
+  - element: "answer_checks[pathologic_stage_group.nos_requires_search.99]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A deterministic post-check invented for this repository; no manual has such a
+      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
+      file, but the wordings it matches on were written from a model's idea of how clinicians
+      write, and have never been measured against real notes.
+  - element: "answer_checks[clinical_t.nos_requires_search.cTX]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A deterministic post-check invented for this repository; no manual has such a
+      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
+      file, but the wordings it matches on were written from a model's idea of how clinicians
+      write, and have never been measured against real notes.
+  - element: "answer_checks[clinical_n.nos_requires_search.cNX]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A deterministic post-check invented for this repository; no manual has such a
+      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
+      file, but the wordings it matches on were written from a model's idea of how clinicians
+      write, and have never been measured against real notes.
+  - element: "answer_checks[summary_stage.nos_requires_search.9]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A deterministic post-check invented for this repository; no manual has such a
+      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
+      file, but the wordings it matches on were written from a model's idea of how clinicians
+      write, and have never been measured against real notes.
+  - element: "answer_checks[summary_stage.not_less_specific.9]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A deterministic post-check invented for this repository; no manual has such a
+      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
+      file, but the wordings it matches on were written from a model's idea of how clinicians
+      write, and have never been measured against real notes.
+  - element: "answer_checks[clinical_t.not_less_specific.cT1]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A deterministic post-check invented for this repository; no manual has such a
+      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
+      file, but the wordings it matches on were written from a model's idea of how clinicians
+      write, and have never been measured against real notes.
+  - element: "answer_checks[clinical_t.not_less_specific.cT2]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A deterministic post-check invented for this repository; no manual has such a
+      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
+      file, but the wordings it matches on were written from a model's idea of how clinicians
+      write, and have never been measured against real notes.
+  - element: "answer_checks[pathologic_t.not_less_specific.pT1]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A deterministic post-check invented for this repository; no manual has such a
+      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
+      file, but the wordings it matches on were written from a model's idea of how clinicians
+      write, and have never been measured against real notes.
+  - element: "answer_checks[pathologic_t.not_less_specific.pT2]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A deterministic post-check invented for this repository; no manual has such a
+      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
+      file, but the wordings it matches on were written from a model's idea of how clinicians
+      write, and have never been measured against real notes.
+  - element: "answer_checks[clinical_stage_group.origin_not_specimen]"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. A deterministic post-check invented for this repository; no manual has such a
+      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
+      file, but the wordings it matches on were written from a model's idea of how clinicians
+      write, and have never been measured against real notes.
+  - element: "proof_obligation.for_negative.required_keywords"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. Six terms, and this is the ONLY list in the whole system that the coverage gate
+      actually enforces -- the per-group lists feed a different check. They were chosen by a
+      language model so that none is a substring of another, and mapped by hand to the nine
+      fields they are meant to reach. Never measured against a note.
+  - element: "proof_obligation.for_negative.gate.require_can_establish_nonempty"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. Requires that the chart hold at least one document of a type this file says can
+      settle the answer, before any absence claim is accepted. A switch on this repository's
+      coverage gate, read by acr/coverage.py. The gate is this repository's construct end to
+      end; no registry manual defines one, and nobody clinical has agreed that passing it means
+      the chart was adequately searched.
+  - element: "proof_obligation.for_negative.gate.exhaustive_strata_complete"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. Requires that every document in the groups marked read-everything was actually read.
+      A switch on this repository's coverage gate, read by acr/coverage.py. The gate is this
+      repository's construct end to end; no registry manual defines one, and nobody clinical has
+      agreed that passing it means the chart was adequately searched.
+  - element: "proof_obligation.for_negative.gate.exclusion_validated"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. Requires that the random sample drawn from the groups treated as silent turned up
+      nothing relevant. A switch on this repository's coverage gate, read by acr/coverage.py.
+      The gate is this repository's construct end to end; no registry manual defines one, and
+      nobody clinical has agreed that passing it means the chart was adequately searched.
+  - element: "proof_obligation.for_negative.gate.keyword_list_validated"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. Requires that searching the group that may mention the answer turned up no unread
+      document -- which is how a bad list of search terms is supposed to be caught. It did not
+      catch this list: measured on the whole corpus the terms miss the diagnosis for 31.7% of
+      patients while the gate stays clean, because the check only sees documents the search
+      already found. A switch on this repository's coverage gate, read by acr/coverage.py. The
+      gate is this repository's construct end to end; no registry manual defines one, and nobody
+      clinical has agreed that passing it means the chart was adequately searched.
+  - element: "proof_obligation.for_negative.gate.max_elusion_upper"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. The largest residual chance of a missed document the run may finish with. 25
+      documents drawn with no relevant hit supports 11.3% at 95% confidence, so this is the
+      nearest round number above the floor the sample size makes reachable -- arithmetic about
+      the sample size, not a measurement of this corpus. No clinician has said that a 12% chance
+      of a missed document is acceptable for this variable. A switch on this repository's
+      coverage gate, read by acr/coverage.py. The gate is this repository's construct end to
+      end; no registry manual defines one, and nobody clinical has agreed that passing it means
+      the chart was adequately searched.
+  - element: "proof_obligation.for_negative.strata[can_establish].match"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. An enumerated list of document types that assign a stage rather than supply an input
+      to one. The file's own comment says this list selects 53 of the 1,516 document types in
+      the real corpus; that count was not re-checked when this record was written, and a count
+      of what the list SELECTS is not evidence that the selection is clinically right.
+  - element: "proof_obligation.for_negative.strata[can_establish].establishes"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. Says this group may settle all nine fields. A clinical ruling written as a list of
+      field names.
+  - element: "proof_obligation.for_negative.strata[cannot_establish].match"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. An enumerated list of document types held to be silent on staging -- cardiology
+      tracings, medication reconciliations, dental and speech notes. Enumerated rather than
+      catch-all on purpose, so that an unfamiliar type is searched instead of assumed
+      irrelevant. The membership is a language model's judgement.
+  - element: "proof_obligation.for_negative.strata[cannot_establish].establishes"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. Declares this group silent on every one of the nine fields. That is the strongest
+      claim in the file and the easiest to be wrong about: one document type in the list that
+      turns out to be citable overturns it.
+  - element: "proof_obligation.for_negative.strata[cannot_establish].min_sample"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. How many of the documents treated as silent are read at random. 25 is a round number
+      a language model picked.
+  - element: "proof_obligation.for_negative.strata[may_mention].match"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. Everything not enumerated above -- imaging, endoscopy, procedure notes, discharge
+      summaries and non-oncology progress notes. Catch-all on purpose, so that an unrecognised
+      document type is searched rather than skipped.
+  - element: "proof_obligation.for_negative.strata[may_mention].establishes"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. Says an ordinary clinical note may settle all nine fields. It sits against the prose
+      above, which says imaging alone never establishes a category or a group. Nobody clinical
+      has reconciled the two.
+  - element: "proof_obligation.for_negative.strata[may_mention].required_keywords"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. Ten terms searched inside this group. They feed a different check from the
+      criterion-level list, one that silently ignores any term of three characters or fewer, so
+      one of the terms here can never match through this path. Chosen by a language model; never
+      measured.
+  - element: "proof_obligation.for_negative.strata[may_mention].min_sample_of_misses"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by an agent on 2026-07-26, in this repository, with no manual
+      open. How many unmatched documents are read anyway. 25 is a round number a language model
+      picked.

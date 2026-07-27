@@ -19,9 +19,14 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3", "pytest-cov>=6.0", "ruff>=0.8"]
+reports = ["openpyxl>=3.1"]
+# Only `acr.mcp_server` needs this, and it imports the SDK lazily so the rest of the package
+# still runs without it. Kept out of the base dependencies for that reason.
+mcp = ["mcp[cli]>=1.28"]
 
 [project.scripts]
 acr = "acr.cli:app"
+acr-mcp = "acr.mcp_server:main"
 
 [build-system]
 requires = ["hatchling"]

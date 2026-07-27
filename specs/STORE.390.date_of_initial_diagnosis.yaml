@@ -103,3 +103,150 @@ search_hints:
   - carcinoma
   - malignancy
   - impression
+
+# ------------------------------------------------------------------------------ provenance
+# WHY THIS BLOCK EXISTS, and it is a fact about this file rather than about the software.
+# All four original specs in this tree were written by a language model in ONE commit --
+# e5229b0, 2026-07-25 -- from whatever manual text happened to be in its context, and were
+# committed under a human author's name. The stage spec was written by an agent on
+# 2026-07-26. NO REGISTRAR OR PHYSICIAN HAS READ A LINE OF ANY OF THEM. Transcribed lines,
+# inferred lines and invented lines are all present, mixed, and to a reader they are
+# identical: they are all just YAML.
+#
+# One record per ENFORCED element -- the lines some code path changes behaviour on. Missing
+# one makes this file refuse to load. The advisory half for the sentences a human reads
+# rather than the runtime lives in `editorial_provenance`, where a missing record is a
+# finding printed in the review document instead of an error.
+#
+# origin: model_authored is not modesty. It is the accurate answer for every element below.
+# `store_manual` and `ajcc_manual` require a section, item or rule number IN THE BASIS, and
+# nothing here has one, because nothing here is a line a manual states: these are regexes,
+# coverage-gate switches, document-type groupings and sample sizes, all invented in this
+# repository. The four code tables come closest, and they were recalled by a model, not
+# copied out of the manual -- so they say so, and they name the item a human should check
+# them against.
+provenance:
+  - element: "fields[date_of_initial_diagnosis].format"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. The value written here is registry notation for an
+      eight-digit date, NOT a pattern -- but the software applies it as one, with a full match,
+      so this field rejects every valid date it is ever given. The bug is real, known, and still
+      unfixed; it is reported in the review document rather than paraphrased away.
+  - element: "proof_obligation.for_negative.gate.require_can_establish_nonempty"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that the chart hold at least one document
+      of a type this file says can settle the answer, before any absence claim is accepted. A
+      switch on this repository's coverage gate, read by acr/coverage.py. The gate is this
+      repository's construct end to end; no registry manual defines one, and nobody clinical has
+      agreed that passing it means the chart was adequately searched.
+  - element: "proof_obligation.for_negative.gate.exhaustive_strata_complete"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that every document in the groups marked
+      read-everything was actually read. A switch on this repository's coverage gate, read by
+      acr/coverage.py. The gate is this repository's construct end to end; no registry manual
+      defines one, and nobody clinical has agreed that passing it means the chart was adequately
+      searched.
+  - element: "proof_obligation.for_negative.gate.required_keywords_all_searched"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that every term in the criterion-level
+      required list has been searched. A switch on this repository's coverage gate, read by
+      acr/coverage.py. The gate is this repository's construct end to end; no registry manual
+      defines one, and nobody clinical has agreed that passing it means the chart was adequately
+      searched.
+  - element: "proof_obligation.for_negative.gate.exclusion_validated"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that the random sample drawn from the
+      groups treated as silent turned up nothing relevant. A switch on this repository's
+      coverage gate, read by acr/coverage.py. The gate is this repository's construct end to
+      end; no registry manual defines one, and nobody clinical has agreed that passing it means
+      the chart was adequately searched.
+  - element: "proof_obligation.for_negative.gate.keyword_list_validated"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that searching the group that may mention
+      the answer turned up no unread document -- which is how a bad list of search terms is
+      supposed to be caught. It did not catch this list: measured on the whole corpus the terms
+      miss the diagnosis for 31.7% of patients while the gate stays clean, because the check
+      only sees documents the search already found. A switch on this repository's coverage gate,
+      read by acr/coverage.py. The gate is this repository's construct end to end; no registry
+      manual defines one, and nobody clinical has agreed that passing it means the chart was
+      adequately searched.
+  - element: "proof_obligation.for_negative.gate.max_elusion_upper"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. The largest residual chance of a missed document
+      the run may finish with. 25 documents drawn with no relevant hit supports 11.3% at 95%
+      confidence, so this is the nearest round number above the floor the sample size makes
+      reachable -- arithmetic about the sample size, not a measurement of this corpus. No
+      clinician has said that a 12% chance of a missed document is acceptable for this variable.
+      A switch on this repository's coverage gate, read by acr/coverage.py. The gate is this
+      repository's construct end to end; no registry manual defines one, and nobody clinical has
+      agreed that passing it means the chart was adequately searched.
+  - element: "proof_obligation.for_negative.strata[can_establish].match"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Pathology, cytology and oncology documents,
+      selected by substring against document type names. Whether an oncology note can fix a
+      first diagnosis date on its own is a clinical question decided here by a language model.
+  - element: "proof_obligation.for_negative.strata[may_mention].match"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Progress notes, consults, discharge summaries,
+      endoscopy and procedure notes, selected by substring against document type names, chosen
+      without looking at the corpus.
+  - element: "proof_obligation.for_negative.strata[may_mention].required_keywords"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Five terms that must be searched before this group
+      may be called silent. Never measured. The comparable list in the site-and-histology
+      criterion WAS measured and misses the answer for almost a third of patients; this list
+      shares three of its terms and has the same shape, so silence here is not evidence that it
+      does better.
+  - element: "proof_obligation.for_negative.strata[may_mention].min_sample_of_misses"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. How many unmatched documents are read anyway. 25 is
+      a round number a language model picked; it fixes the tightest provable residual rate at
+      11.3%.
+  - element: "proof_obligation.for_negative.strata[cannot_establish].match"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Everything not matched above. Catch-all by
+      construction, so an unfamiliar document type is treated as inert without anybody deciding
+      that it is.
+  - element: "proof_obligation.for_negative.strata[cannot_establish].min_sample"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. How many of the documents treated as inert are read
+      at random. 25 is a round number a language model picked.

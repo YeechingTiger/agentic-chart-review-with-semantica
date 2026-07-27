@@ -1,0 +1,1081 @@
+"""The plan the agent revises is the plan that governs retrieval — and it can only widen.
+
+WHAT WAS WRONG
+--------------
+Two greps settled it:
+
+    grep 's["plan"]'                 src/acr/graph.py   -> nothing
+    grep 'CoveragePlan|policy_for'   src/acr/graph.py   -> nothing
+
+There were two plans. The revisable one was a prose list of {id, goal, rationale} that was
+rendered into messages and read by no code. The one that governs retrieval —
+`coverage_planner.CoveragePlan`, with its read_all / search / sample assignment and its term
+list — was never consulted by the agent loop at all. REPLAN and CONTINUE were mechanically
+identical: both appended text. So REPLAN fired 0 times in 291 actions across 37 runs, and a
+model asked "does something learned change what should be done next?" about "find the
+pathology report" was answering correctly. The goal never changes. The RETRIEVAL SCOPE
+changes, and the retrieval scope was not in the plan.
+
+WHAT THESE TESTS HOLD
+---------------------
+Six things, and the fifth is the one the whole design rests on:
+
+  1. ONE PLAN. Structural, so a second one cannot grow back.
+  2. IT GOVERNS. A `sample` type cannot be opened; the refusal names the promotion that
+     would allow it.
+  3. REVISION IS MONOTONE EXPANSION. A non-superset is refused WHOLE and recorded.
+  4. IT IS SAFE AGAINST THE LEDGER ARITHMETIC — proved here on real Clopper-Pearson numbers,
+     including the one place it is conservatively WRONG, which is asserted rather than hidden.
+  5. THE RUNTIME APPLIES IT. Every field of the typed revision is tested by the BEHAVIOUR it
+     changes afterwards, never by the state it writes. If the runtime does not apply it, it
+     did not happen — that one sentence is the entire bug being fixed, and a test that
+     asserted `plan.keywords == [...]` would pass on a plan nobody reads, which is precisely
+     the failure it is supposed to catch.
+  6. EXPANSION HAS A BUDGET, and exhausting it with obligations outstanding is an honest
+     abstention rather than a truncation or a pass.
+
+No provider is called anywhere in this file and no chart text is written into it.
+"""
+from __future__ import annotations
+
+import inspect
+import json
+import re
+from pathlib import Path
+
+import pytest
+
+import acr.graph as G
+from acr.corpus import Corpus
+from acr.coverage import CoverageLedger, ForcedSampler, strata_from_spec
+from acr.coverage_planner import (POLICY_RANK, REFUSED_BUDGET, REFUSED_NOT_MONOTONE,
+                                  REFUSED_REDUNDANT_TERM, REFUSED_UNKNOWN_TYPE,
+                                  TRIGGER_GATE_OBLIGATION_UNREACHABLE,
+                                  TRIGGER_UNLISTED_ANSWER_TERM, TRIGGER_UNSETTLED_THREAD,
+                                  TRIGGER_ZERO_HIT_SEARCH, CoveragePlan, ExpansionBudget,
+                                  OpenThreadLedger, PlanRevision, PlanSnapshot,
+                                  check_monotone, documents_by_type, gate_obligation_triggers,
+                                  load_marker_catalogue, normalise_term, plan_from_spec,
+                                  redundant_against, spec_declared_keywords,
+                                  triggers_from_tool_result)
+from acr.graph import ChartReviewAgent, check_gate, check_threads, gate_answer
+from acr.llm import LLMClient, LLMConfig, LLMResponse
+from acr.spec import load_spec
+from acr.state import Budget, EvidenceLedger
+
+ROOT = Path(__file__).resolve().parents[1]
+SHB = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+CORPUS = ROOT / "corpus" / "patients"
+
+#: A type this spec's `cannot_establish` stratum sweeps into `sample`. It is also the exact
+#: type the coverage module records a real error against: patient P03 was coded C349 (lung
+#: NOS) while "right upper lobe" sat in seven imaging and oncology note types, because the
+#: architecture had taught the agent those documents were useless. Promotion is the move that
+#: was missing.
+SAMPLED_TYPE = "Chest-CT-W-Contr"
+
+
+@pytest.fixture(scope="module")
+def spec():
+    return load_spec(SHB)
+
+
+@pytest.fixture(scope="module")
+def chart():
+    return Corpus(CORPUS).chart("SYN0001")
+
+
+@pytest.fixture
+def plan(spec, chart):
+    return plan_from_spec(spec, chart)
+
+
+@pytest.fixture
+def budget(plan, chart):
+    return ExpansionBudget.priced_against(plan, documents_by_type(chart), max_revisions=6)
+
+
+def _ledger(spec, chart):
+    docs, _ = chart.list_documents(limit=100_000)
+    return CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(7))
+
+
+def _apply(plan, rev, *, budget, step=1, threads=None, chart=None, trigger="test"):
+    return plan.apply_revision(
+        rev, step=step, trigger=trigger, observation="a test observation", budget=budget,
+        threads=threads,
+        n_docs_by_type=documents_by_type(chart) if chart is not None else {})
+
+
+# ==========================================================================================
+# 1. ONE PLAN
+# ==========================================================================================
+def test_the_prose_plan_is_gone_and_the_coverage_plan_is_wired_in():
+    """The two greps from the finding, inverted into an assertion.
+
+    Structural rather than behavioural on purpose. A behavioural test only covers the paths
+    someone thought of; the failure here was an entire object that nothing referenced, and
+    the way that comes back is somebody reintroducing a "planning prompt" beside this one.
+    """
+    src = inspect.getsource(G)
+    assert not hasattr(G, "PLAN_PROMPT") and not re.search(r"^\w*PLAN_PROMPT\s*=", src, re.M), (
+        "graph.py has grown a second planning prompt. The reason the REPLAN bug existed is "
+        "that there were two plans and only one mattered; a second one is the bug returning."
+    )
+    assert not re.search(r'\{"id":\s*"1",\s*"goal"', src), (
+        "the prose {id, goal, rationale} plan is back. No code reads it."
+    )
+    for token in ("CoveragePlan", "policy_for", "may_open", "apply_revision"):
+        assert token in src, f"graph.py must consult the coverage plan; {token!r} is absent"
+
+
+def test_reflection_may_not_assert_replan(spec, chart):
+    """REPLAN is derived by the runtime from an applied revision, never chosen by the model.
+
+    When REPLAN was a word a supervisor could say, saying it changed nothing — so it was
+    never said. The verdict now follows the revision instead of standing in for it.
+    """
+    assert "REPLAN" not in G.MODEL_VERDICTS
+    assert "REPLAN" in G.VERDICTS, "the runtime still routes on it; only the model may not pick it"
+    assert "SUFFICIENT|CONTINUE|STUCK" in G.REFLECT_PROMPT
+    assert "REPLAN" not in G.REFLECT_PROMPT.split("Reply with JSON only:")[1]
+
+
+# ==========================================================================================
+# 2. THE PLAN GOVERNS WHAT MAY BE OPENED
+# ==========================================================================================
+def test_a_sampled_type_may_not_be_opened_and_the_refusal_names_the_way_out(spec, chart, plan):
+    agent = _agent(spec, chart, llm=None)
+    agent.plan = plan
+    nid = _first_note_of_type(chart, SAMPLED_TYPE)
+
+    refusal = agent._plan_refusal("read_document", {"note_id": nid})
+    assert refusal is not None and refusal["error"] == "OUT_OF_PLAN"
+    assert SAMPLED_TYPE in refusal["types"]
+    # The refusal has to carry the escape hatch or it is just a wall. Monotone expansion is
+    # only a design if the agent can actually reach it from where it is standing.
+    assert "promote_types" in refusal["how_to_proceed"]
+    assert "NOT evidence that they hold nothing" in refusal["message"], (
+        "an OUT_OF_PLAN refusal that reads like an empty result would teach the agent the "
+        "type holds nothing — the same inversion as UNKNOWN_DOC_TYPE returning []"
+    )
+
+
+def test_a_runtime_drawn_document_is_always_openable(spec, chart, plan):
+    """The sampler's draws are the runtime's choice, so the plan must never block them —
+    otherwise the forced-sampling obligation becomes unsatisfiable by construction."""
+    agent = _agent(spec, chart, llm=None)
+    agent.plan = plan
+    nid = _first_note_of_type(chart, SAMPLED_TYPE)
+    assert agent._plan_refusal("read_document", {"note_id": nid}) is not None
+    agent.coverage.drawn["cannot_establish"] = [nid]
+    assert agent._plan_refusal("read_document", {"note_id": nid}) is None
+
+
+def test_searching_a_sampled_type_stays_legal(spec, chart, plan):
+    """The plan says what must be READ. A cheap search that turns up a hit in a sampled type
+    is exactly the observation that should trigger a promotion, so blocking it would remove
+    the only evidence that the sampling declaration was wrong."""
+    agent = _agent(spec, chart, llm=None)
+    agent.plan = plan
+    assert agent._plan_refusal("search_notes", {"query": "lobe",
+                                                "doc_type_contains": SAMPLED_TYPE}) is None
+
+
+# ==========================================================================================
+# 3. MONOTONICITY — refused whole, and recorded as refused
+# ==========================================================================================
+def test_check_monotone_catches_every_way_to_look_at_less():
+    before = PlanSnapshot(policies=(("A", "read_all"), ("B", "search"), ("C", "sample")),
+                          keywords=frozenset({"carcinoma", "biopsy"}))
+    assert check_monotone(before, before) == []
+
+    demoted = PlanSnapshot(policies=(("A", "search"), ("B", "search"), ("C", "sample")),
+                           keywords=before.keywords)
+    dropped = PlanSnapshot(policies=(("A", "read_all"), ("B", "search")),
+                           keywords=before.keywords)
+    lost_term = PlanSnapshot(policies=before.policies, keywords=frozenset({"carcinoma"}))
+    widened = PlanSnapshot(policies=(("A", "read_all"), ("B", "read_all"), ("C", "search")),
+                           keywords=frozenset({"carcinoma", "biopsy", "mucinous"}))
+
+    assert any("demoted" in v for v in check_monotone(before, demoted))
+    assert any("dropped" in v for v in check_monotone(before, dropped))
+    assert any("terms removed" in v for v in check_monotone(before, lost_term))
+    assert check_monotone(before, widened) == [], "widening is the whole point"
+
+
+def test_a_demotion_is_refused_whole_and_recorded(plan, budget, chart):
+    """All-or-nothing. Applying the admissible half of a mixed revision would hand back a
+    plan the agent did not propose and cannot see, and the next revision would be computed
+    against it."""
+    before = plan.snapshot()
+    out = _apply(plan, PlanRevision(add_terms=("mucinous",),
+                                    promote_types=(("Surgical-Pathology-Document", "search"),)),
+                 budget=budget, chart=chart)
+
+    assert out.applied is False
+    assert out.refusal_class == REFUSED_NOT_MONOTONE
+    assert any("demoted" in r for r in out.refused)
+    assert plan.snapshot() == before, "a refused revision must change nothing at all"
+    assert "mucinous" not in plan.keywords, (
+        "the admissible term rode in on a refused revision — partial application is how a "
+        "plan the agent never proposed becomes the baseline for the next one"
+    )
+    # RECORDED AS REFUSED. A refusal nobody can count is a refusal that will be repeated.
+    (row,) = plan.refused_revisions
+    assert row["refusal_class"] == REFUSED_NOT_MONOTONE and row["step"] == 1
+    assert row["requested"]["add_terms"] == ["mucinous"]
+
+
+def test_a_hallucinated_document_type_is_refused_not_dropped(plan, budget, chart):
+    """Dropping it would leave the agent believing it had widened a scope it had not."""
+    out = _apply(plan, PlanRevision(promote_types=(("Not-A-Real-Type", "read_all"),)),
+                 budget=budget, chart=chart)
+    assert out.applied is False and out.refusal_class == REFUSED_UNKNOWN_TYPE
+
+
+def test_a_promotion_is_applied_and_carries_its_provenance(plan, budget, chart):
+    assert plan.policy_for(SAMPLED_TYPE) == "sample"
+    out = plan.apply_revision(
+        PlanRevision(promote_types=((SAMPLED_TYPE, "search"),)),
+        step=9, trigger=TRIGGER_UNLISTED_ANSWER_TERM,
+        observation="a read surfaced a lobe name no term would have found",
+        budget=budget, n_docs_by_type=documents_by_type(chart))
+
+    assert out.applied and out.changed_retrieval()
+    assert plan.policy_for(SAMPLED_TYPE) == "search"
+    assert POLICY_RANK[plan.policy_for(SAMPLED_TYPE)] > POLICY_RANK["sample"]
+    (row,) = plan.promotion_log
+    # WHICH type, WHEN, and WHAT OBSERVATION CAUSED IT. Without the last of the three this is
+    # a list of words rather than a develop-plane candidate.
+    assert row["from"] == "sample" and row["to"] == "search" and row["step"] == 9
+    assert row["trigger"] == TRIGGER_UNLISTED_ANSWER_TERM and row["observation"]
+
+
+# ==========================================================================================
+# 4. MONOTONICITY AGAINST THE LEDGER ARITHMETIC
+# ==========================================================================================
+def _stratum(ledger, name):
+    return next(r for r in ledger.stratum_results() if r.name == name)
+
+
+def test_expansion_never_cancels_a_drawn_obligation(spec, chart):
+    """A drawn document that a NEW TERM turns into a search hit does not vanish.
+
+    This is the one place expansion could plausibly weaken the proof: `pending_samples`
+    computes the miss universe as "pool minus search hits", so a term added mid-run removes
+    documents from it. If the obligation simply disappeared, adding terms would be a way to
+    shrink the audited population without reading anything — searching HARDER would make the
+    gate EASIER, which is the inversion `hits_read` was written to close one layer down.
+    """
+    cov = _ledger(spec, chart)
+    cov.listed_documents = True
+    pending = cov.pending_samples()
+    drawn_ids = [d.note_id for docs in pending.values() for d in docs]
+    assert drawn_ids, "this spec must actually draw a sample or the test proves nothing"
+    victim = drawn_ids[0]
+
+    # Expand: a term that hits the drawn-but-uninspected document.
+    cov.note_search("a-newly-added-term", [victim])
+
+    still_drawn = {d.note_id for docs in cov.pending_samples().values() for d in docs}
+    unread_hits = {n for r in cov.stratum_results() for n in r.hits_unread}
+    assert victim in still_drawn or victim in unread_hits, (
+        "a drawn document left the miss frame and landed nowhere — the obligation to look at "
+        "it was cancelled by the act of searching better"
+    )
+
+
+def test_the_elusion_bound_only_moves_the_honest_way(spec, chart):
+    """More clean draws tightens it; a real hit loosens it. Nothing else can move it."""
+    cov = _ledger(spec, chart)
+    cov.listed_documents = True
+    pending = cov.pending_samples()
+    name, docs = next(iter(pending.items()))
+    ids = [d.note_id for d in docs]
+
+    bounds = []
+    for i, nid in enumerate(ids[:6], start=1):
+        cov.record_sample_verdict(name, nid, relevant=False)
+        bounds.append(_stratum(cov, name).elusion_upper)
+    assert bounds == sorted(bounds, reverse=True), (
+        f"a clean draw must never loosen the bound: {bounds}")
+
+    before = _stratum(cov, name).elusion_upper
+    cov.record_sample_verdict(name, ids[6], relevant=True)
+    assert _stratum(cov, name).elusion_upper > before, (
+        "a hit in the sample must raise the bound — that is the prior being falsified, and "
+        "the gate failing on it is the accounting working, not breaking"
+    )
+
+
+def test_an_expansion_that_moves_the_frame_recomputes_the_bound_and_never_inherits_it(spec, chart):
+    """CLAIM 2 OF `MONOTONICITY_VS_LEDGER`, WHICH USED TO BE FALSE.
+
+    `test_expansion_never_cancels_a_drawn_obligation` above covers the drawn-but-UNREAD case,
+    where a new term trades the miss sample for the stronger obligation to read the hit. This
+    is the case it does not cover and the old docstring wrongly claimed: draws that already
+    carry a clean verdict. Nothing is found, no verdict is overturned, `n_s` does not decrease
+    numerically — and the frame those verdicts described has lost most of its members.
+
+    Measured on SYN0001: 25 clean draws bound elusion at 0.1129 and clear the spec's 0.12
+    cap; one term that hits 20 of them leaves 5 draws in a 92-document frame, worth 0.4507.
+    Inheriting 0.1129 across that revision reaches a gate PASS, which is the worst direction
+    an absence proof can fail in.
+    """
+    cov = _ledger(spec, chart)
+    cov.listed_documents = True
+    docs = cov.pending_samples().get("may_mention") or []
+    if len(docs) < 10:
+        pytest.skip("this spec draws too small a miss sample on this chart to move a frame")
+    for d in docs:
+        cov.note_read(d.note_id, d.doc_type)
+    cov.resolve_sample_verdicts(cited=set())
+    before = _stratum(cov, "may_mention")
+    assert before.misses_sampled == len(docs) and before.miss_sample_hits == 0
+
+    victims = [d.note_id for d in docs[:-5]]          # one monotone term addition
+    cov.note_search("a-newly-added-term", victims)
+
+    after = _stratum(cov, "may_mention")
+    assert after.miss_sample_hits == 0, "fixture assumption: the prior was never falsified"
+    assert after.misses_sampled == 5, (
+        "the bound is still being credited draws that left the frame it is a bound over")
+    assert after.draws_invalidated == sorted(victims)
+    assert after.elusion_upper > before.elusion_upper, (
+        "the bound was inherited across a frame revision. Expansion is monotone in the "
+        "EVIDENCE and not in the BOUND: n_s did not decrease, the universe it was drawn from "
+        "shrank underneath it."
+    )
+    assert after.replacement_draws_required == len(victims)
+    assert len(cov.pending_samples().get("may_mention") or []) == len(victims), (
+        "replacement draws must be demanded until n is restored")
+
+
+def test_the_monotonicity_note_states_what_is_true_and_not_what_is_comfortable():
+    """A comment that overstates a guarantee is how the inherited-bound defect survived.
+
+    Structural, like `test_the_prose_plan_is_gone_...`, and for the same reason: the failure
+    was not a code path anybody exercised, it was a sentence everybody believed. The way it
+    comes back is somebody restoring the reassuring version of it.
+    """
+    from acr import coverage_planner as CP
+
+    src = inspect.getsource(CP)
+    for gone in ("THE BOUND CANNOT BE GAMED DOWNWARD", "Expansion never decreases n_s"):
+        assert gone not in src, (
+            f"{gone!r} is back. It is false: n_s does not decrease numerically while the "
+            "universe it was drawn from shrinks underneath it."
+        )
+    assert "drawn-but-unread" in src, (
+        "claim 1 holds only for the drawn-but-unread case — the only case "
+        "test_expansion_never_cancels_a_drawn_obligation covers — and must say so"
+    )
+    note = CP.MONOTONICITY_VS_LEDGER
+    assert "monotone" in note, "graph and deep_runner ship this string into every manifest"
+    for owed in ("frame", "recomputed", "not in the BOUND"):
+        assert owed in note, f"the manifest's one-line summary must carry {owed!r}"
+
+
+def test_reading_more_of_a_sampled_stratum_earns_no_credit_and_that_is_correct(spec, chart):
+    """Documents the AGENT chose are not a random sample.
+
+    Crediting self-selected reading toward the elusion bound would let the agent read the
+    reassuring documents and call the result evidence — the circularity `ForcedSampler`
+    exists to prevent, rebuilt on the expansion path. So this asserts a NON-effect on
+    purpose: promoting a type and reading its documents leaves the bound exactly where it was.
+    """
+    cov = _ledger(spec, chart)
+    cov.listed_documents = True
+    cov.pending_samples()
+    name = next(iter(cov.drawn))
+    before = _stratum(cov, name).elusion_upper
+
+    pool = cov.by_stratum[name]
+    undrawn = [d for d in pool if d.note_id not in set(cov.drawn[name])]
+    for d in undrawn[:10]:
+        cov.note_read(d.note_id, d.doc_type)
+
+    assert _stratum(cov, name).elusion_upper == before
+
+
+def test_a_censused_search_stratum_still_reports_elusion_one_AND_THAT_IS_A_DEFECT(spec, chart):
+    """Asserted so that it is on the record, not so that it is blessed.
+
+    Expand far enough that every document in `may_mention` is a search hit and `misses` falls
+    to zero. The stratum has then been CENSUSED — `keyword_list_validated` refuses until every
+    hit is read — yet `elusion_upper` stays at `clopper_pearson_upper(0, 0) == 1.0`, because
+    the bound is computed from a sample that no longer has anything to draw from. A
+    `max_elusion_upper` cap therefore becomes unpassable precisely for the run that did the
+    most work.
+
+    It is conservative, so nothing unsafe passes and monotonicity is not violated: the gate
+    can only get harder. But it does mean an honest exhaustive expansion can be forced into
+    EVIDENCE_INSUFFICIENT, and the fix — teaching `coverage.stratum_results` that a censused
+    stratum has eluded nothing — is a change to the ledger and is deliberately NOT made from
+    the planner. If this test ever starts failing, the ledger has been fixed and this file
+    should celebrate rather than complain.
+    """
+    cov = _ledger(spec, chart)
+    cov.listed_documents = True
+    pool = cov.by_stratum.get("may_mention") or []
+    if not pool:
+        pytest.skip("this spec declares no may_mention stratum on this chart")
+    cov.note_search("a-term-that-hits-everything", [d.note_id for d in pool])
+    for d in pool:
+        cov.note_read(d.note_id, d.doc_type)
+
+    r = _stratum(cov, "may_mention")
+    assert r.misses == 0 and r.hits == len(pool) and not r.hits_unread
+    assert r.elusion_upper == 1.0, (
+        "the ledger now credits a census — good. Update coverage_planner.MONOTONICITY_VS_LEDGER "
+        "and this test, because the documented conservative defect is gone."
+    )
+
+
+# ==========================================================================================
+# 5. TWO TERM LISTS, FOR TWO PURPOSES
+# ==========================================================================================
+def test_the_initial_list_is_the_specs_and_survives_expansion(spec, chart, plan, budget):
+    declared = spec_declared_keywords(spec)
+    assert plan.initial_keywords == declared and declared, "fixture assumption"
+
+    _apply(plan, PlanRevision(add_terms=("mucinous", "right upper lobe")),
+           budget=budget, chart=chart)
+
+    assert plan.initial_keywords == declared, (
+        "the runtime rescue overwrote the baseline. That erases the evidence that the spec's "
+        "list was wrong, and that evidence is the whole input to §6c — on this corpus "
+        "STORE.400's five terms miss the diagnosis for 31.7% of patients, and folding the "
+        "rescue back in reads as 0%."
+    )
+    assert set(declared) < set(plan.keywords)
+    assert plan.terms_added() == ["mucinous", "right upper lobe"]
+
+
+def test_the_planners_own_terms_are_additions_not_baseline(spec, chart):
+    """A term the coverage planner proposed is a term the SPEC did not declare. Folding it
+    into the baseline would erase the gap at the moment it is created."""
+    from acr.coverage_planner import plan_coverage
+
+    class _Planner:
+        def chat(self, messages, tools=None):
+            return LLMResponse(content=json.dumps({
+                "assignments": [{"type": SAMPLED_TYPE, "policy": "search", "why": "", "confidence": 1}],
+                "keywords": ["adenocarcinoma", "pathology"]}), tool_calls=[])
+
+    p = plan_coverage(spec, chart, _Planner())
+    assert p.initial_keywords == spec_declared_keywords(spec)
+    assert "adenocarcinoma" in p.keywords
+    (added,) = [r for r in p.term_provenance if r["term"] == "adenocarcinoma"]
+    assert added["trigger"] == "planner_proposal" and added["step"] == 0
+    assert "pathology" not in [r["term"] for r in p.term_provenance], (
+        "a term the spec already declared must not be logged as an addition")
+
+
+def test_coverage_is_evaluated_against_the_final_list(spec, chart, plan, budget):
+    """Adding a term must not be free: the gate then requires that the search actually ran."""
+    cov = _ledger(spec, chart)
+    cov.listed_documents = True
+    for k in plan.keywords:
+        cov.note_search(k, [])
+    assert not [m for m in check_gate(spec, cov, plan).missing if "mucinous" in m]
+
+    _apply(plan, PlanRevision(add_terms=("mucinous",)), budget=budget, chart=chart)
+    missing = check_gate(spec, cov, plan).missing
+    assert any("mucinous" in m for m in missing), (
+        "a term added at run time and never run widened nothing, yet the gate accepted the "
+        "shorter list — expansion has to bind the expander"
+    )
+    cov.note_search("mucinous", [])
+    assert not [m for m in check_gate(spec, cov, plan).missing if "mucinous" in m]
+
+
+# ==========================================================================================
+# 6. TRIGGERS ARE DETECTED, NOT ASKED
+# ==========================================================================================
+def test_the_marker_catalogue_comes_from_the_skill_not_from_src():
+    """Read the catalogue, do not invent one. A second hand-written list in src/ drifts from
+    the measured one within a week and then the two disagree about what blocks an answer."""
+    cat = load_marker_catalogue()
+    assert cat.degraded == "", cat.degraded
+    assert "thread-chasing" in cat.source
+    texts = {m.text for m in cat.markers}
+    for expected in ("stains pending", "see addendum", "outside facility",
+                     "correlate clinically", "truncated"):
+        assert expected in texts, f"{expected!r} missing from the parsed catalogue"
+    assert "final diagnosis" not in texts, (
+        "`final diagnosis` is in the base-rate table because it is the RESOLUTION, not the "
+        "thread. Enrolling it would open a thread on every pathology report in the corpus."
+    )
+    # The catalogue's own precision warning, parsed rather than restated: `pending` occurs in
+    # 599 of 7,965 documents and is mostly refills and appointments.
+    assert cat.by_text()["pending"].low_precision is True
+    assert cat.by_text()["see addendum"].low_precision is False
+
+
+def test_a_zero_hit_search_is_a_trigger(plan):
+    cat = load_marker_catalogue()
+    t, = triggers_from_tool_result("search_notes", {"query": "signet ring"},
+                                   {"n_hits": 0, "hits": []}, plan=plan, catalogue=cat, step=3)
+    assert t.kind == TRIGGER_ZERO_HIT_SEARCH and "signet ring" in t.observation
+    assert not triggers_from_tool_result("search_notes", {"query": "x"},
+                                         {"n_hits": 4}, plan=plan, catalogue=cat, step=3)
+
+
+def test_a_citation_the_term_list_would_not_have_found_is_a_trigger(plan):
+    """Mechanical and model-free. If no current term occurs in the quote the agent chose to
+    rest its answer on, the plan did not lead there and the term that would have is missing."""
+    cat = load_marker_catalogue()
+    t, = triggers_from_tool_result(
+        "record_evidence", {"note_id": "N1"},
+        {"recorded": True, "quote": "mucinous neoplasm of the appendiceal orifice"},
+        plan=plan, catalogue=cat, step=4,
+        quote="mucinous neoplasm of the appendiceal orifice")
+    assert t.kind == TRIGGER_UNLISTED_ANSWER_TERM
+    assert "mucinous" in t.terms_proposed
+    # A quote the plan's own terms would have found is not a trigger.
+    assert not triggers_from_tool_result(
+        "record_evidence", {"note_id": "N1"}, {"quote": "invasive carcinoma"},
+        plan=plan, catalogue=cat, step=4, quote="invasive carcinoma")
+
+
+def test_an_unsettled_marker_and_a_truncated_read_are_both_triggers(plan):
+    cat = load_marker_catalogue()
+    out = triggers_from_tool_result(
+        "read_document", {},
+        {"note_id": "N1", "doc_type": "Surgical-Pathology-Document", "truncated": True,
+         "returned_chars": 4000, "total_chars": 19050,
+         "text": "diagnosis deferred; special stains pending, see addendum"},
+        plan=plan, catalogue=cat, step=5)
+    markers = {t.marker for t in out}
+    assert {"truncated", "stains pending", "see addendum"} <= markers
+    assert all(t.kind == TRIGGER_UNSETTLED_THREAD for t in out)
+
+
+def test_a_low_precision_marker_fires_only_inside_a_decisive_type(plan):
+    """The catalogue's rule, in the plan's vocabulary rather than as a hard-coded type list:
+    inside a document the plan judged capable of establishing the answer, `pending` is a
+    thread; inside a progress note it is a medication refill."""
+    cat = load_marker_catalogue()
+    body = {"note_id": "N", "text": "prior authorisation pending", "truncated": False}
+    quiet = triggers_from_tool_result("read_document", {},
+                                      {**body, "doc_type": "Onc-Med-MD-OP-Progress-Note"},
+                                      plan=plan, catalogue=cat, step=1)
+    loud = triggers_from_tool_result("read_document", {},
+                                     {**body, "doc_type": "Surgical-Pathology-Document"},
+                                     plan=plan, catalogue=cat, step=1)
+    assert quiet == [] and [t.marker for t in loud] == ["pending"]
+
+
+def test_an_obligation_the_plan_forbids_discharging_is_a_trigger(plan):
+    """A gate saying "read these hits" while the plan says "you may not open that type" is a
+    deadlock, not a rejection — and the old loop would spend its whole budget inside it."""
+    t, = gate_obligation_triggers([], plan=plan, unread_hit_types=[SAMPLED_TYPE], step=7)
+    assert t.kind == TRIGGER_GATE_OBLIGATION_UNREACHABLE
+    assert SAMPLED_TYPE in t.types_proposed
+
+    t2, = gate_obligation_triggers(["required search not performed: 'lobe'"],
+                                   plan=plan, step=7)
+    assert t2.terms_proposed == ("lobe",)
+
+
+# ==========================================================================================
+# 7. THE TYPED REVISION IS APPLIED — tested by the behaviour each field changes
+# ==========================================================================================
+def test_add_terms_changes_what_the_gate_demands(spec, chart, plan, budget):
+    """BEHAVIOUR, not state. `plan.keywords == [...]` would pass on a plan nobody reads."""
+    cov = _ledger(spec, chart)
+    cov.listed_documents = True
+    for k in plan.keywords:
+        cov.note_search(k, [])
+    before = check_gate(spec, cov, plan).missing
+
+    _apply(plan, PlanRevision(add_terms=("psammoma",)), budget=budget, chart=chart)
+    after = check_gate(spec, cov, plan).missing
+    assert len(after) > len(before) and any("psammoma" in m for m in after)
+
+
+def test_promote_types_changes_what_may_be_opened(spec, chart, plan, budget):
+    agent = _agent(spec, chart, llm=None)
+    agent.plan = plan
+    nid = _first_note_of_type(chart, SAMPLED_TYPE)
+    assert agent._plan_refusal("read_document", {"note_id": nid}) is not None
+
+    out = _apply(plan, PlanRevision(promote_types=((SAMPLED_TYPE, "search"),)),
+                 budget=budget, chart=chart)
+    assert out.applied
+    assert agent._plan_refusal("read_document", {"note_id": nid}) is None, (
+        "the revision was recorded but the dispatch guard still refuses — the runtime did "
+        "not apply it, so it did not happen"
+    )
+
+
+def test_open_threads_blocks_the_answer_and_resolve_threads_unblocks_it(spec, chart, plan,
+                                                                        budget):
+    """The 8046 error, as a control. A histology coded off "special stains pending" with the
+    addendum never chased must not be able to reach a manifest."""
+    threads = OpenThreadLedger()
+    ev, cov = EvidenceLedger(), _ledger(spec, chart)
+    nid = _first_note_of_type(chart, "Surgical-Pathology-Document")
+    from acr.state import Evidence
+    ev.add(Evidence(nid, "Surgical-Pathology-Document", "2019-01-01", 0, 5, "xxxxx",
+                    "histology"))
+    submitted = {"status": "FOUND", "value": {"histology": "8046"}, "reasoning": "coded"}
+
+    assert gate_answer(spec, submitted, evidence=ev, coverage=cov, chart=chart,
+                       threads=threads, plan=plan)["accepted"] in (True, False)
+
+    out = _apply(plan, PlanRevision(open_threads=((nid, "stains pending", "the report defers"),)),
+                 budget=budget, chart=chart, threads=threads)
+    assert out.threads_opened == [f"{nid}#stains pending"]
+    verdict = gate_answer(spec, submitted, evidence=ev, coverage=cov, chart=chart,
+                          threads=threads, plan=plan)
+    assert verdict["accepted"] is False
+    assert any("unsettled thread" in m for m in verdict["missing"])
+
+    out = _apply(plan, PlanRevision(resolve_threads=((f"{nid}#stains pending",
+                                                      "the addendum is later in the same file"),)),
+                 budget=budget, chart=chart, threads=threads, step=4)
+    assert out.threads_resolved == [f"{nid}#stains pending"]
+    assert check_threads(threads) == []
+
+
+def test_dismiss_threads_requires_a_reason_and_records_it(plan, budget, chart):
+    threads = OpenThreadLedger()
+    threads.open_thread(note_id="N1", doc_type="Surgical-Pathology-Document",
+                        marker="stains pending", obligation="the lab had not finished",
+                        excerpt="", step=1)
+    out = _apply(plan, PlanRevision(dismiss_threads=(("N1#stains pending", ""),)),
+                 budget=budget, chart=chart, threads=threads)
+    assert out.threads_dismissed == [] and threads.unresolved(), (
+        "an unreasoned dismissal reads exactly like an unnoticed thread")
+    assert threads.refused_dismissals
+
+    out = _apply(plan, PlanRevision(dismiss_threads=(("N1#stains pending",
+                                                      "the stain bears on histology and this "
+                                                      "answer codes only the site"),)),
+                 budget=budget, chart=chart, threads=threads, step=6)
+    assert out.threads_dismissed == ["N1#stains pending"] and not threads.unresolved()
+    (t,) = threads.to_dict()["threads"]
+    assert t["state"] == "dismissed" and "codes only the site" in t["resolution"]
+
+
+def test_a_thread_is_not_counted_as_a_replan(plan, budget, chart):
+    """Resolving a thread is bookkeeping. Counting it would reinflate the replan rate with
+    exactly the sort of no-op the old REPLAN verdict was."""
+    threads = OpenThreadLedger()
+    threads.open_thread(note_id="N1", doc_type="d", marker="pending", obligation="o",
+                        excerpt="", step=1)
+    out = _apply(plan, PlanRevision(resolve_threads=(("N1#pending", "found it"),)),
+                 budget=budget, chart=chart, threads=threads)
+    assert out.applied and not out.changed_retrieval()
+    assert plan.revisions_applied == 0
+
+
+def test_re_reading_a_document_does_not_multiply_the_debt():
+    threads = OpenThreadLedger()
+    for _ in range(3):
+        threads.open_thread(note_id="N1", doc_type="d", marker="pending", obligation="o",
+                            excerpt="", step=1)
+    assert len(threads.threads) == 1
+
+
+# ==========================================================================================
+# 8. THE BUDGET
+# ==========================================================================================
+def test_the_budget_is_priced_against_the_plan_with_no_literal_in_it(plan, chart):
+    b = ExpansionBudget.priced_against(plan, documents_by_type(chart), max_revisions=6)
+    assert b.max_terms_added == len(plan.initial_keywords)
+    assert b.max_type_promotions == len(plan.read_all) + len(plan.search)
+    assert b.max_documents_opened_by_promotion == sum(
+        documents_by_type(chart).get(t, 0) for t in plan.read_all + plan.search)
+
+
+def test_expansion_beyond_the_budget_is_refused_and_recorded(plan, chart):
+    tight = ExpansionBudget(max_terms_added=1, max_type_promotions=1,
+                            max_documents_opened_by_promotion=10_000, max_revisions=6)
+    assert _apply(plan, PlanRevision(add_terms=("one",)), budget=tight, chart=chart).applied
+    out = _apply(plan, PlanRevision(add_terms=("two",)), budget=tight, chart=chart)
+
+    assert out.applied is False and out.refusal_class == REFUSED_BUDGET
+    assert "two" not in plan.keywords
+    assert plan.budget_exhausted(tight) is True
+    # NEVER a silent truncation. The refusal is in the plan, and `_after_reflect` reads
+    # `budget_exhausted` to route the run to an honest abstention.
+    assert plan.refused_revisions[-1]["refusal_class"] == REFUSED_BUDGET
+
+
+def test_budget_exhausted_with_obligations_outstanding_is_an_honest_dead_end(spec, chart, plan):
+    agent = _agent(spec, chart, llm=None)
+    agent.plan = plan
+    agent.threads = OpenThreadLedger()
+    agent._expansion_budget = ExpansionBudget(max_terms_added=0, max_type_promotions=0,
+                                              max_documents_opened_by_promotion=0,
+                                              max_revisions=6)
+    assert agent._expansion_exhausted_with_obligations() is False, (
+        "budget untouched is not exhaustion; a run that never tried to widen must keep going")
+
+    _apply(plan, PlanRevision(add_terms=("x",)), budget=agent._expansion_budget, chart=chart)
+    assert agent._outstanding_obligations(), "fixture assumption: the gate is not yet met"
+    assert agent._expansion_exhausted_with_obligations() is True
+
+    src = inspect.getsource(G.ChartReviewAgent._after_reflect)
+    assert "EXPANSION_BUDGET_EXHAUSTED" in src and '"finalize"' in src
+
+
+def test_a_spent_budget_with_nothing_outstanding_is_not_a_dead_end(spec, chart, plan,
+                                                                   monkeypatch):
+    agent = _agent(spec, chart, llm=None)
+    agent.plan = plan
+    agent.threads = OpenThreadLedger()
+    agent._expansion_budget = ExpansionBudget(0, 0, 0, max_revisions=6)
+    _apply(plan, PlanRevision(add_terms=("x",)), budget=agent._expansion_budget, chart=chart)
+    monkeypatch.setattr(agent, "_outstanding_obligations", lambda: [])
+    assert agent._expansion_exhausted_with_obligations() is False
+
+
+# ==========================================================================================
+# 9. END TO END — the revision reaches the model, and the rate reaches the manifest
+# ==========================================================================================
+class _RevisingLLM(LLMClient):
+    """Scripted. Widens the plan once at the first reflection, then reads what it unlocked.
+
+    It cites nothing and never submits, so the run ends on the budget — which is fine: what
+    is under test is whether a revision travels from the reflection JSON into the dispatch
+    guard, and whether the rate lands in the manifest.
+    """
+
+    def __init__(self, promote: str, term: str):
+        super().__init__(LLMConfig(model="scripted/none", api_key="none"))
+        self.promote, self.term = promote, term
+        self.revised = False
+        self.read_results: list[dict] = []
+
+    def _reply(self, obj, calls=None):
+        self.calls += 1
+        self.prompt_tokens += 10
+        self.completion_tokens += 5
+        return LLMResponse(content=json.dumps(obj), tool_calls=calls or [],
+                           prompt_tokens=10, completion_tokens=5)
+
+    def chat(self, messages, tools=None):
+        last = next((m["content"] for m in reversed(messages) if m.get("role") == "user"), "")
+        for m in reversed(messages):
+            if m.get("role") == "tool" and m.get("name") == "read_document":
+                self.read_results.append(json.loads(m["content"]))
+                break
+        if tools is None:
+            if "read_all|search|sample" in last:
+                # One type declared junk, everything else left unjudged (and therefore
+                # defaulted to `search`). That single `sample` assignment is the prior this
+                # run is going to falsify.
+                return self._reply({"assignments": [{"type": self.promote, "policy": "sample",
+                                                     "why": "imaging cannot establish "
+                                                            "histology", "confidence": 0.9}],
+                                    "keywords": []})
+            if "SUFFICIENT|CONTINUE|STUCK" in last:
+                if self.revised:
+                    return self._reply({"verdict": "CONTINUE", "reason": "working the widened plan"})
+                self.revised = True
+                return self._reply({
+                    "verdict": "CONTINUE",
+                    "reason": "imaging localises the tumour and the plan sampled it away",
+                    "revision": {"add_terms": [self.term],
+                                 "promote_types": [{"type": self.promote, "to": "search"}]}})
+            return self._reply({"status": "EVIDENCE_INSUFFICIENT", "value": {},
+                                "reasoning": "the scripted run never finalised"})
+        # act: always try to open the sampled type. Refused before the revision, allowed after.
+        return self._reply({}, [{"id": "c0", "name": "read_document",
+                                 "arguments": {"note_id": self._target}}])
+
+
+def test_a_revision_travels_from_reflection_json_into_the_dispatch_guard(spec, chart, tmp_path):
+    llm = _RevisingLLM(SAMPLED_TYPE, "right upper lobe")
+    llm._target = _first_note_of_type(chart, SAMPLED_TYPE)
+    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=6), out_dir=tmp_path,
+                             sample_seed=7)
+    res = agent.run(chart)
+
+    errs = [r for r in llm.read_results if r.get("error") == "OUT_OF_PLAN"]
+    oks = [r for r in llm.read_results if r.get("note_id")]
+    assert errs, "the plan never refused anything, so it never governed anything"
+    assert oks, ("the promotion was applied to the plan object but the dispatch guard still "
+                 "refused — IF THE RUNTIME DOES NOT APPLY IT, IT DID NOT HAPPEN")
+    assert agent.plan.policy_for(SAMPLED_TYPE) == "search"
+    assert "right upper lobe" in agent.plan.keywords
+
+
+def test_the_replan_rate_and_its_provenance_land_in_the_manifest(spec, chart, tmp_path):
+    llm = _RevisingLLM(SAMPLED_TYPE, "right upper lobe")
+    llm._target = _first_note_of_type(chart, SAMPLED_TYPE)
+    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=6), out_dir=tmp_path,
+                             sample_seed=7)
+    res = agent.run(chart, run_id="replan-manifest")
+    man = json.loads((tmp_path / "replan-manifest.manifest.json").read_text(encoding="utf-8"))
+
+    r = man["replan"]
+    assert r["n_reflections"] >= 1 and r["n_revisions_applied"] == 1
+    assert 0 < r["replan_rate"] <= 1, (
+        "the health metric for the prior is missing or zero. Zero used to mean 'the agent is "
+        "stable' and actually meant 'REPLAN and CONTINUE were the same instruction'."
+    )
+    assert r["terms_added"] == 1 and r["types_promoted"] == 1
+    # The planner's own proposals are counted against the SPEC, never as replanning.
+    assert r["terms_added_by_reflection"] == 1
+    assert r["plan_refused_opens"] >= 1
+
+    # BOTH LISTS, never merged.
+    plan = man["plan"]
+    assert plan["initial_keywords"] == spec_declared_keywords(spec)
+    assert "right upper lobe" in plan["keywords"]
+    assert plan["initial_keywords"] != plan["keywords"]
+
+    # Harvested candidates, each with the observation that produced it and the trace it came
+    # from. Without those it is a list of words, not an input to the develop plane.
+    d = man["develop_plane_candidates"]
+    assert d["spec_declared_terms"] == spec_declared_keywords(spec)
+    (term,) = [t for t in d["terms_added_at_runtime"] if t["term"] == "right upper lobe"]
+    assert term["trigger"] and term["observation"] and term["step"] >= 0
+    (prom,) = d["types_promoted_at_runtime"]
+    assert prom["type"] == SAMPLED_TYPE and prom["from"] == "sample"
+    assert Path(d["trace"]).exists()
+
+    assert man["expansion_budget"]["source"] == "priced_against_plan"
+    assert "monotone" in man["monotonicity_vs_ledger"]
+    assert man["open_threads"]["marker_catalogue"].endswith("marker-catalogue.md")
+
+    # The runtime-derived REPLAN really was recorded as a verdict, in the trace.
+    events = [json.loads(l) for l in Path(res["trace"]).read_text().splitlines() if l.strip()]
+    assert any(e["kind"] == "reflect" and e["verdict"] == "REPLAN" for e in events)
+    assert any(e["kind"] == "plan_revision" and e["applied"] for e in events)
+    assert any(e["kind"] == "plan_refused_open" for e in events)
+
+
+# ==========================================================================================
+# 10. A TERM THE PLAN ALREADY COVERS IS NOT AN EXPANSION
+#
+# `max_terms_added` is priced against the spec's own list, so it is single digits — five on
+# STORE.400. A variant that retrieves nothing still spends one of those five, and an agent
+# that spends all five on variants has widened nothing and learned nothing about the chart.
+# Not a safety hole (the plan is still monotone, the gate still demands every term be run)
+# and that is exactly why nothing caught it.
+#
+# The rule these tests pin down is a fact about the SEARCH THE AGENT HAS, not a style
+# preference: `corpus.PatientChart.search` compiles `re.escape(query)` with `re.IGNORECASE`.
+# ==========================================================================================
+def _hits(term: str, texts) -> set[str]:
+    """The corpus search semantics, spelled out on strings written here.
+
+    `corpus.py`: `re.compile(query if regex else re.escape(query), re.IGNORECASE)`. Copied
+    rather than run against the corpus so the direction claim below is PROVED by the same
+    rule the runtime uses, on text this test owns and no chart text at all.
+    """
+    pat = re.compile(re.escape(term), re.IGNORECASE)
+    return {t for t in texts if pat.search(t)}
+
+
+_NOTES = ("Final diagnosis: invasive carcinoma, moderately differentiated.",
+          "IMPRESSION: CARCINOMA of the right upper lobe cannot be excluded.",
+          "Specimen shows adenocarcinoma arising in a tubular adenoma.",
+          "No malignancy identified in this biopsy.")
+
+
+def test_a_case_variant_is_the_same_search_and_must_not_cost_a_term_slot(plan, chart):
+    """The verified defect: "CARCINOMA" beside "carcinoma" was accepted as a distinct term.
+
+    Priced first, because that is the damage — the plan gains nothing and the allowance is
+    one smaller. With a cap of one, the variant used to consume the only slot the run had.
+    """
+    assert "carcinoma" in plan.keywords, "fixture assumption"
+    assert _hits("CARCINOMA", _NOTES) == _hits("carcinoma", _NOTES), (
+        "fixture assumption: the runtime's search is case-insensitive, so the variant "
+        "retrieves exactly nothing new")
+    one = ExpansionBudget(max_terms_added=1, max_type_promotions=1,
+                          max_documents_opened_by_promotion=10_000, max_revisions=6)
+
+    out = _apply(plan, PlanRevision(add_terms=("CARCINOMA",)), budget=one, chart=chart)
+
+    assert out.terms_added == [] and plan.terms_added() == []
+    assert plan.keywords.count("carcinoma") == 1 and "CARCINOMA" not in plan.keywords
+    # THE SLOT SURVIVED. This is the whole point: the next revision, the one that carries a
+    # real term, must still be affordable.
+    real = _apply(plan, PlanRevision(add_terms=("mucinous",)), budget=one, chart=chart, step=2)
+    assert real.applied and real.terms_added == ["mucinous"]
+
+
+@pytest.mark.parametrize("variant", ["  carcinoma  ", "\tcarcinoma\n", "final   diagnosis",
+                                     "Final Diagnosis"])
+def test_whitespace_and_case_variants_are_the_same_term(plan, chart, budget, variant):
+    """Surrounding whitespace, internal runs, and case. A padded term is not a new search —
+    and a double-spaced one is a strictly NARROWER search, since `re.escape` keeps both
+    spaces and the note has one."""
+    before = list(plan.keywords)
+    out = _apply(plan, PlanRevision(add_terms=(variant,)), budget=budget, chart=chart)
+    assert plan.keywords == before and out.terms_added == []
+
+
+def test_a_narrower_term_is_redundant_and_a_broader_one_is_the_whole_point(plan, chart, budget):
+    """BOTH WAYS ROUND, because inverting this rule would refuse the only additions worth
+    paying for.
+
+    Substring search means hits(narrow) is contained in hits(broad). So adding
+    "adenocarcinoma" when the plan already runs "carcinoma" buys nothing, while adding
+    "carcin" when the plan runs "carcinoma" is a genuine widening — it reaches documents the
+    plan cannot currently see.
+    """
+    assert _hits("adenocarcinoma", _NOTES) < _hits("carcinoma", _NOTES), (
+        "fixture assumption: the longer term returns a strict subset")
+    assert _hits("carcin", _NOTES) >= _hits("carcinoma", _NOTES), (
+        "fixture assumption: the shorter term returns a superset")
+
+    narrower = _apply(plan, PlanRevision(add_terms=("adenocarcinoma",)),
+                      budget=budget, chart=chart)
+    assert "adenocarcinoma" not in plan.keywords
+    assert narrower.terms_added == [], (
+        "every document 'adenocarcinoma' could return is already returned by 'carcinoma'")
+    assert any("carcinoma" in why for why in narrower.refused), (
+        "the refusal must name the term that already covers it, or the agent cannot tell "
+        "whether to try a different word or a shorter one")
+
+    broader = _apply(plan, PlanRevision(add_terms=("carcin",)), budget=budget, chart=chart,
+                     step=2)
+    assert broader.applied and broader.terms_added == ["carcin"], (
+        "a SHORTER term reaches documents the plan cannot currently see; refusing it would "
+        "block the only kind of expansion that is worth a budget slot")
+    assert broader.changed_retrieval() is True
+
+
+@pytest.mark.parametrize("order", [("carcin", "adenocarcinoma"), ("adenocarcinoma", "carcin")])
+def test_one_revision_pays_once_for_a_term_and_its_narrower_variant(plan, chart, order):
+    """Order-independent: the price of a revision must not depend on the order the model
+    happened to list its terms in, because nothing downstream can reproduce that."""
+    one = ExpansionBudget(max_terms_added=1, max_type_promotions=1,
+                          max_documents_opened_by_promotion=10_000, max_revisions=6)
+    out = _apply(plan, PlanRevision(add_terms=order), budget=one, chart=chart)
+
+    assert out.applied and out.terms_added == ["carcin"], (
+        "two terms, one search: 'adenocarcinoma' is inside 'carcin' and cannot add a "
+        "document to it")
+    assert len(plan.terms_added()) == 1
+
+
+def test_a_revision_that_was_all_variants_is_refused_by_name_not_silently_swallowed(plan,
+                                                                                    chart,
+                                                                                    budget):
+    """A duplicate the agent is never told about is a duplicate it sends again.
+
+    Refused rather than applied-as-a-no-op on purpose: `graph._after_reflect` renders
+    `outcome.refused` into the message stream only on the refusal branch, so "applied" over
+    a plan that did not move is a lie the agent has no way to detect.
+    """
+    out = _apply(plan, PlanRevision(add_terms=("CARCINOMA", "  biopsy")),
+                 budget=budget, chart=chart)
+
+    assert out.applied is False and out.refusal_class == REFUSED_REDUNDANT_TERM
+    assert out.changed_retrieval() is False
+    assert len(out.refused) == 2
+    for term, covered_by in (("carcinoma", "carcinoma"), ("biopsy", "biopsy")):
+        assert any(repr(term) in why and repr(covered_by) in why for why in out.refused)
+    # Countable over a directory of manifests, and never mistaken for the budget refusal
+    # that ends a run: this one leaves the allowance untouched.
+    row = plan.refused_revisions[-1]
+    assert row["refusal_class"] == REFUSED_REDUNDANT_TERM and row["step"] == 1
+    assert plan.budget_exhausted(budget) is False
+
+
+def test_a_variant_alongside_a_real_term_still_lands_and_is_still_reported(plan, chart, budget):
+    """Partial, in the same shape as the budget overrun: what is admissible is applied, and
+    what was dropped travels back rather than vanishing."""
+    out = _apply(plan, PlanRevision(add_terms=("mucinous", "SPECIMEN")),
+                 budget=budget, chart=chart)
+
+    assert out.applied and out.terms_added == ["mucinous"]
+    assert plan.terms_added() == ["mucinous"], "the variant must not appear in the harvest"
+    assert any(REFUSED_REDUNDANT_TERM in why and "'specimen'" in why for why in out.refused)
+
+
+def test_the_normalisation_is_case_and_whitespace_only(plan, chart, budget):
+    """Not stemming, not punctuation folding. A different WORD is a different search, and
+    quietly folding one onto another would drop a term the agent is still charged for."""
+    assert normalise_term("  Final   Diagnosis ") == "final diagnosis"
+    assert redundant_against("carcinoid", ["carcinoma"]) is None
+    assert redundant_against("carcinomas", ["carcinoma"]) == "carcinoma"
+
+    out = _apply(plan, PlanRevision(add_terms=("carcinoid",)), budget=budget, chart=chart)
+    assert out.applied and out.terms_added == ["carcinoid"], (
+        "'carcinoid' shares a prefix with 'carcinoma' and is a different word; folding them "
+        "would lose a search the agent asked for and was charged for")
+
+
+class _DuplicateTermLLM(LLMClient):
+    """Reflects once asking for a term the plan already has, then keeps acting.
+
+    Scripted end to end because the claim under test is that the refusal REACHES THE MODEL,
+    and the message stream is the only place that can be observed.
+    """
+
+    def __init__(self, term: str):
+        super().__init__(LLMConfig(model="scripted/none", api_key="none"))
+        self.term = term
+        self.act_prompts: list[str] = []
+
+    def _reply(self, obj, calls=None):
+        self.calls += 1
+        self.prompt_tokens += 10
+        self.completion_tokens += 5
+        return LLMResponse(content=json.dumps(obj), tool_calls=calls or [],
+                           prompt_tokens=10, completion_tokens=5)
+
+    def chat(self, messages, tools=None):
+        last = next((m["content"] for m in reversed(messages) if m.get("role") == "user"), "")
+        if tools is None:
+            if "read_all|search|sample" in last:
+                return self._reply({"assignments": [], "keywords": []})
+            if "SUFFICIENT|CONTINUE|STUCK" in last:
+                return self._reply({"verdict": "CONTINUE", "reason": "widen the term list",
+                                    "revision": {"add_terms": [self.term]}})
+            return self._reply({"status": "EVIDENCE_INSUFFICIENT", "value": {},
+                                "reasoning": "the scripted run never finalised"})
+        self.act_prompts.append(last)
+        return self._reply({}, [{"id": "c0", "name": "list_documents", "arguments": {}}])
+
+
+def test_the_duplicate_refusal_reaches_the_model_in_the_loop_it_understands(spec, chart,
+                                                                           tmp_path):
+    llm = _DuplicateTermLLM("CARCINOMA")
+    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=4), out_dir=tmp_path,
+                             sample_seed=7)
+    agent.run(chart, run_id="redundant-term")
+
+    told = [m for m in llm.act_prompts if REFUSED_REDUNDANT_TERM in m]
+    assert told, ("the refusal never reached the model. A duplicate it is not told about is "
+                  "one it will send again, one slot at a time")
+    assert any("carcinoma" in m for m in told), "the refusal must name the covering term"
+    assert agent.plan.terms_added() == [], "no slot may have been spent"
+
+
+# ------------------------------------------------------------------------------- helpers
+def _agent(spec, chart, llm) -> ChartReviewAgent:
+    """A ChartReviewAgent wired to real ledgers but never run. Same trick `deep_runner` uses
+    to borrow the gate: hold the object, do not invoke the graph."""
+    from acr.trace import Tracer
+    from acr.tools import Toolbox
+
+    a = ChartReviewAgent(spec, llm)
+    a.chart = chart
+    a.evidence = EvidenceLedger()
+    a.coverage = _ledger(spec, chart)
+    a.toolbox = Toolbox(chart, a.evidence, a.coverage)
+    a.tracer = Tracer.create(Path("/tmp") / "acr-test-traces")
+    a._docs_by_type = documents_by_type(chart)
+    a._pending_triggers = []
+    a._trigger_counts = {}
+    a.markers = load_marker_catalogue()
+    return a
+
+
+def _first_note_of_type(chart, doc_type: str) -> str:
+    docs, _ = chart.list_documents(doc_type_contains=doc_type, limit=5)
+    assert docs, f"the corpus fixture has no {doc_type!r}"
+    return docs[0].note_id
