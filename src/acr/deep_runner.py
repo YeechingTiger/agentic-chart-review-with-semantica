@@ -42,8 +42,8 @@ from pathlib import Path
 from .answer_checks import check_answer  # noqa: F401  (used via the shared gate)
 from .corpus import Corpus
 from .coverage import CoverageLedger, ForcedSampler, strata_from_spec
-from .coverage_planner import (MONOTONICITY_VS_LEDGER, OpenThreadLedger, documents_by_type,
-                               load_marker_catalogue, plan_from_spec,
+from .coverage_planner import (MONOTONICITY_VS_LEDGER, OPEN_REQUEST_OPENED, OpenThreadLedger,
+                               documents_by_type, load_marker_catalogue, plan_from_spec,
                                triggers_from_tool_result)
 from .graph import (SPEC_SECTIONS, ChartReviewAgent, assert_answer_is_reportable,
                     build_spec_gap, strip_value_from_spec_insufficient)
@@ -129,10 +129,17 @@ def _make_tools(toolbox: Toolbox, tracer: Tracer, *, plan, catalogue, threads, c
                     quote=str((out or {}).get("quote", "")) if _name == "record_evidence" else ""):
                 if t.kind == "UNSETTLED_THREAD":
                     m = catalogue.by_text().get(t.marker)
-                    if threads.open_thread(note_id=t.note_id, doc_type=t.doc_type,
-                                           marker=t.marker,
-                                           obligation=(m.obligation if m else "unsettled"),
-                                           excerpt=t.observation, step=0) is None:
+                    # THE SAME GUARD AS `run_triggers.detect_from_tool_result`, and it broke
+                    # the same way: `is None` was the sentinel test, `open_thread` began
+                    # handing back the existing thread, and this runtime started counting
+                    # short reads as threads too. Branch on the status; only `opened` is new
+                    # debt. Both front ends must agree here — a trigger count that depends on
+                    # which binary the operator launched is not a measurement.
+                    request = threads.open_thread(
+                        note_id=t.note_id, doc_type=t.doc_type, marker=t.marker,
+                        obligation=(m.obligation if m else "unsettled"),
+                        excerpt=t.observation, step=0)
+                    if request.status != OPEN_REQUEST_OPENED:
                         continue
                 # `tracer.trigger`, not `emit("trigger", **t.to_dict())`: the trigger's own
                 # `kind` collides with the trace envelope's, which used to raise a TypeError

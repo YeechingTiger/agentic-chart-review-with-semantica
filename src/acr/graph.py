@@ -64,9 +64,9 @@ from .llm import LLMClient, extract_json
 from .spec import ExtractionSpec
 from .coverage import (SEED_CALLER, SEED_DERIVED, CoverageLedger, ForcedSampler, GateResult,
                        derive_sample_seed, strata_from_spec)
-from .coverage_planner import (REFUSED_BUDGET, TRIGGERS, CoveragePlan, ExpansionBudget,
-                               MONOTONICITY_VS_LEDGER, OpenThreadLedger, PlanRevision,
-                               RevisionOutcome, Trigger, documents_by_type,
+from .coverage_planner import (REFUSED_BUDGET, REFUSED_THREAD_NOOP, TRIGGERS, CoveragePlan,
+                               ExpansionBudget, MONOTONICITY_VS_LEDGER, OpenThreadLedger,
+                               PlanRevision, RevisionOutcome, Trigger, documents_by_type,
                                load_marker_catalogue, plan_coverage, plan_from_spec)
 from .plan_expansion import (budget_report, expansion_is_spent, fit_terms_to_budget,
                              headroom, price_expansion_budget)
@@ -143,7 +143,12 @@ PROOF OBLIGATION FOR A NEGATIVE ANSWER:
 THE PLAN (there is only one, and it governs what may be opened):
 {plan}
 
-UNSETTLED THREADS:
+UNSETTLED THREADS — an OPEN one blocks your answer, and the only two ways past it are \
+`resolve_threads` (say where it was settled) and `dismiss_threads` (say why it does not bear \
+on the answer). Both are recorded. Opening a thread ADDS an obligation; re-opening one that \
+is already open discharges nothing and is refused as a no-op. If you have already chased a \
+thread — paged to the end, read the section list, looked at later documents — then RESOLVE \
+it in this revision, because the work does not count until the ledger is told:
 {threads}
 
 OBSERVATIONS THAT REQUIRE A RESPONSE — these were detected mechanically since the last \
@@ -164,7 +169,8 @@ HOW THE PLAN MAY BE REVISED — this is enforced in code, not requested:
 - ADD a search term. Anything you add becomes a search the gate then REQUIRES to have run.
 - PROMOTE a document type toward more reading: sample -> search -> read_all.
 - OPEN a thread, or RESOLVE one (say where it was settled) or DISMISS one (say why it does \
-not bear on the answer). An unsettled thread blocks submission.
+not bear on the answer). An unsettled thread blocks submission, and only the last two settle \
+one — a second OPEN of a thread already open is a no-op and is refused as one.
 - You may NEVER remove a term, demote a type, or drop a type from the plan. A revision that \
 is not a superset of the current plan is REFUSED WHOLE and recorded as refused.
 
@@ -379,6 +385,12 @@ class ChartReviewAgent:
             else:
                 out, ms = self.toolbox.dispatch(c["name"], c["arguments"])
             self.tracer.tool(c["name"], c["arguments"], out, ok="error" not in out, ms=ms)
+            # BEFORE detection, always. `_record_reads` is what makes the deterministic
+            # settlement route reachable, and it has to run first for both of its halves: a
+            # read that completes a document must settle the thread before the same result is
+            # scanned, and a window read of an already-complete document must not be able to
+            # open one at all.
+            self._record_reads(c["name"], out, s.get("step", 0))
             self._detect_triggers(c["name"], c["arguments"] or {}, out, s.get("step", 0))
 
             if c["name"] == "submit_answer":
@@ -400,7 +412,18 @@ class ChartReviewAgent:
                 else:
                     rejections.append(verdict)
                     self.tracer.rejected(verdict["why"], verdict["missing"], self.toolbox.submitted)
-                    out = {"accepted": False, "why": verdict["why"], "you_must_still": verdict["missing"]}
+                    out = {"accepted": False, "why": verdict["why"],
+                           "you_must_still": verdict["missing"]}
+                    if verdict.get("how_to_satisfy"):
+                        # THE GATE WROTE THE WAY OUT AND THIS LINE USED TO THROW IT AWAY. The
+                        # thread rejection's `how_to_satisfy` is the only place the word
+                        # `resolve_threads` appears in a rejection, and it was dropped at the
+                        # boundary: the agent was told "this thread blocks you" without being
+                        # told in the same breath how to settle it. On SYN0001 that rejection
+                        # was answered with nine more requests to OPEN the same thread and
+                        # zero requests to resolve it. Telling a run what is wrong and not
+                        # what to do about it is how a loop becomes a deadlock.
+                        out["how_to_satisfy"] = verdict["how_to_satisfy"]
 
             msgs.append({"role": "tool", "tool_call_id": c["id"], "name": c["name"],
                          "content": json.dumps(out, ensure_ascii=False, default=str)[:6000]})
@@ -451,6 +474,51 @@ class ChartReviewAgent:
                                "and permanent."),
         }
 
+    def _record_reads(self, name: str, out: dict, step: int) -> None:
+        """Hand every read's extent to the thread ledger, and trace what it settled.
+
+        THE ROUTE FROM "I READ TO THE END OF IT" TO "THE THREAD IS SETTLED". It did not exist:
+        on SYN0001 the agent paged to the end of the truncated report, listed its sections and
+        read FINAL DIAGNOSIS, and the ledger learned nothing from any of it because nothing
+        was telling the ledger what had been read. This is that wire, and it is deliberately
+        mechanical — no model is asked whether the document is finished, because the runtime
+        computed `truncated` from the character counts in the first place and can compute the
+        complement just as well. See `OpenThreadLedger.note_read`, and
+        `MECHANICALLY_DISCHARGEABLE_MARKERS` for why `truncated` is the only marker this may
+        ever settle.
+        """
+        threads = getattr(self, "threads", None)
+        if threads is None or not isinstance(out, dict) or out.get("error"):
+            return
+        reads: list[tuple[str, int, int, int | None]] = []
+        if name == "read_document" and out.get("note_id") and "returned_chars" in out:
+            reads.append((str(out["note_id"]), int(out.get("offset") or 0),
+                          int(out.get("returned_chars") or 0), out.get("total_chars")))
+        elif name == "read_documents_batch":
+            for d in (out.get("documents") or []):
+                # The batch reader always starts at zero and returns `text`; it reports
+                # `total_chars` so a short excerpt of a long note stays visibly short.
+                reads.append((str(d.get("note_id", "")), 0, len(str(d.get("text", ""))),
+                              d.get("total_chars")))
+        elif name == "read_section" and out.get("note_id") and "start" in out and "end" in out:
+            # A named section carries TRUE offsets and no document length, so it contributes
+            # coverage and can never on its own prove the document is complete. That is the
+            # honest accounting: reading FINAL DIAGNOSIS tells you nothing about what sits
+            # after it.
+            reads.append((str(out["note_id"]), int(out.get("start") or 0),
+                          max(0, int(out.get("end") or 0) - int(out.get("start") or 0)), None))
+        for note_id, offset, returned, total in reads:
+            settled = threads.note_read(note_id, offset=offset, returned_chars=returned,
+                                        total_chars=total, step=step)
+            if settled:
+                self.tracer.emit(
+                    "threads_settled_by_read", thread_ids=settled, note_id=note_id,
+                    total_chars=threads.doc_length.get(note_id),
+                    message=("the document has now been returned in full by reads in this "
+                             "run, so its `truncated` thread is discharged deterministically "
+                             "— the runtime owns both sides of that predicate and does not "
+                             "need to ask"))
+
     def _detect_triggers(self, name: str, args: dict, out: dict, step: int) -> None:
         """Queue whatever `run_triggers` read off this tool result. No model is asked here."""
         for t in detect_from_tool_result(name, args, out, step=step, plan=self.plan,
@@ -472,8 +540,12 @@ class ChartReviewAgent:
     def _gate_triggers(self, step: int) -> None:
         """Queue the obligations the CURRENT plan structurally cannot discharge; see
         `run_triggers.detect_gate_obligations` for why a deadlock is not a rejection."""
+        # The tracer is not optional there: the detector swallows its own exceptions, so
+        # without a channel to say so a fourth trigger that has stopped working is
+        # indistinguishable from a run with no deadlock to report.
         for t in detect_gate_obligations(spec=self.spec, coverage=self.coverage,
-                                         chart=self.chart, plan=self.plan, step=step):
+                                         chart=self.chart, plan=self.plan, step=step,
+                                         tracer=self.tracer):
             self._record_trigger(t)
 
     # ------------------------------------------------------------- the expansion budget
@@ -634,9 +706,13 @@ class ChartReviewAgent:
             if not outcome.applied:
                 self._counters.revisions_refused += 1
                 # THE THREAD WORK IS NOT COLLATERAL. Retried on its own below; see
-                # `_salvage_thread_work`.
-                salvage = self._salvage_thread_work(to_apply, step=step,
-                                                    trigger=trigger_label, observation=why)
+                # `_salvage_thread_work`. Except when the refusal IS the thread work: a
+                # revision refused THREAD_NOOP has already had every thread operation in it
+                # processed, and re-sending them would produce the same no-op a second time
+                # and record it twice.
+                if outcome.refusal_class != REFUSED_THREAD_NOOP:
+                    salvage = self._salvage_thread_work(to_apply, step=step,
+                                                        trigger=trigger_label, observation=why)
                 # Back to the agent, in the loop it already understands. A refusal the model
                 # never sees is a refusal it repeats.
                 triggers = triggers + [Trigger(
@@ -670,6 +746,14 @@ class ChartReviewAgent:
         elif outcome is not None and outcome.applied:
             tail = ("Your revision was APPLIED. The plan now reads:\n"
                     + self.plan.render(self._docs_by_type))
+            if outcome.refused:
+                # APPLIED IS NOT THE SAME AS "ALL OF IT LANDED". A revision that promoted a
+                # type already at read_all and re-opened a thread already open used to come
+                # back as an unqualified APPLIED, and the parts that changed nothing were
+                # invisible — so they were sent again, and again. Whatever moved nothing is
+                # named here, in the same message that says what did.
+                tail += ("\nPART OF IT CHANGED NOTHING and was not counted as progress:\n  - "
+                         + "\n  - ".join(outcome.refused))
         elif outcome is not None:
             tail = (f"Your revision was REFUSED ({outcome.refusal_class}) and the refusal is "
                     f"recorded:\n  - " + "\n  - ".join(outcome.refused))
@@ -719,6 +803,64 @@ class ChartReviewAgent:
                                   "than discarded with it"))
         return out
 
+    def _downgrade_a_positive_that_owes_something(self, ans: dict, s: RunState) -> None:
+        """A run that stopped owing an obligation may not walk out with a positive.
+
+        WHAT SYN0001 DID. It exhausted `max_tokens (400000)`, went to finalize with the
+        `truncated` thread still open, and emitted:
+
+            status FOUND, proof_basis UNGATED, route_to_human true,
+            unsettled_threads ['Surgical-Pathology-Report_2023-04-27#truncated']
+
+        That is a FOUND with a warning stapled to it. The manifest says so, `explain` says so,
+        and `concordance.variables_from_answer` promotes each populated field to FOUND
+        regardless of the answer's status — so the "warning" is carried by nothing that
+        downstream reads. The honest label for "the budget ran out and the chart still has a
+        question outstanding" is EVIDENCE_INSUFFICIENT, which is precisely what
+        `ExpansionBudget`'s own docstring already promised and what `_after_reflect` already
+        does for the expansion budget. The token budget got the same treatment here.
+
+        THE THREE CONDITIONS, all required:
+          * the answer is FOUND;
+          * it never passed `gate_answer` — a gate-validated FOUND cleared the thread check
+            and the decision rules, and nothing here has standing to second-guess it;
+          * an obligation is genuinely outstanding, by the same `_outstanding_obligations`
+            the dead-end edge uses. No obligation outstanding is a run that finished, and it
+            keeps its UNGATED FOUND.
+
+        THE VALUE GOES WITH THE STATUS. Left in place it would be re-promoted to FOUND field
+        by field, and the downgrade would be cosmetic exactly where it matters most — the
+        SYN0001 answer would still ship C341/8140/3 as established. It is preserved verbatim
+        under `withheld_value` so nothing is destroyed and a reviewer can see what the model
+        wanted to say; it simply is not asserted by a run that did not finish.
+        """
+        if ans.get("status") != "FOUND" or s.get("gate_validated"):
+            return
+        outstanding = self._outstanding_obligations()
+        if not outstanding:
+            return
+        termination = getattr(self, "_termination", None) or "BUDGET_EXHAUSTED"
+        ans["status"] = "EVIDENCE_INSUFFICIENT"
+        ans["downgraded_from"] = "FOUND"
+        ans["downgraded_because"] = (
+            f"the run stopped ({termination}) with {len(outstanding)} obligation(s) still "
+            f"outstanding and never passed the answer gate; a positive asserted from that "
+            f"position is a guess with a warning attached, and the honest status is an "
+            f"abstention")
+        ans["outstanding_at_termination"] = outstanding[:20]
+        if ans.get("value"):
+            ans["withheld_value"] = ans["value"]
+            # Explicit nulls, not a dropped key: `concordance.variables_from_answer` reads a
+            # missing field as a silence and an explicit null as the answer's own status, and
+            # the second is what this is. The run has a candidate and cannot vouch for it.
+            ans["value"] = {f.name: None for f in self.spec.fields}
+        self.tracer.emit("positive_downgraded_at_termination", severity="warning",
+                         termination=termination, outstanding=outstanding[:20],
+                         withheld_value=ans.get("withheld_value"),
+                         message=("FOUND was emitted by a run that stopped with an obligation "
+                                  "outstanding and no gate pass; recorded as "
+                                  "EVIDENCE_INSUFFICIENT with the proposed value withheld"))
+
     def _n_finalize(self, s: RunState) -> dict:
         if s.get("answer") and s.get("done"):
             ans = s["answer"]
@@ -760,6 +902,8 @@ class ChartReviewAgent:
                                       "EVIDENCE_INSUFFICIENT. This label is NOT evidence "
                                       "that the agent reached that conclusion"))
             ans["status"] = "EVIDENCE_INSUFFICIENT"
+
+        self._downgrade_a_positive_that_owes_something(ans, s)
 
         # Positive and negative findings are proved differently, so they are labelled
         # differently. A negative additionally has three possible bases demanding three
@@ -930,6 +1074,14 @@ class ChartReviewAgent:
                                    elapsed=time.time() - self._t0)
         if why:
             self.tracer.emit("budget_exceeded", reason=why)
+            # LABELLED HERE AND NOT AT THE EDGE. Both `_after_act` and `_after_reflect` route
+            # to finalize on exhaustion, and only the reflect edge used to set `_termination`
+            # — so a run that ran out of tokens between two act steps arrived at finalize with
+            # no termination reason at all. That is the SYN0001 run exactly: its
+            # `ungated_positive` event carries `termination: null`, and the answer it labelled
+            # was FOUND. One owner, so the two edges cannot disagree about why a run stopped.
+            if getattr(self, "_termination", None) is None:
+                self._termination = "BUDGET_EXHAUSTED"
         return bool(why)
 
     # ------------------------------------------------------------------ gate

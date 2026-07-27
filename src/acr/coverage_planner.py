@@ -216,6 +216,145 @@ MARKER_BASE_RATE_TABLE = SKILL_DIR / "references" / "marker-catalogue.md"
 #: mechanism -- the run stopped 353 characters short of the word that resolved the stain.
 MARKER_TRUNCATED = "truncated"
 
+# ------------------------------------------------- which markers a machine may discharge
+#: THE ONE MARKER THE RUNTIME CAN SETTLE WITHOUT ASKING ANYBODY, and the reason no other
+#: marker joins it.
+#:
+#: `truncated` is not a claim about clinical content. It is a claim about a READ: "this call
+#: returned fewer characters than the document holds". `corpus.PatientChart.read` computes it
+#: from `offset + len(chunk) < len(text)`, so the runtime already owns both sides of the
+#: predicate and can see for itself when the document has been read to its end. Nothing is
+#: being judged; an arithmetic fact is being noticed. `OpenThreadLedger.note_read` does the
+#: noticing, and `SETTLED_BY_READING_TO_THE_END` is the resolution it writes.
+#:
+#: EVERY OTHER MARKER IN THE CATALOGUE NAMES A DOCUMENT, NOT AN OFFSET, and the runtime
+#: cannot tell whether the document it names was found. Taken from the obligation table in
+#: `skills/thread-chasing/SKILL.md`, marker kind by marker kind:
+#:
+#:   * `pending`, `results pending`, `stains pending`, `additional sections`, `recut`
+#:     — the lab had not finished. Discharged by "a LATER report of the same type", which is
+#:     a judgement about whether the later report is the one this line was waiting for.
+#:     Reaching the end of the deferring document does not settle it and must not appear to.
+#:   * `see addendum`, `addendum`, `amended`
+#:     — the resolution exists and is filed somewhere: a section named `ADDENDUM 1`, or one
+#:     of the `Path-Rpt-Addendum` / `Addendum` / `Discharge-Summary-Staff-Addendum` types.
+#:     Whether the addendum found is the addendum referenced is not decidable from offsets.
+#:   * `preliminary` — a final version will follow, in a document that may not exist yet.
+#:   * `deferred`, `in consultation`, `sent out` — another pathologist holds it; the
+#:     catalogue says outright it "may legitimately never return".
+#:   * `correlate clinically`, `clinical correlation` — the author is disclaiming their own
+#:     document. Reading MORE of that document is precisely the wrong move; the obligation
+#:     points at a different CLASS of document.
+#:   * `to be dictated` — the text does not exist yet. There is nothing to page to.
+#:   * `outside facility`, `outside hospital`, `outside institution` — the document is not in
+#:     this chart at all. This one cannot be discharged by reading ANYTHING, mechanically or
+#:     otherwise: the only honest exits are a dismissal carrying a reason and an abstention on
+#:     the fields that document would have established.
+#:
+#: So the deterministic route settles exactly one marker kind, and every other kind still
+#: needs the agent to SAY where it was settled. That asymmetry is the design, not an
+#: unfinished part of it: a mechanical discharge is only sound where the runtime holds the
+#: whole predicate, and it holds the whole predicate for `truncated` alone.
+MECHANICALLY_DISCHARGEABLE_MARKERS = frozenset({MARKER_TRUNCATED})
+
+#: Written into `OpenThread.resolution` by the deterministic route, so a manifest reader can
+#: separate "the runtime observed the end of the document" from "the agent said it chased it".
+SETTLED_BY_READING_TO_THE_END = "read to its end by the runtime's own count"
+
+# ------------------------------------------- what a request to open a thread actually DID
+# THE SENTINEL THAT KILLED A GUARD, TWICE. `open_thread` used to return `OpenThread | None`,
+# and the whole meaning of the None lived in a comment at the single call site that acted on
+# it: "already outstanding; re-reading must not multiply debt". When the deadlock fix routed
+# `open_thread` through `request_open` — which hands the EXISTING thread back so the caller
+# can tell the agent what to do about it — the sentinel stopped being None, the guard stopped
+# guarding, and no test anywhere noticed. Three partial reads of one document began emitting
+# three triggers, and a RESOLVED thread began being announced again on the next short read.
+#
+# A return value whose meaning is recorded only in a comment is a contract nobody can be held
+# to. So the four outcomes are named, the meanings are a table rather than prose, and the
+# result object REFUSES to be read as a bare truth value; see `OpenRequest.__bool__`.
+OPEN_REQUEST_OPENED = "opened"
+OPEN_REQUEST_ALREADY_OPEN = "already_open"
+OPEN_REQUEST_ALREADY_SETTLED = "already_settled"
+OPEN_REQUEST_DISCHARGED_ON_READ = "discharged_on_read"
+
+#: status -> what it means for the caller. Exactly one of these is new debt. The other three
+#: are three DIFFERENT ways of saying "nothing was opened", and the difference between them
+#: is what a caller has to be able to act on: one is a no-op to be refused, one is a paid
+#: debt, one is an obligation the runtime discharged before it could exist.
+OPEN_REQUEST_STATUSES: dict[str, str] = {
+    OPEN_REQUEST_OPENED:
+        "a new obligation now exists, and this is the only status that is new debt",
+    OPEN_REQUEST_ALREADY_OPEN:
+        "the identical thread_id is still outstanding; this request is a no-op, not progress, "
+        "and what the caller needs is resolve_threads or dismiss_threads",
+    OPEN_REQUEST_ALREADY_SETTLED:
+        "the identical thread_id has already been resolved or dismissed; re-opening it would "
+        "reinstate a debt that has been paid",
+    OPEN_REQUEST_DISCHARGED_ON_READ:
+        "a mechanically dischargeable marker against a document this run has already seen "
+        "read whole, so nothing was opened and nothing is owed",
+}
+
+
+class OpenRequest(dict):
+    """What `request_open` did, as a status the caller has to NAME.
+
+    A mapping, because the manifest and the revision outcome already carry these as plain
+    JSON and a dataclass would have meant touching every reader. What it is NOT is a truth
+    value: `__bool__` raises rather than answering, so `if threads.open_thread(...)` fails
+    loudly at its first execution instead of quietly counting a re-read as a new obligation.
+
+    There is deliberately no `ok` key. A boolean sitting beside a four-valued status is the
+    same defect one refactor later — the caller reads the boolean, the meaning drifts into
+    the status, and nothing fails.
+    """
+
+    __slots__ = ()
+
+    @property
+    def status(self) -> str:
+        return self["status"]
+
+    @property
+    def opened(self) -> bool:
+        """True only for `opened`. The one question with a boolean answer, asked by name."""
+        return self["status"] == OPEN_REQUEST_OPENED
+
+    @property
+    def thread(self) -> "OpenThread | None":
+        """The thread this request concerns — the NEW one for `opened`, the EXISTING one for
+        `already_open` / `already_settled`, and None when nothing was or is owed."""
+        return self["thread"]
+
+    @property
+    def thread_id(self) -> str:
+        return self["thread_id"]
+
+    @property
+    def why(self) -> str:
+        """Empty for `opened`; otherwise the refusal, naming the call that would help."""
+        return self["why"]
+
+    def __bool__(self) -> bool:
+        raise TypeError(
+            "an OpenRequest has no truth value: 'nothing was opened' is three different "
+            f"facts ({', '.join(s for s in OPEN_REQUEST_STATUSES if s != OPEN_REQUEST_OPENED)})"
+            f" and this one is {self.get('status')!r}. Branch on `.status`, or ask `.opened` "
+            "if the only thing you need to know is whether new debt was added.")
+
+
+# ---------------------------------------------------- how much of a document has been read
+#: `fully_read` answers False for three different situations and a mechanical discharge has
+#: to be able to tell them apart: a `read_section` contributes true offsets and no document
+#: length, so a run that only ever read sections does not know there is a hole — it does not
+#: know anything. Same empty-answer-as-meaning shape as the sentinel above, so it gets names
+#: too, and `fully_read` is the one-line projection of this.
+READ_STATE_UNREAD = "unread"
+READ_STATE_LENGTH_UNKNOWN = "length_unknown"
+READ_STATE_INCOMPLETE = "incomplete"
+READ_STATE_COMPLETE = "complete"
+
 _ROW = re.compile(r"^\|(?P<c1>[^|]*)\|(?P<c2>[^|]*)\|(?P<c3>[^|]*)\|\s*$")
 _TICKED = re.compile(r"`([^`]+)`")
 _LOW_PRECISION_SENTENCE = re.compile(
@@ -384,21 +523,209 @@ class OpenThreadLedger:
     def __init__(self) -> None:
         self.threads: list[OpenThread] = []
         self.refused_dismissals: list[dict] = []
+        #: note_id -> disjoint, sorted [start, end) character spans this run has actually
+        #: read. The deterministic settlement route is a statement about this map.
+        self.read_spans: dict[str, list[list[int]]] = {}
+        #: note_id -> total_chars, as the corpus reported it on a read that knew.
+        self.doc_length: dict[str, int] = {}
+        #: Every mechanical discharge, and every open request that a mechanical discharge
+        #: pre-empted. Recorded because a settlement nobody can see is the same defect as a
+        #: thread nobody noticed, one step further along.
+        self.mechanical_discharges: list[dict] = []
+        #: Reads `note_read` REFUSED to record, and why. `note_read` returns `[]` for "this
+        #: settled nothing" and it used to return the same `[]` for "I recorded nothing at
+        #: all" — an empty container carrying two meanings, which is the sentinel defect in
+        #: its other costume. A dropped span is a hole in the coverage `fully_read` asserts
+        #: over, so it can keep a `truncated` thread undischargeable forever; it goes in the
+        #: manifest rather than into a return value nobody can distinguish.
+        self.ignored_reads: list[dict] = []
 
     def _find(self, thread_id: str) -> OpenThread | None:
         return next((t for t in self.threads if t.thread_id == thread_id), None)
 
-    def open_thread(self, *, note_id: str, doc_type: str, marker: str, obligation: str,
-                    excerpt: str, step: int) -> OpenThread | None:
-        """Idempotent on (note_id, marker): re-reading a document must not multiply the debt."""
+    # ------------------------------------------------- the deterministic settlement route
+    def note_read(self, note_id: str, *, offset: int, returned_chars: int,
+                  total_chars: int | None, step: int) -> list[str]:
+        """Record one read's extent, and settle whatever that read finished.
+
+        THE DEADLOCK THIS BREAKS, from the first end-to-end run (SYN0001, 2026-07-27). The
+        whole 521-character pathology report was read at step 4 (`offset 0, limit 1200 ->
+        returned 521 of 521, truncated false`). At step 6 the agent re-read a 180-character
+        WINDOW of it (`offset 330, limit 180`), which of course did not reach the end, and
+        `truncated: true` on that window opened a thread against a document that had already
+        been read in full. The agent then paged to the end, read the section list, read
+        FINAL DIAGNOSIS, recorded the final-diagnosis evidence — and the ledger learned
+        nothing from any of it, because nothing connected "I read to the end of it" to "the
+        thread is settled". Eighteen reflections and 400k tokens later the run emitted an
+        ungated positive.
+
+        Both halves of that are fixed here and both are the same fact: the runtime knows how
+        much of a document has been read. A read that completes the document settles any
+        open `truncated` thread on it, and `open_thread` will not open one in the first place
+        against a document already complete.
+
+        Returns the thread_ids this read settled — `[]` when it settled nothing, and `[]`
+        again when the read was malformed enough not to be recorded at all. Those are not the
+        same fact, so the second one lands in `self.ignored_reads` and in the manifest instead
+        of being left to a caller that cannot see the difference.
+        """
+        if not note_id or returned_chars < 0:
+            self.ignored_reads.append(
+                {"note_id": note_id, "offset": offset, "returned_chars": returned_chars,
+                 "total_chars": total_chars, "step": step,
+                 "why": ("a read with no note_id was dropped" if not note_id else
+                         f"a read reporting {returned_chars} characters was dropped")
+                 + "; its span is NOT in the coverage `fully_read` computes over, so a "
+                   "`truncated` thread on this document may never discharge mechanically"})
+            return []
+        if total_chars is not None and total_chars >= 0:
+            # The largest length any read reported. A `read_section` knows offsets but not
+            # the document length, so it contributes spans and never a length.
+            self.doc_length[note_id] = max(self.doc_length.get(note_id, 0), int(total_chars))
+        spans = self.read_spans.setdefault(note_id, [])
+        spans.append([int(offset), int(offset) + int(returned_chars)])
+        spans.sort()
+        merged: list[list[int]] = []
+        for s in spans:
+            if merged and s[0] <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], s[1])
+            else:
+                merged.append(list(s))
+        self.read_spans[note_id] = merged
+        if not self.fully_read(note_id):
+            return []
+        settled: list[str] = []
+        for t in self.threads:
+            if (t.note_id == note_id and t.state == "open"
+                    and t.marker in MECHANICALLY_DISCHARGEABLE_MARKERS):
+                t.state, t.resolved_at_step = "resolved", step
+                t.resolution = (
+                    f"{SETTLED_BY_READING_TO_THE_END}: characters 0-{self.doc_length[note_id]} "
+                    f"of {note_id} have all been returned by a read in this run, so the read "
+                    f"that stopped short no longer stops anything")
+                settled.append(t.thread_id)
+                self.mechanical_discharges.append(
+                    {"thread_id": t.thread_id, "marker": t.marker, "note_id": note_id,
+                     "step": step, "how": "settled_on_read", "why": t.resolution})
+        return settled
+
+    def read_state(self, note_id: str) -> str:
+        """How much of this document the run has actually seen, as one of `READ_STATE_*`.
+
+        Contiguity from zero, not merely "a read reached the last character". A run that read
+        the head and then the tail and skipped the middle has not read the document, and the
+        conclusion it is chasing could be in the hole. The spans are merged in `note_read`,
+        so completeness is the one-span test.
+
+        The three non-complete states are kept apart because they are three different pieces
+        of news. `unread` is a document nobody opened. `length_unknown` is the `read_section`
+        case — true offsets, no document length — where the run knows how much it has seen
+        and nothing at all about how much there is. `incomplete` is the only one that asserts
+        a hole. A single False for all three is the empty-answer-as-meaning shape, and it is
+        the reason this is a state and `fully_read` is its projection.
+        """
+        spans = self.read_spans.get(note_id)
+        if not spans:
+            return READ_STATE_UNREAD
+        n = self.doc_length.get(note_id)
+        if not n:
+            return READ_STATE_LENGTH_UNKNOWN
+        return (READ_STATE_COMPLETE if spans[0][0] <= 0 and spans[0][1] >= n
+                else READ_STATE_INCOMPLETE)
+
+    def fully_read(self, note_id: str) -> bool:
+        """Has every character of this document been returned by some read in this run?
+
+        The one question a mechanical discharge may act on, and the only reduction of
+        `read_state` to a boolean that is sound: everything that is not `complete` blocks the
+        discharge, whether or not it asserts a hole.
+        """
+        return self.read_state(note_id) == READ_STATE_COMPLETE
+
+    # ------------------------------------------------------------------- opening a thread
+    def request_open(self, *, note_id: str, doc_type: str, marker: str, obligation: str,
+                     excerpt: str, step: int) -> OpenRequest:
+        """Open a thread, or say exactly why this request opened nothing.
+
+        A LOOP THAT REPORTS SUCCESS FOR DOING NOTHING IS HOW A RUN SPENDS 400k TOKENS
+        STANDING STILL. On SYN0001 the supervisor asked to open
+        `Surgical-Pathology-Report_2023-04-27#truncated` nine times over; the ledger deduped
+        every one of them to nothing and the loop reported APPLIED nine times. Identity
+        dedupe was already here and was the right half of the answer — the missing half is
+        that the caller has to be TOLD, in the same words it can act on, that the request
+        changed nothing and that the operation it actually needs is `resolve_threads`.
+
+        THE ANSWER IS A STATUS AND NEVER A TRUTH VALUE. Three of the four outcomes mean
+        "nothing was opened" and they are three different facts; the caller that collapsed
+        them lost the dedupe guard for a day without a single test going red. `status` is one
+        of `OPEN_REQUEST_STATUSES`, and only `opened` is new debt:
+
+          opened               a new obligation now exists
+          already_open         identical thread_id, still outstanding; a NO-OP, not progress
+          already_settled      identical thread_id, already resolved or dismissed
+          discharged_on_read   `truncated` against a document the runtime has seen read whole
+
+        Note that `thread` is the EXISTING thread for `already_open` and `already_settled` —
+        that is what lets `_noop_why` name the call that would actually help — which is
+        precisely why `OpenRequest.__bool__` raises.
+        """
         tid = f"{note_id}#{marker}"
-        if self._find(tid):
-            return None
+        existing = self._find(tid)
+        if existing is not None:
+            status = (OPEN_REQUEST_ALREADY_OPEN if existing.state == "open"
+                      else OPEN_REQUEST_ALREADY_SETTLED)
+            return OpenRequest(status=status, thread_id=tid, thread=existing,
+                               why=self._noop_why(existing, status))
+        if marker in MECHANICALLY_DISCHARGEABLE_MARKERS and self.fully_read(note_id):
+            why = (f"{tid!r} was NOT opened: {note_id} has already been read to its end in "
+                   f"this run (characters 0-{self.doc_length.get(note_id, 0)} all returned), "
+                   f"so there is nothing left to page to. A `{marker}` marker is discharged "
+                   f"by the runtime's own count of what it returned, not by re-declaring it.")
+            self.mechanical_discharges.append(
+                {"thread_id": tid, "marker": marker, "note_id": note_id, "step": step,
+                 "how": "not_opened_already_complete", "why": why})
+            return OpenRequest(status=OPEN_REQUEST_DISCHARGED_ON_READ, thread_id=tid,
+                               thread=None, why=why)
         t = OpenThread(thread_id=tid, note_id=note_id, doc_type=doc_type, marker=marker,
                        obligation=obligation, excerpt=" ".join((excerpt or "").split())[:240],
                        opened_at_step=step)
         self.threads.append(t)
-        return t
+        return OpenRequest(status=OPEN_REQUEST_OPENED, thread_id=tid, thread=t, why="")
+
+    @staticmethod
+    def _noop_why(t: OpenThread, status: str) -> str:
+        """The refusal an agent can act on: what happened, and the call that would help.
+
+        Naming `resolve_threads` with THIS thread_id filled in, rather than describing it.
+        The affordance existed in the schema for the entire 400k-token run and was never
+        reached; a refusal that does not carry the next move is a refusal that gets repeated.
+        """
+        if status == OPEN_REQUEST_ALREADY_SETTLED:
+            return (f"{t.thread_id!r} was NOT re-opened: it is already {t.state} "
+                    f"({t.resolution[:120]!r}). Re-opening a settled thread would reinstate a "
+                    f"debt that has been paid.")
+        return (f"{t.thread_id!r} was ALREADY OPEN and this request changed NOTHING — it is a "
+                f"no-op, not progress, and it is the same request that has already been "
+                f"made. Opening a thread is how you ADD an obligation; it is not how you "
+                f"discharge one. To settle this thread send "
+                f'resolve_threads=[{{"thread_id": "{t.thread_id}", "how": "<where it was '
+                f'settled>"}}], or dismiss_threads=[{{"thread_id": "{t.thread_id}", '
+                f'"reason": "<why it does not bear on the answer>"}}]. Both are recorded.')
+
+    def open_thread(self, *, note_id: str, doc_type: str, marker: str, obligation: str,
+                    excerpt: str, step: int) -> OpenRequest:
+        """`request_open` under the name the detectors and the tests already call it by.
+
+        IT NO LONGER PROJECTS THE ANSWER DOWN TO A SENTINEL. This method used to return
+        `["thread"]` — `OpenThread | None` — and the whole of "None means nothing new" lived
+        in a comment at one call site. The deadlock fix made `request_open` hand the EXISTING
+        thread back for `already_open` and `already_settled`, the sentinel silently became
+        truthy in both, and the guard that stopped a re-read from multiplying the debt was
+        gone with 1391 tests green. Same status object as `request_open`, so there is exactly
+        one contract and no lossy alias of it to drift.
+        """
+        return self.request_open(note_id=note_id, doc_type=doc_type, marker=marker,
+                                 obligation=obligation, excerpt=excerpt, step=step)
 
     def resolve(self, thread_id: str, how: str, *, step: int) -> dict:
         t = self._find(thread_id)
@@ -431,12 +758,30 @@ class OpenThreadLedger:
         return [t for t in self.threads if t.state == "open"]
 
     def render(self) -> str:
+        """Every thread, and — on the open ones — the exact call that settles it.
+
+        THE AFFORDANCE HAS TO BE WHERE THE BLOCK IS. On SYN0001 the supervisor was shown this
+        block eighteen times, was told eighteen times that a thread was outstanding, and
+        asked to RE-OPEN it every time; `resolve_threads` was requested zero times in fourteen
+        revisions. It was in the schema at the bottom of the prompt the whole while. An
+        affordance named a long way from the obstacle it clears is one that does not exist in
+        practice, so the two now travel together, with the thread_id already filled in.
+        """
         if not self.threads:
             return "(no unsettled threads detected)"
-        return "\n".join(
-            f"  [{t.state.upper()}] {t.thread_id}  ({t.doc_type}) {t.marker!r}: "
-            f"{t.obligation[:90]}" + (f"  -> {t.resolution[:80]}" if t.resolution else "")
-            for t in self.threads)
+        lines: list[str] = []
+        for t in self.threads:
+            lines.append(f"  [{t.state.upper()}] {t.thread_id}  ({t.doc_type}) {t.marker!r}: "
+                         + t.obligation[:90]
+                         + (f"  -> {t.resolution[:80]}" if t.resolution else ""))
+            if t.state == "open":
+                lines.append(
+                    f'      THIS BLOCKS YOUR ANSWER. Settle it with resolve_threads='
+                    f'[{{"thread_id": "{t.thread_id}", "how": "<where it was settled>"}}] '
+                    f'or dismiss_threads=[{{"thread_id": "{t.thread_id}", '
+                    f'"reason": "<why it does not bear on the answer>"}}]. Re-opening it '
+                    f'again does nothing.')
+        return "\n".join(lines)
 
     def to_dict(self) -> dict:
         return {
@@ -444,6 +789,18 @@ class OpenThreadLedger:
             "n_unresolved": len(self.unresolved()),
             "n_dismissed": sum(1 for t in self.threads if t.state == "dismissed"),
             "n_resolved": sum(1 for t in self.threads if t.state == "resolved"),
+            # How each settled thread was settled, kept apart on purpose: "the runtime
+            # observed the end of the document" and "the agent said it chased it" are
+            # different facts about a run and a manifest that merged them could not tell you
+            # whether the deterministic route was ever reached.
+            "n_resolved_mechanically": sum(
+                1 for t in self.threads
+                if t.state == "resolved" and t.resolution.startswith(SETTLED_BY_READING_TO_THE_END)),
+            "mechanical_discharges": list(self.mechanical_discharges),
+            "mechanically_dischargeable_markers": sorted(MECHANICALLY_DISCHARGEABLE_MARKERS),
+            # Reads the ledger dropped. Normally empty; when it is not, every `fully_read`
+            # answer about those documents was computed over spans that are missing one.
+            "ignored_reads": list(self.ignored_reads),
             "refused_dismissals": list(self.refused_dismissals),
             "threads": [t.to_dict() for t in self.threads],
         }
@@ -605,6 +962,10 @@ class RevisionOutcome:
     threads_opened: list[str] = field(default_factory=list)
     threads_resolved: list[str] = field(default_factory=list)
     threads_dismissed: list[str] = field(default_factory=list)
+    #: Open requests that opened nothing, with the status that says why. Counted separately
+    #: from `refused` so a directory of manifests can measure the standing-still loop without
+    #: reading prose: `[{"thread_id": ..., "status": "already_open"}]`.
+    thread_noops: list[dict] = field(default_factory=list)
     refused: list[str] = field(default_factory=list)
     refusal_class: str = ""
 
@@ -622,6 +983,7 @@ class RevisionOutcome:
                 "threads_opened": self.threads_opened,
                 "threads_resolved": self.threads_resolved,
                 "threads_dismissed": self.threads_dismissed,
+                "thread_noops": self.thread_noops,
                 "refused": self.refused, "refusal_class": self.refusal_class}
 
 
@@ -631,6 +993,10 @@ REFUSED_BUDGET = "BUDGET_EXHAUSTED"
 REFUSED_UNKNOWN_TYPE = "UNKNOWN_TYPE"
 #: Not inadmissible and not unaffordable -- it retrieves nothing. See `redundant_against`.
 REFUSED_REDUNDANT_TERM = "REDUNDANT_TERM"
+#: A revision whose whole content was re-opening threads that are already open. Admissible,
+#: affordable, and it moves nothing -- the exact shape of the SYN0001 deadlock, where nine
+#: such revisions were each reported back as APPLIED.
+REFUSED_THREAD_NOOP = "THREAD_NOOP"
 
 
 # ------------------------------------------------------------------ what makes two terms one
@@ -880,11 +1246,25 @@ class CoveragePlan:
 
         if threads is not None:
             for note_id, marker, why in rev.open_threads:
-                th = threads.open_thread(note_id=note_id, doc_type="", marker=marker or
-                                         "agent_reported", obligation=why or "reported by the "
-                                         "agent during reflection", excerpt=why, step=step)
-                if th:
-                    out.threads_opened.append(th.thread_id)
+                r = threads.request_open(
+                    note_id=note_id, doc_type="", marker=marker or "agent_reported",
+                    obligation=why or "reported by the agent during reflection",
+                    excerpt=why, step=step)
+                # Branching on the STATUS, by name. `if r:` would be true for every outcome
+                # (an OpenRequest refuses the question) and `r["ok"]` was a boolean sitting
+                # beside a four-valued status, waiting for the meaning to drift into one of
+                # them. Only `opened` added an obligation.
+                if r.status == OPEN_REQUEST_OPENED:
+                    out.threads_opened.append(r.thread_id)
+                else:
+                    # NOT SILENCE. The ledger's identity dedupe was already correct; what was
+                    # missing is that the caller heard nothing about it and the revision was
+                    # still reported as APPLIED. A no-op reported as progress is how the
+                    # SYN0001 loop re-sent the same open nine times. `already_open`,
+                    # `already_settled` and `discharged_on_read` are all no-ops and the
+                    # status travels so a reader can tell which kind it was.
+                    out.thread_noops.append({"thread_id": r.thread_id, "status": r.status})
+                    out.refused.append(f"{REFUSED_THREAD_NOOP}: {r.why}")
             for tid, how in rev.resolve_threads:
                 r = threads.resolve(tid, how, step=step)
                 (out.threads_resolved if r["ok"] else out.refused).append(
@@ -893,6 +1273,18 @@ class CoveragePlan:
                 r = threads.dismiss(tid, reason, step=step)
                 (out.threads_dismissed if r["ok"] else out.refused).append(
                     tid if r["ok"] else f"dismiss {tid}: {r['why']}")
+
+        # A REVISION THAT WAS ENTIRELY A NO-OP IS A REFUSAL. Not because it is inadmissible —
+        # nothing here is — but because reporting APPLIED over a run that did not move is the
+        # signal that let 400k tokens go by. Refusing it routes the explanation back through
+        # `graph._n_reflect`'s REVISION_REFUSED trigger, which is the one channel the loop
+        # already reads and acts on.
+        if out.thread_noops and not (out.terms_added or out.types_promoted
+                                     or out.threads_opened or out.threads_resolved
+                                     or out.threads_dismissed):
+            out.refusal_class = REFUSED_THREAD_NOOP
+            self._record_refusal(out, step=step, trigger=trigger, rev=rev)
+            return out
 
         out.applied = True
         if out.changed_retrieval():

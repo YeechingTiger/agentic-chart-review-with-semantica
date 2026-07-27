@@ -1079,3 +1079,239 @@ def _first_note_of_type(chart, doc_type: str) -> str:
     docs, _ = chart.list_documents(doc_type_contains=doc_type, limit=5)
     assert docs, f"the corpus fixture has no {doc_type!r}"
     return docs[0].note_id
+
+
+# ==========================================================================================
+# 12. THE MANIFEST'S REPLAN BLOCK IS DERIVED FROM THE TRACE, NOT ACCUMULATED BESIDE IT
+#
+# WHAT HAPPENED. The first true end-to-end run (SYN0001, run
+# `extract__20260727T200902Z__2d2f55b-dirty`) left a trace holding 14 `plan_revision` events,
+# 13 of them `applied: true`, and a manifest reporting `n_revisions_applied: 0` and
+# `replan_rate: 0.0`. The 0.0 was read as "the model ignores the replanning channel" and a
+# conclusion was written from it.
+#
+# BOTH NUMBERS WERE ARITHMETICALLY RIGHT AND THE CONCLUSION WAS WRONG. They count different
+# things and neither name says so:
+#
+#   trace `plan_revision.applied`  == the revision was ADMISSIBLE (monotone, affordable, not
+#                                     wholly redundant). True even when it moved nothing.
+#   manifest `n_revisions_applied` == the revision MOVED RETRIEVAL (terms or promotions).
+#
+# On that run all 13 admitted revisions had `outcome.terms_added == []` and
+# `outcome.types_promoted == []`: the agent asked to re-promote types already at `read_all`
+# and to re-open a thread already open. So `replan_rate: 0.0` is a true statement about plan
+# MOVEMENT and a false answer to the question anyone actually asks of it, because the
+# manifest had no field at all for "how many times did the agent reach for this channel".
+# 14 requests and 0 requests rendered identically. That missing field is the defect.
+#
+# WHAT THESE TESTS HOLD
+#   1. Every replan number is recomputed from the trace events by ONE function,
+#      `run_manifest.replan_from_trace`, and the manifest publishes what that function
+#      returns. Two counters for one quantity is what produced the divergence.
+#   2. A revision that was admitted and moved nothing is REPORTED AS SUCH — requested,
+#      admitted, no-op — so "never tried" and "tried and it did nothing" cannot be read as
+#      the same run ever again.
+#   3. The runtime counters `graph.py` still keeps are cross-checked against the derivation
+#      inside the manifest itself, so a future divergence is visible in the artifact and
+#      fails here loudly rather than reading plausibly.
+#
+# No provider is called and no chart text is written here.
+# ==========================================================================================
+from acr.run_manifest import replan_from_trace
+
+
+def _events(path) -> list[dict]:
+    return [json.loads(l) for l in Path(path).read_text(encoding="utf-8").splitlines() if l.strip()]
+
+
+#: The refusal prose `apply_revision` returns for a promotion already in force. Verbatim
+#: from the SYN0001 trace, where it appeared on four revisions all reported as `applied`.
+REFUSAL_ALREADY_AT_POLICY = "'Surgical-Pathology-Report' is already at 'read_all'; no change"
+
+
+def _revision_event(*, applied: bool, terms=(), promotions=(), refused=()) -> dict:
+    """One `plan_revision` event in the shape `graph._after_reflect` emits."""
+    return {"kind": "plan_revision", "applied": applied,
+            "outcome": {"applied": applied, "terms_added": list(terms),
+                        "types_promoted": [{"type": t, "from": "search", "to": "read_all"}
+                                           for t in promotions],
+                        "threads_opened": [], "threads_resolved": [], "threads_dismissed": [],
+                        "refused": list(refused), "refusal_class": "" if applied else "BUDGET"}}
+
+
+def test_the_recorded_syn0001_divergence_is_reproduced_and_named_by_one_function():
+    """The exact shape of the run that produced the wrong conclusion, replayed as events.
+
+    13 admitted revisions that moved nothing plus 1 refused, over 18 reflections. The old
+    reading had exactly two numbers available — 13 (trace) and 0 (manifest) — and no way to
+    tell which answered "did the agent revise its plan". The derivation must publish both,
+    under names that cannot be confused, plus the request count that neither had.
+    """
+    events = ([{"kind": "reflect", "verdict": "CONTINUE"}] * 18
+              # 12 no-ops that were silently admitted, 1 of them carrying refusal prose
+              + [_revision_event(applied=True) for _ in range(9)]
+              + [_revision_event(applied=True,
+                                 refused=[REFUSAL_ALREADY_AT_POLICY])
+                 for _ in range(4)]
+              + [_revision_event(applied=False, refused=["REDUNDANT_TERM: 'histology'"])])
+
+    r = replan_from_trace(events)
+
+    assert r["n_reflections"] == 18
+    assert r["n_revision_requests"] == 14, (
+        "THE NUMBER THE MANIFEST NEVER HAD. Without it a run that reached for the replanning "
+        "channel 14 times is indistinguishable from one that never reached for it, and 0.0 "
+        "gets read as 'the model ignores the channel'."
+    )
+    assert r["n_revisions_admitted"] == 13, "what the trace's `applied: true` counts"
+    assert r["n_revisions_applied"] == 0, "what moved retrieval — and nothing did"
+    assert r["n_revisions_no_op"] == 13, (
+        "admitted and changed nothing. This is the whole finding: the agent used the channel "
+        "and the plan was already maximal for what it asked."
+    )
+    assert r["n_revisions_refused"] == 1
+    assert r["n_revisions_partly_refused"] == 4, (
+        "a revision admitted WITH refusal prose on part of it was counted as neither applied "
+        "nor refused, so 4 refusals of a real request were reported nowhere"
+    )
+    assert r["replan_rate"] == 0.0
+    assert r["request_rate"] == round(14 / 18, 4), (
+        "the honest answer to 'did the agent use the replanning channel'. It is not the "
+        "replan rate and must never be read as one."
+    )
+    assert r["terms_added_by_reflection"] == 0 and r["types_promoted"] == 0
+
+
+def test_replan_rate_and_request_rate_are_different_questions():
+    """A run that never reaches for the channel and a run that reaches and is refused every
+    time both score `replan_rate == 0`. They must not score the same everywhere."""
+    silent = replan_from_trace([{"kind": "reflect"}] * 5)
+    trying = replan_from_trace([{"kind": "reflect"}] * 5
+                               + [_revision_event(applied=False, refused=["x"])] * 5)
+    assert silent["replan_rate"] == trying["replan_rate"] == 0.0
+    assert silent["n_revision_requests"] == 0 and silent["request_rate"] == 0.0
+    assert trying["n_revision_requests"] == 5 and trying["request_rate"] == 1.0, (
+        "the two runs are the opposite diagnosis — nothing to do, versus the budget or the "
+        "monotonicity rule refusing everything — and one number cannot carry both"
+    )
+
+
+def test_a_moving_revision_is_counted_once_as_applied_and_once_as_a_request():
+    r = replan_from_trace([{"kind": "reflect"}] * 2
+                          + [_revision_event(applied=True, terms=["right upper lobe"],
+                                             promotions=["Chest-CT-W-Contr"])])
+    assert r["n_revision_requests"] == 1 and r["n_revisions_admitted"] == 1
+    assert r["n_revisions_applied"] == 1 and r["n_revisions_no_op"] == 0
+    assert r["terms_added_by_reflection"] == 1 and r["types_promoted"] == 1
+    assert r["replan_rate"] == 0.5
+
+
+class _NoOpRevisingLLM(_RevisingLLM):
+    """Scripted to reproduce SYN0001: ask, every single reflection, for a promotion the plan
+    has already made. Admissible, monotone, affordable — and it moves nothing."""
+
+    def chat(self, messages, tools=None):
+        last = next((m["content"] for m in reversed(messages) if m.get("role") == "user"), "")
+        if tools is None and "read_all|search|sample" in last:
+            # The type is ALREADY at `search`, so asking for `search` is admissible, monotone,
+            # free — and moves nothing. Exactly the SYN0001 shape.
+            return self._reply({"assignments": [{"type": self.promote, "policy": "search",
+                                                 "why": "already searchable",
+                                                 "confidence": 0.9}], "keywords": []})
+        if tools is None and "SUFFICIENT|CONTINUE|STUCK" in last:
+            self.revised = True
+            return self._reply({
+                "verdict": "CONTINUE",
+                "reason": "the pathology type must be read in full",
+                "revision": {"add_terms": [],
+                             "promote_types": [{"type": self.promote, "to": "search"}]}})
+        return super().chat(messages, tools)
+
+
+def test_a_revision_that_moved_nothing_is_reported_as_a_request_not_as_silence(
+        spec, chart, tmp_path):
+    """THE SYN0001 FIX, end to end. Every reflection asks for a promotion already in force.
+
+    `replan_rate` stays 0.0 — correctly, the retrieval scope never moved — but the manifest
+    must now say, in the same block, that the channel was used and that every use was a
+    no-op. A reader who concludes "the model ignores the replanning channel" from this
+    manifest is contradicted by the manifest.
+    """
+    llm = _NoOpRevisingLLM(SAMPLED_TYPE, "right upper lobe")
+    llm._target = _first_note_of_type(chart, SAMPLED_TYPE)
+    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=6), out_dir=tmp_path,
+                             sample_seed=7)
+    agent.run(chart, run_id="noop-replan")
+    r = json.loads((tmp_path / "noop-replan.manifest.json").read_text(encoding="utf-8"))["replan"]
+
+    assert r["n_revisions_applied"] == 0 and r["replan_rate"] == 0.0
+    assert r["n_revision_requests"] >= 1, (
+        "the agent asked and the manifest recorded silence. This is the bug that turned a "
+        "true 0.0 into 'the model ignores the replanning channel'."
+    )
+    assert r["n_revisions_no_op"] == r["n_revision_requests"], (
+        "every request was admitted and moved nothing; the block must say so rather than "
+        "leaving the reader to infer it from a zero"
+    )
+    assert r["request_rate"] > 0.0
+    assert r["n_revisions_partly_refused"] >= 1, (
+        "each request was told 'already at that policy; no change' — refusal prose that "
+        "reached the agent and was counted nowhere"
+    )
+
+
+def test_every_replan_number_in_the_manifest_recomputes_from_its_own_trace(
+        spec, chart, tmp_path):
+    """THE AGREEMENT TEST. Recompute the block from the JSONL and demand equality.
+
+    This is the guard the class of bug needs: a manifest field that summarises trace events
+    is derived by one function, and if a second accumulator ever grows back beside it, this
+    fails instead of publishing a plausible number.
+    """
+    llm = _RevisingLLM(SAMPLED_TYPE, "right upper lobe")
+    llm._target = _first_note_of_type(chart, SAMPLED_TYPE)
+    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=6), out_dir=tmp_path,
+                             sample_seed=7)
+    res = agent.run(chart, run_id="replan-agreement")
+    man = json.loads((tmp_path / "replan-agreement.manifest.json").read_text(encoding="utf-8"))
+
+    recomputed = replan_from_trace(_events(res["trace"]))
+    for k, v in recomputed.items():
+        if k == "triggers_fired":
+            # The manifest also carries the kinds that never fired, at zero — "it fired zero
+            # times" and "this build has no such trigger" must stay distinguishable. Every
+            # count it does carry has to be the one the events support, and no kind the
+            # events show may be missing from it.
+            published = man["replan"]["triggers_fired"]
+            assert {kk: published.get(kk) for kk in v} == v
+            assert all(published[kk] == 0 for kk in published if kk not in v)
+            continue
+        assert man["replan"][k] == v, (
+            f"manifest `replan.{k}` = {man['replan'][k]!r} but the trace of this same run "
+            f"says {v!r}. A summary of trace events that disagrees with the events is an "
+            f"instrument reading plausibly, which is worse than one reading nothing."
+        )
+
+    # The trace really does hold the raw material, in the shape the derivation reads.
+    events = _events(res["trace"])
+    assert [e for e in events if e["kind"] == "plan_revision"]
+    assert len([e for e in events if e["kind"] == "reflect"]) == man["replan"]["n_reflections"]
+
+
+def test_the_runtime_counters_are_cross_checked_against_the_derivation_in_the_artifact(
+        spec, chart, tmp_path):
+    """`graph.py` still increments its own counters. They are no longer what is published —
+    they are compared to the derivation, and the comparison ships inside the manifest so a
+    divergence is visible to a reader who never runs this test."""
+    llm = _RevisingLLM(SAMPLED_TYPE, "right upper lobe")
+    llm._target = _first_note_of_type(chart, SAMPLED_TYPE)
+    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=6), out_dir=tmp_path,
+                             sample_seed=7)
+    agent.run(chart, run_id="replan-crosscheck")
+    r = json.loads((tmp_path / "replan-crosscheck.manifest.json").read_text(encoding="utf-8"))["replan"]
+
+    assert r["derived_from"] == "trace_events", "the block must say where its numbers come from"
+    assert r["counter_disagreements"] == {}, (
+        f"the runtime counters and the trace disagree: {r['counter_disagreements']}"
+    )
+    assert r["counters_agree"] is True
