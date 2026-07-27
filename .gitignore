@@ -45,3 +45,11 @@ corpus/patients/.doc_type_vocab.json
 
 # Document-type vocabulary cache, rebuilt on demand
 corpus/patients/.doc_type_vocab.json
+
+# Run output from REAL patients never enters git, manifest or not. The rule
+# above ("manifests are 2KB of evidence and go in") was written when every run
+# was against the synthetic corpus. A real run puts the patient id in the
+# directory NAME and in the manifest, so committing one is a PHI disclosure
+# that tests/test_no_phi_in_tree.py catches only after the fact -- as it did.
+runs/*_1168*/
+runs/**/*_1168*/
