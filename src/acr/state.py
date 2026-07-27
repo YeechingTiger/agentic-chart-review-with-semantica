@@ -106,6 +106,21 @@ class Budget:
     max_tokens: int = 400_000
     max_seconds: int = 1200
 
+    @property
+    def report(self) -> dict:
+        """The limits, for the manifest.
+
+        `negative_basis: BUDGET_EXHAUSTED` without the numbers is not a finding a reader can
+        act on: it does not say which of the three limits bound, and it does not say whether
+        the limit was the default or something the operator chose. Seven real runs abstained
+        on `max_tokens (400000)` while their step counts sat at 8-16 against a cap of 24, and
+        the manifest recorded no budget at all — so the abstention read as a fact about the
+        charts. It was a fact about this dataclass.
+        """
+        return {"max_steps": self.max_steps, "max_tokens": self.max_tokens,
+                "max_seconds": self.max_seconds, "max_plan_revisions": self.max_plan_revisions,
+                "is_library_default": self == Budget()}
+
     def exceeded(self, *, step: int, tokens: int, elapsed: float) -> str | None:
         if step >= self.max_steps:
             return f"max_steps ({self.max_steps}) reached"

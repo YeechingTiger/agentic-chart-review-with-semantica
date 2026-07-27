@@ -24,6 +24,25 @@ CORPUS = typer.Option("corpus/patients", "--corpus", help="root directory of pat
 MODEL = typer.Option(None, "--model", "-m", help="LiteLLM model string, e.g. ollama_chat/qwen3.6:35b")
 API_BASE = typer.Option(None, "--api-base", help="override provider base URL (vLLM, proxy, …)")
 
+# THE RUN BUDGET, ON THE COMMAND LINE. `Budget` has carried max_tokens and max_seconds since
+# it was written, and every construction site passed max_steps and nothing else — so the two
+# that actually bind on a real chart were unreachable defaults. On a 10-patient batch of real
+# charts, 7 of 10 runs returned EVIDENCE_INSUFFICIENT with `negative_basis: BUDGET_EXHAUSTED`
+# and `max_tokens (400000) reached`, at 8-16 steps against a 24-step cap: the abstention was
+# a property of a number nobody could set, and it read as a property of the charts.
+MAX_STEPS = typer.Option(24, "--max-steps", help="reflect/act cycles before the run is cut off")
+MAX_TOKENS = typer.Option(400_000, "--max-tokens",
+                          help="prompt+completion tokens before the run is cut off. Prompt is "
+                               "~96% of the spend and grows with the chart, so a large chart "
+                               "needs a larger number here, not more steps")
+MAX_SECONDS = typer.Option(1200, "--max-seconds", help="wall-clock seconds before the run is cut off")
+
+
+def budget(max_steps: int, max_tokens: int, max_seconds: int) -> "Budget":
+    """One construction site for the run budget, so no command can quietly drop a limit."""
+    from .state import Budget
+    return Budget(max_steps=max_steps, max_tokens=max_tokens, max_seconds=max_seconds)
+
 #: The artifact contract of the L0-L5 chain. Named here rather than in the command that writes
 #: each one, because the command that READS an artifact has to name the same string; two copies
 #: of a schema tag drift, and a drifted tag turns `_load_artifact`'s guard into a nuisance

@@ -246,7 +246,7 @@ class ExpansionRecord:
 def build_manifest(*, spec, patient_id: str, model: str, plan, coverage, threads, markers,
                    tracer, final: dict, counters: RunCounters, expansion: ExpansionRecord,
                    seed: SeedRecord, triggers_fired: dict[str, int], usage: dict,
-                   elapsed_s: float) -> dict:
+                   run_budget: dict, elapsed_s: float) -> dict:
     """The finished run, as a record. Pure: it computes no verdict and touches no ledger."""
     answer = final.get("answer", {})
     # DERIVED, not accumulated. See the module docstring and `replan_from_trace`.
@@ -336,6 +336,11 @@ def build_manifest(*, spec, patient_id: str, model: str, plan, coverage, threads
                              "terms_deferred": list(expansion.terms_deferred)},
         "monotonicity_vs_ledger": MONOTONICITY_VS_LEDGER,
         "steps": final.get("step", 0),
+        # BESIDE `negative_basis`, deliberately. A reader who sees BUDGET_EXHAUSTED has to be
+        # able to tell, without opening the trace, whether the run was starved or the chart
+        # was silent — and `is_library_default: true` says nobody chose the number that
+        # stopped it.
+        "run_budget": run_budget,
         "negative_basis": (final.get("answer") or {}).get("negative_basis"),
         "gate_validated": bool(final.get("gate_validated")),
         # What the spec's provenance permits this run to CLAIM, which is a separate

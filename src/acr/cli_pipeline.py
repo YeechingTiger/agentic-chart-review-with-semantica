@@ -30,7 +30,6 @@ from .explain import (DEFAULT_MAX_ELUSION_UPPER, ArtifactBindingError, VariableR
 from .graph import ChartReviewAgent
 from .registry_catalog import (VariableCatalog, VariableResolutionError,
                                check_guideline_bindings)
-from .state import Budget
 
 pipeline_app = typer.Typer(add_completion=False)
 
@@ -147,7 +146,9 @@ def extract(
     corpus: str = CORPUS,
     model: str = MODEL,
     api_base: str = API_BASE,
-    max_steps: int = typer.Option(24, "--max-steps"),
+    max_steps: int = cli_common.MAX_STEPS,
+    max_tokens: int = cli_common.MAX_TOKENS,
+    max_seconds: int = cli_common.MAX_SECONDS,
     reflect_every: int = typer.Option(2, "--reflect-every"),
     temperature: float = typer.Option(0.0, "--temperature"),
     seed: int = typer.Option(None, "--seed", help="validation-sampling seed; share it across arms"),
@@ -199,7 +200,8 @@ def extract(
             con.print(f"[dim]— {pid} / {sid}[/]")
             try:
                 agent = ChartReviewAgent(sp, cli_common.llm_client(model, api_base, temperature),
-                                         budget=Budget(max_steps=max_steps),
+                                         budget=cli_common.budget(max_steps, max_tokens,
+                                                                  max_seconds),
                                          reflect_every=reflect_every, out_dir=run_dir,
                                          sample_seed=seed)
                 r = agent.run(c.chart(pid), run_id=f"{pid}__{sid}", known_doc_types=vocab)

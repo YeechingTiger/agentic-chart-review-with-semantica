@@ -223,6 +223,18 @@ def compare(
     for f, p in d["per_field"].items():
         t.add_row(f, str(p["before"]), str(p["after"]), str(p["delta"]))
     con.print(t)
+    if nc := d.get("not_comparable"):
+        # Printed BEFORE the field table would be tidier, but the field rates are still real
+        # and worth seeing. What must not happen is a per-instance count appearing beneath
+        # them, because a reader takes `0 regression(s)` as a result rather than as silence.
+        con.print(f"[bold red]NOT_COMPARABLE[/] — {nc['reason']} "
+                  f"({nc['n_colliding']} colliding id(s), basis={nc['pseudonym_basis']})")
+        con.print(f"[dim]{nc['why']}[/]")
+        con.print(f"[yellow]remedy: {nc['remedy']}[/]")
+        dump(d, out)
+        if not out:
+            typer.echo(json.dumps({"verdict": d["verdict"]}))
+        raise typer.Exit(2)
     for r in d["regressions"]:
         con.print(f"[red]REGRESSED[/] {r['instance_id']} / {r['field']}: "
                   f"{r['before']} -> {r['after']}")

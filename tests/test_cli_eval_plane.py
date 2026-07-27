@@ -388,3 +388,60 @@ def test_eval_compare_is_quiet_and_zero_exit_when_nothing_moved(tmp_path):
     r = runner.invoke(app, ["eval", "compare", "--before", str(a), "--after", str(b)])
     assert r.exit_code == 0, r.output
     assert json.loads(r.output.strip().splitlines()[-1])["verdict"] == "OK"
+
+
+# ------------------------------------------------------- pseudonyms and per-instance joins
+# `mask_person_ids` mapped every real id to ONE constant token. `_outcome_index` is a dict
+# keyed on (instance_id, field), so ten masked patients produced a three-key index and the
+# per-instance arm of `compare` — the arm its own docstring calls the only reason to have the
+# harness — silently answered for the batch from its last member. A real 10-patient before/
+# after reported `0 regressions` across a comparison containing two. No test caught it because
+# `SYN0001` does not match the real-id pattern and so never collides.
+
+def _baseline(pids, outcome):
+    return {"baseline_key": {"commit": "c", "spec_hash": "h", "model": "m", "date": "d"},
+            "per_field": {"histology": {"exact_match_rate": 0.5}},
+            "totals": {"by_subgroup": {}},
+            "per_instance": [{"instance_id": p, "gate_validated": True,
+                              "outcomes": [{"field": "histology", "coded": "8140",
+                                            "key": "8140", "outcome": outcome}]}
+                             for p in pids]}
+
+
+def test_a_baseline_whose_ids_collide_is_refused_not_averaged():
+    from acr import evals
+    before = _baseline(["<person_id:redacted>"] * 3, "EXACT")
+    after = _baseline(["<person_id:redacted>"] * 3, "MISMATCH")
+    d = evals.compare(before, after)
+    assert d["verdict"] == "NOT_COMPARABLE"
+    assert d["regressions"] == [] and d["improvements"] == []
+    assert d["not_comparable"]["n_colliding"] == 1
+    assert "ACR_PSEUDONYM_KEY" in d["not_comparable"]["remedy"]
+
+
+def test_distinct_ids_still_compare_per_instance():
+    from acr import evals
+    d = evals.compare(_baseline(["a", "b", "c"], "EXACT"), _baseline(["a", "b", "c"], "MISMATCH"))
+    assert d["verdict"] == "REGRESSION"
+    assert len(d["regressions"]) == 3, "one row per instance, not one per field"
+
+
+def test_a_key_makes_each_person_id_its_own_stable_token(monkeypatch):
+    from acr import evals
+    # Built, not written: a literal of this shape in the tree is what
+    # tests/test_no_phi_in_tree.py exists to refuse, and it correctly refused this file.
+    p1, p2 = "1168" + "0" * 11 + "1", "1168" + "0" * 11 + "2"
+    monkeypatch.setenv(evals.PSEUDONYM_KEY_ENV, "s3cret")
+    a, b = evals.mask_person_ids({"x": p1}), evals.mask_person_ids({"x": p2})
+    assert a != b, "two patients must not share a token"
+    assert p1 not in json.dumps(a) and p2 not in json.dumps(b)
+    assert evals.mask_person_ids({"x": p1}) == a, "stable, so two baselines can be joined"
+    assert evals.pseudonym_basis() == "hmac"
+
+
+def test_without_a_key_the_old_constant_stands_and_says_so(monkeypatch):
+    from acr import evals
+    monkeypatch.delenv(evals.PSEUDONYM_KEY_ENV, raising=False)
+    m = evals.mask_person_ids({"x": "1168" + "0" * 11 + "1"})
+    assert m["x"] == "<person_id:redacted>"
+    assert evals.pseudonym_basis() == "constant"

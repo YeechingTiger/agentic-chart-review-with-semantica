@@ -1178,6 +1178,7 @@ class ChartReviewAgent:
             seed=SeedRecord(effective=self.effective_seed, provenance=self.seed_provenance,
                             caller_supplied=self.sample_seed is not None),
             triggers_fired=self._trigger_counts, usage=self.llm.usage(),
+            run_budget=self.budget.report,
             elapsed_s=round(time.time() - self._t0, 2))
         self.tracer.run_end(**{k: v for k, v in result.items() if k != "answer"},
                             status=result.get("answer", {}).get("status"))

@@ -20,7 +20,6 @@ from .cli_common import API_BASE, CORPUS, MODEL, con
 from .corpus import Corpus
 from .graph import ChartReviewAgent
 from .spec import load_spec, load_specs
-from .state import Budget
 from .trace import load_trace, plan_summary
 
 chart_app = typer.Typer(add_completion=False)
@@ -67,7 +66,9 @@ def run(
     corpus: str = CORPUS,
     model: str = MODEL,
     api_base: str = API_BASE,
-    max_steps: int = typer.Option(24, "--max-steps"),
+    max_steps: int = cli_common.MAX_STEPS,
+    max_tokens: int = cli_common.MAX_TOKENS,
+    max_seconds: int = cli_common.MAX_SECONDS,
     reflect_every: int = typer.Option(2, "--reflect-every"),
     out: str = typer.Option("runs", "--out"),
     temperature: float = typer.Option(0.0, "--temperature"),
@@ -84,7 +85,7 @@ def run(
     # stats every file in the corpus (~276k stats, ~39 min on Lustre) to run one patient.
     vocab = c.doc_type_vocabulary()
     agent = ChartReviewAgent(sp, cli_common.llm_client(model, api_base, temperature),
-                             budget=Budget(max_steps=max_steps),
+                             budget=cli_common.budget(max_steps, max_tokens, max_seconds),
                              reflect_every=reflect_every,
                              out_dir=cli_common.unique_run_dir(out), sample_seed=seed)
     con.print(f"[bold]{sp.spec_id}[/] v{sp.spec_version} (hash {sp.spec_hash}) "
@@ -100,7 +101,9 @@ def batch(
     model: str = MODEL,
     api_base: str = API_BASE,
     patients_arg: str = typer.Option("", "--patients", help="comma list; default all"),
-    max_steps: int = typer.Option(24, "--max-steps"),
+    max_steps: int = cli_common.MAX_STEPS,
+    max_tokens: int = cli_common.MAX_TOKENS,
+    max_seconds: int = cli_common.MAX_SECONDS,
     out: str = typer.Option("runs", "--out"),
 ):
     """Run one spec across many patients."""
@@ -110,7 +113,8 @@ def batch(
     results = []
     for pid in pids:
         agent = ChartReviewAgent(sp, cli_common.llm_client(model, api_base),
-                                 budget=Budget(max_steps=max_steps), out_dir=out)
+                                 budget=cli_common.budget(max_steps, max_tokens, max_seconds),
+                                 out_dir=out)
         con.print(f"[dim]— {pid}[/]")
         try:
             results.append(agent.run(c.chart(pid)))

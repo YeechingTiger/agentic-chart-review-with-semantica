@@ -632,3 +632,47 @@ def test_the_existing_commands_still_work():
     assert {"patients", "chart", "specs", "run", "batch", "consistency", "trace"} <= names
     assert {"extract", "concord", "explain"} <= names
     assert runner.invoke(app, ["specs"]).exit_code == 0
+
+
+# --------------------------------------------------------------- the run budget on the CLI
+# `Budget` has carried max_tokens and max_seconds since it was written and every construction
+# site passed max_steps alone, so the two limits that actually bind on a real chart were
+# unreachable defaults. That is not a hypothetical: on a 10-patient batch of real charts, 7 of
+# 10 abstained with `max_tokens (400000) reached` at 8-16 steps against a 24-step cap. The
+# manifest recorded no budget, so the abstention read as a fact about the charts rather than
+# about a number nobody could set. Both halves are pinned here — the value reaches the run,
+# and the run says what it was.
+
+def test_the_token_budget_on_the_command_line_reaches_the_run(tmp_path, scripted, monkeypatch):
+    seen = {}
+    import acr.cli_common as cc
+    real = cc.budget
+    monkeypatch.setattr(cc, "budget",
+                        lambda *a: seen.setdefault("b", real(*a)))
+    (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
+    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+                            "--variables", "histology", "--out", str(tmp_path / "runs"),
+                            "--max-steps", "9", "--max-tokens", "12345", "--max-seconds", "77"])
+    assert r.exit_code == 0, r.output
+    b = seen["b"]
+    assert (b.max_steps, b.max_tokens, b.max_seconds) == (9, 12345, 77)
+
+
+def test_the_manifest_says_what_the_run_was_allowed_to_spend(tmp_path, scripted):
+    """A BUDGET_EXHAUSTED with no numbers beside it cannot be told from a silent chart."""
+    (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
+    runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+                        "--variables", "histology", "--out", str(tmp_path / "runs"),
+                        "--max-tokens", "999999"])
+    (m,) = list((tmp_path / "runs").glob("extract__*/*.manifest.json"))
+    rb = json.loads(m.read_text(encoding="utf-8"))["run_budget"]
+    assert rb["max_tokens"] == 999999
+    assert rb["is_library_default"] is False, "an operator-chosen budget must not read as default"
+
+
+def test_an_untouched_budget_is_declared_a_default_so_a_reader_can_discount_it(tmp_path, scripted):
+    (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
+    runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+                        "--variables", "histology", "--out", str(tmp_path / "runs")])
+    (m,) = list((tmp_path / "runs").glob("extract__*/*.manifest.json"))
+    assert json.loads(m.read_text(encoding="utf-8"))["run_budget"]["is_library_default"] is True

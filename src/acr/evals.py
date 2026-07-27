@@ -79,7 +79,10 @@ direction the missingness happens to lean.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import os
 import re
 import statistics
 from collections import Counter
@@ -398,9 +401,41 @@ UNIVERSAL_TERMS = {".", ".*", ".+", ".?", "*", "%", "^", "$", r"\w", r"\w*", r"\
 ABSTAIN_STATUSES = {"EVIDENCE_INSUFFICIENT", "NO_ANSWER", "SPEC_INSUFFICIENT", "ABSTAIN"}
 
 
+#: Environment variable holding the pseudonymisation key. Kept out of the tree, beside the
+#: provider credentials.
+PSEUDONYM_KEY_ENV = "ACR_PSEUDONYM_KEY"
+
+
+def pseudonym_basis() -> str:
+    """`hmac` when a key is available, `constant` otherwise. Recorded in every baseline."""
+    return "hmac" if os.environ.get(PSEUDONYM_KEY_ENV) else "constant"
+
+
 def mask_person_ids(obj: Any) -> Any:
-    """Replace any real person_id with an opaque token, structure preserved."""
-    return json.loads(_PERSON_ID.sub("<person_id:redacted>", json.dumps(obj, default=str)))
+    """Replace any real person_id with an opaque token, structure preserved.
+
+    TWO MASKS, AND THE DIFFERENCE IS NOT COSMETIC. The constant token protects the identifier
+    and destroys DISTINCTNESS: ten patients masked this way share one `instance_id`, and
+    `_outcome_index` is a dict, so nine of them vanish and the tenth answers for the batch.
+    That is how a real 10-patient before/after reported `0 regressions` while two instances
+    had visibly left a good outcome — and why no test caught it, since a synthetic `SYN0001`
+    does not match `_PERSON_ID` and never collides.
+
+    With a key set, each id becomes its own token, stable across processes so two baselines
+    can be joined, and not invertible without the key. Without one the old behaviour stands,
+    because a pseudonym that is merely a hash of a 12-digit number behind a known prefix is
+    a lookup table, not a protection. `compare` refuses rather than guess when it sees the
+    collision, so the unkeyed path is slow, never wrong.
+    """
+    key = os.environ.get(PSEUDONYM_KEY_ENV)
+    if not key:
+        return json.loads(_PERSON_ID.sub("<person_id:redacted>", json.dumps(obj, default=str)))
+
+    def tok(m: "re.Match[str]") -> str:
+        digest = hmac.new(key.encode(), m.group(0).encode(), hashlib.sha256).hexdigest()[:12]
+        return f"<person:{digest}>"
+
+    return json.loads(_PERSON_ID.sub(tok, json.dumps(obj, default=str)))
 
 
 def _num(v: Any, cast):
@@ -768,6 +803,10 @@ class ScoreReport:
 
     def to_dict(self) -> dict:
         return {"baseline_key": self.key.to_dict(), "baseline_key_str": self.key.as_str(),
+                # Whether the instance ids in this file can identify an instance at all. On
+                # `constant` they cannot, and every per-instance consumer has to say so
+                # rather than read the collapsed index.
+                "pseudonym_basis": pseudonym_basis(),
                 "per_field": self.per_field, "totals": self.totals,
                 "per_instance": [r.to_dict() for r in self.per_instance]}
 
@@ -870,6 +909,19 @@ def _outcome_index(report: Mapping[str, Any]) -> dict[tuple[str, str], str]:
             for i in (report.get("per_instance") or []) for o in (i.get("outcomes") or [])}
 
 
+def collided_instance_ids(report: Mapping[str, Any]) -> list[str]:
+    """Instance ids that appear more than once in one baseline.
+
+    `_outcome_index` is a dict keyed on (instance_id, field). A repeated id therefore does
+    not raise and does not warn — the later row overwrites the earlier one and the batch
+    silently shrinks to its last member. Ten real patients whose ids were all masked to the
+    same constant produced a three-key index and a per-instance verdict of `0 regressions`
+    over a comparison that contained two.
+    """
+    seen = Counter(str(i.get("instance_id", "")) for i in (report.get("per_instance") or []))
+    return sorted(k for k, n in seen.items() if n > 1)
+
+
 def compare(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict:
     """Two baselines into a delta: per field AND per instance AND per subgroup.
 
@@ -889,6 +941,27 @@ def compare(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict:
     per_field = {f: _pair((bf.get(f) or {}).get("exact_match_rate"),
                           (af.get(f) or {}).get("exact_match_rate"))
                  for f in sorted(set(bf) | set(af))}
+
+    # THE PER-INSTANCE ARM IS EITHER SOUND OR ABSENT, never approximate. A collided id means
+    # the index cannot tell two patients apart, so the arm that the docstring above calls the
+    # only reason to have this harness is not computable — and a `0 regressions` printed from
+    # a collapsed index is worse than no number, because it reads as evidence of safety.
+    collisions = sorted(set(collided_instance_ids(before)) | set(collided_instance_ids(after)))
+    if collisions:
+        return {"before_key": bk, "after_key": ak, "key_differences": diffs,
+                "per_field": per_field, "regressions": [], "improvements": [],
+                "subgroup_regressions": [], "verdict": "NOT_COMPARABLE",
+                "not_comparable": {
+                    "reason": "instance ids are not unique within a baseline",
+                    "colliding_ids": collisions[:10],
+                    "n_colliding": len(collisions),
+                    "why": ("person ids were masked to a single constant token, so every "
+                            "patient shares one instance_id and the per-instance index keeps "
+                            "one row per field"),
+                    "remedy": (f"set {PSEUDONYM_KEY_ENV} to a secret and re-run `eval score` "
+                               "on both arms; each id then masks to its own stable token, "
+                               "joinable across baselines and not invertible without the key"),
+                    "pseudonym_basis": pseudonym_basis()}}
 
     b_out, a_out = _outcome_index(before), _outcome_index(after)
     regressions, improvements = [], []
