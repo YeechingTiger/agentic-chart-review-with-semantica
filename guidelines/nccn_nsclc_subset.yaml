@@ -1,0 +1,312 @@
+guideline_id: NCCN-NSCLC-SUBSET
+guideline_version: 0.1.0
+
+source_authority:
+  document: "NCCN Clinical Practice Guidelines in Oncology (NCCN Guidelines) — Non-Small Cell Lung Cancer"
+  version_binding: NOT_BOUND
+  # Honesty about what this file is, because a fabricated citation is worse than no citation.
+  # These three recommendations are PARAPHRASED OPERATIONALISATIONS of long-standing NCCN
+  # NSCLC positions, written so that a rule engine can decide them from registry variables.
+  # They are not a licensed reproduction of NCCN text and no version/page is asserted. Before
+  # any number computed from this file is reported, a thoracic oncologist must bind each
+  # recommendation to a specific NCCN version and sign off on the thresholds flagged
+  # `requires_clinical_signoff` below. Same standard the recurrence spec applies to its
+  # surveillance schedule, which is still PLACEHOLDER_REQUIRES_CLINICAL_INPUT rather than a
+  # number someone made up.
+  status: "engineering subset for validating the rule engine; not clinically bound"
+  scoring_unit: "one tumour at one reporting facility"
+
+# ---------------------------------------------------------------------------- value sets
+# All clinical content lives here and in the conditions below. src/acr/concordance.py
+# contains no oncology.
+value_sets:
+
+  # ICD-O-3 morphology, 4 digits without the behaviour digit, matching STORE [522] and the
+  # `histology` field of specs/STORE.400_522_523.site_histology_behavior.yaml.
+  #
+  # 8000 (neoplasm, malignant NOS) and 8010 (carcinoma, NOS) are DELIBERATELY ABSENT, and
+  # they are additionally declared under `unknown_value_codes` below. Neither distinguishes
+  # small cell from non-small cell, and that distinction is the entire premise of all three
+  # recommendations — so a patient coded 8010 is NOT_ASSESSABLE (nobody knows) and not
+  # NOT_APPLICABLE (determinately some other disease). Leaving them merely absent from this
+  # set would produce the second answer, which is a false claim about the patient dressed up
+  # as an exclusion. Small cell (8041-8045) IS a determinate exclusion: different disease,
+  # different guideline, correctly NOT_APPLICABLE.
+  # 8046 (non-small cell carcinoma, NOS) is included: imprecise about subtype, definitive
+  # about the thing the guideline turns on. It is also the code that was wrongly assigned
+  # over "favor squamous cell carcinoma" on 2026-07-26 — an extraction error this layer
+  # cannot see and must not pretend to.
+  nsclc_histology:
+    ["8012", "8013", "8022", "8031", "8032", "8033", "8046",
+     "8050", "8052", "8070", "8071", "8072", "8073", "8074", "8083", "8084",
+     "8140", "8144", "8250", "8251", "8252", "8253", "8254", "8255", "8260", "8265",
+     "8310", "8323", "8333", "8480", "8481", "8490", "8550", "8560", "8562",
+     "8570", "8571", "8572", "8573", "8574"]
+
+  # Used only to EXCLUDE from the molecular-testing population. Adenosquamous (8560) is
+  # intentionally not here — it carries an adenocarcinoma component and is tested.
+  squamous_histology:
+    ["8052", "8070", "8071", "8072", "8073", "8074", "8083", "8084"]
+
+  # AJCC 8th edition group labels, as declared in the allowable_values of
+  # specs/STORE.700_880.stage.yaml, plus the bare roman-numeral roll-ups a registry feed may
+  # carry instead. Both are accepted because either source can supply the variable. Matching
+  # is case- and whitespace-insensitive.
+  #
+  # `99` (unknown) and `0` (stage 0) are in neither set, and 99 is additionally declared a
+  # sentinel below. Without that declaration an unknown stage would fail set membership like
+  # any ordinary non-member and the patient would be dropped from the population as though
+  # their stage had been established as something else.
+  stage_I:       ["I", "IA", "IA1", "IA2", "IA3", "IB"]
+  stage_II_IIIA: ["II", "IIA", "IIB", "IIIA"]
+  stage_IV:      ["IV", "IVA", "IVB"]
+
+  # STORE [610] Class of Case. Analytic AND treated here: 10-22. Class 00 is diagnosed at the
+  # reporting facility with all treatment delivered elsewhere, so the facility cannot be held
+  # to a treatment recommendation — the same restriction the class-of-case spec already states
+  # in its downstream_warning ("restrict to Class of Case 10-22, not 00-22").
+  analytic_treated_at_reporting_facility: ["10", "11", "12", "13", "14", "20", "21", "22"]
+
+  # Anatomic resection: the operation the adjuvant trials enrolled after.
+  anatomic_resection:
+    ["lobectomy", "bilobectomy", "sleeve_lobectomy", "pneumonectomy", "segmentectomy"]
+  # Stage I additionally permits sublobar resection in selected patients.
+  any_definitive_resection:
+    ["lobectomy", "bilobectomy", "sleeve_lobectomy", "pneumonectomy", "segmentectomy",
+     "wedge_resection"]
+
+  # Drug CLASS, not agent — the guideline recommends a class, and a class is decidable.
+  # single_agent_chemotherapy is absent on purpose: adjuvant single-agent chemotherapy is
+  # not the recommended regimen, so a patient who received it is NON_CONCORDANT rather than
+  # quietly counted as treated.
+  guideline_concordant_adjuvant_systemic:
+    ["platinum_doublet_chemotherapy", "egfr_tki", "alk_tki", "immune_checkpoint_inhibitor"]
+
+# ------------------------------------------------------------------- unknown sentinels
+# Codes that are present and well-formed but whose MEANING is "nobody established this".
+# They resolve to UNKNOWN, so the recommendation comes back NOT_ASSESSABLE and names the
+# variable in blocking_inputs, instead of quietly failing set membership and reporting the
+# patient as outside the population. Every entry is a value the corresponding spec's own
+# allowable_values permits, so each one WILL arrive.
+unknown_value_codes:
+  clinical_stage_group:   ["99"]        # STORE.700_880.stage allowable_values
+  pathologic_stage_group: ["99"]
+  class_of_case:          ["99"]        # STORE.610 allowable_values
+  histology:              ["8000", "8010"]
+
+# --------------------------------------------------------------------- recommendations
+recommendations:
+
+  - id: NSCLC-ADJ-SYSTEMIC-II-IIIA
+    title: "Adjuvant systemic therapy after complete resection of stage II-IIIA NSCLC"
+    statement: >
+      A patient with completely resected (anatomic resection, negative margins) pathologic
+      stage II or IIIA non-small cell lung cancer should receive adjuvant systemic therapy
+      of a guideline-concordant class, started within the post-operative window.
+    source:
+      basis: "NCCN NSCLC — adjuvant treatment after surgical resection"
+      paraphrase: true
+      operationalisation:
+        max_days_surgery_to_adjuvant: 120
+        requires_clinical_signoff: true
+        rationale: >
+          NCCN states that adjuvant therapy follows recovery from surgery; it does not
+          publish a day count. 120 days is an operationalisation chosen so that a normal
+          post-operative recovery is not scored as a gap. It is a threshold a clinician must
+          set, not an engineer — it is declared here rather than buried in code so that
+          changing it changes the guideline hash and therefore breaks label comparability,
+          which is the intended behaviour.
+        min_days_surgery_to_adjuvant: 0
+        min_days_rationale: >
+          Systemic therapy dated before the operation is neoadjuvant, and neoadjuvant therapy
+          does not satisfy an adjuvant recommendation. Without a lower bound the date
+          arithmetic would accept it.
+
+    required_inputs:
+      - {name: primary_site,          source: extraction_spec, spec_id: STORE.400_522_523.site_histology_behavior, item: "STORE [400]"}
+      - {name: histology,             source: extraction_spec, spec_id: STORE.400_522_523.site_histology_behavior, item: "STORE [522]"}
+      - {name: behavior,              source: extraction_spec, spec_id: STORE.400_522_523.site_histology_behavior, item: "STORE [523]"}
+      - {name: class_of_case,         source: registry_limited_dataset, item: "STORE [610]",
+         why: "not derivable from notes — specs/STORE.610 answers SPEC_INSUFFICIENT / WRONG_DATA_SOURCE by design"}
+      - {name: pathologic_stage_group, source: extraction_spec, spec_id: STORE.700_880.stage, item: "AJCC 8th pathologic stage group"}
+      - {name: surgical_resection_extent,   source: not_yet_extractable, item: "NAACCR RX Summ--Surg Prim Site [1290]"}
+      - {name: surgical_margins,            source: not_yet_extractable, item: "NAACCR RX Summ--Surgical Margins [1320]"}
+      - {name: adjuvant_systemic_therapy_class,        source: not_yet_extractable, item: "first-course systemic therapy class"}
+      - {name: date_of_definitive_surgery,             source: not_yet_extractable, item: "NAACCR Date of Most Definitive Surg [3170]"}
+      - {name: date_of_first_adjuvant_systemic_therapy, source: not_yet_extractable, item: "NAACCR Date Systemic Therapy Started [3230]"}
+      - {name: date_of_death,                          source: registry_limited_dataset, item: "date of death"}
+      - {name: ecog_performance_status_after_surgery,  source: not_yet_extractable, item: "documented post-operative ECOG PS"}
+      - {name: patient_refused_adjuvant_systemic_therapy, source: not_yet_extractable, item: "NAACCR Reason for No Systemic Therapy [1380] = refused"}
+      - {name: contraindication_to_systemic_therapy,   source: not_yet_extractable, item: "documented contraindicating comorbidity"}
+      - {name: clinical_trial_enrollment,              source: not_yet_extractable, item: "documented therapeutic trial enrolment"}
+
+    applies_when:
+      - {op: matches, var: primary_site, pattern: "C34\\d"}
+      - {op: in_set,  var: histology, set: nsclc_histology}
+      - {op: equals,  var: behavior, value: "3"}
+      - {op: in_set,  var: class_of_case, set: analytic_treated_at_reporting_facility}
+      - {op: in_set,  var: pathologic_stage_group, set: stage_II_IIIA}
+      - {op: in_set,  var: surgical_resection_extent, set: anatomic_resection}
+      - {op: equals,  var: surgical_margins, value: "negative"}
+
+    satisfied_when:
+      - {op: in_set, var: adjuvant_systemic_therapy_class, set: guideline_concordant_adjuvant_systemic}
+      - {op: days_between, from: date_of_definitive_surgery,
+         to: date_of_first_adjuvant_systemic_therapy, min_days: 0, max_days: 120}
+
+    # Each exception is itself an extracted variable and is held to the same evidentiary
+    # standard as the primary ones: FOUND=false means the coverage proof ruled it out,
+    # EVIDENCE_INSUFFICIENT means nobody looked and the case is NOT_ASSESSABLE.
+    exceptions:
+      - id: performance_status_precludes_systemic_therapy
+        label: "post-operative ECOG performance status 2 or worse"
+        evidence_standard: "a dated PS assessment after the resection and before the adjuvant window closed"
+        when: [{op: at_least, var: ecog_performance_status_after_surgery, value: 2}]
+      - id: patient_refused
+        label: "patient declined adjuvant systemic therapy"
+        evidence_standard: "an explicit statement of refusal, not an absence of a chemotherapy note"
+        when: [{op: is_true, var: patient_refused_adjuvant_systemic_therapy}]
+      - id: contraindicating_comorbidity
+        label: "documented contraindication to systemic therapy"
+        evidence_standard: "a named contraindication, e.g. dialysis-dependent renal failure, not 'frailty'"
+        when: [{op: is_true, var: contraindication_to_systemic_therapy}]
+      - id: therapeutic_clinical_trial
+        label: "enrolled on a therapeutic clinical trial"
+        evidence_standard: "a named protocol with a documented enrolment date"
+        when: [{op: is_true, var: clinical_trial_enrollment}]
+      - id: died_before_window_closed
+        label: "died before adjuvant therapy could be delivered"
+        evidence_standard: "date of death within the post-operative window"
+        when: [{op: days_between, from: date_of_definitive_surgery, to: date_of_death,
+                min_days: 0, max_days: 120}]
+
+  - id: NSCLC-BIOMARKER-BEFORE-FIRST-LINE
+    title: "EGFR and ALK results available before first-line systemic therapy in metastatic non-squamous NSCLC"
+    statement: >
+      A patient with metastatic (stage IV) non-squamous non-small cell lung cancer who starts
+      first-line systemic therapy should have EGFR and ALK results resulted on or before the
+      date that therapy starts, because the presence of either changes what first-line therapy
+      should be.
+    source:
+      basis: "NCCN NSCLC — molecular/biomarker testing before first-line systemic therapy"
+      paraphrase: true
+      operationalisation:
+        minimum_biomarker_panel: ["EGFR", "ALK"]
+        requires_clinical_signoff: true
+        rationale: >
+          NCCN recommends broad molecular profiling, a panel that has grown over time and
+          will keep growing. Scoring against the full current panel would make every
+          historical case non-concordant for reasons that have nothing to do with the care
+          delivered, so the rule uses the two markers that were actionable across the whole
+          period the corpus covers. Extending the panel is a guideline edit, and it changes
+          the guideline hash.
+
+    required_inputs:
+      - {name: primary_site, source: extraction_spec, spec_id: STORE.400_522_523.site_histology_behavior, item: "STORE [400]"}
+      - {name: histology,    source: extraction_spec, spec_id: STORE.400_522_523.site_histology_behavior, item: "STORE [522]"}
+      - {name: behavior,     source: extraction_spec, spec_id: STORE.400_522_523.site_histology_behavior, item: "STORE [523]"}
+      - {name: class_of_case, source: registry_limited_dataset, item: "STORE [610]"}
+      - {name: clinical_stage_group, source: extraction_spec, spec_id: STORE.700_880.stage, item: "AJCC 8th clinical stage group"}
+      - {name: date_of_first_systemic_therapy, source: not_yet_extractable, item: "NAACCR Date Systemic Therapy Started [3230]"}
+      - {name: date_of_egfr_result, source: not_yet_extractable, item: "molecular pathology report date"}
+      - {name: date_of_alk_result,  source: not_yet_extractable, item: "molecular pathology / IHC report date"}
+      - {name: tissue_insufficient_for_molecular_testing, source: not_yet_extractable,
+         item: "pathology statement of insufficient tissue with rebiopsy not feasible or declined"}
+      - {name: patient_refused_molecular_testing, source: not_yet_extractable, item: "documented refusal"}
+
+    applies_when:
+      - {op: matches, var: primary_site, pattern: "C34\\d"}
+      - {op: in_set,  var: histology, set: nsclc_histology}
+      - {op: not_in_set, var: histology, set: squamous_histology}
+      - {op: equals,  var: behavior, value: "3"}
+      - {op: in_set,  var: class_of_case, set: analytic_treated_at_reporting_facility}
+      - {op: in_set,  var: clinical_stage_group, set: stage_IV}
+      # No first-line systemic therapy means the trigger never fires. That is NOT_APPLICABLE,
+      # not a missed test: the recommendation is about the ordering of two events, and one of
+      # them did not happen.
+      - {op: is_present, var: date_of_first_systemic_therapy}
+
+    satisfied_when:
+      - {op: on_or_before, from: date_of_egfr_result, to: date_of_first_systemic_therapy}
+      - {op: on_or_before, from: date_of_alk_result,  to: date_of_first_systemic_therapy}
+
+    exceptions:
+      - id: insufficient_tissue
+        label: "insufficient tissue for molecular testing and rebiopsy not feasible or declined"
+        evidence_standard: "a pathology statement of quantity-not-sufficient plus a documented decision on rebiopsy"
+        when: [{op: is_true, var: tissue_insufficient_for_molecular_testing}]
+      - id: patient_refused_testing
+        label: "patient declined molecular testing"
+        evidence_standard: "an explicit statement of refusal"
+        when: [{op: is_true, var: patient_refused_molecular_testing}]
+
+  - id: NSCLC-STAGE-I-DEFINITIVE-LOCAL-THERAPY
+    title: "Definitive local therapy for clinical stage I NSCLC"
+    statement: >
+      A patient with clinical stage I non-small cell lung cancer should receive definitive
+      local therapy — surgical resection when medically operable, definitive radiotherapy
+      (SABR) when not — within a reasonable interval of diagnosis.
+    source:
+      basis: "NCCN NSCLC — stage I: surgical resection preferred; definitive RT/SABR for medically inoperable disease"
+      paraphrase: true
+      operationalisation:
+        max_days_diagnosis_to_local_therapy: 180
+        requires_clinical_signoff: true
+        rationale: >
+          The recommendation itself is untimed. A bound is needed anyway, because without
+          one "received definitive therapy" is satisfied by therapy delivered years later
+          for what is by then different disease. 180 days is deliberately loose: it is there
+          to exclude the pathological case, not to measure timeliness. A tighter timeliness
+          measure is a different recommendation and should be written as one.
+        min_days_diagnosis_to_local_therapy: 0
+
+    required_inputs:
+      - {name: primary_site, source: extraction_spec, spec_id: STORE.400_522_523.site_histology_behavior, item: "STORE [400]"}
+      - {name: histology,    source: extraction_spec, spec_id: STORE.400_522_523.site_histology_behavior, item: "STORE [522]"}
+      - {name: behavior,     source: extraction_spec, spec_id: STORE.400_522_523.site_histology_behavior, item: "STORE [523]"}
+      - {name: class_of_case, source: registry_limited_dataset, item: "STORE [610]"}
+      - {name: clinical_stage_group, source: extraction_spec, spec_id: STORE.700_880.stage, item: "AJCC 8th clinical stage group"}
+      - {name: date_of_initial_diagnosis, source: extraction_spec, spec_id: STORE.390.date_of_initial_diagnosis, item: "STORE [390]"}
+      - {name: surgical_resection_extent, source: not_yet_extractable, item: "NAACCR RX Summ--Surg Prim Site [1290]"}
+      - {name: radiotherapy_intent, source: not_yet_extractable, item: "definitive vs palliative radiotherapy intent"}
+      - {name: date_of_first_definitive_local_therapy, source: not_yet_extractable,
+         item: "earlier of NAACCR Date of Most Definitive Surg [3170] and Date Radiation Started [1210]"}
+      - {name: ecog_performance_status, source: not_yet_extractable, item: "documented ECOG PS at diagnosis"}
+      - {name: patient_refused_local_therapy, source: not_yet_extractable, item: "NAACCR Reason for No Surgery [1340] = refused"}
+      - {name: comfort_care_or_hospice_before_treatment, source: not_yet_extractable, item: "documented goals-of-care decision"}
+      - {name: clinical_trial_enrollment, source: not_yet_extractable, item: "documented therapeutic trial enrolment"}
+
+    applies_when:
+      - {op: matches, var: primary_site, pattern: "C34\\d"}
+      - {op: in_set,  var: histology, set: nsclc_histology}
+      - {op: equals,  var: behavior, value: "3"}
+      - {op: in_set,  var: class_of_case, set: analytic_treated_at_reporting_facility}
+      - {op: in_set,  var: clinical_stage_group, set: stage_I}
+
+    satisfied_when:
+      # Either modality satisfies it. Requiring surgery specifically would score every
+      # medically inoperable patient treated correctly with SABR as a care gap.
+      - op: any_of
+        conditions:
+          - {op: in_set, var: surgical_resection_extent, set: any_definitive_resection}
+          - {op: equals, var: radiotherapy_intent, value: "definitive"}
+      - {op: days_between, from: date_of_initial_diagnosis,
+         to: date_of_first_definitive_local_therapy, min_days: 0, max_days: 180}
+
+    exceptions:
+      - id: performance_status_precludes_local_therapy
+        label: "ECOG performance status 3 or worse"
+        evidence_standard: "a dated PS assessment at or near diagnosis"
+        when: [{op: at_least, var: ecog_performance_status, value: 3}]
+      - id: patient_refused
+        label: "patient declined all definitive local therapy"
+        evidence_standard: "an explicit statement of refusal, not an absence of a treatment note"
+        when: [{op: is_true, var: patient_refused_local_therapy}]
+      - id: comfort_care
+        label: "comfort-care or hospice goals of care set before treatment"
+        evidence_standard: "a dated goals-of-care decision preceding the treatment window"
+        when: [{op: is_true, var: comfort_care_or_hospice_before_treatment}]
+      - id: therapeutic_clinical_trial
+        label: "enrolled on a therapeutic clinical trial"
+        evidence_standard: "a named protocol with a documented enrolment date"
+        when: [{op: is_true, var: clinical_trial_enrollment}]
