@@ -582,14 +582,21 @@ class AuditMiddleware(AgentMiddleware):
         if not payload:
             return
         quote = str(payload.get("quote", "")) if name == "record_evidence" else ""
+        # `step=self.ctx.n_model_calls`, not the literal 0 this passed until 2026-07-28. Every
+        # other emitter on this path already uses the counter (`_gate_answer`, `_record_reads`,
+        # `revise_plan`), so a run's trigger records read `step: 0` while its
+        # `terms_added_at_runtime` records read `step: 4` for the same exchange. A field that is
+        # always the same number looks like data and is a constant: it made the six triggers on
+        # SYN0002 unorderable against anything else in the manifest.
         for t in triggers_from_tool_result(name, args, payload, plan=self.ctx.plan,
-                                           catalogue=self.ctx.catalogue, step=0, quote=quote):
+                                           catalogue=self.ctx.catalogue,
+                                           step=self.ctx.n_model_calls, quote=quote):
             if t.kind == "UNSETTLED_THREAD":
                 m = self.ctx.catalogue.by_text().get(t.marker)
                 req = self.ctx.threads.open_thread(
                     note_id=t.note_id, doc_type=t.doc_type, marker=t.marker,
                     obligation=(m.obligation if m else "unsettled"),
-                    excerpt=t.observation, step=0)
+                    excerpt=t.observation, step=self.ctx.n_model_calls)
                 # Branch on the typed status. `is None` was the old sentinel test and it
                 # counted every short read as a new thread once `open_thread` began handing
                 # back the existing one.

@@ -281,6 +281,32 @@ def test_a_live_trigger_does_not_kill_the_run(spec, chart, tmp_path):
     assert "pseudomyxoma peritonei" in t["observation"]
 
 
+def test_a_trigger_records_the_step_it_fired_on(spec, chart, tmp_path):
+    """`step` must say WHEN, and until 2026-07-28 it said 0 for every trigger ever emitted.
+
+    `_detect` passed the literal `step=0` into `triggers_from_tool_result` and into
+    `open_thread`, while every other emitter on the same path passed `ctx.n_model_calls`. On the
+    293-document chart that produced six triggers, all six read `step: 0` and the
+    `terms_added_at_runtime` entries for the same exchange read `step: 4` — so nothing in the
+    manifest could be put in order against anything else, and the four zero-hit searches could
+    not be told apart from four simultaneous ones.
+
+    Two misses, so the assertion does not depend on a query that happens to hit: the steps must
+    be non-zero AND distinct. A constant returns 0 and 0 and fails both halves.
+    """
+    llm = ScriptedLLM(acts=[("search_notes", {"query": "pseudomyxoma peritonei"}),
+                            ("search_notes", {"query": "chordoma of the clivus"})],
+                      assignments=_assignments(chart))
+    _, _, events = _run(spec, chart, llm, tmp_path, "trigger-step", max_steps=3)
+
+    steps = [t["step"] for t in _triggers(events, TRIGGER_ZERO_HIT_SEARCH)]
+    assert len(steps) == 2, f"both misses should have fired a trigger, got {steps}"
+    assert all(s > 0 for s in steps), f"step is the model-call index, never 0: {steps}"
+    assert steps[0] != steps[1], (
+        f"two triggers on two different model calls must carry different steps, got {steps} — "
+        "a field that is always the same number looks like data and is a constant")
+
+
 def test_every_trigger_field_survives_into_the_trace(spec, chart, tmp_path):
     """The payload is the audit. A trigger whose observation is dropped is a shrug."""
     nid = _first_of_type(chart, PATHOLOGY_TYPE)
