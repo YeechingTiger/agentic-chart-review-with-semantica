@@ -1,101 +1,76 @@
-"""There is exactly one route by which an answer becomes gate-validated.
+"""There is ONE route to an answer, and `gate_validated` has ONE origin.
 
-An invariant hung on one edge has to account for every edge into the node it protects. The
-gate lived on `submit_answer`; `finalize` had a second inbound edge, from reflect's
-SUFFICIENT verdict; and so a run could reach an answer having skipped the proof obligation
-entirely. It still printed a `proof_obligation` field — computed, but with no power to
-refuse — which is a comment dressed as a check, and it is what made the bypass look
-inspected.
+This file used to introspect `graph.py`'s edge table: SUFFICIENT must route to act and not to
+finalize, exactly one node may reach END, and so on. That runtime is gone and the library owns
+the edges now, so the questions change shape — but they do not go away, because what they were
+really protecting is the property that made the gate worth having: an answer cannot become
+`gate_validated` except by passing through the gate.
 
-Behavioural tests only cover the paths someone thought of. These are structural: they assert
-the shape of the graph and the single origin of `gate_validated`, so a future third edge to
-`finalize` fails here rather than in production.
+Asserted against the source rather than by running the agent, deliberately. A second
+assignment to `gate_validated`, or a coverage ledger attached on the ungated branch, is a
+defect that a passing run will not reveal — the old runtime shipped exactly that, accepting
+FOUND answers unchecked and stamping them True.
 """
 from __future__ import annotations
 
 import inspect
 import re
-from pathlib import Path
 
 import pytest
 
-import acr.graph as G
+pytest.importorskip("langchain.agents")
 
-SRC = inspect.getsource(G)
+import acr.agent as A  # noqa: E402
+from acr.answer_contract import NO_COVERAGE_CLAIM, attach_coverage_claim  # noqa: E402
 
-
-def test_sufficient_routes_to_submission_not_to_the_exit():
-    """reflect keeps its judgement, but expresses it as 'go submit', not 'we are done'."""
-    body = inspect.getsource(G.ChartReviewAgent._after_reflect)
-    m = re.search(r'if v == "SUFFICIENT":(.*?)if v == "STUCK":', body, re.S)
-    assert m, "SUFFICIENT and STUCK must be handled separately — they are different signals"
-    assert '"act"' in m.group(1), "SUFFICIENT must route to act (and thus to submit_answer)"
-    assert '"finalize"' not in m.group(1), (
-        "routing SUFFICIENT straight to finalize reopens the bypass around the gate"
-    )
+SRC = inspect.getsource(A)
 
 
-def test_stuck_is_not_asked_to_prove_coverage():
-    """A give-up asserts no coverage, so requiring it to prove coverage is incoherent."""
-    body = inspect.getsource(G.ChartReviewAgent._after_reflect)
-    m = re.search(r'if v == "STUCK":(.*?)if v == "REPLAN"', body, re.S)
-    assert m and '"finalize"' in m.group(1)
-    assert "AGENT_GAVE_UP" in m.group(1), "a give-up has to be labelled as one"
+def test_accepted_has_exactly_one_origin():
+    """`ctx.accepted` is what the manifest reports as `gate_validated`."""
+    assignments = re.findall(r"^\s*(?:self\.)?ctx\.accepted\s*=\s*(\S+)", SRC, re.M)
+    assert assignments == ["True"], (
+        f"expected exactly one assignment, setting True; found {assignments}. Two places that "
+        f"can validate an answer are two places that can validate a wrong one.")
 
 
-def test_gate_validated_has_exactly_one_origin():
-    """If this count ever exceeds one, the gate has grown a second door."""
-    assignments = re.findall(r"gate_validated\s*=\s*True", SRC)
-    assert len(assignments) == 1, (
-        f"gate_validated is set True in {len(assignments)} places; it must be set only where "
-        "submit_answer is accepted"
-    )
-    acted = inspect.getsource(G.ChartReviewAgent._n_act)
-    assert "gate_validated = True" in acted
+def test_the_only_assignment_is_inside_the_gate():
+    gate = inspect.getsource(A.AuditMiddleware._gate_answer)
+    assert "ctx.accepted = True" in gate
+    assert 'verdict.get("accepted")' in gate, "it must be the gate's verdict that sets it"
 
 
-def test_an_unvalidated_answer_carries_no_coverage_claim():
-    """Attaching the ledger to an answer that never passed the gate lets it read as if it had."""
-    fin = inspect.getsource(G.ChartReviewAgent._n_finalize)
-    # Anchor on the gate_validated branch; the function has other else-clauses. Strip
-    # comments first — the ungated branch explains in prose that it withholds
-    # coverage_attested, and a naive substring check would trip over its own documentation.
-    def code_only(block: str) -> str:
-        return "\n".join(ln for ln in block.splitlines() if not ln.strip().startswith("#"))
-
-    _, tail = fin.split('if s.get("gate_validated"):', 1)
-    validated, unvalidated = (code_only(x) for x in tail.split("        else:", 1))
-
-    assert "coverage_attested" in validated, "a gated answer should carry its ledger"
-    assert "coverage_attested" not in unvalidated, (
-        "the ungated branch must not attach coverage_attested — that is what lets an "
-        "unvalidated negative read as a verified one"
-    )
-    assert "route_to_human" in unvalidated
+def test_submit_answer_cannot_reach_the_model_unjudged():
+    """The toolbox returns a receipt for submit_answer; the gate's verdict must replace it."""
+    hook = inspect.getsource(A.AuditMiddleware.wrap_tool_call)
+    assert 'name == "submit_answer"' in hook
+    assert "_gate_answer" in hook, "the receipt must not be what the model sees"
 
 
-def test_every_negative_declares_its_basis():
-    """EVIDENCE_INSUFFICIENT means three different things with three different remedies:
-    a verified negative can be filed, a give-up and a budget exhaustion must reach a human."""
-    fin = inspect.getsource(G.ChartReviewAgent._n_finalize)
-    assert "negative_basis" in fin
-    for basis in ("GATE_VALIDATED", "AGENT_GAVE_UP", "BUDGET_EXHAUSTED"):
-        assert basis in SRC, f"{basis} must be a reachable basis"
+def test_an_unvalidated_negative_carries_no_coverage_claim():
+    """The rule itself, exercised rather than grepped — it lives in answer_contract now."""
+    gated, ungated = {}, {}
+    attach_coverage_claim(gated, gate_validated=True, ledger={"mode": "stratified"},
+                          ungated_basis="BUDGET_EXHAUSTED")
+    attach_coverage_claim(ungated, gate_validated=False, ledger={"mode": "stratified"},
+                          ungated_basis="BUDGET_EXHAUSTED")
+    assert gated["coverage_attested"] == {"mode": "stratified"}
+    assert gated["negative_basis"] == "GATE_VALIDATED"
+    assert "coverage_attested" not in ungated, (
+        "an unearned ledger is indistinguishable downstream from an earned one")
+    assert ungated["route_to_human"] is True
+    assert ungated["negative_basis"] == "BUDGET_EXHAUSTED"
 
 
-def test_finalize_is_the_only_node_wired_to_end():
-    """A second exit would be a second way to produce an answer."""
-    build = inspect.getsource(G.ChartReviewAgent._build)
-    ends = re.findall(r"add_edge\(\s*([A-Za-z_\"']+)\s*,\s*END\s*\)", build)
-    assert ends == ['"finalize"'], f"exactly one node may reach END, found {ends}"
+def test_every_negative_declares_a_basis_that_exists():
+    fin = inspect.getsource(A.run_chart_review)
+    assert 'termination = "RUNTIME_ERROR" if crashed else "BUDGET_EXHAUSTED"' in fin, (
+        "a crash and a spent budget must not be filed under one word")
+    assert "attach_coverage_claim" in fin
+    assert NO_COVERAGE_CLAIM in fin or "NO_COVERAGE_CLAIM" in fin
 
 
-def test_finalize_inbound_edges_are_enumerated():
-    """Both routes into finalize must be accounted for, and neither may claim validation
-    unless it actually passed the gate."""
-    build = inspect.getsource(G.ChartReviewAgent._build)
-    assert build.count('"finalize"') >= 2, "finalize has more than one inbound edge by design"
-    fin = inspect.getsource(G.ChartReviewAgent._n_finalize)
-    assert 's.get("gate_validated")' in fin, (
-        "finalize must branch on whether the answer was actually gated, not assume it"
-    )
+def test_a_positive_is_labelled_ungated_when_it_never_passed_the_gate():
+    fin = inspect.getsource(A.run_chart_review)
+    assert '"UNGATED"' in fin and "route_to_human" in fin, (
+        "a FOUND answer that skipped the gate must say so; the old runtime stamped it True")

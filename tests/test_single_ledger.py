@@ -16,7 +16,6 @@ from __future__ import annotations
 import inspect
 
 import acr.coverage
-import acr.graph
 import acr.state
 import acr.tools.toolbox
 
@@ -38,7 +37,6 @@ def test_coverage_is_the_only_definition():
 
 
 def test_everything_imports_the_stratified_ledger():
-    assert acr.graph.CoverageLedger is acr.coverage.CoverageLedger
     assert acr.tools.toolbox.CoverageLedger is acr.coverage.CoverageLedger
 
 
@@ -64,3 +62,16 @@ def test_the_ledger_reports_which_mode_it_is_in():
     full = acr.coverage.CoverageLedger(docs, strata)
     assert full.to_dict()["mode"] == "stratified_exclusion"
     assert full.to_dict()["sample_seed"] is not None, "the seed has to reach the trace"
+
+
+def test_the_runtime_imports_the_stratified_ledger_too():
+    """`acr.graph` used to be checked here. It is gone; the runtime that replaced it is not
+    exempt from the one-ledger rule, and the import is lazy so it is asserted at the call."""
+    import inspect
+
+    import pytest
+    pytest.importorskip("langchain.agents")
+    import acr.agent
+    src = inspect.getsource(acr.agent.run_patient)
+    assert "from .coverage import CoverageLedger" in src, (
+        "the runtime must take the ledger from acr.coverage and not define or import another")
