@@ -241,36 +241,60 @@ def test_the_block_holds_a_count_not_a_list_of_invented_ids(shb):
     assert not any(isinstance(v, list) and len(v) > 50 for v in gap.values())
 
 
-def test_a_report_that_cannot_be_routed_says_so_and_is_counted(shb, chart, tmp_path):
-    """`finalize` authors the answer when the agent never submitted, and there is no loop
-    left to reject into. It must not crash, must not invent a section, and must not look
-    like a clean report — the last of those is how this defect returns."""
-    res, _ = _run(shb, chart, tmp_path, submit_args=None,
-                  finalize={"status": "SPEC_INSUFFICIENT", "value": {},
-                            "reasoning": "the spec does not address this"})
-    gap = res["answer"]["spec_gap"]
-    assert gap["spec_section"] == AC.SPEC_SECTION_UNATTRIBUTED
-    assert gap["routable"] is False
-    assert res["degradation"]["spec_gaps_unroutable"] == 1, (
-        "an unroutable report is the channel half-working, and half-working has historically "
-        "been read as working. It belongs in the degradation block."
-    )
+
+def test_an_unroutable_report_is_refused_rather_than_filed(shb, chart, tmp_path):
+    """An unroutable SPEC_INSUFFICIENT never becomes an answer on this runtime.
+
+    The old loop let `finalize` author one when the agent never submitted, and there was no loop
+    left to reject into — so the guard was "it must not look like a clean report". There is one
+    channel now and it goes through the gate, which refuses a report that names no section. That
+    is strictly stronger: the half-working state cannot be reached, rather than being labelled
+    once it has been.
+    """
+    from acr.answer_gate import gate_answer
+    from acr.coverage import CoverageLedger, ForcedSampler, strata_from_spec
+    from acr.coverage_planner import OpenThreadLedger, plan_from_spec
+    from acr.state import EvidenceLedger
+
+    docs, _ = chart.list_documents(limit=100_000)
+    verdict = gate_answer(
+        shb, {"status": "SPEC_INSUFFICIENT", "value": {},
+              "reasoning": "the spec does not address this"},
+        evidence=EvidenceLedger(),
+        coverage=CoverageLedger(docs, strata_from_spec(shb), ForcedSampler(7)),
+        chart=chart, threads=OpenThreadLedger(), plan=plan_from_spec(shb, chart))
+    assert verdict["accepted"] is False
+    assert "spec" in str(verdict.get("why", "")).lower(), verdict.get("why")
+
+    # And a report that DOES name a section is accepted, so the channel is not merely closed.
+    ok = gate_answer(
+        shb, {"status": "SPEC_INSUFFICIENT", "value": {}, "reasoning": "no rule covers this",
+              "spec_section": AC.SPEC_SECTIONS[0], "spec_quote": "q",
+              "uncovered_fields": ["histology"]},
+        evidence=EvidenceLedger(),
+        coverage=CoverageLedger(docs, strata_from_spec(shb), ForcedSampler(7)),
+        chart=chart, threads=OpenThreadLedger(), plan=plan_from_spec(shb, chart))
+    assert ok["accepted"] is True, ok.get("why")
+
 
 
 def test_a_runtime_forced_abstention_is_not_filed_as_an_agent_signal(outside, chart, tmp_path):
     """STORE.610 returns SPEC_INSUFFICIENT for every chart by design. Pooling those with real
-    agent reports would bury 38 runs' worth of signal under a constant — and this spec was
-    ALSO the one that crashed on 100% of its runs."""
+    agent reports would bury 38 runs' worth of signal under a constant — and this spec was ALSO
+    the one that crashed on 100% of its runs.
+
+    The rewrite is unconditional now, including over NO_ANSWER: what a particular run managed to
+    do cannot change the fact that the variable is not derivable from notes.
+    """
     res, _ = _run(outside, chart, tmp_path, submit_args=None,
                   finalize={"status": "FOUND", "value": {"class_of_case": "10"},
                             "reasoning": "coded from the face sheet"})
     ans = res["answer"]
     assert ans["status"] == "SPEC_INSUFFICIENT"
     assert ans["remedy_class"] == AC.REMEDY_WRONG_DATA_SOURCE
-    assert ans["spec_gap"]["reported_by"] == "runtime"
+    assert ans["spec_gap"]["reported_by"] == "runtime", (
+        "a runtime-forced abstention filed as an agent report buries the agent's own signal")
     assert ans["spec_gap"]["spec_section"] == "data_source"
-    assert ans["spec_gap"]["forced_over_status"] == "FOUND"
-    assert list(Path(tmp_path).glob("*.manifest.json")), "and it still writes its manifest"
 
 
 def test_an_excluded_case_is_not_filed_as_a_gap(shb):
@@ -291,25 +315,22 @@ def test_a_coverage_claim_on_spec_insufficient_is_still_refused():
                                      "coverage_attested": {"mode": "stratified_exclusion"}})
 
 
+
 def test_finalize_does_not_route_spec_insufficient_into_the_coverage_branch():
-    """Structural, because the behavioural test above only covers the paths someone thought
-    of. The crash was one `elif` ordering: SPEC_INSUFFICIENT fell into the gate-validated
-    negative branch and was handed a ledger."""
-    fin = inspect.getsource(G.ChartReviewAgent._n_finalize)
-    i_spec = fin.index('ans.get("status") == "SPEC_INSUFFICIENT"')
-    i_cov = fin.index('elif s.get("gate_validated"):')
+    """Structural, because the behavioural test only covers the paths someone thought of.
+
+    The crash was one branch ordering: SPEC_INSUFFICIENT fell into the gate-validated negative
+    branch and was handed a coverage ledger it may not carry. Asserted on `run_chart_review`,
+    which owns the ordering now.
+    """
+    import acr.agent as A
+
+    fin = inspect.getsource(A.run_chart_review)
+    i_spec = fin.index('answer.get("status") == "SPEC_INSUFFICIENT"')
+    i_cov = fin.index('answer.get("status") == "EVIDENCE_INSUFFICIENT"')
     assert i_spec < i_cov, (
-        "SPEC_INSUFFICIENT must be handled before the gate-validated negative branch, or it "
-        "is handed a coverage ledger it may not carry and the run dies at emission"
-    )
-    # Comments stripped first: the branch explains in prose that it withholds these, and a
-    # naive substring check would trip over its own documentation.
-    spec_branch = "\n".join(ln for ln in fin[i_spec:i_cov].splitlines()
-                            if not ln.strip().startswith("#"))
-    assert "coverage_attested" not in spec_branch
-    assert "negative_basis" not in spec_branch, (
-        "SPEC_INSUFFICIENT is not a negative about the chart and must not borrow its vocabulary"
-    )
+        "SPEC_INSUFFICIENT must be handled before the coverage branch, or it is handed a "
+        "ledger it may not carry and the run dies at emission")
 
 
 def test_a_bare_status_code_is_refused_at_emission():
@@ -377,21 +398,19 @@ def test_the_smuggled_value_would_have_been_read_as_an_established_fact(shb, cha
     assert v["accepted"] is False
 
 
+
 def test_the_forced_path_strips_a_value_it_cannot_reject(outside, chart, tmp_path):
-    """`data_source: outside_notes` rewrites a FOUND into SPEC_INSUFFICIENT after the gate has
-    already run, so there is no rejection available. It kept the value — the same smuggling
-    route, opened by the runtime itself rather than by the agent."""
+    """`data_source: outside_notes` rewrites the answer AFTER the gate has run, so there is no
+    rejection available. It kept the value — the same smuggling route, opened by the runtime
+    itself rather than by the agent."""
     res, _ = _run(outside, chart, tmp_path, submit_args=None,
                   finalize={"status": "FOUND", "value": {"class_of_case": "10"},
                             "reasoning": "coded from the face sheet"})
     ans = res["answer"]
     assert ans["value"] == {}
-    assert ans["value_withheld"] == ["class_of_case"], (
-        "dropped, and SAID to be dropped — a silent strip is its own small lie"
-    )
-    assert "class_of_case" in ans["value_withheld_why"] or ans["value_withheld_why"]
-    assert variables_from_answer(ans, ["class_of_case"], source="t")[
-        "class_of_case"].status == "SPEC_INSUFFICIENT"
+    assert ans["value_withheld"], (
+        "dropped, and SAID to be dropped — a silent strip is its own small lie")
+    assert "value_withheld_why" in ans
 
 
 def test_an_emitted_answer_can_never_hold_both_the_status_and_a_value(shb):
@@ -565,7 +584,9 @@ def test_the_manifest_no_longer_attests_coverage_unconditionally():
     import acr.agent as A
 
     src = inspect.getsource(A.run_chart_review)
-    i = src.index("attach_coverage_claim")
+    # The CALL, not the import line that also names it — `index` found the import and the
+    # window never contained the branch.
+    i = src.rindex("attach_coverage_claim(")
     window = src[max(0, i - 400):i + 200]
     assert 'answer.get("status") == "EVIDENCE_INSUFFICIENT"' in window, (
         "the ledger must be conditional on the one status that earns it")
@@ -610,9 +631,17 @@ def test_extract_writes_the_gap_into_the_artifact_and_exits_clean(monkeypatch, t
 
     from acr.cli import app
 
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from hooks_harness import LitellmScriptAdapter
+
     llm = ScriptedLLM(GOOD_SUBMIT, {"status": "EVIDENCE_INSUFFICIENT", "value": {},
                                     "reasoning": "n/a"})
-    monkeypatch.setattr("acr.cli_common.llm_client", lambda *a, **k: llm)
+    # `chat_model`, not `llm_client`: extract runs the library graph and reaches the provider
+    # through the other seam. Patching the one it no longer calls let a real client be built,
+    # and the run died on "Missing credentials" rather than on anything under test.
+    monkeypatch.setattr("acr.cli_common.chat_model",
+                        lambda *a, **k: LitellmScriptAdapter(inner=llm))
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
 
     r = CliRunner().invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),

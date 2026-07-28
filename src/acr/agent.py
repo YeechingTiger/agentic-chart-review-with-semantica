@@ -774,8 +774,14 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
     # WRONG_DATA_SOURCE by design"), which the runtime had stopped doing. The rewrite lands AFTER
     # the gate, so there is no rejection available and the value has to be taken here or it
     # smuggles itself out under a status that disclaims it.
+    # UNCONDITIONAL, including over NO_ANSWER. `cli_pipeline` tells the operator "EVERY run will
+    # return SPEC_INSUFFICIENT / WRONG_DATA_SOURCE by design", and it is right: the variable is
+    # not derivable from notes, so what this particular run managed to do does not change the
+    # answer. Gating the rewrite on "the run produced something" would let a run that produced
+    # nothing report NO_ANSWER — a statement about this chart — for a spec whose problem is that
+    # it is not about charts.
     forced_from = None
-    if spec.data_source == "outside_notes" and answer.get("status") != "NO_ANSWER":
+    if spec.data_source == "outside_notes":
         forced_from = answer.get("status")
         answer["status"] = "SPEC_INSUFFICIENT"
     # THE THREE FIELDS `_n_finalize` SETS AND THIS FUNCTION DROPPED. Measured on ten real

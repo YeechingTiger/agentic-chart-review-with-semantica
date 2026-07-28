@@ -107,38 +107,25 @@ def _apply(plan, rev, *, budget, step=1, threads=None, chart=None, trigger="test
         n_docs_by_type=documents_by_type(chart) if chart is not None else {})
 
 
-# ==========================================================================================
-# 1. ONE PLAN
-# ==========================================================================================
+
 def test_the_prose_plan_is_gone_and_the_coverage_plan_is_wired_in():
     """The two greps from the finding, inverted into an assertion.
 
-    Structural rather than behavioural on purpose. A behavioural test only covers the paths
-    someone thought of; the failure here was an entire object that nothing referenced, and
-    the way that comes back is somebody reintroducing a "planning prompt" beside this one.
+    Structural on purpose. A behavioural test only covers the paths someone thought of; the
+    failure was an entire object that nothing referenced, and the way that returns is somebody
+    reintroducing a "planning prompt" beside the real plan. Asserted on the runtime that holds
+    the plan now.
     """
-    src = inspect.getsource(G)
-    assert not hasattr(G, "PLAN_PROMPT") and not re.search(r"^\w*PLAN_PROMPT\s*=", src, re.M), (
-        "graph.py has grown a second planning prompt. The reason the REPLAN bug existed is "
-        "that there were two plans and only one mattered; a second one is the bug returning."
-    )
-    assert not re.search(r'\{"id":\s*"1",\s*"goal"', src), (
-        "the prose {id, goal, rationale} plan is back. No code reads it."
-    )
-    for token in ("CoveragePlan", "policy_for", "may_open", "apply_revision"):
-        assert token in src, f"graph.py must consult the coverage plan; {token!r} is absent"
+    import acr.agent as A
+
+    src = inspect.getsource(A)
+    assert not re.search(r"^\w*PLAN_PROMPT\s*=", src, re.M), (
+        "a second planning prompt has appeared. The REPLAN bug existed because there were two "
+        "plans and only one mattered; a second one is the bug returning")
+    for token in ("plan.render", "may_open", "apply_revision"):
+        assert token in src, f"the runtime must consult the coverage plan; {token!r} is absent"
 
 
-def test_reflection_may_not_assert_replan(spec, chart):
-    """REPLAN is derived by the runtime from an applied revision, never chosen by the model.
-
-    When REPLAN was a word a supervisor could say, saying it changed nothing — so it was
-    never said. The verdict now follows the revision instead of standing in for it.
-    """
-    assert "REPLAN" not in G.MODEL_VERDICTS
-    assert "REPLAN" in G.VERDICTS, "the runtime still routes on it; only the model may not pick it"
-    assert "SUFFICIENT|CONTINUE|STUCK" in G.REFLECT_PROMPT
-    assert "REPLAN" not in G.REFLECT_PROMPT.split("Reply with JSON only:")[1]
 
 
 # ==========================================================================================
@@ -706,22 +693,36 @@ def test_expansion_beyond_the_budget_is_refused_and_recorded(plan, chart):
     assert plan.refused_revisions[-1]["refusal_class"] == REFUSED_BUDGET
 
 
+
+
 def test_budget_exhausted_with_obligations_outstanding_is_an_honest_dead_end(spec, chart, plan):
+    """Both halves matter, and so does the third: the plan must have BUMPED into the cap.
+
+    `expansion_is_spent` deliberately answers False for a run that never tried to widen, however
+    small its budget — otherwise a tight budget would end a run that had asked for nothing. So a
+    dead end is: it asked, it was refused, and an obligation is still outstanding.
+    """
+    from acr.plan_expansion import expansion_is_spent
+
+    zero = ExpansionBudget(max_terms_added=0, max_type_promotions=0,
+                           max_documents_opened_by_promotion=0, max_revisions=6)
     agent = _agent(spec, chart, llm=None)
     agent.plan = plan
     agent.threads = OpenThreadLedger()
-    agent._expansion_budget = ExpansionBudget(max_terms_added=0, max_type_promotions=0,
-                                              max_documents_opened_by_promotion=0,
-                                              max_revisions=6)
-    assert agent._expansion_exhausted_with_obligations() is False, (
+    agent._expansion_budget = zero
+
+    assert expansion_is_spent(plan, zero, terms_deferred=[]) is False, (
         "budget untouched is not exhaustion; a run that never tried to widen must keep going")
 
-    _apply(plan, PlanRevision(add_terms=("x",)), budget=agent._expansion_budget, chart=chart)
+    _apply(plan, PlanRevision(add_terms=("mucinous",)), budget=zero, chart=chart)
+    assert expansion_is_spent(plan, zero, terms_deferred=[]) is True, (
+        "the plan asked, was refused, and has no room left")
     assert agent._outstanding_obligations(), "fixture assumption: the gate is not yet met"
-    assert agent._expansion_exhausted_with_obligations() is True
 
-    src = inspect.getsource(G.ChartReviewAgent._after_reflect)
-    assert "EXPANSION_BUDGET_EXHAUSTED" in src and '"finalize"' in src
+    # And the runtime says so rather than merely stopping at the call limit.
+    import acr.agent as A
+    src = inspect.getsource(A.AuditMiddleware._expansion_spent_with_obligations)
+    assert "expansion_is_spent" in src and "outstanding" in src
 
 
 def test_a_spent_budget_with_nothing_outstanding_is_not_a_dead_end(spec, chart, plan,
@@ -983,18 +984,27 @@ class _DuplicateTermLLM(LLMClient):
         return self._reply({}, [{"id": "c0", "name": "list_documents", "arguments": {}}])
 
 
-def test_the_duplicate_refusal_reaches_the_model_in_the_loop_it_understands(spec, chart,
-                                                                           tmp_path):
-    llm = _DuplicateTermLLM("CARCINOMA")
-    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=4), out_dir=tmp_path,
-                             sample_seed=7)
-    agent.run(chart, run_id="redundant-term")
 
-    told = [m for m in llm.act_prompts if REFUSED_REDUNDANT_TERM in m]
-    assert told, ("the refusal never reached the model. A duplicate it is not told about is "
-                  "one it will send again, one slot at a time")
-    assert any("carcinoma" in m for m in told), "the refusal must name the covering term"
-    assert agent.plan.terms_added() == [], "no slot may have been spent"
+def test_the_duplicate_refusal_reaches_the_model_in_the_loop_it_understands(spec, chart):
+    """A duplicate it is not told about is one it will send again, one slot at a time.
+
+    The refusal used to be rendered into the next reflect prompt. It is the `revise_plan` tool's
+    RETURN VALUE now, which is stronger: the model has it in hand by construction rather than by
+    a prompt someone remembered to write.
+    """
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from hooks_harness import revise, revise_plan_tool
+
+    tool, ctx = revise_plan_tool(spec, chart)
+    assert "carcinoma" in ctx.plan.keywords, "fixture assumption: the spec already covers it"
+    before = list(ctx.plan.keywords)
+
+    r = revise(tool, add_terms=["CARCINOMA"])
+    told = " ".join(r["refused"])
+    assert REFUSED_REDUNDANT_TERM in told, "the refusal never reached the model"
+    assert "carcinoma" in told.lower(), "the refusal must name the covering term"
+    assert ctx.plan.keywords == before, "a redundant term must cost no budget and change nothing"
 
 
 # ------------------------------------------------------------------------------- helpers
@@ -1029,10 +1039,21 @@ def _agent(spec, chart, llm=None):
     mw._docs_by_type = docs_by_type
     mw._expansion_budget = price_expansion_budget(plan, docs_by_type, max_revisions=6,
                                                   supplied=None, planner_terms=len(plan.keywords))
-    mw._plan_refusal = lambda name, args: mw._out_of_plan(name, args)
-    mw._expansion_exhausted_with_obligations = lambda: (
-        expansion_is_spent(plan, mw._expansion_budget, terms_deferred=[])
-        and bool(threads.unresolved()))
+    def _refusal(name, args):
+        # The tests swap a plan in with `agent.plan = ...`; the rule reads `ctx.plan`, so the
+        # two are synced at the call. Without this the assignment set an attribute nothing read
+        # and the guard answered about the plan the context happened to hold.
+        ctx.plan = mw.plan
+        return mw._out_of_plan(name, args)
+
+    def _spent():
+        ctx.plan = mw.plan
+        return (expansion_is_spent(mw.plan, mw._expansion_budget, terms_deferred=[])
+                and bool(mw.threads.unresolved()))
+
+    mw._plan_refusal = _refusal
+    mw._expansion_exhausted_with_obligations = _spent
+    mw._outstanding_obligations = lambda: ctx.outstanding_obligations()
     return mw
 
 
@@ -1189,36 +1210,28 @@ class _NoOpRevisingLLM(_RevisingLLM):
         return super().chat(messages, tools)
 
 
-def test_a_revision_that_moved_nothing_is_reported_as_a_request_not_as_silence(
-        spec, chart, tmp_path):
-    """THE SYN0001 FIX, end to end. Every reflection asks for a promotion already in force.
 
-    `replan_rate` stays 0.0 — correctly, the retrieval scope never moved — but the manifest
-    must now say, in the same block, that the channel was used and that every use was a
-    no-op. A reader who concludes "the model ignores the replanning channel" from this
-    manifest is contradicted by the manifest.
+def test_a_revision_that_moved_nothing_is_reported_as_a_request_not_as_silence(spec, chart):
+    """THE SYN0001 FIX. Every request asks for a promotion already in force.
+
+    The retrieval scope never moves — correctly — but the record must say, in the same block,
+    that the channel WAS used and that every use was a no-op. A reader who concludes "the model
+    ignores the replanning channel" has to be contradicted by the record.
     """
-    llm = _NoOpRevisingLLM(SAMPLED_TYPE, "right upper lobe")
-    llm._target = _first_note_of_type(chart, SAMPLED_TYPE)
-    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=6), out_dir=tmp_path,
-                             sample_seed=7)
-    agent.run(chart, run_id="noop-replan")
-    r = json.loads((tmp_path / "noop-replan.manifest.json").read_text(encoding="utf-8"))["replan"]
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from hooks_harness import revise, revise_plan_tool
 
-    assert r["n_revisions_applied"] == 0 and r["replan_rate"] == 0.0
-    assert r["n_revision_requests"] >= 1, (
-        "the agent asked and the manifest recorded silence. This is the bug that turned a "
-        "true 0.0 into 'the model ignores the replanning channel'."
-    )
-    assert r["n_revisions_no_op"] == r["n_revision_requests"], (
-        "every request was admitted and moved nothing; the block must say so rather than "
-        "leaving the reader to infer it from a zero"
-    )
-    assert r["request_rate"] > 0.0
-    assert r["n_revisions_partly_refused"] >= 1, (
-        "each request was told 'already at that policy; no change' — refusal prose that "
-        "reached the agent and was counted nowhere"
-    )
+    tool, ctx = revise_plan_tool(spec, chart)
+    already = sorted(ctx.plan.read_all)[0]
+    for _ in range(3):
+        revise(tool, promote_types=[{"type": already, "to": "search"}])
+
+    assert len(ctx.revisions) == 3, "three asks must be three recorded asks"
+    assert all(not r["applied"] for r in ctx.revisions), (
+        "a promotion already in force moves nothing")
+    assert any(r["refused"] for r in ctx.revisions), (
+        "silence and a refusal are different facts; the record must carry the second")
 
 
 

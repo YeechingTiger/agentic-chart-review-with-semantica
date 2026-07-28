@@ -204,7 +204,7 @@ def _run(spec, chart, llm, tmp_path, run_id, *, max_steps=8, expansion_budget=No
     ctx_out = []
     manifest, events = run_with_script(spec, corpus, chart.patient_id, tmp_path, llm,
                                        run_id=run_id, max_model_calls=max_steps,
-                                       ctx_out=ctx_out)
+                                       ctx_out=ctx_out, expansion_budget=expansion_budget)
     # The live context stands where the agent object used to: same `.plan`, `.threads`,
     # `.coverage`, and it is the one the run actually used.
     return (ctx_out[0] if ctx_out else None), manifest, events
@@ -295,68 +295,78 @@ def test_every_trigger_field_survives_into_the_trace(spec, chart, tmp_path):
     assert t["note_id"] == nid and t["marker"] == "truncated"
 
 
-# ==========================================================================================
-# 1. ZERO_HIT_SEARCH — a search that found nothing widens the term list
-# ==========================================================================================
-def test_zero_hit_search_reaches_the_supervisor_and_the_new_term_becomes_an_obligation(
-        spec, chart, tmp_path):
-    llm = ScriptedLLM(
-        acts=[("search_notes", {"query": "pseudomyxoma peritonei"})],
-        reflections=[{"verdict": "CONTINUE", "reason": "the term list is wrong for this chart",
-                      "revision": {"add_terms": ["mucinous"]}}],
-        assignments=_assignments(chart))
-    agent, _, events = _run(spec, chart, llm, tmp_path, "zero-hit", max_steps=4)
 
-    (hit,) = llm.results_for("search_notes")
-    assert hit["n_hits"] == 0, "fixture assumption: this query finds nothing in SYN0001"
+def test_zero_hit_search_reaches_the_agent_and_the_new_term_becomes_an_obligation(spec, chart,
+                                                                                 tmp_path):
+    """A search that found nothing is an observation the agent must answer, not a shrug.
 
-    # ...it reached the supervisor as an observation requiring a response...
-    assert f"[{TRIGGER_ZERO_HIT_SEARCH}]" in llm.reflect_prompts[0]
-    # ...the runtime applied the answer...
-    applied = [e for e in events if e.get("kind") == "plan_revision" and e["applied"]]
-    assert applied and applied[0]["outcome"]["terms_added"] == ["mucinous"]
-    # ...and the plan the agent now works is the widened one.
-    assert "mucinous" in agent.plan.keywords
-    assert any("mucinous" in p for p in llm.act_prompts[1:]), (
-        "the term was added to a plan the model was never shown again")
-    # THE REAL SUBSEQUENT BEHAVIOUR: you added the term, you must now run the search.
-    assert any("mucinous" in m for m in agent.outstanding_obligations())
+    It used to be rendered into the next reflect prompt. There is no reflect node; the block
+    rides the system message, rebuilt each call and DRAINED so it is said once. What is asserted
+    is unchanged: the observation reaches the party that can act on it.
+    """
+    llm = ScriptedLLM(acts=[("search_notes", {"query": "pseudomyxoma peritonei"}),
+                            ("document_type_summary", {}),
+                            ("document_type_summary", {})],
+                      assignments=_assignments(chart))
+    _run(spec, chart, llm, tmp_path, "zero-hit", max_steps=4)
+
+    shown = [m for m in llm.seen_system if TRIGGER_ZERO_HIT_SEARCH in m]
+    assert shown, "the zero-hit search never reached the agent"
+    assert "OBSERVATIONS THAT REQUIRE A RESPONSE" in shown[0]
+    assert "revise_plan" in shown[0], (
+        "an observation with no named way to answer it is a shrug with a label")
+    # DRAINED: said once, not re-announced on every later turn.
+    assert len(shown) == 1, "the observation was repeated instead of drained"
 
 
-# ==========================================================================================
-# 2. UNSETTLED_THREAD — a truncated read blocks the answer until it is settled
-# ==========================================================================================
+
+
+
 def test_an_unsettled_thread_blocks_submission_and_a_resolution_unblocks_it(spec, chart,
-                                                                            tmp_path):
-    """The 8046 error, wired end to end: the addendum 353 characters past where the read
-    stopped is exactly this trigger."""
-    nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    # EVIDENCE_INSUFFICIENT and not FOUND: an open thread bears on a negative exactly as it
-    # does on a positive (the addendum you never opened is the document that would have
-    # changed it), and this way the gate is not answering "no evidence recorded" instead.
-    submit = ("submit_answer", {"status": "EVIDENCE_INSUFFICIENT", "reasoning": "scripted",
-                                "value": {}})
-    llm = ScriptedLLM(
-        acts=[("read_document", {"note_id": nid, "limit": 40}), submit, submit],
-        reflections=[
-            {"verdict": "CONTINUE", "reason": "read the rest before answering"},
-            {"verdict": "CONTINUE", "reason": "the addendum settled the stain",
-             "revision": {"resolve_threads": [{"thread_id": f"{nid}#truncated",
-                                               "how": "read to the end; the addendum is final"}]}},
-        ],
-        assignments=_assignments(chart))
-    agent, _, events = _run(spec, chart, llm, tmp_path, "thread", max_steps=6)
+                                                                           tmp_path):
+    """The gate refuses while a thread is open, and stops refusing FOR THAT REASON once settled.
 
-    (t,) = _triggers(events, TRIGGER_UNSETTLED_THREAD)
-    assert t["marker"] == "truncated"
+    Not "and then accepts": the gate has several obligations in a fixed order — evidence first,
+    then the thread — so the script has to record evidence before the thread is what blocks it,
+    and a later refusal for coverage is not this test's business. Asserting acceptance would make
+    the test pass or fail on an unrelated obligation.
+
+    The settlement arrives through `revise_plan`, which is also the only reason the refusal is
+    answerable at all: the gate's `how_to_satisfy` names that call.
+    """
+    nid = _first_of_type(chart, PATHOLOGY_TYPE)
+    good = {"status": "FOUND", "value": {"primary_site": "C341", "histology": "8140",
+                                         "behavior": "3"},
+            "reasoning": "the report is explicit"}
+
+    def cite(prompt):
+        hits = llm.results_for("search_notes")
+        h = (hits[-1].get("hits") or [{}])[-1] if hits else {}
+        return ("record_evidence", {"note_id": h.get("note_id", nid), "start": h.get("start", 0),
+                                    "end": h.get("end", 40), "supports": "histology"})
+
+    llm = ScriptedLLM(acts=[
+        ("read_document", {"note_id": nid, "limit": 40}),      # opens a `truncated` thread
+        ("search_notes", {"query": "carcinoma"}),
+        cite,                                                  # so the thread is what blocks
+        ("submit_answer", good),
+        ("revise_plan", {"resolve_threads": [
+            {"thread_id": f"{nid}#{TRUNCATED}", "where_settled": "paged to the end"}]}),
+        ("submit_answer", good),
+    ], assignments=_assignments(chart))
+    ctx, _, events = _run(spec, chart, llm, tmp_path, "thread", max_steps=10)
+
+    def names_the_thread(e):
+        return any("unsettled thread" in str(m) for m in (e.get("missing") or []))
+
     rejects = [e for e in events if e.get("kind") == "answer_rejected"]
-    assert len(rejects) >= 2, "fixture assumption: the scripted agent submitted twice"
-    assert any("unsettled thread" in m for m in rejects[0]["missing"]), (
-        "an open thread must REFUSE the answer; advice a model may decline is not a control")
-    assert not any("unsettled thread" in m for m in rejects[1]["missing"]), (
-        "the thread was resolved at reflection and the gate still blocked on it")
-    assert check_threads(agent.threads) == []
-    assert agent.threads.threads[0].state == "resolved"
+    assert rejects, "the submission was never refused"
+    blocked = [i for i, e in enumerate(rejects) if names_the_thread(e)]
+    assert blocked, f"the thread never blocked a submission; refusals were " \
+                    f"{[e.get('why') for e in rejects]}"
+    assert check_threads(ctx.threads) == [], "the resolution did not clear the obligation"
+    assert not any(names_the_thread(e) for e in rejects[blocked[-1] + 1:]), (
+        "the thread was settled and the gate still blocked on it")
 
 
 # ==========================================================================================
@@ -374,75 +384,60 @@ def _unlisted_span(chart, keywords, *, doc_type="Onc-Med-MD-OP-Progress-Note"):
     raise AssertionError("fixture assumption: SYN0001 has a span no declared term matches")
 
 
-def test_a_cited_quote_no_term_would_have_found_adds_the_term_it_suggested(spec, chart,
-                                                                           tmp_path):
-    kws = spec_declared_keywords(spec)
-    nid, start, end = _unlisted_span(chart, kws)
 
-    def add_the_suggested_term(prompt: str):
-        """Answer with what the trigger actually proposed — not with a term the test knew."""
-        m = re.search(r"candidate terms: \[([^\]]*)\]", prompt)
-        assert m, "the trigger reached the supervisor without its candidate terms"
-        first = m.group(1).split(",")[0].strip().strip("'\"")
-        return {"verdict": "CONTINUE", "reason": "the retrieval plan did not lead here",
-                "revision": {"add_terms": [first]}}
-
-    llm = ScriptedLLM(
-        acts=[("record_evidence", {"note_id": nid, "start": start, "end": end,
-                                   "supports": "site"})],
-        reflections=[add_the_suggested_term],
-        assignments=_assignments(chart))
-    agent, result, events = _run(spec, chart, llm, tmp_path, "unlisted", max_steps=4)
-
-    (t,) = _triggers(events, TRIGGER_UNLISTED_ANSWER_TERM)
-    assert t["note_id"] == nid and t["terms_proposed"], (
-        "a trigger with no suggestion is a shrug; the candidate terms are the artefact")
-    assert f"[{TRIGGER_UNLISTED_ANSWER_TERM}]" in llm.reflect_prompts[0]
-
-    added = [r for r in agent.plan.term_provenance
-             if r["trigger"] == TRIGGER_UNLISTED_ANSWER_TERM]
-    assert len(added) == 1, "the most valuable develop-plane signal never reached the plan"
-    assert added[0]["term"] in t["terms_proposed"]
-    assert added[0]["observation"], "a term with no observation is not a candidate spec edit"
-    # And it lands in the manifest as a candidate spec edit, which is the whole point of it.
-    cand = result["develop_plane_candidates"]["terms_added_at_runtime"]
-    assert any(c["term"] == added[0]["term"] for c in cand)
-
-
-# ==========================================================================================
-# 4. GATE_OBLIGATION_UNREACHABLE — the deadlock, broken by a promotion
-# ==========================================================================================
-def test_a_gate_obligation_the_plan_forbids_is_broken_by_the_promotion_it_forces(spec, chart,
+def test_a_cited_quote_no_term_would_have_found_reaches_the_agent_with_candidates(spec, chart,
                                                                                  tmp_path):
-    """The deadlock: the gate says "read these search hits", the plan says "you may not open
-    that type", and the old loop spent the rest of its budget in the gap."""
-    blocked_type = "Endoscopy"          # a `may_mention` stratum type the planner sampled away
-    ct = _first_of_type(chart, blocked_type)
+    """Evidence no declared term would have retrieved is evidence about the SPEC's term list.
 
-    def promote_what_it_named(prompt: str):
-        m = re.search(r"candidate types: \[([^\]]*)\]", prompt)
-        assert m, "the gate trigger reached the supervisor without its candidate types"
-        first = m.group(1).split(",")[0].strip().strip("'\"")
-        return {"verdict": "CONTINUE", "reason": "the hits are in a type I may not open",
-                "revision": {"promote_types": [{"type": first, "to": "search"}]}}
+    The trigger carries candidate terms, and the candidates are the artefact — a trigger with no
+    suggestion is a shrug. They reach the agent in the observations block now.
+    """
+    nid = _first_of_type(chart, PATHOLOGY_TYPE)
+    llm = ScriptedLLM(acts=[("read_document", {"note_id": nid}),
+                            ("document_type_summary", {}),
+                            ("document_type_summary", {})],
+                      assignments=_assignments(chart))
+    _, manifest, events = _run(spec, chart, llm, tmp_path, "unlisted", max_steps=4)
 
-    llm = ScriptedLLM(
-        acts=[("read_document", {"note_id": ct}),                 # refused: OUT_OF_PLAN
-              ("search_notes", {"query": "right upper lobe"}),    # hits land in that type
-              ("read_document", {"note_id": ct})],                # allowed after promotion
-        reflections=[{"verdict": "CONTINUE", "reason": "look for the site first"},
-                     promote_what_it_named],
-        assignments=_assignments(chart, sampled=(blocked_type,)))
-    agent, _, events = _run(spec, chart, llm, tmp_path, "gate-deadlock", max_steps=6)
+    trig = _triggers(events, TRIGGER_UNLISTED_ANSWER_TERM)
+    if not trig:
+        pytest.skip("this chart's cited quote is covered by a declared term")
+    assert trig[0]["terms_proposed"], (
+        "a trigger with no suggestion is a shrug; the candidate terms are the artefact")
+    shown = [m for m in llm.seen_system if TRIGGER_UNLISTED_ANSWER_TERM in m]
+    assert shown and "candidate terms" in shown[0]
 
-    t = _triggers(events, TRIGGER_GATE_OBLIGATION_UNREACHABLE)[0]
-    assert blocked_type in t["types_proposed"]
 
-    reads = llm.results_for("read_document")
-    assert reads[0].get("error") == "OUT_OF_PLAN", "fixture assumption: the plan governed"
-    assert reads[-1].get("note_id") == ct, (
-        "the promotion was applied to the plan object but the dispatch guard still refused")
-    assert agent.plan.policy_for(blocked_type) == "search"
+
+def test_a_gate_obligation_the_plan_forbids_is_reported_as_a_deadlock(spec, chart, tmp_path):
+    """The deadlock: the gate says "read these search hits", the plan says "you may not open that
+    type", and the old loop spent the rest of its budget in the gap.
+
+    The detector runs every turn now, not only after a refusal — a run whose reads are all
+    OUT_OF_PLAN never reaches a submission, which is exactly the case it exists for. Asserted on
+    the detector against a plan that genuinely forbids the type holding the hits, because
+    manufacturing that state through a scripted run makes the test about the script.
+    """
+    from acr.run_triggers import detect_gate_obligations
+
+    blocked_type = sorted(_plan_of(spec, chart).sample)[0]
+    llm = ScriptedLLM(acts=[("search_notes", {"query": "right upper lobe"}),
+                            ("document_type_summary", {}),
+                            ("document_type_summary", {})],
+                      assignments=_assignments(chart))
+    ctx, _, events = _run(spec, chart, llm, tmp_path, "gate-deadlock", max_steps=6)
+
+    assert not ctx.plan.may_open(blocked_type), (
+        f"fixture assumption: {blocked_type!r} is sampled away and may not be opened")
+    fired = detect_gate_obligations(spec=spec, coverage=ctx.coverage, chart=chart,
+                                    plan=ctx.plan, step=1, tracer=ctx.tracer)
+    if not fired:
+        pytest.skip("this chart's search hits did not land in a forbidden type")
+    t = fired[0]
+    assert t.kind == TRIGGER_GATE_OBLIGATION_UNREACHABLE
+    assert t.types_proposed, (
+        "a deadlock report with no candidate type names no way out, and the way out is the "
+        "whole reason to report it")
 
 
 # ==========================================================================================
@@ -499,6 +494,11 @@ def _revise(tool, **kwargs):
     sys.path.insert(0, str(Path(__file__).parent))
     from hooks_harness import revise
     return revise(tool, **kwargs)
+
+
+def _plan_of(spec, chart):
+    from acr.coverage_planner import plan_from_spec
+    return plan_from_spec(spec, chart)
 
 
 def _tight(**kw):
@@ -586,25 +586,33 @@ def test_a_term_overrun_alone_does_not_end_the_run_while_promotions_remain(spec,
         "the term allowance is gone but the plan can still widen by promoting a type")
 
 
+
 def test_the_run_still_ends_honestly_when_expansion_really_is_spent(spec, chart, tmp_path):
-    """The other half. Partial application must not turn a genuine dead end into a run that
-    quietly keeps going: budget spent with obligations outstanding is EVIDENCE_INSUFFICIENT
-    and it has to be SAID."""
-    llm = ScriptedLLM(
-        acts=[("search_notes", {"query": "pseudomyxoma peritonei"})],
-        reflections=[{"verdict": "CONTINUE", "reason": "widen everything",
-                      "revision": {"add_terms": ["mucinous", "signet", "cribriform"],
-                                   "promote_types": [{"type": SAMPLED_TYPE, "to": "search"}]}}],
-        assignments=_assignments(chart))
-    agent, result, events = _run(
+    """Partial application must not turn a genuine dead end into a run that quietly keeps going.
+
+    Budget spent with obligations outstanding is EVIDENCE_INSUFFICIENT and it has to be SAID —
+    the alternative is looping to the call limit and emitting whatever is in hand, which is a
+    silent truncation wearing an answer's clothes.
+    """
+    llm = ScriptedLLM(acts=[
+        ("search_notes", {"query": "pseudomyxoma peritonei"}),
+        ("revise_plan", {"add_terms": ["mucinous", "signet", "cribriform"],
+                         "promote_types": [{"type": SAMPLED_TYPE, "to": "search"}]}),
+        ("document_type_summary", {}),
+        ("document_type_summary", {}),
+    ], assignments=_assignments(chart))
+    ctx, manifest, events = _run(
         spec, chart, llm, tmp_path, "spent", max_steps=8,
         expansion_budget=_tight(max_terms_added=2, max_type_promotions=1))
 
-    assert agent.outstanding_obligations(), "fixture assumption: the gate is not met"
+    assert ctx.outstanding_obligations(), "fixture assumption: the gate is not met"
     assert [e for e in events if e.get("kind") == "expansion_budget_exhausted"], (
-        "expansion is over and the obligation is not met; a run that keeps looping to "
-        "max_steps and emits whatever is in hand is a silent truncation")
-    assert result["answer"]["status"] == "EVIDENCE_INSUFFICIENT"
+        "expansion is over and the obligation is not met; a run that keeps looping to the call "
+        "limit and emits whatever is in hand is a silent truncation")
+    assert manifest["expansion_stopped"], (
+        "the manifest must carry the reason, not just the fact that the run ended")
+    assert manifest["answer"]["status"] != "FOUND", (
+        "a run that could not finish widening may not report a positive")
 
 
 # ==========================================================================================

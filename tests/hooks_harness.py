@@ -153,7 +153,7 @@ class LitellmScriptAdapter(BaseChatModel):
 
 
 def run_with_script(spec, corpus, patient_id, tmp_path, llm, *, run_id="scripted",
-                    max_model_calls=12, seed=7, ctx_out=None):
+                    max_model_calls=12, seed=7, ctx_out=None, expansion_budget=None):
     """Drive the real runtime with a litellm-shaped scripted client. (manifest, events).
 
     `ctx_out` is a list the runtime appends its live `RunContext` to, so a test can assert on
@@ -161,7 +161,8 @@ def run_with_script(spec, corpus, patient_id, tmp_path, llm, *, run_id="scripted
     """
     m = run_patient(spec=spec, corpus=corpus, patient_id=patient_id, out_dir=Path(tmp_path),
                     model=LitellmScriptAdapter(inner=llm), max_model_calls=max_model_calls,
-                    seed=seed, run_id=run_id, ctx_out=ctx_out)
+                    seed=seed, run_id=run_id, ctx_out=ctx_out,
+                    expansion_budget=expansion_budget)
     trace = Path(tmp_path) / f"{run_id}.jsonl"
     events = [json.loads(l) for l in trace.read_text(encoding="utf-8").splitlines() if l.strip()]
     return m, events
