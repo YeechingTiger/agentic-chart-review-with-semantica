@@ -155,21 +155,19 @@ def extract(
     seed: int = typer.Option(None, "--seed", help="validation-sampling seed; share it across arms"),
     limit: int = typer.Option(0, "--limit", help="first N patients only; 0 = all"),
     out: str = typer.Option("runs", "--out"),
-    # STILL `langgraph`, and the reason is a test gap rather than a preference. On ten real
-    # charts `hooks` is better on every axis measured — 5/10 vs 3/10 exact, 10/10 vs 5/10
-    # gate-validated, $1.54 vs $6.58 — so the default should move. It cannot yet: the eight
-    # CLI tests that drive `extract` end to end inject a `ScriptedLLM` at
-    # `cli_common.llm_client`, and the hooks branch constructs its own `ChatOpenAI` and never
-    # passes through that seam. Flipping the default turns those eight red, which would trade
-    # a measured improvement for the loss of the only end-to-end coverage `extract` has.
-    # What unblocks it: a LangChain-shaped test double and a seam for the hooks branch to take
-    # it through. Until then the better runtime is one flag away and the tests still mean
-    # something.
-    runtime: str = typer.Option("langgraph", "--runtime",
-                                help="langgraph (the hand-written loop, still the default: the "
-                                     "end-to-end CLI tests can only drive this one) or hooks "
-                                     "(the library graph with our rules as middleware, better "
-                                     "on every axis measured over 10 real charts)"),
+    # `hooks` IS THE DEFAULT, and it is the default because it was measured. On the same ten
+    # real charts, same answer key, same cohort: 5/10 exact against 3/10, 10/10 gate-validated
+    # against 5/10, $1.54 against $6.58. `langgraph` stays reachable as the arm those numbers
+    # were compared against — deleting the baseline would leave the comparison unverifiable.
+    #
+    # It could not become the default until `cli_common.chat_model` existed: the branch built
+    # its own ChatOpenAI, the end-to-end tests inject at the seam, and flipping the default
+    # without the seam turned eight of them red. tests/test_hooks_runtime_cli.py is what made
+    # the change safe rather than merely correct.
+    runtime: str = typer.Option("hooks", "--runtime",
+                                help="hooks (default: the library graph, our rules as "
+                                     "middleware) or langgraph (the hand-written loop, kept as "
+                                     "the measured baseline)"),
     dry_run: bool = typer.Option(False, "--dry-run",
                                  help="resolve, plan and cost the work without calling a model"),
 ):
@@ -220,16 +218,9 @@ def extract(
                     # cycles, and there is no reflect node — the two arms are not comparable
                     # step for step, only end to end.
                     from .agent import run_patient
-                    from langchain_openai import ChatOpenAI
-                    from .audit import _callbacks
                     r = run_patient(
                         spec=sp, corpus=c, patient_id=pid, out_dir=run_dir,
-                        model=ChatOpenAI(model=(model or os.getenv("ACR_MODEL_NAME",
-                                                                   "gpt-5.6-luna")),
-                                         base_url=api_base or os.getenv("ACR_API_BASE"),
-                                         api_key=os.getenv("ACR_API_KEY"),
-                                         temperature=temperature, timeout=600, max_retries=3,
-                                         callbacks=_callbacks()),
+                        model=cli_common.chat_model(model, api_base, temperature),
                         max_model_calls=max_steps, seed=seed or 1234,
                         run_id=f"{pid}__{sid}")
                 else:

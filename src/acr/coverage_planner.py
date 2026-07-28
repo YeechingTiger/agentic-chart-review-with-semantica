@@ -424,9 +424,18 @@ def load_marker_catalogue(skill_dir: str | Path | None = None) -> MarkerCatalogu
     the RESOLUTION, not the thread. Taking the base-rate table as the marker set would open a
     thread on every pathology report in the corpus.
     """
-    d = Path(skill_dir) if skill_dir is not None else SKILL_DIR
-    obligations = d / "SKILL.md"
-    rates = d / "references" / "marker-catalogue.md"
+    # The two filenames come from the module constants, not from literals repeated here.
+    # `MARKER_OBLIGATION_TABLE` and `MARKER_BASE_RATE_TABLE` were declared above and then
+    # never read, while this function rebuilt the same two paths from strings — one fact
+    # computed twice, which is how a rename moves one copy and leaves the other pointing at a
+    # file that no longer exists, with `degraded` reporting "the table has moved" as if the
+    # skill were at fault.
+    if skill_dir is None:
+        obligations, rates = MARKER_OBLIGATION_TABLE, MARKER_BASE_RATE_TABLE
+    else:
+        d = Path(skill_dir)
+        obligations = d / MARKER_OBLIGATION_TABLE.name
+        rates = d / MARKER_BASE_RATE_TABLE.parent.name / MARKER_BASE_RATE_TABLE.name
     if not obligations.exists():
         return MarkerCatalogue(
             markers=(Marker(MARKER_TRUNCATED, "finish the document before reasoning about it"),),

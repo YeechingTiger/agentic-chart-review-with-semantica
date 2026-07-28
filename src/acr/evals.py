@@ -331,10 +331,6 @@ def assert_judge_allowed(dimension: str) -> JudgeRuling:
     return r
 
 
-def registered_dimensions() -> tuple[str, ...]:
-    return tuple(REGISTRY)
-
-
 def judgeable_dimensions() -> tuple[str, ...]:
     """The canonical rows a judge or an evaluator YAML may declare. Split parents excluded."""
     return tuple(n for n, d in REGISTRY.items() if not d.deterministic and not d.sub_questions)

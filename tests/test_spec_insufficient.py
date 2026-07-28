@@ -596,7 +596,7 @@ def test_extract_writes_the_gap_into_the_artifact_and_exits_clean(monkeypatch, t
     monkeypatch.setattr("acr.cli_common.llm_client", lambda *a, **k: llm)
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
 
-    r = CliRunner().invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+    r = CliRunner().invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
                                  "--variables", "primary_site",
                                  "--max-steps", "4", "--seed", "7",
                                  "--out", str(tmp_path / "runs")])
@@ -631,7 +631,7 @@ def test_a_crashed_run_is_distinguishable_from_one_that_never_happened(monkeypat
     monkeypatch.setattr("acr.cli_common.llm_client", lambda *a, **k: Boom(None, {}))
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
 
-    r = CliRunner().invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+    r = CliRunner().invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
                                  "--variables", "primary_site", "--max-steps", "2",
                                  "--out", str(tmp_path / "runs")])
     assert r.exit_code == 1

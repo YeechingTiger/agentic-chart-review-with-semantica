@@ -88,6 +88,33 @@ def llm_client(model, api_base, temperature=0.0) -> LLMClient:
     return LLMClient(LLMConfig.from_env(model=model, api_base=api_base, temperature=temperature))
 
 
+def chat_model(model, api_base, temperature=1.0):
+    """THE provider seam for the hooks runtime, the counterpart to `llm_client` above.
+
+    Same rule, same reason: reached as `cli_common.chat_model(...)` so one monkeypatch silences
+    the provider for every command that uses the library graph. The hooks branch of `extract`
+    constructed its own `ChatOpenAI` inline, which is exactly the mistake `llm_client`'s
+    docstring already warns about — "when each group held its own `_llm`, a test that muzzled
+    one of them left the others free to dial out". The consequence here was narrower and worse
+    than a stray API call: the eight end-to-end `extract` tests inject at `llm_client`, so they
+    could not drive this runtime at all, and the better runtime could not become the default
+    without turning them red.
+
+    Imported lazily because langchain is not needed by any command that stays on the
+    LangGraph path.
+    """
+    import os
+
+    from langchain_openai import ChatOpenAI
+
+    from .audit import _callbacks
+    return ChatOpenAI(model=(model or os.getenv("ACR_MODEL_NAME", "gpt-5.6-luna")),
+                      base_url=api_base or os.getenv("ACR_API_BASE"),
+                      api_key=os.getenv("ACR_API_KEY"),
+                      temperature=temperature, timeout=600, max_retries=3,
+                      callbacks=_callbacks())
+
+
 def load_artifact(path: str, schema: str) -> dict:
     """Read a pipeline artifact, refusing one that is not the stage it is being fed to."""
     p = Path(path)

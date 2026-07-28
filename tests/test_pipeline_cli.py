@@ -224,9 +224,21 @@ def test_flattened_rows_are_what_the_rule_engine_accepts():
 
 
 # ------------------------------------------------------------------ extract (L0-L3)
+# ---------------------------------------------------------------------------------------
+# EVERY `extract` INVOCATION BELOW NAMES `--runtime langgraph`, and that is the point of the
+# flag rather than an accident of it. These tests pin plumbing that belongs to the
+# hand-written loop — `cli_common.budget`, the `run_budget` manifest block, the single plan
+# block in the transcript — and they were written when it was the only runtime, so the
+# default carried the choice implicitly. When the default moved to `hooks` (measured better
+# on ten real charts) all eight failed, which read as a regression and was really a test
+# saying "whatever runs by default" about something runtime-specific.
+#
+# The hooks runtime's own end-to-end coverage is tests/test_hooks_runtime_cli.py.
+# ---------------------------------------------------------------------------------------
+
 def test_extract_dry_run_plans_the_work_without_a_model(tmp_path):
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\nSYN0002\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "primary_site,histology,stage", "--dry-run"])
     assert r.exit_code == 0, r.output
     assert "2 patient(s) x 2 spec(s) = 4 agent run(s)" in r.output
@@ -236,7 +248,7 @@ def test_extract_dry_run_plans_the_work_without_a_model(tmp_path):
 def test_many_variables_of_one_spec_are_one_run(tmp_path):
     """The unit of work is the spec. Three fields of one spec is one pass over the chart."""
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "primary_site,histology,behavior", "--dry-run"])
     assert "1 patient(s) x 1 spec(s) = 1 agent run(s)" in r.output
 
@@ -244,7 +256,7 @@ def test_many_variables_of_one_spec_are_one_run(tmp_path):
 def test_an_unknown_variable_stops_the_command(tmp_path):
     """Never a shorter extract than was asked for — and the vocabulary comes back with it."""
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "histology,tx1_date", "--dry-run"])
     assert r.exit_code == 2
     assert "tx1_date" in r.output and "known variables" in r.output
@@ -252,14 +264,14 @@ def test_an_unknown_variable_stops_the_command(tmp_path):
 
 def test_an_outside_notes_variable_is_flagged_before_the_cohort_is_spent(tmp_path):
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "class_of_case", "--dry-run"])
     assert r.exit_code == 0
     assert "WRONG_DATA_SOURCE" in r.output
 
 
 def test_a_missing_cohort_file_is_a_usage_error(tmp_path):
-    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "nope.csv"),
+    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "nope.csv"),
                             "--variables", "histology", "--dry-run"])
     assert r.exit_code != 0
 
@@ -333,7 +345,7 @@ def scripted(monkeypatch):
 def test_extract_runs_the_agent_and_writes_a_usable_artifact(tmp_path, scripted):
     """The whole L0-L3 leg: resolve, run the gated agent per patient x spec, flatten, write."""
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\nSYN0002\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "primary_site,histology,behavior",
                             "--out", str(tmp_path / "runs"), "--seed", "7"])
     assert r.exit_code == 0, r.output
@@ -354,7 +366,7 @@ def test_extract_runs_the_agent_and_writes_a_usable_artifact(tmp_path, scripted)
 
 def test_the_run_is_traceable_back_to_the_code_and_spec_that_made_it(tmp_path, scripted):
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+    runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
                         "--variables", "histology", "--out", str(tmp_path / "runs")])
     (path,) = list((tmp_path / "runs").glob("extract__*/extract.json"))
     doc = json.loads(path.read_text(encoding="utf-8"))
@@ -366,7 +378,7 @@ def test_the_run_is_traceable_back_to_the_code_and_spec_that_made_it(tmp_path, s
 def test_a_real_extract_feeds_concord_and_explain(tmp_path, scripted):
     """End to end on an artifact the agent actually produced, not a hand-built one."""
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+    runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
                         "--variables", "primary_site,histology,behavior",
                         "--out", str(tmp_path / "runs")])
     (ex,) = list((tmp_path / "runs").glob("extract__*/extract.json"))
@@ -390,7 +402,7 @@ def test_one_failing_patient_does_not_shrink_the_cohort_silently(tmp_path, scrip
     carrying the error and the command exits non-zero; dropping it would move a denominator
     with nothing recording that it moved."""
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\nNO_SUCH_PATIENT\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "histology", "--out", str(tmp_path / "runs")])
     assert r.exit_code == 1
     (path,) = list((tmp_path / "runs").glob("extract__*/extract.json"))
@@ -654,7 +666,7 @@ def test_the_token_budget_on_the_command_line_reaches_the_run(tmp_path, scripted
     monkeypatch.setattr(cc, "budget",
                         lambda *a: seen.setdefault("b", real(*a)))
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "histology", "--out", str(tmp_path / "runs"),
                             "--max-steps", "9", "--max-tokens", "12345", "--max-seconds", "77"])
     assert r.exit_code == 0, r.output
@@ -665,7 +677,7 @@ def test_the_token_budget_on_the_command_line_reaches_the_run(tmp_path, scripted
 def test_the_manifest_says_what_the_run_was_allowed_to_spend(tmp_path, scripted):
     """A BUDGET_EXHAUSTED with no numbers beside it cannot be told from a silent chart."""
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+    runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
                         "--variables", "histology", "--out", str(tmp_path / "runs"),
                         "--max-tokens", "999999"])
     (m,) = list((tmp_path / "runs").glob("extract__*/*.manifest.json"))
@@ -676,7 +688,7 @@ def test_the_manifest_says_what_the_run_was_allowed_to_spend(tmp_path, scripted)
 
 def test_an_untouched_budget_is_declared_a_default_so_a_reader_can_discount_it(tmp_path, scripted):
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+    runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
                         "--variables", "histology", "--out", str(tmp_path / "runs")])
     (m,) = list((tmp_path / "runs").glob("extract__*/*.manifest.json"))
     assert json.loads(m.read_text(encoding="utf-8"))["run_budget"]["is_library_default"] is True
@@ -724,7 +736,7 @@ def test_nothing_but_a_plan_block_is_dropped():
 def test_a_run_carries_exactly_one_plan_block_end_to_end(tmp_path, scripted):
     from acr.plan_expansion import is_plan_block
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "histology", "--out", str(tmp_path / "runs")])
     assert r.exit_code == 0, r.output
     sent = [m for call in scripted.seen for m in call if is_plan_block(m)]
