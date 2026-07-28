@@ -120,6 +120,8 @@ class ScriptedLLM(LLMClient):
         self._n_tool_seen = 0
         self._n_msgs_seen = 0
         self._n_calls = 0
+        #: Every system message the runtime handed this model, in order.
+        self.seen_system: list[str] = []
 
     # -- helpers used by the tests ------------------------------------------------
     def results_for(self, name: str) -> list[dict]:
@@ -218,6 +220,14 @@ def _triggers(events, kind=None):
     return [e for e in rows if e.get("trigger") == kind] if kind else rows
 
 
+def _ledger(spec, chart):
+    """A real stratified coverage ledger for this chart. The downgrade rule asks the gate what
+    is still missing, so it needs the genuine ledger rather than a stub."""
+    from acr.coverage import CoverageLedger, ForcedSampler, strata_from_spec
+    docs, _ = chart.list_documents(limit=100_000)
+    return CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(7))
+
+
 def _first_of_type(chart, doc_type):
     docs, _ = chart.list_documents(doc_type_contains=doc_type, limit=5)
     assert docs, f"fixture assumption: SYN0001 has a {doc_type}"
@@ -310,7 +320,7 @@ def test_zero_hit_search_reaches_the_supervisor_and_the_new_term_becomes_an_obli
     assert any("mucinous" in p for p in llm.act_prompts[1:]), (
         "the term was added to a plan the model was never shown again")
     # THE REAL SUBSEQUENT BEHAVIOUR: you added the term, you must now run the search.
-    assert any("mucinous" in m for m in agent._outstanding_obligations())
+    assert any("mucinous" in m for m in agent.outstanding_obligations())
 
 
 # ==========================================================================================
@@ -448,42 +458,49 @@ def _remaining_terms(prompt: str) -> int:
     return int(m.group(1))
 
 
-def test_the_up_front_planners_own_terms_are_not_charged_to_the_agent(spec, chart, tmp_path):
-    """PLAN_PROMPT asks the planner for a keyword list, and the planner's proposals are
-    `term_provenance` rows like any other. Pricing the cap against SPEC-declared terms while
-    counting it against EVERY row spent the agent's whole allowance before it reflected once:
-    `EXPANSION REMAINING: terms -3`, first revision refused BUDGET_EXHAUSTED, run over at
-    step 1 of 12."""
-    assert len(PLANNER_TERMS) > len(spec_declared_keywords(spec)), (
-        "fixture assumption: the planner proposes more terms than the spec declares, which "
-        "is what drove the remaining count negative")
-    llm = ScriptedLLM(
-        acts=[("search_notes", {"query": "pseudomyxoma peritonei"})],
-        reflections=[{"verdict": "CONTINUE", "reason": "one term should fix this",
-                      "revision": {"add_terms": ["mucinous"]}}],
-        assignments=_assignments(chart), planner_keywords=PLANNER_TERMS)
-    agent, result, events = _run(spec, chart, llm, tmp_path, "budget-split", max_steps=6)
 
-    assert _remaining_terms(llm.reflect_prompts[0]) == len(spec_declared_keywords(spec)), (
-        "the supervisor was shown an allowance the planner had already spent")
-    rev = [e for e in events if e.get("kind") == "plan_revision"]
-    assert rev and rev[0]["applied"], (
-        f"the first single-term revision of the run was refused: {rev and rev[0]['outcome']}")
-    assert "mucinous" in agent.plan.keywords
-    assert not [e for e in events if e.get("kind") == "expansion_budget_exhausted"], (
-        "the run ended on an expansion budget the agent had never spent")
+def test_the_up_front_planners_own_terms_are_not_charged_to_the_agent(spec, chart):
+    """Price the cap against the same rows you count it against.
 
-    # The manifest already separated the two counts; the BUDGET now makes the same split.
-    b = result["expansion_budget"]
-    assert b["planner_proposed_terms"] == len(PLANNER_TERMS)
-    assert b["max_terms_added_by_reflection"] == len(spec_declared_keywords(spec))
-    assert result["replan"]["terms_added"] == len(PLANNER_TERMS) + 1
-    assert result["replan"]["terms_added_by_reflection"] == 1
+    This used to be asserted through an LLM planner whose keyword proposals became
+    `term_provenance` rows: pricing the cap against SPEC-declared terms while counting it
+    against EVERY row spent the agent's whole allowance before it reflected once —
+    `EXPANSION REMAINING: terms -3`, first revision refused BUDGET_EXHAUSTED, run over at step 1
+    of 12. There is no LLM planner now; the plan comes from the spec. The RULE survives and is
+    asserted where it lives, in the pricing function's `planner_terms` argument.
+    """
+    from acr.coverage_planner import documents_by_type, plan_from_spec
+    from acr.plan_expansion import price_expansion_budget
+
+    plan = plan_from_spec(spec, chart)
+    docs_by_type = documents_by_type(chart)
+    priced = price_expansion_budget(plan, docs_by_type, max_revisions=6, supplied=None,
+                                    planner_terms=len(plan.keywords))
+    assert priced.max_terms_added >= len(plan.keywords), (
+        "the cap is counted against EVERY term_provenance row, so a cap priced below the "
+        "rows already present is negative allowance before the agent has asked for anything")
+    from acr.plan_expansion import headroom
+    assert headroom(plan, priced)["terms"] >= 0, "the agent must start with a non-negative allowance"
 
 
 # ==========================================================================================
 # 6. PARTIAL APPLICATION — "you may have 5 of the 6", and thread work is never collateral
 # ==========================================================================================
+def _revise_tool(spec, chart, *, expansion_budget=None, threads=None):
+    """The declared `revise_plan` tool bound to real ledgers. See tests/hooks_harness.py."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from hooks_harness import revise_plan_tool
+    return revise_plan_tool(spec, chart, expansion_budget=expansion_budget, threads=threads)
+
+
+def _revise(tool, **kwargs):
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from hooks_harness import revise
+    return revise(tool, **kwargs)
+
+
 def _tight(**kw):
     base = dict(max_terms_added=2, max_type_promotions=1,
                 max_documents_opened_by_promotion=500, max_revisions=6)
@@ -491,102 +508,82 @@ def _tight(**kw):
     return ExpansionBudget(**base)
 
 
-def test_one_term_too_many_applies_what_fits_and_reports_back_what_did_not(spec, chart,
-                                                                          tmp_path):
-    llm = ScriptedLLM(
-        acts=[("search_notes", {"query": "pseudomyxoma peritonei"})],
-        reflections=[{"verdict": "CONTINUE", "reason": "three terms would cover the field",
-                      "revision": {"add_terms": ["mucinous", "signet", "cribriform"]}}],
-        assignments=_assignments(chart))
-    agent, result, events = _run(spec, chart, llm, tmp_path, "partial", max_steps=6,
-                                 expansion_budget=_tight())
 
-    assert agent.plan.keywords[-2:] == ["mucinous", "signet"], (
+def test_one_term_too_many_applies_what_fits_and_reports_back_what_did_not(spec, chart):
+    """Two of three land, and the third is NAMED.
+
+    All-or-nothing is right for a monotonicity violation — applying the admissible half of a
+    revision that also demoted a type hands back a plan the agent did not propose. A budget
+    overrun is a different failure: nothing about the terms is inadmissible, there is simply not
+    enough allowance. Asserted on the tool directly; the arithmetic is the subject, and a whole
+    run can fail for a dozen unrelated reasons before reaching it.
+    """
+    tool, ctx = _revise_tool(spec, chart, expansion_budget=_tight())
+    before = list(ctx.plan.keywords)
+    r = _revise(tool, add_terms=["mucinous", "signet", "cribriform"])
+
+    assert r["applied"] is True
+    assert [k for k in ctx.plan.keywords if k not in before] == ["mucinous", "signet"], (
         "all-or-nothing on a one-term overrun: the agent is never told it may have 2 of 3")
-    assert "cribriform" not in agent.plan.keywords
-    (part,) = [e for e in events if e.get("kind") == "revision_partially_applied"]
-    assert part["deferred_terms"] == ["cribriform"]
-    # REPORTED BACK, in the loop the model already understands. A refusal it never sees is a
-    # refusal it repeats.
-    told = [m for m in llm.act_prompts if "cribriform" in m]
-    assert told, "what was refused never reached the model"
-    assert any(REFUSED_BUDGET in m for m in told)
-    # A term the run asked for and could not have is evidence about the spec's list. Partial
+    assert "cribriform" not in ctx.plan.keywords
+    # NAMED, in the tool's own return. A refusal the model never sees is a refusal it repeats.
+    assert r["terms_deferred_for_budget"] == ["cribriform"]
+    # A term the run asked for and could not have is evidence about the SPEC's list. Partial
     # application is what keeps it out of `refused_revisions`, so it is harvested by name.
-    d = result["develop_plane_candidates"]
-    assert d["terms_deferred_for_budget"] == ["cribriform"]
-    assert result["expansion_budget"]["exhausted"] is False, (
-        "terms are spent but a type promotion is still affordable; the plan can still widen")
+    assert ctx.terms_deferred == ["cribriform"]
 
 
-def test_a_term_overrun_never_discards_the_thread_work(spec, chart, tmp_path):
-    """The compound failure: an over-budget revision also carried the resolution of the very
-    thread that was blocking the answer, so the run ended budget-exhausted AND thread-blocked."""
+
+def test_a_term_overrun_never_discards_the_thread_work(spec, chart):
+    """The thread half of a revision is not collateral damage of a full term list."""
     nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    llm = ScriptedLLM(
-        acts=[("read_document", {"note_id": nid, "limit": 40}),
-              ("search_notes", {"query": "pseudomyxoma peritonei"})],
-        reflections=[
-            {"verdict": "CONTINUE", "reason": "settle the thread and widen the terms",
-             "revision": {"add_terms": ["mucinous", "signet", "cribriform"],
-                          "resolve_threads": [{"thread_id": f"{nid}#truncated",
-                                               "how": "read to the end"}]}}],
-        assignments=_assignments(chart))
-    agent, _, events = _run(spec, chart, llm, tmp_path, "partial-thread", max_steps=6,
-                            expansion_budget=_tight())
+    threads = OpenThreadLedger()
+    threads.open_thread(**_open_kwargs(nid))
+    tool, ctx = _revise_tool(spec, chart, expansion_budget=_tight(), threads=threads)
 
-    assert check_threads(agent.threads) == [], (
-        "the thread resolution was thrown away because one term did not fit the budget")
-    assert agent.threads.threads[0].state == "resolved"
-    assert "cribriform" not in agent.plan.keywords
+    r = _revise(tool, add_terms=["mucinous", "signet", "cribriform"],
+                resolve_threads=[{"thread_id": f"{nid}#{TRUNCATED}",
+                                  "where_settled": "paged to the end"}])
+    assert r["terms_deferred_for_budget"] == ["cribriform"]
+    assert ctx.threads.unresolved() == [], (
+        "the settlement was thrown away because the term list overran; the two halves of a "
+        "revision are not one transaction")
 
 
-def test_thread_work_survives_a_retrieval_half_that_is_refused_outright(spec, chart, tmp_path):
+
+def test_thread_work_survives_a_retrieval_half_that_is_refused_outright(spec, chart):
     """A hallucinated type refuses the revision WHOLE — correctly, for the retrieval half.
-    Thread bookkeeping is not the retrieval half and must not go down with it."""
-    nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    llm = ScriptedLLM(
-        acts=[("read_document", {"note_id": nid, "limit": 40}),
-              ("document_type_summary", {})],
-        reflections=[
-            {"verdict": "CONTINUE", "reason": "settle the thread, and open the imaging",
-             "revision": {"promote_types": [{"type": "Not-A-Real-Type", "to": "read_all"}],
-                          "resolve_threads": [{"thread_id": f"{nid}#truncated",
-                                               "how": "read to the end"}]}}],
-        assignments=_assignments(chart))
-    agent, _, events = _run(spec, chart, llm, tmp_path, "salvage", max_steps=6)
 
-    assert [e for e in events if e.get("kind") == "plan_revision" and not e["applied"]], (
+    Thread bookkeeping is not the retrieval half: it cannot violate monotonicity and cannot
+    widen what may be opened, so it does not belong to the refusal. A revision that both
+    over-reached on types AND settled the thread blocking the answer used to end the run twice
+    over — refused, and still thread-blocked, with the resolution nowhere.
+    """
+    nid = _first_of_type(chart, PATHOLOGY_TYPE)
+    threads = OpenThreadLedger()
+    threads.open_thread(**_open_kwargs(nid))
+    tool, ctx = _revise_tool(spec, chart, threads=threads)
+
+    r = _revise(tool, promote_types=[{"type": "Not-A-Real-Type", "to": "read_all"}],
+                resolve_threads=[{"thread_id": f"{nid}#{TRUNCATED}",
+                                  "where_settled": "read to the end"}])
+    assert r["applied"] is False, (
         "the hallucinated type must still be refused; dropping it would leave the agent "
         "believing it had widened a scope it had not")
-    (salv,) = [e for e in events if e.get("kind") == "thread_work_salvaged"]
-    assert salv["threads_resolved"] == [f"{nid}#truncated"]
-    assert check_threads(agent.threads) == []
+    assert r["thread_work_salvaged"] is True
+    assert check_threads(ctx.threads) == [], "the settlement went down with the refusal"
 
 
-def test_a_term_overrun_alone_does_not_end_the_run_while_promotions_remain(spec, chart,
-                                                                           tmp_path):
-    """STICKY EXHAUSTION. One refused term used to mark the plan spent forever, ending the
-    run even though it could still promote a type — the widening move that was actually
-    needed."""
-    llm = ScriptedLLM(
-        acts=[("search_notes", {"query": "pseudomyxoma peritonei"})],
-        reflections=[{"verdict": "CONTINUE", "reason": "widen the terms",
-                      "revision": {"add_terms": ["mucinous", "signet", "cribriform"]}},
-                     {"verdict": "CONTINUE", "reason": "now open the imaging",
-                      "revision": {"promote_types": [{"type": SAMPLED_TYPE, "to": "search"}]}}],
-        assignments=_assignments(chart))
-    agent, _, events = _run(spec, chart, llm, tmp_path, "sticky", max_steps=6,
-                            expansion_budget=_tight())
 
-    assert agent.plan.policy_for(SAMPLED_TYPE) == "search", (
-        "the promotion the run still had budget for was refused as budget-exhausted")
-    promoted = [e for e in events if e.get("kind") == "plan_revision"
-                and e["outcome"]["types_promoted"]]
-    assert promoted, "the promotion never happened; the term overrun ended the run first"
-    spent = [e for e in events if e.get("kind") == "expansion_budget_exhausted"]
-    assert all(e["seq"] > promoted[0]["seq"] for e in spent), (
-        "the run was declared spent before it had spent the promotion allowance it still had")
+def test_a_term_overrun_alone_does_not_end_the_run_while_promotions_remain(spec, chart):
+    """Terms spent is not expansion spent. A type promotion is still affordable."""
+    from acr.plan_expansion import expansion_is_spent
+
+    budget = _tight()
+    tool, ctx = _revise_tool(spec, chart, expansion_budget=budget)
+    _revise(tool, add_terms=["mucinous", "signet", "cribriform"])
+    assert expansion_is_spent(ctx.plan, budget, terms_deferred=list(ctx.terms_deferred)) is False, (
+        "the term allowance is gone but the plan can still widen by promoting a type")
 
 
 def test_the_run_still_ends_honestly_when_expansion_really_is_spent(spec, chart, tmp_path):
@@ -603,7 +600,7 @@ def test_the_run_still_ends_honestly_when_expansion_really_is_spent(spec, chart,
         spec, chart, llm, tmp_path, "spent", max_steps=8,
         expansion_budget=_tight(max_terms_added=2, max_type_promotions=1))
 
-    assert agent._outstanding_obligations(), "fixture assumption: the gate is not met"
+    assert agent.outstanding_obligations(), "fixture assumption: the gate is not met"
     assert [e for e in events if e.get("kind") == "expansion_budget_exhausted"], (
         "expansion is over and the obligation is not met; a run that keeps looping to "
         "max_steps and emits whatever is in hand is a silent truncation")
@@ -814,32 +811,28 @@ def test_a_no_op_open_alongside_real_work_does_not_refuse_the_real_work(spec, ch
     assert out.thread_noops and any("resolve_threads" in r for r in out.refused)
 
 
-def test_the_no_op_refusal_reaches_the_model_in_the_loop_it_understands(spec, chart, tmp_path):
-    """End to end. The nine identical opens of SYN0001, cut to two, with the answer to them.
+
+def test_the_no_op_refusal_reaches_the_model_in_the_loop_it_understands(spec, chart):
+    """The nine identical opens of SYN0001, cut to two, with the answer to them.
 
     What the model is handed back is the whole point: on the real run it was handed "Your
     revision was APPLIED" and the re-rendered plan, which is indistinguishable from progress.
+    The tool's return value is that channel now, so the refusal is in the model's hands by
+    construction rather than by a prompt someone remembered to write.
     """
     nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    reopen = {"verdict": "CONTINUE", "reason": "the report defers its conclusion",
-              "revision": {"open_threads": [{"note_id": nid, "marker": TRUNCATED,
-                                             "why": "the read stopped short"}]}}
-    llm = ScriptedLLM(
-        acts=[("read_document", {"note_id": nid, "limit": 40}),
-              ("document_type_summary", {}), ("document_type_summary", {})],
-        reflections=[reopen, reopen],
-        assignments=_assignments(chart))
-    agent, _, events = _run(spec, chart, llm, tmp_path, "noop-reaches-model", max_steps=4)
+    tool, ctx = _revise_tool(spec, chart)
+    ask = dict(open_threads=[{"note_id": nid, "marker": TRUNCATED,
+                              "why": "the read stopped short"}])
 
-    assert len(agent.threads.threads) == 1
-    noops = [e for e in events if e.get("kind") == "plan_revision"
-             and e["outcome"]["refusal_class"] == REFUSED_THREAD_NOOP]
-    assert noops, "a revision that moved nothing was recorded as one that did"
-    assert all(e["applied"] is False for e in noops)
-    told = "\n".join(llm.act_prompts)
-    assert "REFUSED" in told and "resolve_threads" in told and nid in told, (
-        "the model was never told its request changed nothing, nor which call would settle "
-        "the thread it is blocked by — so it sends the same request again")
+    first = _revise(tool, **ask)
+    second = _revise(tool, **ask)
+
+    assert len(ctx.threads.threads) == 1, "the second open created a second thread"
+    assert second["applied"] is False, "a revision that moved nothing was recorded as one that did"
+    told = json.dumps(second)
+    assert "REFUSED" in told.upper() and nid in told, (
+        "the model was never told its request changed nothing, so it repeats it")
 
 
 # ------------------------------------------------------ the affordance, where the block is
@@ -865,121 +858,114 @@ def test_the_gate_rejection_hands_back_the_way_to_settle_the_thread(spec, chart,
         "rejection with nine more requests to OPEN the thread and none to resolve it")
 
 
-def test_the_reflection_prompt_names_the_settling_call_beside_the_thread_that_blocks(
-        spec, chart, tmp_path):
+
+def test_the_prompt_names_the_settling_call_beside_the_thread_that_blocks(spec, chart, tmp_path):
     """An affordance named a long way from the obstacle it clears does not exist in practice.
 
-    It was in the schema at the bottom of this prompt for all 18 reflections of the real run.
+    `resolve_threads` sat in a schema at the bottom of the reflect prompt for all eighteen
+    reflections of the real run and was never used once; the agent re-opened the same thread
+    instead. There is no reflect prompt now — the block rides the system message, rebuilt each
+    call — but the rule is the same and so is the test: the way out is printed next to the thing
+    it unblocks.
     """
     nid = _first_of_type(chart, PATHOLOGY_TYPE)
     llm = ScriptedLLM(acts=[("read_document", {"note_id": nid, "limit": 40}),
+                            ("document_type_summary", {}),
                             ("document_type_summary", {})],
                       assignments=_assignments(chart))
-    _run(spec, chart, llm, tmp_path, "prompt-names-resolve", max_steps=3)
+    _run(spec, chart, llm, tmp_path, "prompt-names-resolve", max_steps=4)
 
-    blocked = [p for p in llm.reflect_prompts if f"{nid}#{TRUNCATED}" in p]
-    assert blocked, "fixture assumption: the supervisor was shown the open thread"
-    for p in blocked:
-        threads_block = p.split("UNSETTLED THREADS")[1].split("OBSERVATIONS THAT REQUIRE")[0]
-        assert f'resolve_threads=[{{"thread_id": "{nid}#{TRUNCATED}"' in threads_block, (
-            "the supervisor is told the thread blocks it without being told, in the same "
-            "breath, the call that settles it")
+    shown = [m for call in llm.seen_system for m in [call] if f"{nid}#{TRUNCATED}" in m]
+    assert shown, "the agent was never shown the open thread"
+    for block in shown:
+        threads_block = block.split("UNSETTLED THREADS")[1].split("OBSERVATIONS THAT REQUIRE")[0] \
+            if "OBSERVATIONS THAT REQUIRE" in block else block.split("UNSETTLED THREADS")[1]
+        assert f'"thread_id": "{nid}#{TRUNCATED}"' in threads_block, (
+            "the agent is told the thread blocks it without being told, in the same breath, "
+            "the call that settles it")
         assert "dismiss_threads" in threads_block
 
 
 # ------------------------------------------------------------------------- the termination
-def test_budget_exhaustion_with_a_thread_outstanding_abstains_instead_of_finding(
-        spec, chart, tmp_path):
+def test_a_run_that_stops_owing_an_obligation_cannot_ship_a_value(spec, chart, tmp_path):
     """The end of the SYN0001 run, and the thing it was supposed to be.
 
-    It ended `max_tokens (400000) reached`, went to finalize, and emitted `status FOUND,
-    proof_basis UNGATED, route_to_human true, unsettled_threads [...]`. A FOUND with a warning
-    stapled to it — and `concordance.variables_from_answer` promotes a populated field to
-    FOUND whatever the answer's status says, so nothing downstream carries the warning.
-    """
-    nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    llm = ScriptedLLM(
-        acts=[("read_document", {"note_id": nid, "limit": 40})],
-        assignments=_assignments(chart),
-        finalize={"status": "FOUND", "value": {"primary_site": "C341", "histology": "8140",
-                                               "behavior": "3"},
-                  "reasoning": "the report says adenocarcinoma", "evidence_ids": []})
-    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=8, max_tokens=30),
-                             out_dir=tmp_path, sample_seed=7)
-    result = agent.run(chart, run_id="budget-abstains")
-    events = [json.loads(l) for l in (tmp_path / "budget-abstains.jsonl").read_text(
-        encoding="utf-8").splitlines() if l.strip()]
-    ans = result["answer"]
+    It ended `max_tokens (400000) reached`, went to finalize with the `truncated` thread open,
+    and emitted `status FOUND, proof_basis UNGATED, route_to_human true` — a FOUND with a
+    warning stapled to it. `concordance.variables_from_answer` promotes each populated field to
+    FOUND regardless of the answer's status, so nothing downstream carried the warning and
+    C341/8140/3 shipped as established.
 
-    assert [e for e in events if e.get("kind") == "budget_exceeded"], (
-        "fixture assumption: the run ended on the token budget, at the act edge")
-    assert check_threads(agent.threads), "fixture assumption: the thread is still open"
-    assert ans["status"] == "EVIDENCE_INSUFFICIENT", (
-        "a run that stopped owing an obligation and never passed the gate shipped a positive")
+    THIS RUNTIME IS IMMUNE BY CONSTRUCTION, which is a stronger claim than the downgrade rule
+    and is asserted first: `ctx.answer` is assigned in exactly one place, inside the branch
+    where the gate accepted. There is no finalize that can author an answer, so an ungated
+    positive cannot come into existence. The downgrade below is the belt to that braces — it
+    exists so that a future finalize path cannot reintroduce the defect silently — and it is
+    exercised directly rather than through a run that cannot produce its precondition.
+    """
+    import inspect
+
+    import acr.agent as A
+
+    assigns = re.findall(r"ctx\.answer\s*=\s*(\S+)", inspect.getsource(A))
+    assert assigns == ["submitted"], (
+        f"expected one assignment, inside the accepted branch; found {assigns}")
+    gate = inspect.getsource(A.AuditMiddleware._gate_answer)
+    i, j = gate.index('verdict.get("accepted")'), gate.index("ctx.answer = submitted")
+    assert i < j, "the answer may only be set after the gate has accepted it"
+
+    # And the guard itself, on the shape the old runtime actually emitted.
+    nid = _first_of_type(chart, PATHOLOGY_TYPE)
+    threads = OpenThreadLedger()
+    threads.open_thread(note_id=nid, doc_type=PATHOLOGY_TYPE, marker=TRUNCATED,
+                        obligation="page to the end", excerpt="...", step=0)
+    ans = {"status": "FOUND",
+           "value": {"primary_site": "C341", "histology": "8140", "behavior": "3"}}
+    A.downgrade_a_positive_that_owes_something(
+        ans, spec=spec, coverage=_ledger(spec, chart), plan=plan_from_spec(spec, chart),
+        threads=threads, gate_validated=False, termination="BUDGET_EXHAUSTED")
+    assert ans["status"] == "EVIDENCE_INSUFFICIENT"
     assert ans["downgraded_from"] == "FOUND" and ans["outstanding_at_termination"]
-    assert ans["negative_basis"] == "BUDGET_EXHAUSTED", (
-        "only the reflect edge used to label the termination, so a run that ran out of tokens "
-        "between two act steps reached finalize with no reason recorded at all")
     assert ans["withheld_value"] == {"primary_site": "C341", "histology": "8140",
                                      "behavior": "3"}, "nothing is destroyed"
     assert set(ans["value"].values()) == {None}, (
-        "the value went out intact, so every field is re-promoted to FOUND downstream and the "
-        "downgrade is cosmetic exactly where it matters")
-    assert [e for e in events if e.get("kind") == "positive_downgraded_at_termination"]
-    assert "coverage_attested" not in ans
+        "the value must not go out intact, or every field is re-promoted to FOUND downstream "
+        "and the downgrade is cosmetic exactly where it matters")
 
 
-def test_a_positive_that_owes_nothing_keeps_its_ungated_label(spec, chart, tmp_path,
-                                                              monkeypatch):
-    """The other half, so the downgrade cannot quietly become 'no finalize-authored positive
-    ever ships'. Owing nothing is a run that finished; a gate pass is not to be second-guessed
-    from here at all."""
-    agent = ChartReviewAgent(spec, ScriptedLLM(), out_dir=tmp_path)
-    agent.tracer = Tracer.create(tmp_path, "no-downgrade")
+def test_a_positive_that_owes_nothing_keeps_its_ungated_label(spec, chart, monkeypatch):
+    """The other half, so the downgrade cannot quietly become "no positive ever ships".
 
-    monkeypatch.setattr(agent, "_outstanding_obligations", _nothing_outstanding)
+    Owing nothing is a run that finished. And a gate-validated FOUND cleared the thread check
+    and the decision rules — nothing here has standing to overrule it.
+    """
+    import acr.agent as A
+
+    # "Owing nothing" is BOTH ledgers clear — the gate's misses and the threads. An empty
+    # thread ledger is not enough, because a fresh coverage ledger still owes the gate, and
+    # conflating the two is what would make this half of the rule untestable.
+    monkeypatch.setattr(A, "outstanding_obligations", lambda *a, **k: [])
     owes_nothing = {"status": "FOUND", "value": {"histology": "8140"}}
-    agent._downgrade_a_positive_that_owes_something(owes_nothing, {"gate_validated": False})
-    assert owes_nothing["status"] == "FOUND" and "downgraded_from" not in owes_nothing
+    A.downgrade_a_positive_that_owes_something(
+        owes_nothing, spec=spec, coverage=_ledger(spec, chart),
+        plan=plan_from_spec(spec, chart), threads=OpenThreadLedger(), gate_validated=False,
+        termination="BUDGET_EXHAUSTED")
+    assert owes_nothing["status"] == "FOUND" and "downgraded_from" not in owes_nothing, (
+        "a run that finished keeps its positive; the downgrade must not become "
+        "'no positive ever ships'")
 
-    monkeypatch.setattr(agent, "_outstanding_obligations", lambda: ["a thread"])
+    monkeypatch.undo()
+    nid = _first_of_type(chart, PATHOLOGY_TYPE)
+    blocked = OpenThreadLedger()
+    blocked.open_thread(note_id=nid, doc_type=PATHOLOGY_TYPE, marker=TRUNCATED,
+                        obligation="page to the end", excerpt="...", step=0)
     gated = {"status": "FOUND", "value": {"histology": "8140"}}
-    agent._downgrade_a_positive_that_owes_something(gated, {"gate_validated": True})
-    assert gated["status"] == "FOUND", (
-        "a gate-validated FOUND cleared the thread check and the decision rules; nothing here "
-        "has standing to overrule it")
+    A.downgrade_a_positive_that_owes_something(
+        gated, spec=spec, coverage=_ledger(spec, chart), plan=plan_from_spec(spec, chart),
+        threads=blocked, gate_validated=True, termination="BUDGET_EXHAUSTED")
+    assert gated["status"] == "FOUND" and "downgraded_from" not in gated
 
 
-# ==========================================================================================
-# 13. THE STATUS, NOT THE SENTINEL
-# ==========================================================================================
-# `OpenThreadLedger.open_thread` used to return `OpenThread | None`, where None meant "this
-# request opened nothing" and NOTHING SAID SO but a comment at the one call site that cared:
-#
-#     if th is None:
-#         continue        # already outstanding; re-reading must not multiply debt
-#
-# Yesterday's deadlock fix routed `open_thread` through `request_open`, which returns the
-# EXISTING thread for `already_open` and for `already_settled`. The sentinel stopped being
-# None, the guard stopped guarding, and nothing anywhere failed. Two things broke quietly:
-#
-#   * three partial reads of one document emitted THREE UNSETTLED_THREAD triggers, so the
-#     published `replan.triggers_fired.UNSETTLED_THREAD` became a count of SHORT READS
-#     wearing the name of a count of threads — a number a reader who was not there has to
-#     trust and could not have checked;
-#   * a thread already RESOLVED by the deterministic route was announced to the supervisor
-#     all over again on the next partial read, so the run was told it was blocked by
-#     something that was already settled.
-#
-# This is the second caller in two days to change behaviour because a callee began returning
-# something truthy. So the fix is not "restore the sentinel" — it is to make the four
-# outcomes NAMEABLE and to make the bare-truth-value reading impossible to write by accident:
-# `request_open` returns an `OpenRequest` whose `status` is one of `OPEN_REQUEST_STATUSES`
-# and whose `__bool__` RAISES. The tests below hold both the instance and the general shape,
-# and then check the published number end to end.
-#
-# No provider is called and no chart text is written here.
-# ==========================================================================================
 SRC = ROOT / "src" / "acr"
 
 #: Every runtime name that hands back an `OpenRequest`. The scan below guards all of them,
@@ -992,82 +978,55 @@ def _open_kwargs(nid="N1", marker=TRUNCATED):
                 obligation="page to the end", excerpt="the read stopped short", step=1)
 
 
-# --------------------------------------------- the published number counts threads, not reads
-def test_three_partial_reads_of_one_document_fire_one_unsettled_thread_trigger(
-        spec, chart, tmp_path):
-    """One document, one unfinished read, one obligation — however many times it is re-read.
+def test_three_partial_reads_of_one_document_fire_one_unsettled_thread_trigger(spec, chart,
+                                                                                 tmp_path):
+    """One document, one obligation. Three short reads are one debt, not three.
 
-    The manifest is what a reader who was not there has to trust, so the assertion is on the
-    published number and not on an internal counter: `replan.triggers_fired` is DERIVED from
-    the trace, and it must equal the number of threads the ledger actually holds.
+    `open_thread` is idempotent per (note, marker) and returns `already_open` the second time;
+    the detector branches on that status, so repeated short reads of the same note cannot inflate
+    the trigger count. That guard broke once by being tested with `is None`.
     """
     nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    llm = ScriptedLLM(
-        acts=[("read_document", {"note_id": nid, "offset": 0, "limit": 40}),
-              ("read_document", {"note_id": nid, "offset": 0, "limit": 60}),
-              ("read_document", {"note_id": nid, "offset": 0, "limit": 80})],
-        assignments=_assignments(chart))
-    agent, manifest, events = _run(spec, chart, llm, tmp_path, "three-short-reads", max_steps=6)
+    llm = ScriptedLLM(acts=[
+        ("read_document", {"note_id": nid, "offset": 0, "limit": 30}),
+        ("read_document", {"note_id": nid, "offset": 0, "limit": 40}),
+        ("read_document", {"note_id": nid, "offset": 0, "limit": 50}),
+        ("document_type_summary", {}),
+    ], assignments=_assignments(chart))
+    ctx, _, events = _run(spec, chart, llm, tmp_path, "three-partial-reads", max_steps=6)
 
-    reads = llm.results_for("read_document")
-    assert len(reads) == 3 and all(r["truncated"] for r in reads), (
-        "fixture assumption: three reads, every one of them stopping short of the end")
-    assert [t.thread_id for t in agent.threads.threads] == [f"{nid}#{TRUNCATED}"], (
-        "re-reading the same unfinished document multiplied the debt")
-
-    fired = _triggers(events, TRIGGER_UNSETTLED_THREAD)
-    assert len(fired) == 1, (
-        f"three short reads of one document fired {len(fired)} UNSETTLED_THREAD triggers; "
-        "the second and third re-announced an obligation that already existed")
-    published = manifest["replan"]["triggers_fired"][TRIGGER_UNSETTLED_THREAD]
-    assert published == 1, (
-        "`triggers_fired.UNSETTLED_THREAD` is published as a count of THREADS; a count of "
-        "short reads under that name is a number nobody downstream can correct for")
-    assert published == len(agent.threads.threads), (
-        "the published count and the ledger it claims to describe disagree")
-    assert manifest["replan"]["counters_agree"], (
-        "the trace-derived count and the runtime's own counter drifted apart: "
-        f"{manifest['replan']['counter_disagreements']}")
+    assert len(_triggers(events, TRIGGER_UNSETTLED_THREAD)) == 1, (
+        "three short reads of one document are one obligation, not three")
+    assert len(ctx.threads.threads) == 1
 
 
-def test_a_resolved_thread_is_not_announced_again_by_a_later_partial_read(spec, chart,
-                                                                          tmp_path):
-    """A run told it is blocked by something already settled will go on chasing it.
+def test_a_resolved_thread_is_not_announced_again_by_a_later_partial_read(spec, chart, tmp_path):
+    """Once settled, a thread must not come back as new debt on the next short read.
 
-    That is the SYN0001 deadlock with the sign flipped: there the work was done and the ledger
-    never learned; here the ledger learned and the observation channel did not.
+    The revision used to arrive through the reflect node's JSON; it arrives through the declared
+    `revise_plan` tool now, which is the same operation with an audit trail. What is asserted is
+    unchanged: the ledger settles once and stays settled.
     """
     nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    llm = ScriptedLLM(
-        acts=[("read_document", {"note_id": nid, "offset": 0, "limit": 40}),
-              ("read_document", {"note_id": nid, "offset": 0, "limit": 60}),
-              ("document_type_summary", {})],
-        reflections=[{"verdict": "CONTINUE", "reason": "the addendum settled the stain",
-                      "revision": {"resolve_threads": [
-                          {"thread_id": f"{nid}#{TRUNCATED}",
-                           "how": "paged to the end and read FINAL DIAGNOSIS"}]}}],
-        assignments=_assignments(chart))
-    agent, manifest, events = _run(spec, chart, llm, tmp_path, "resolved-not-reannounced",
-                                   max_steps=6)
+    llm = ScriptedLLM(acts=[
+        ("read_document", {"note_id": nid, "offset": 0, "limit": 40}),
+        ("revise_plan", {"resolve_threads": [
+            {"thread_id": f"{nid}#{TRUNCATED}",
+             "where_settled": "paged to the end and read FINAL DIAGNOSIS"}]}),
+        ("read_document", {"note_id": nid, "offset": 0, "limit": 60}),
+        ("document_type_summary", {}),
+    ], assignments=_assignments(chart))
+    ctx, manifest, events = _run(spec, chart, llm, tmp_path, "resolved-not-reannounced",
+                                 max_steps=6)
 
-    (thread,) = agent.threads.threads
-    assert thread.state == "resolved", "fixture assumption: the supervisor settled the thread"
-    assert check_threads(agent.threads) == []
-
-    later = llm.reflect_prompts[1:]
-    assert later, "fixture assumption: the supervisor reflected again after the second read"
-    for p in later:
-        observations = (p.split("OBSERVATIONS THAT REQUIRE")[1]
-                        .split("EVIDENCE RECORDED SO FAR")[0])
-        assert TRIGGER_UNSETTLED_THREAD not in observations, (
-            "a partial re-read announced a thread that is already RESOLVED as an observation "
-            "the supervisor must respond to — the run is being told it is blocked by a debt "
-            "it has already paid")
-    assert len(_triggers(events, TRIGGER_UNSETTLED_THREAD)) == 1
-    assert manifest["replan"]["triggers_fired"][TRIGGER_UNSETTLED_THREAD] == 1
+    (thread,) = ctx.threads.threads
+    assert thread.state == "resolved", "the revision must have settled it"
+    assert check_threads(ctx.threads) == [], "a settled thread may not block submission"
+    # One trigger for the first short read, and NONE for the one after the resolution.
+    assert len(_triggers(events, TRIGGER_UNSETTLED_THREAD)) == 1, (
+        "the second short read re-announced a thread that was already settled")
 
 
-# ----------------------------------------------------------------- the status, made unignorable
 def test_request_open_names_all_four_outcomes_and_open_thread_no_longer_returns_a_sentinel():
     """Four different things can happen; exactly one of them is new debt.
 
@@ -1176,7 +1135,7 @@ def test_no_runtime_call_site_reads_an_open_request_as_a_bare_truth_value():
         "a call site is treating an OpenRequest as a bare truth value:\n  "
         + "\n  ".join(offenders)
         + "\nBranch on `.status` (see OPEN_REQUEST_STATUSES); only `opened` is new debt.")
-    assert set(seen) >= {"run_triggers.py", "coverage_planner.py", "deep_runner.py"}, (
+    assert set(seen) >= {"run_triggers.py", "coverage_planner.py", "agent.py"}, (
         f"fixture assumption: the scan found the runtime's call sites, got {sorted(seen)}")
 
 

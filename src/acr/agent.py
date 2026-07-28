@@ -117,9 +117,27 @@ class RunContext:
     #: earlier version of that cost a correct answer on a real chart.
     max_frozen_repeats: int = 3
     rejection_progress: dict = field(default_factory=dict)
+    #: Terms a revision asked for that the budget could not pay for. Harvested, not
+    #: discarded: the ask is evidence about the spec's declared list.
+    terms_deferred: list = field(default_factory=list)
+    #: Detected mechanically, not yet shown to the model. Drained by
+    #: `wrap_model_call`; a trigger nobody is told about is a trigger that did not
+    #: happen as far as the run is concerned.
+    pending_triggers: list = field(default_factory=list)
     spend: Any = None
     spend_stopped: str | None = None
+    expansion_stopped: str | None = None
     stalled: dict | None = None
+
+
+    def outstanding_obligations(self) -> list[str]:
+        """What this run still owes, asked of the context rather than of a runtime object.
+
+        A method because it is a real question about a run — "is this finished?" — and every
+        caller must get the same answer from the same two ledgers. When the old runtime had two
+        ways to compute it they disagreed about whether a run had finished.
+        """
+        return outstanding_obligations(self.spec, self.coverage, self.plan, self.threads)
 
 
 class AuditMiddleware(AgentMiddleware):
@@ -130,9 +148,11 @@ class AuditMiddleware(AgentMiddleware):
     WHICH HOOK each rule sits in — that is the design, not the packaging.
     """
 
-    def __init__(self, ctx: RunContext):
+    def __init__(self, ctx: RunContext, budget=None):
         super().__init__()
         self.ctx = ctx
+        #: The expansion budget, so the dead-end test can be asked once per turn.
+        self._budget = budget
 
     # ------------------------------------------------------------------- before_agent
     def before_agent(self, state, runtime) -> dict | None:
@@ -158,11 +178,75 @@ class AuditMiddleware(AgentMiddleware):
         so yesterday's plan is not still in the thread arguing with today's.
         """
         self.ctx.n_model_calls += 1
-        block = "PLAN (current):\n" + self.ctx.plan.render(self._docs_by_type())
+        parts = ["PLAN (current):\n" + self.ctx.plan.render(self._docs_by_type())]
+        if (obligations := self._threads_block()):
+            parts.append(obligations)
+        if (observed := self._triggers_block()):
+            parts.append(observed)
         sm = request.system_message
         content = ((sm.content if isinstance(sm.content, str) else str(sm.content)) + "\n\n"
-                   if sm is not None else "") + block
+                   if sm is not None else "") + "\n\n".join(parts)
         return handler(request.override(system_message=SystemMessage(content=content)))
+
+    def _expansion_spent_with_obligations(self) -> str | None:
+        """True only for the CONJUNCTION. Budget spent with everything discharged is a run that
+        finished; obligations outstanding with budget left is a run that should keep going. Only
+        both at once is a dead end, and a dead end has to be SAID."""
+        from .plan_expansion import expansion_is_spent
+        if self._budget is None:
+            return None
+        if not expansion_is_spent(self.ctx.plan, self._budget,
+                                  terms_deferred=list(self.ctx.terms_deferred)):
+            return None
+        outstanding = self.ctx.outstanding_obligations()
+        if not outstanding:
+            return None
+        return f"EXPANSION_BUDGET_EXHAUSTED with {len(outstanding)} obligation(s) outstanding"
+
+    def _threads_block(self) -> str:
+        """The open threads, each beside the call that settles it.
+
+        AN AFFORDANCE NAMED A LONG WAY FROM THE OBSTACLE IT CLEARS DOES NOT EXIST IN PRACTICE.
+        On the run this was written for, `resolve_threads` was in a schema at the bottom of the
+        prompt for all eighteen reflections and the agent never once used it; it re-opened the
+        same thread instead. So the way out is printed next to the thing it unblocks.
+        """
+        open_ = self.ctx.threads.unresolved() if self.ctx.threads else []
+        if not open_:
+            return ""
+        rows = []
+        for t in open_[:10]:
+            rows.append(
+                f"  - {t.thread_id}: {getattr(t, 'obligation', '') or 'unsettled'}\n"
+                f'    settle it with revise_plan(resolve_threads=[{{"thread_id": '
+                f'"{t.thread_id}", "where_settled": "..."}}])\n'
+                f'    or, if this chart cannot settle it, revise_plan(dismiss_threads=[...]) '
+                f"with a reason")
+        return ("UNSETTLED THREADS — each of these blocks submit_answer until it is settled:\n"
+                + "\n".join(rows))
+
+    def _triggers_block(self) -> str:
+        """What was detected mechanically since the last call. DRAINED, so it is said once.
+
+        The detector ran and told only the trace. The agent — the only party that can act on an
+        observation — was never shown it, so a mechanism that fires, records, and changes
+        nothing looked from the outside exactly like a mechanism that works.
+        """
+        pending, self.ctx.pending_triggers = list(self.ctx.pending_triggers), []
+        if not pending:
+            return ""
+        rows = []
+        for t in pending[:10]:
+            line = f"  - {t.kind}: {t.observation}"
+            if getattr(t, "terms_proposed", None):
+                line += f"\n    candidate terms: {list(t.terms_proposed)}"
+            if getattr(t, "types_proposed", None):
+                line += f"\n    candidate types: {list(t.types_proposed)}"
+            rows.append(line)
+        return ("OBSERVATIONS THAT REQUIRE A RESPONSE — detected mechanically since your last "
+                "turn. You are not being asked whether anything happened; these happened. For "
+                "each one either widen the plan with revise_plan or proceed knowing it stands:\n"
+                + "\n".join(rows))
 
     def _docs_by_type(self) -> dict[str, int]:
         return {r["doc_type"]: r["count"] for r in self.ctx.chart.type_summary()}
@@ -195,6 +279,23 @@ class AuditMiddleware(AgentMiddleware):
         # tens of dollars on one patient — and it is the only one that should. Step caps and
         # loop brakes were cutting working runs short while the budget went untouched.
         self.ctx.spend.add(getattr(last, "usage_metadata", None))
+        # EVERY TURN, not only after a refusal. A gate obligation the CURRENT plan structurally
+        # cannot discharge is a deadlock whether or not the agent has tried to submit yet — and
+        # on a run whose reads are refused OUT_OF_PLAN it never gets as far as submitting, which
+        # is exactly the case the detector exists for.
+        self._detect_deadlock()
+        if (spent := self._expansion_spent_with_obligations()) and not self.ctx.accepted:
+            # EXPANSION HAS A BUDGET AND RUNNING OUT OF IT IS A RESULT. The alternative — keep
+            # looping to the call limit and emit whatever is in hand — is a silent truncation
+            # dressed as an answer. This exits labelled, so the manifest carries a reason.
+            self.ctx.expansion_stopped = spent
+            self.ctx.tracer.emit("expansion_budget_exhausted", severity="warning",
+                                 outstanding=self.ctx.outstanding_obligations()[:20],
+                                 terms_deferred=list(self.ctx.terms_deferred),
+                                 message=("the plan can no longer widen and the proof obligation "
+                                          "is still not met. This is EVIDENCE_INSUFFICIENT and "
+                                          "it is honest; it is not a pass and not a truncation"))
+            return {"jump_to": "end"}
         if (why := self.ctx.spend.exceeded()) and not self.ctx.accepted:
             self.ctx.spend_stopped = why
             self.ctx.tracer.emit("cost_ceiling_reached", severity="error", why=why,
@@ -321,10 +422,25 @@ class AuditMiddleware(AgentMiddleware):
         if verdict.get("accepted"):
             self.ctx.accepted = True
             self.ctx.answer = submitted
+            out = {"accepted": True}
         else:
             self.ctx.rejections.append(verdict)
+            # A REJECTION IS AN EVENT, not a line in a tool log. `tracer.rejected` is what the
+            # eval plane's `rejection_loop` detector and `rule_attribution` read; emitting only
+            # `tracer.tool` left both blind, so a run that argued with the gate twenty times
+            # looked identical to one that submitted once.
+            self.ctx.tracer.rejected(verdict.get("why", ""), verdict.get("missing") or [],
+                                     submitted)
             self._detect_deadlock()
-        return ToolMessage(content=json.dumps(verdict, default=str)[:8000],
+            # SHAPED FOR THE AGENT, not the raw verdict. `missing` is the gate's word for its own
+            # bookkeeping; `you_must_still` is an instruction. And `how_to_satisfy` is the only
+            # place a thread rejection says `resolve_threads` — dropping it at this boundary is
+            # what turned one run into nine repeats of the wrong request.
+            out = {"accepted": False, "why": verdict.get("why"),
+                   "you_must_still": verdict.get("missing") or []}
+            if verdict.get("how_to_satisfy"):
+                out["how_to_satisfy"] = verdict["how_to_satisfy"]
+        return ToolMessage(content=json.dumps(out, default=str)[:8000],
                            tool_call_id=request.tool_call["id"], name="submit_answer",
                            status="success" if verdict.get("accepted") else "error")
 
@@ -341,11 +457,12 @@ class AuditMiddleware(AgentMiddleware):
         gives: it swallows its own exceptions, so without a channel to say so a detector that
         has stopped working is indistinguishable from a run with no deadlock to report.
         """
-        from .run_triggers import detect_gate_obligations
+        from .run_triggers import detect_gate_obligations  # noqa: F401
         for t in detect_gate_obligations(spec=self.ctx.spec, coverage=self.ctx.coverage,
                                          chart=self.ctx.chart, plan=self.ctx.plan,
                                          step=self.ctx.n_model_calls,
                                          tracer=self.ctx.tracer):
+            self.ctx.pending_triggers.append(t)
             self.ctx.tracer.trigger(runtime="deepagents-hooks", **t.to_dict())
 
     def _stalled(self, submitted: dict, verdict: dict) -> dict | None:
@@ -478,12 +595,13 @@ class AuditMiddleware(AgentMiddleware):
                 # back the existing one.
                 if req.status != OPEN_REQUEST_OPENED:
                     continue
+            self.ctx.pending_triggers.append(t)
             self.ctx.tracer.trigger(runtime="deepagents", **t.to_dict())
 
 
 def build_agent(*, model, tools: list[StructuredTool], system_prompt: str, ctx: RunContext,
                 backend, max_model_calls: int, summarization_model=None,
-                keep_messages: int = 20, max_usd: float = 5.0):
+                keep_messages: int = 20, max_usd: float = 5.0, expansion_budget=None):
     """The graph. Every node comes from the library; every rule comes from a hook.
 
     Middleware order is composition order. `AuditMiddleware` is last so its `wrap_tool_call`
@@ -507,7 +625,7 @@ def build_agent(*, model, tools: list[StructuredTool], system_prompt: str, ctx: 
         # The budget the CLI can finally reach, as a library concern rather than a dataclass
         # every construction site forgot to pass.
         ModelCallLimitMiddleware(thread_limit=max_model_calls, exit_behavior="end"),
-        AuditMiddleware(ctx),
+        AuditMiddleware(ctx, budget=expansion_budget),
     ]
     agent = create_agent(model, tools, system_prompt=system_prompt, middleware=middleware)
     assert_tool_surface(agent, ctx.declared)
@@ -542,16 +660,84 @@ def recursion_limit_for(agent, max_model_calls: int, *, slack: int = 8) -> int:
 # hook advances `ctx`, and this function, which owns those, assembles the record. The split is
 # the same one `graph.py` had between `_n_finalize` and `run`.
 
+def outstanding_obligations(spec, coverage, plan, threads) -> list[str]:
+    """Everything this run still owes: the gate's misses plus the unsettled threads.
+
+    A free function so the finalize path and the deadlock detector ask the same question. When
+    the old runtime had two ways to compute it they disagreed about whether a run had finished.
+    """
+    from .answer_gate import check_gate, check_threads
+    try:
+        missing = list(check_gate(spec, coverage, plan).missing)
+    except Exception:      # noqa: BLE001 - a broken gate must not decide the answer's status
+        missing = []
+    return missing + check_threads(threads)
+
+
+def downgrade_a_positive_that_owes_something(ans: dict, *, spec, coverage, plan, threads,
+                                             gate_validated: bool, termination: str,
+                                             tracer=None) -> None:
+    """A run that stopped owing an obligation may not walk out with a positive.
+
+    NOT PORTED WITH THE RUNTIME, and that is worse than it sounds. The hooks runtime was setting
+    `proof_basis: UNGATED` and `route_to_human: True` on such an answer and shipping the VALUE
+    intact — and `concordance.variables_from_answer` promotes every populated field to FOUND
+    regardless of the answer's status. So the warning was carried by nothing downstream reads,
+    which is precisely the defect this rule exists to prevent: a real run once ended
+    `max_tokens (400000) reached` with a `truncated` thread open and emitted
+    C341/8140/3 as established.
+
+    THE THREE CONDITIONS, all required:
+      * the answer is FOUND;
+      * it never passed the gate — a gate-validated FOUND cleared the thread check and the
+        decision rules, and nothing here has standing to second-guess it;
+      * an obligation is genuinely outstanding. Owing nothing is a run that finished, and it
+        keeps its UNGATED FOUND.
+
+    THE VALUE GOES WITH THE STATUS. Left in place it is re-promoted field by field and the
+    downgrade is cosmetic exactly where it matters. It is preserved verbatim under
+    `withheld_value` so nothing is destroyed and a reviewer can see what the model wanted to
+    say; it simply is not asserted by a run that did not finish.
+    """
+    if ans.get("status") != "FOUND" or gate_validated:
+        return
+    obligations = outstanding_obligations(spec, coverage, plan, threads)
+    if not obligations:
+        return
+    ans["status"] = "EVIDENCE_INSUFFICIENT"
+    ans["downgraded_from"] = "FOUND"
+    ans["downgraded_because"] = (
+        f"the run stopped ({termination}) with {len(obligations)} obligation(s) still "
+        f"outstanding and never passed the answer gate; a positive asserted from that position "
+        f"is a guess with a warning attached, and the honest status is an abstention")
+    ans["outstanding_at_termination"] = obligations[:20]
+    if ans.get("value"):
+        ans["withheld_value"] = ans["value"]
+        # Explicit nulls, not a dropped key: `variables_from_answer` reads a missing field as a
+        # silence and an explicit null as the answer's own status, and the second is what this is.
+        ans["value"] = {f.name: None for f in spec.fields}
+    if tracer is not None:
+        tracer.emit("positive_downgraded_at_termination", severity="warning",
+                    termination=termination, outstanding=obligations[:20],
+                    withheld_value=ans.get("withheld_value"),
+                    message=("FOUND was emitted by a run that stopped with an obligation "
+                             "outstanding and no gate pass; recorded as EVIDENCE_INSUFFICIENT "
+                             "with the proposed value withheld"))
+
+
 def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads, catalogue,
                      tracer, gate, model, tools, system_prompt, backend, max_model_calls,
                      out_dir, elapsed_fn, expansion_budget, ctx_out=None,
-                     max_usd: float = 5.0) -> dict:
+                     max_usd: float = 5.0, seed_record: dict | None = None) -> dict:
     """One patient, one spec, through the library's graph. Returns the manifest."""
     from .answer_contract import NO_COVERAGE_CLAIM, attach_coverage_claim
+    from .coverage_planner import MONOTONICITY_VS_LEDGER
     from .plan_expansion import budget_report, expansion_is_spent, headroom
     from .answer_contract import (assert_answer_is_reportable, build_spec_gap,
                                   strip_value_from_spec_insufficient)
 
+    seed_record = seed_record or {"effective": None, "provenance": "unrecorded",
+                                  "caller_supplied": None}
     ctx = RunContext(spec=spec, chart=chart, plan=plan, coverage=coverage, threads=threads,
                      catalogue=catalogue, tracer=tracer, gate=gate, toolbox=toolbox)
     # The typed channel goes in with the chart tools, so it is declared, audited by
@@ -563,7 +749,8 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         ctx_out.append(ctx)
     tools = list(tools) + [make_revise_plan_tool(ctx, expansion_budget)]
     agent = build_agent(model=model, tools=tools, system_prompt=system_prompt, ctx=ctx,
-                        backend=backend, max_model_calls=max_model_calls, max_usd=max_usd)
+                        backend=backend, max_model_calls=max_model_calls, max_usd=max_usd,
+                        expansion_budget=expansion_budget)
 
     crashed = False
     try:
@@ -576,7 +763,21 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
     # person reading the manifest, so they are not folded into one word.
     termination = "RUNTIME_ERROR" if crashed else "BUDGET_EXHAUSTED"
 
-    answer = dict(ctx.answer or {"status": "NO_ANSWER"})
+    # `value` present even on NO_ANSWER: `variables_from_answer` reads a MISSING field as a
+    # silence and an explicit null as the answer's own statement, and a run that produced nothing
+    # is making a statement.
+    answer = dict(ctx.answer or {"status": "NO_ANSWER",
+                                 "value": {f.name: None for f in spec.fields}})
+    # A SPEC THIS CHART CANNOT ANSWER AT ALL. `data_source: outside_notes` means the variable is
+    # not derivable from the notes, so whatever the run produced is rewritten — and `cli_pipeline`
+    # already tells the operator this happens ("every run will return SPEC_INSUFFICIENT /
+    # WRONG_DATA_SOURCE by design"), which the runtime had stopped doing. The rewrite lands AFTER
+    # the gate, so there is no rejection available and the value has to be taken here or it
+    # smuggles itself out under a status that disclaims it.
+    forced_from = None
+    if spec.data_source == "outside_notes" and answer.get("status") != "NO_ANSWER":
+        forced_from = answer.get("status")
+        answer["status"] = "SPEC_INSUFFICIENT"
     # THE THREE FIELDS `_n_finalize` SETS AND THIS FUNCTION DROPPED. Measured on ten real
     # charts: every run came out with `proof_basis: None` and `answer.evidence: []` while the
     # ledger held 3-10 items. Nothing raised, because the ledger copy lives at the manifest's
@@ -584,6 +785,10 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
     # `status == "FOUND" and e.evidence and e.proof_basis == "WITNESS"`, so every positive
     # this runtime produced would have been silently dropped from L5 — a whole arm's results
     # missing from the explanation layer with no error anywhere.
+    # BEFORE the FOUND labelling: a downgraded answer must not also be given WITNESS.
+    downgrade_a_positive_that_owes_something(
+        answer, spec=spec, coverage=coverage, plan=plan, threads=threads,
+        gate_validated=ctx.accepted, termination=termination, tracer=tracer)
     if answer.get("status") == "FOUND":
         # Witness proof: one qualifying document settles it, which is what the FOUND branch of
         # the gate checks. It never claims the universe was searched, so no coverage ledger is
@@ -597,8 +802,11 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
     answer["evidence"] = evidence.to_list()
     spec_gap = None
     if answer.get("status") == "SPEC_INSUFFICIENT":
-        spec_gap, remedy = build_spec_gap(spec, answer, reported_by="agent",
-                                          gate_validated=ctx.accepted)
+        spec_gap, remedy = build_spec_gap(
+            spec, answer, reported_by=("runtime" if forced_from is not None else "agent"),
+            gate_validated=ctx.accepted)
+        if forced_from is not None:
+            spec_gap["forced_over_status"] = forced_from
         answer.update({"spec_gap": spec_gap, "remedy_class": remedy,
                        "proof_basis": "NOT_APPLICABLE",
                        "coverage_note": ("no coverage claim is made — SPEC_INSUFFICIENT is a "
@@ -615,11 +823,40 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
     assert_answer_is_reportable(answer)
 
     manifest = {
+        # IDENTITY. A manifest a reader cannot tie back to a patient, a spec version, a model
+        # and a trace is a number with no provenance, and this runtime was emitting fifteen
+        # fewer keys than the one it replaced — including the one below that decides whether a
+        # gate pass may be reported as a validated answer at all.
+        "run_id": tracer.run_id,
+        "model": getattr(model, "model_name", "") or str(model),
+        "spec_version": spec.spec_version,
+        "trace": str(tracer.path),
         "runtime": "deepagents-hooks", "patient_id": chart.patient_id,
         "spec_id": spec.spec_id, "spec_hash": spec.spec_hash,
         "answer": answer, "spec_gap": spec_gap, "gate_validated": ctx.accepted,
         "rejections": ctx.rejections, "rule_attribution": tracer.rule_attribution(),
         "plan": plan.to_dict(),
+        # THE DEVELOP-PLANE HARVEST. Lost in the port because this function assembles its own
+        # manifest and never calls `run_manifest.build_manifest`, where the block lived. It is
+        # the channel the improvement loop reads: what the spec DECLARED versus what a real
+        # chart forced the run to add. Without it every run still rescued itself at runtime and
+        # nothing recorded that the spec's list had been insufficient.
+        "develop_plane_candidates": {
+            "spec_declared_terms": list(plan.initial_keywords),
+            "terms_added_at_runtime": list(plan.term_provenance),
+            "types_promoted_at_runtime": list(plan.promotion_log),
+            "refused_revisions": list(plan.refused_revisions),
+            # A term the run ASKED FOR and the budget could not pay for is evidence about the
+            # spec's list too, and partial application is exactly what stops it from landing in
+            # `refused_revisions` — the revision was applied, only the tail of its term list was
+            # not. It would otherwise disappear from the harvest.
+            "terms_deferred_for_budget": list(ctx.terms_deferred),
+            "what_this_is": ("candidate spec edits observed on a real chart. Score the spec's "
+                             "list against spec_declared_terms, NEVER against the expanded "
+                             "list — a runtime rescue folded back into the baseline erases the "
+                             "evidence that the baseline was wrong"),
+            "trace": str(tracer.path),
+        },
         "open_threads": {**threads.to_dict(), "marker_catalogue": catalogue.source},
         # UNDEFINED, NOT ZERO. There is no `revise_plan` tool yet, so no revision can be
         # proposed; reporting 0.0 would claim the agent had nothing to add on an axis that was
@@ -654,6 +891,34 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # non-null only when the ceiling is what ended the run.
         "spend": ctx.spend.report() if ctx.spend else None,
         "spend_stopped": ctx.spend_stopped,
+        "expansion_stopped": ctx.expansion_stopped,
+        # WHAT THE SPEC'S PROVENANCE PERMITS THIS RUN TO CLAIM, which is a separate question
+        # from whether the gate passed. The gate proves the search was done; it cannot prove the
+        # search terms were right. `reportable_as_validated` inside this block is the field a
+        # downstream filter must read, never `gate_validated` alone — and this runtime was not
+        # emitting the block at all, so every consumer had only the stronger-looking flag.
+        "provenance": spec.provenance_for_run(
+            answer.get("value") or {}, str(answer.get("status") or ""),
+            gate_validated=ctx.accepted),
+        "negative_basis": answer.get("negative_basis"),
+        "steps": ctx.n_model_calls,
+        "plan_revisions": len(ctx.revisions),
+        "suspected_recognition_failures": len(getattr(coverage, "suspected_recognition_failures",
+                                                      []) or []),
+        "monotonicity_vs_ledger": MONOTONICITY_VS_LEDGER,
+        # The seed and where it came from, always. A run whose seed was caller-supplied was
+        # sampled with a number the operator chose, and a reader who cannot see that cannot tell
+        # a reproduced draw from a shopped one.
+        "sample_seed": seed_record["effective"],
+        "seed_provenance": seed_record["provenance"],
+        "seed_is_caller_supplied": seed_record["caller_supplied"],
+        # The shape `evals.py` reads. `spend` prices the run; this is the token accounting.
+        "usage": {"llm_calls": ctx.n_model_calls,
+                  "prompt_tokens": ctx.spend.prompt if ctx.spend else 0,
+                  "cached_tokens": ctx.spend.cached if ctx.spend else 0,
+                  "completion_tokens": ctx.spend.completion if ctx.spend else 0,
+                  "total_tokens": ((ctx.spend.prompt + ctx.spend.completion)
+                                   if ctx.spend else 0)},
         "n_model_calls": ctx.n_model_calls, "max_model_calls": max_model_calls,
         "recursion_limit": recursion_limit_for(agent, max_model_calls),
         # Non-zero means the model tried to stop without answering and was sent back.
@@ -690,6 +955,9 @@ REVISE_PLAN_DESCRIPTION = """Widen the retrieval plan and settle open threads.
 The plan may only GROW: add search terms, promote a document type toward more reading. A
 request to remove a term or demote a type is refused — scope that can shrink is not a scope.
 
+Promote to `search` to have a type's documents searched, or `read_all` to have every document
+of it read. `search` is the smaller step; ask for it unless you need the whole type.
+
 Threads: resolve_threads when you found where the deferred text was settled (say where);
 dismiss_threads when it cannot be settled from this chart at all (say why). A thread naming an
 outside facility or an outside institution CANNOT be resolved by reading, because the document
@@ -698,10 +966,11 @@ is not in this record — dismiss it with that reason. An open thread blocks sub
 
 def make_revise_plan_tool(ctx: RunContext, budget) -> StructuredTool:
     """The typed channel, as a declared tool so `wrap_tool_call` audits it like any other."""
-    from .coverage_planner import PlanRevision
+    from .coverage_planner import REFUSED_THREAD_NOOP, PlanRevision
 
     def _revise(add_terms: list | None = None, promote_types: list | None = None,
-                resolve_threads: list | None = None, dismiss_threads: list | None = None) -> str:
+                open_threads: list | None = None, resolve_threads: list | None = None,
+                dismiss_threads: list | None = None) -> str:
         def pairs(rows, second):
             out = []
             for r in rows or []:
@@ -713,9 +982,33 @@ def make_revise_plan_tool(ctx: RunContext, budget) -> StructuredTool:
 
         rev = PlanRevision(
             add_terms=tuple(str(t) for t in (add_terms or [])),
-            promote_types=tuple((str(t), "read_all") for t in (promote_types or [])),
+            # THE TARGET IS THE AGENT'S TO NAME. Forcing `read_all` made every promotion the
+            # largest possible one: a type the plan had put in `sample` jumped straight to
+            # reading every document of it, when `search` is the smaller step and usually the
+            # right one. Monotonicity does not require the biggest move, only that no move
+            # shrinks — `apply_revision` still refuses a demotion.
+            promote_types=tuple(
+                ((str(t.get("type", "")), str(t.get("to", "search"))) if isinstance(t, dict)
+                 else (str(t), "search"))
+                for t in (promote_types or [])),
+            # OPENING is part of the channel too. The runtime opens threads from markers on
+            # its own, but an agent that notices a deferral the detector's catalogue does not
+            # list has no other way to record it — and the THREAD_NOOP refusal class exists
+            # precisely to answer a request to open one that is already open.
+            open_threads=tuple(
+                (str(t.get("note_id", "")), str(t.get("marker", "")), str(t.get("why", "")))
+                if isinstance(t, dict) else tuple(t) for t in (open_threads or [])),
             resolve_threads=pairs(resolve_threads, "where_settled"),
             dismiss_threads=pairs(dismiss_threads, "reason"))
+        # PARTIAL ON A BUDGET OVERRUN, all-or-nothing on monotonicity. `fit_terms_to_budget`
+        # owns that distinction and this tool was skipping it, so a request for three terms with
+        # room for two was refused whole — the agent never learned it could have had two, and
+        # re-sent all three. Its docstring is the argument: nothing about the requested terms is
+        # inadmissible, there is simply not enough allowance, and that is a different failure
+        # from a revision that also tried to demote a type.
+        from .plan_expansion import fit_terms_to_budget
+        rev, deferred = fit_terms_to_budget(rev, ctx.plan, budget)
+        ctx.terms_deferred.extend(t for t in deferred if t not in ctx.terms_deferred)
         outcome = ctx.plan.apply_revision(
             rev, step=ctx.n_model_calls, trigger="agent_request",
             observation="requested by the agent through revise_plan", budget=budget,
@@ -724,13 +1017,51 @@ def make_revise_plan_tool(ctx: RunContext, budget) -> StructuredTool:
             known_types=[r["doc_type"] for r in ctx.chart.type_summary()])
         ctx.revisions.append({"requested": rev.__dict__ if hasattr(rev, "__dict__")
                               else str(rev), "applied": bool(outcome.applied),
-                              "refused": list(outcome.refused)})
+                              "refused": list(outcome.refused),
+                              "terms_deferred": deferred})
+        # THE THREAD HALF IS NOT COLLATERAL DAMAGE OF THE RETRIEVAL HALF. A revision that both
+        # over-reached on types AND resolved the thread blocking the answer used to end the run
+        # twice over — refused, and still thread-blocked, with the resolution nowhere. Thread
+        # bookkeeping cannot violate monotonicity or widen what may be opened, so it does not
+        # belong to the refusal. Re-sent through `apply_revision` rather than applied against
+        # the ledger here, so a resolution's semantics stay defined in one place.
+        salvaged = None
+        if not outcome.applied and getattr(outcome, "refusal_class", None) != REFUSED_THREAD_NOOP:
+            threads_only = PlanRevision(open_threads=rev.open_threads,
+                                        resolve_threads=rev.resolve_threads,
+                                        dismiss_threads=rev.dismiss_threads)
+            if not threads_only.is_empty():
+                salvaged = ctx.plan.apply_revision(
+                    threads_only, step=ctx.n_model_calls, trigger="thread_work_salvage",
+                    observation="the retrieval half of this revision was refused", budget=budget,
+                    threads=ctx.threads,
+                    n_docs_by_type={r["doc_type"]: r["count"] for r in ctx.chart.type_summary()},
+                    known_types=[r["doc_type"] for r in ctx.chart.type_summary()])
+                ctx.tracer.emit("thread_work_salvaged", severity="warning",
+                                applied=salvaged.applied,
+                                threads_opened=salvaged.threads_opened,
+                                threads_resolved=salvaged.threads_resolved,
+                                threads_dismissed=salvaged.threads_dismissed,
+                                refused=list(salvaged.refused),
+                                message=("the retrieval half was refused; its thread operations "
+                                         "were re-applied on their own rather than discarded "
+                                         "with it"))
+        if deferred:
+            ctx.tracer.emit("revision_partially_applied", severity="warning",
+                            deferred_terms=list(deferred), applied=bool(outcome.applied),
+                            message=("the term list did not fit the remaining expansion budget; "
+                                     "what fitted was applied and the rest is named so the "
+                                     "agent does not re-send it"))
         ctx.tracer.emit("plan_revision", runtime="deepagents-hooks",
                         applied=bool(outcome.applied), refused=list(outcome.refused),
                         refusal_class=getattr(outcome, "refusal_class", None))
         return json.dumps({
             "applied": bool(outcome.applied), "refused": list(outcome.refused),
+            "thread_work_salvaged": bool(salvaged and salvaged.applied),
             "unresolved_threads": [t.thread_id for t in ctx.threads.unresolved()],
+            # NAMED, not counted. An agent told only "partly applied" re-sends the part that
+            # already landed, which is the loop this channel exists to end.
+            "terms_deferred_for_budget": list(deferred),
             # The refusals are returned verbatim rather than summarised: an agent told only
             # "partly applied" re-sends the part that already landed, which is the loop this
             # channel exists to end.
@@ -741,9 +1072,16 @@ def make_revise_plan_tool(ctx: RunContext, budget) -> StructuredTool:
         func=_revise, name="revise_plan", description=REVISE_PLAN_DESCRIPTION,
         args_schema={"type": "object", "properties": {
             "add_terms": {"type": "array", "items": {"type": "string"}},
-            "promote_types": {"type": "array", "items": {"type": "string"}},
+            "promote_types": {"type": "array", "items": {"type": "object", "properties": {
+                "type": {"type": "string"},
+                "to": {"type": "string", "enum": ["search", "read_all"],
+                       "description": "search is the smaller step; ask for read_all only when "
+                                      "every document of the type must be read"}}}},
             "resolve_threads": {"type": "array", "items": {"type": "object", "properties": {
                 "thread_id": {"type": "string"}, "where_settled": {"type": "string"}}}},
+            "open_threads": {"type": "array", "items": {"type": "object", "properties": {
+                "note_id": {"type": "string"}, "marker": {"type": "string"},
+                "why": {"type": "string"}}}},
             "dismiss_threads": {"type": "array", "items": {"type": "object", "properties": {
                 "thread_id": {"type": "string"}, "reason": {"type": "string"}}}}}})
 
@@ -767,7 +1105,7 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
     from .audit import _callbacks
     from .state import Budget, EvidenceLedger
     from .tools.toolbox import Toolbox
-    from .trace import Tracer
+    from .trace import Tracer, rule_citation_block
     from deepagents.backends import StateBackend
 
     chart = corpus.chart(patient_id)
@@ -803,10 +1141,19 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
         spec=spec, chart=chart, toolbox=toolbox, coverage=coverage, evidence=evidence,
         plan=plan, threads=threads, catalogue=markers, tracer=tracer, gate=gate,
         model=model, tools=tools,
-        system_prompt=spec.as_prompt_block() + "\n\n" + TASK.format(patient=patient_id),
+        # THE RULE IDENTIFIERS GO IN THE PROMPT, not only into the finalize question. The
+        # self-report channel asks at submit time which decision rule was applied, and
+        # `submit_answer` is reachable from any turn — an agent asked at the last moment to cite
+        # identifiers it has never seen invents them, and `rule_attribution.self_reported` then
+        # records invented ids as if they were a measurement of the agent's reasoning.
+        system_prompt=(spec.as_prompt_block()
+                       + (f"\n\n{cite}" if (cite := rule_citation_block(spec)) else "")
+                       + "\n\n" + TASK.format(patient=patient_id)),
         backend=StateBackend(), max_model_calls=max_model_calls, out_dir=out_dir,
         elapsed_fn=lambda: round(time.time() - t0, 1), ctx_out=ctx_out,
         max_usd=max_usd,
+        seed_record={"effective": seed, "provenance": "caller_supplied",
+                     "caller_supplied": True},
         # PRICED AGAINST THE PLAN, not a constant. The old runtime computed this from the
         # plan's own size — how many types it may promote, how many documents that opens —
         # and this one shipped `ExpansionBudget(40, 8, 40, 6)`, four numbers that fit no

@@ -347,17 +347,21 @@ def test_the_elusion_cap_is_above_the_floor_its_sample_sizes_allow(ledger, chart
     assert gate_spec["max_elusion_upper"] < 1.0, "an absent cap is not a cap"
 
 
+
 def test_the_full_runtime_gate_including_the_search_obligation(spec, ledger, chart):
-    """evaluate_gate is only part of it: graph._check_gate adds the required-keyword loop and
-    the listed_documents rule on top. Exercise the real method, not a copy of it."""
-    agent = ChartReviewAgent(spec, llm=None)      # __init__ builds the graph, never calls the LLM
-    agent.coverage = ledger
+    """`evaluate_gate` is only part of it: the runtime gate adds the required-keyword loop and
+    the listed_documents rule on top. Exercise the real function, not a copy of it.
+
+    Reached directly now. It used to be borrowed off a `ChartReviewAgent` that was constructed
+    and never run — a whole runtime instantiated to call one three-line forwarder.
+    """
+    from acr.answer_gate import check_gate
 
     _work_the_obligation(ledger, chart)
-    assert agent._check_gate().verdict == "PASS"
+    assert check_gate(spec, ledger).verdict == "PASS"
 
     ledger.searched_terms.remove("pleural")
-    g = agent._check_gate()
+    g = check_gate(spec, ledger)
     assert g.verdict == "FAIL"
     assert any("pleural" in m for m in g.missing), g.missing
 

@@ -141,13 +141,24 @@ class ScriptedLLM(LLMClient):
 
 
 def _run(spec, chart, tmp_path, submit_args, finalize=None, max_steps=4):
-    llm = ScriptedLLM(submit_args, finalize or {"status": "EVIDENCE_INSUFFICIENT", "value": {},
-                                                "reasoning": "nothing established"})
+    """Drive the live runtime. ONE submission channel, so `finalize` folds into it.
+
+    The old loop had two ways to produce an answer — the agent's `submit_answer` and a finalize
+    prompt that could author one itself — and these tests used the second to exercise paths the
+    first cannot reach (a runtime-forced rewrite, for instance). There is one channel now: an
+    answer exists only if it went through the gate. So a script that only set `finalize` is
+    submitting that, which is also the honest translation: whatever the run means to say, it says
+    through `submit_answer`.
+    """
     import sys
     sys.path.insert(0, str(Path(__file__).parent))
     from hooks_harness import run_with_script
 
     from acr.corpus import Corpus
+    llm = ScriptedLLM(submit_args or finalize or {"status": "EVIDENCE_INSUFFICIENT", "value": {},
+                                                 "reasoning": "nothing established"},
+                      finalize or {"status": "EVIDENCE_INSUFFICIENT", "value": {},
+                                   "reasoning": "nothing established"})
     manifest, _ = run_with_script(spec, Corpus(ROOT / "corpus" / "patients"), chart.patient_id,
                                   tmp_path, llm, run_id="spec-insufficient",
                                   max_model_calls=max_steps)

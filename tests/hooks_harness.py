@@ -137,6 +137,13 @@ class LitellmScriptAdapter(BaseChatModel):
 
     def _generate(self, messages: list[BaseMessage], stop=None,
                   run_manager: CallbackManagerForLLMRun | None = None, **kw) -> ChatResult:
+        # The SYSTEM message is where the plan, the open threads and the mechanical
+        # observations ride. Recorded on the inner script so a test can assert on what the
+        # agent was actually shown rather than on what a prompt template claims it shows.
+        for m in messages:
+            if getattr(m, "type", None) == "system":
+                txt = m.content if isinstance(m.content, str) else str(m.content)
+                getattr(self.inner, "seen_system", []).append(txt)
         r = self.inner.chat(self._as_dicts(messages), tools=[{"x": 1}])
         calls = [{"name": c["name"], "args": c.get("arguments") or {},
                   "id": c.get("id") or f"a{i}"}
@@ -158,3 +165,41 @@ def run_with_script(spec, corpus, patient_id, tmp_path, llm, *, run_id="scripted
     trace = Path(tmp_path) / f"{run_id}.jsonl"
     events = [json.loads(l) for l in trace.read_text(encoding="utf-8").splitlines() if l.strip()]
     return m, events
+
+
+def revise_plan_tool(spec, chart, *, expansion_budget=None, threads=None):
+    """The declared `revise_plan` tool, bound to real ledgers. (tool, ctx).
+
+    Several tests here are about the ARITHMETIC of a revision — what fits in the budget, what is
+    refused as redundant, whether the thread half survives a refused retrieval half — and they
+    used to reach it by scripting a reflect node and running the whole loop. The operation is a
+    tool call now, so it can be invoked directly. That is shorter and it is also a better test:
+    a full run can fail for a dozen unrelated reasons before it reaches the arithmetic.
+    """
+    from acr.agent import RunContext, make_revise_plan_tool
+    from acr.coverage import CoverageLedger, ForcedSampler, strata_from_spec
+    from acr.coverage_planner import (ExpansionBudget, OpenThreadLedger, load_marker_catalogue,
+                                      plan_from_spec)
+    from acr.state import EvidenceLedger
+    from acr.tools import Toolbox
+    from acr.trace import Tracer
+
+    docs, _ = chart.list_documents(limit=100_000)
+    evidence = EvidenceLedger()
+    coverage = CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(7))
+    plan = plan_from_spec(spec, chart)
+    ctx = RunContext(spec=spec, chart=chart, plan=plan, coverage=coverage,
+                     threads=threads or OpenThreadLedger(),
+                     catalogue=load_marker_catalogue(),
+                     tracer=Tracer.create(Path("/tmp") / "acr-revise-tests"),
+                     gate=lambda submitted: {"accepted": False},
+                     toolbox=Toolbox(chart, evidence, coverage))
+    budget = expansion_budget or ExpansionBudget(max_terms_added=40, max_type_promotions=8,
+                                                 max_documents_opened_by_promotion=40,
+                                                 max_revisions=6)
+    return make_revise_plan_tool(ctx, budget), ctx
+
+
+def revise(tool, **kwargs) -> dict:
+    """Call the tool the way the model does and parse what it hands back."""
+    return json.loads(tool.func(**kwargs))

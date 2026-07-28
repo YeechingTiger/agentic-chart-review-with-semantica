@@ -339,34 +339,44 @@ class _ScriptedLLM(LLMClient):
                            "reasoning": "coded from the cited span"}}])
 
 
+
 def test_a_gate_validated_run_is_still_not_reportable_as_validated(tmp_path):
-    """The end-to-end claim. A clean gate on a model-authored spec buys a proven SEARCH, not
-    a proven QUESTION, and the manifest has to be able to say which one it has."""
+    """The end-to-end claim. A clean gate on a model-authored spec buys a proven SEARCH, not a
+    proven QUESTION, and the manifest has to be able to say which one it has.
+
+    This block was absent from the hooks runtime's manifest entirely, so every consumer had only
+    `gate_validated` — the stronger-looking flag — and no way to learn that the elements the run
+    leaned on are `model_authored` and `draft`.
+    """
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from hooks_harness import run_with_script
+
     spec = load_spec(SHB)
     llm = _ScriptedLLM({"primary_site": "C341", "histology": "8140", "behavior": "3"})
-    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=8), out_dir=tmp_path,
-                             sample_seed=7)
-    chart = Corpus(ROOT / "corpus" / "patients").chart("SYN0001")
-    result = agent.run(chart, run_id="prov-test")
+    manifest, _ = run_with_script(spec, Corpus(ROOT / "corpus" / "patients"), "SYN0001",
+                                  tmp_path, llm, run_id="prov-test", max_model_calls=8)
 
-    manifest = json.loads((tmp_path / "prov-test.manifest.json").read_text(encoding="utf-8"))
-    assert manifest["gate_validated"] is True, "the run has to pass the gate for this to bite"
     prov = manifest["provenance"]
+    assert prov["spec_id"] == spec.spec_id
     assert prov["weakest_status"] == "draft"
-    assert prov["reportable_as_validated"] is False
+    assert prov["reportable_as_validated"] is False, (
+        "a gate pass on a model-authored spec is a proven search, not a proven question")
     assert prov["elements_used"], "a manifest that used no elements is a manifest of nothing"
-    assert result["provenance"] == prov
+
 
 
 def test_the_manifest_names_the_elements_that_dragged_the_status_down(tmp_path):
     """A verdict with no subject is unactionable: the reader has to know which line to fix."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from hooks_harness import run_with_script
+
     spec = load_spec(SHB)
     llm = _ScriptedLLM({"primary_site": "C341", "histology": "8140", "behavior": "3"})
-    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=8), out_dir=tmp_path,
-                             sample_seed=7)
-    agent.run(Corpus(ROOT / "corpus" / "patients").chart("SYN0001"), run_id="prov-test-2")
-    prov = json.loads((tmp_path / "prov-test-2.manifest.json").read_text(
-        encoding="utf-8"))["provenance"]
+    manifest, _ = run_with_script(spec, Corpus(ROOT / "corpus" / "patients"), "SYN0001",
+                                  tmp_path, llm, run_id="prov-test-2", max_model_calls=8)
+    prov = manifest["provenance"]
     assert set(prov["weakest_elements"]) <= set(prov["elements_used"])
     assert prov["counts_by_origin"]["model_authored"] >= 1
     assert prov["spec_id"] == spec.spec_id

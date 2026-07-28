@@ -1042,14 +1042,24 @@ def test_the_service_never_raises_out_of_call():
         assert isinstance(svc.call("chart.list_documents", args), dict)
 
 
+
 def test_the_gate_is_the_agent_s_gate_and_not_a_second_copy():
-    """Two gate implementations that can disagree is the two-ledger failure one layer up."""
+    """Two gate implementations that can disagree is the two-ledger failure one layer up.
+
+    Both surviving front ends must reach the SAME function. The hand-written runtime is gone,
+    so the pair is `agent` and `mcp_server`; the fence is that neither of them defines a gate.
+    """
     import inspect
 
-    from acr import graph, mcp_server
-    assert mcp_server.gate_answer is graph.gate_answer
+    from acr import agent, answer_gate, mcp_server
+    assert mcp_server.gate_answer is answer_gate.gate_answer
     assert "gate_answer(" in inspect.getsource(mcp_server.ChartReviewService._h_gate_check)
-    assert "gate_answer(" in inspect.getsource(graph.ChartReviewAgent._gate)
+    assert "gate_answer(" in inspect.getsource(agent.run_patient), (
+        "the runtime must call the shared gate, not hold an object that owns one")
+    for mod in (agent, mcp_server):
+        assert "def gate_answer" not in inspect.getsource(mod), (
+            f"{mod.__name__} defines its own gate; a second copy drifts and then a run's "
+            f"validation means whichever copy happened to execute")
 
 
 def test_the_mcp_adapter_is_a_shim_over_the_same_entry_point():
