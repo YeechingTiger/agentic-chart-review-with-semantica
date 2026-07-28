@@ -37,7 +37,6 @@ from acr.corpus import Corpus
 from acr.coverage import (ADMITTED, REFUSED, UNDECLARED, CoverageLedger, ForcedSampler,
                           admissibility_for_citations, strata_from_spec)
 from acr.answer_gate import gate_answer
-from acr.graph import ChartReviewAgent
 from acr.spec import load_spec
 from acr.state import Budget, Evidence, EvidenceLedger
 from acr.trace import (MAX_KEPT_UNRECOGNISED, PROV_DETERMINISTIC, PROV_SELF_REPORTED, Tracer,
@@ -539,14 +538,14 @@ class _ScriptedLLM:
 
 def _run(tmp_path, value, reasoning, run_id):
     llm = _ScriptedLLM(value, reasoning)
-    agent = ChartReviewAgent(_spec(), llm, budget=Budget(max_steps=6), out_dir=tmp_path,
-                             sample_seed=7)
-    chart = Corpus(ROOT / "corpus" / "patients").chart("SYN0001")
-    result = agent.run(chart, run_id=run_id)
-    manifest = json.loads((tmp_path / f"{run_id}.manifest.json").read_text(encoding="utf-8"))
-    trace = [json.loads(ln) for ln in
-             (tmp_path / f"{run_id}.jsonl").read_text(encoding="utf-8").splitlines() if ln]
-    return llm, result, manifest, trace
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from hooks_harness import run_with_script
+
+    from acr.corpus import Corpus
+    manifest, trace = run_with_script(_spec(), Corpus(ROOT / "corpus" / "patients"), "SYN0001",
+                                      tmp_path, llm, run_id=run_id, max_model_calls=6)
+    return llm, manifest, manifest, trace
 
 
 def test_a_completed_run_can_be_attributed_from_its_manifest_alone(tmp_path):

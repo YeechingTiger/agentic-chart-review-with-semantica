@@ -28,7 +28,6 @@ from .corpus import Corpus
 from .explain import (DEFAULT_MAX_ELUSION_UPPER, ArtifactBindingError, VariableResult,
                       mark_binding, resolve_bound_extract, scaffold_explanation,
                       side_input_record)
-from .graph import ChartReviewAgent
 from .registry_catalog import (VariableCatalog, VariableResolutionError,
                                check_guideline_bindings)
 
@@ -148,26 +147,10 @@ def extract(
     model: str = MODEL,
     api_base: str = API_BASE,
     max_steps: int = cli_common.MAX_STEPS,
-    max_tokens: int = cli_common.MAX_TOKENS,
-    max_seconds: int = cli_common.MAX_SECONDS,
-    reflect_every: int = typer.Option(2, "--reflect-every"),
     temperature: float = typer.Option(0.0, "--temperature"),
     seed: int = typer.Option(None, "--seed", help="validation-sampling seed; share it across arms"),
     limit: int = typer.Option(0, "--limit", help="first N patients only; 0 = all"),
     out: str = typer.Option("runs", "--out"),
-    # `hooks` IS THE DEFAULT, and it is the default because it was measured. On the same ten
-    # real charts, same answer key, same cohort: 5/10 exact against 3/10, 10/10 gate-validated
-    # against 5/10, $1.54 against $6.58. `langgraph` stays reachable as the arm those numbers
-    # were compared against — deleting the baseline would leave the comparison unverifiable.
-    #
-    # It could not become the default until `cli_common.chat_model` existed: the branch built
-    # its own ChatOpenAI, the end-to-end tests inject at the seam, and flipping the default
-    # without the seam turned eight of them red. tests/test_hooks_runtime_cli.py is what made
-    # the change safe rather than merely correct.
-    runtime: str = typer.Option("hooks", "--runtime",
-                                help="hooks (default: the library graph, our rules as "
-                                     "middleware) or langgraph (the hand-written loop, kept as "
-                                     "the measured baseline)"),
     dry_run: bool = typer.Option(False, "--dry-run",
                                  help="resolve, plan and cost the work without calling a model"),
 ):
@@ -213,23 +196,12 @@ def extract(
             sp = specs[sid]
             con.print(f"[dim]— {pid} / {sid}[/]")
             try:
-                if runtime == "hooks":
-                    # The library graph. `max_steps` is model CALLS here, not plan/act/reflect
-                    # cycles, and there is no reflect node — the two arms are not comparable
-                    # step for step, only end to end.
-                    from .agent import run_patient
-                    r = run_patient(
-                        spec=sp, corpus=c, patient_id=pid, out_dir=run_dir,
-                        model=cli_common.chat_model(model, api_base, temperature),
-                        max_model_calls=max_steps, seed=seed or 1234,
-                        run_id=f"{pid}__{sid}")
-                else:
-                    agent = ChartReviewAgent(sp, cli_common.llm_client(model, api_base, temperature),
-                                             budget=cli_common.budget(max_steps, max_tokens,
-                                                                      max_seconds),
-                                             reflect_every=reflect_every, out_dir=run_dir,
-                                             sample_seed=seed)
-                    r = agent.run(c.chart(pid), run_id=f"{pid}__{sid}", known_doc_types=vocab)
+                from .agent import run_patient
+                r = run_patient(
+                    spec=sp, corpus=c, patient_id=pid, out_dir=run_dir,
+                    model=cli_common.chat_model(model, api_base, temperature),
+                    max_model_calls=max_steps, seed=seed or 1234,
+                    run_id=f"{pid}__{sid}")
             except Exception as e:  # noqa: BLE001
                 # One patient failing must not silently shrink the cohort: the row survives,
                 # carries the error, and the command exits non-zero at the end.

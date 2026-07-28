@@ -39,7 +39,7 @@ from pathlib import Path
 import pytest
 
 import acr.answer_contract as AC
-import acr.graph as G
+from acr import answer_gate as G
 from acr.concordance import variables_from_answer
 from acr.corpus import Corpus
 from acr.coverage import CoverageLedger, ForcedSampler, strata_from_spec
@@ -47,7 +47,6 @@ from acr.answer_contract import (SPEC_SECTIONS, CoverageClaimError, SpecGapError
                                  assert_answer_is_reportable, assert_spec_gap_is_reported,
                                  build_spec_gap)
 from acr.answer_gate import gate_answer
-from acr.graph import ChartReviewAgent
 from acr.llm import LLMClient, LLMConfig, LLMResponse
 from acr.spec import load_spec
 from acr.state import Budget, EvidenceLedger
@@ -144,12 +143,17 @@ class ScriptedLLM(LLMClient):
 def _run(spec, chart, tmp_path, submit_args, finalize=None, max_steps=4):
     llm = ScriptedLLM(submit_args, finalize or {"status": "EVIDENCE_INSUFFICIENT", "value": {},
                                                 "reasoning": "nothing established"})
-    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=max_steps),
-                             out_dir=tmp_path, sample_seed=7)
-    return agent.run(chart), llm
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from hooks_harness import run_with_script
+
+    from acr.corpus import Corpus
+    manifest, _ = run_with_script(spec, Corpus(ROOT / "corpus" / "patients"), chart.patient_id,
+                                  tmp_path, llm, run_id="spec-insufficient",
+                                  max_model_calls=max_steps)
+    return manifest, llm
 
 
-# ======================================================== 1. it completes and lands on disk
 def test_spec_insufficient_completes_and_writes_a_manifest(shb, chart, tmp_path):
     """The regression, end to end. Before the fix this raised CoverageClaimError out of
     `agent.run`, leaving a half-written trace and no manifest at all."""
@@ -517,18 +521,22 @@ def test_the_mcp_forced_path_also_strips_the_value(outside):
     assert ans["spec_gap"]["reported_by"] == "runtime"
 
 
-def test_all_three_front_ends_use_the_one_builder_and_the_one_assertion():
+def test_both_front_ends_use_the_one_builder_and_the_one_assertion():
     """Structural, and the reason is in the bug: the same status meant three different things
-    on three runtimes — a crash on graph, a bare code on MCP, a bare code plus an unearned
-    coverage ledger on deepagents. Nobody noticed, because each surface looked fine alone.
+    on three runtimes — a crash on the hand-written loop, a bare code on MCP, a bare code plus
+    an unearned coverage ledger on deepagents. Nobody noticed, because each surface looked fine
+    alone.
 
-    Assert on the shared call, not on the output shape: three correct copies today are three
-    copies free to drift tomorrow, and the drift is invisible from inside any one of them.
+    TWO front ends now, not three: the hand-written loop is gone and `agent.py` is the runtime.
+    The count is not the point — the point is that every surface which can emit an answer goes
+    through the same three calls. Assert on the shared call, not on the output shape: correct
+    copies today are copies free to drift tomorrow, and the drift is invisible from inside any
+    one of them.
     """
-    import acr.deep_runner as D
+    import acr.agent as A
     import acr.mcp_server as M
 
-    for mod in (G, D, M):
+    for mod in (A, M):
         src = inspect.getsource(mod)
         assert "build_spec_gap" in src, f"{mod.__name__} cannot assemble a spec gap"
         assert "strip_value_from_spec_insufficient" in src, (
@@ -537,30 +545,30 @@ def test_all_three_front_ends_use_the_one_builder_and_the_one_assertion():
             f"{mod.__name__} emits answers without the emission-time checks")
 
 
-def test_the_deepagents_manifest_no_longer_attests_coverage_unconditionally():
-    """It attached `coverage_attested` to every manifest, including NO_ANSWER and
-    SPEC_INSUFFICIENT. Same category error as the crash, silent because nothing checked it."""
-    import acr.deep_runner as D
+def test_the_manifest_no_longer_attests_coverage_unconditionally():
+    """A manifest that carried a coverage ledger for every status claimed the universe had been
+    searched on runs that never searched it — including SPEC_INSUFFICIENT, which is not a
+    statement about this chart at all. Same category error as the crash, silent because nothing
+    checked it. Asserted against `agent.run_chart_review`, which is where the branch now lives.
+    """
+    import acr.agent as A
 
-    src = inspect.getsource(D.main)
-    i = src.index('"coverage_attested"')
+    src = inspect.getsource(A.run_chart_review)
+    i = src.index("attach_coverage_claim")
     window = src[max(0, i - 400):i + 200]
     assert 'answer.get("status") == "EVIDENCE_INSUFFICIENT"' in window, (
-        "the ledger must be conditional on the one status that earns it"
-    )
+        "the ledger must be conditional on the one status that earns it")
 
 
 def test_every_front_end_offers_the_reporting_fields_to_the_model():
-    """A gate that demands `spec_section` from a model that was never given the parameter is
-    an unwinnable loop: it would be rejected forever for omitting something it cannot send."""
-    import acr.deep_runner as D
+    """A gate that demands `spec_section` from a model that was never given the parameter is an
+    unwinnable loop: it would be rejected forever for omitting something it cannot send."""
     from acr.tools.toolbox import TOOL_SCHEMAS
 
     submit = next(s for s in TOOL_SCHEMAS if s["function"]["name"] == "submit_answer")
     props = submit["function"]["parameters"]["properties"]
     for k in ("spec_section", "spec_quote", "uncovered_fields"):
-        assert k in props, f"the LangGraph toolbox cannot send {k}"
-    assert "spec_section" in inspect.getsource(D.main), "the deepagents tool cannot send it"
+        assert k in props, f"the toolbox cannot send {k}"
 
     from acr.mcp_server import MCP_TOOLS
     desc = next(t for t in MCP_TOOLS if t["name"] == "gate.check")["inputSchema"]
@@ -596,7 +604,7 @@ def test_extract_writes_the_gap_into_the_artifact_and_exits_clean(monkeypatch, t
     monkeypatch.setattr("acr.cli_common.llm_client", lambda *a, **k: llm)
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
 
-    r = CliRunner().invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
+    r = CliRunner().invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
                                  "--variables", "primary_site",
                                  "--max-steps", "4", "--seed", "7",
                                  "--out", str(tmp_path / "runs")])
@@ -631,7 +639,7 @@ def test_a_crashed_run_is_distinguishable_from_one_that_never_happened(monkeypat
     monkeypatch.setattr("acr.cli_common.llm_client", lambda *a, **k: Boom(None, {}))
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
 
-    r = CliRunner().invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
+    r = CliRunner().invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
                                  "--variables", "primary_site", "--max-steps", "2",
                                  "--out", str(tmp_path / "runs")])
     assert r.exit_code == 1

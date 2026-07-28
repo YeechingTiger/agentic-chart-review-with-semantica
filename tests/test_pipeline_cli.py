@@ -238,7 +238,7 @@ def test_flattened_rows_are_what_the_rule_engine_accepts():
 
 def test_extract_dry_run_plans_the_work_without_a_model(tmp_path):
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\nSYN0002\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "primary_site,histology,stage", "--dry-run"])
     assert r.exit_code == 0, r.output
     assert "2 patient(s) x 2 spec(s) = 4 agent run(s)" in r.output
@@ -248,7 +248,7 @@ def test_extract_dry_run_plans_the_work_without_a_model(tmp_path):
 def test_many_variables_of_one_spec_are_one_run(tmp_path):
     """The unit of work is the spec. Three fields of one spec is one pass over the chart."""
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "primary_site,histology,behavior", "--dry-run"])
     assert "1 patient(s) x 1 spec(s) = 1 agent run(s)" in r.output
 
@@ -256,7 +256,7 @@ def test_many_variables_of_one_spec_are_one_run(tmp_path):
 def test_an_unknown_variable_stops_the_command(tmp_path):
     """Never a shorter extract than was asked for — and the vocabulary comes back with it."""
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "histology,tx1_date", "--dry-run"])
     assert r.exit_code == 2
     assert "tx1_date" in r.output and "known variables" in r.output
@@ -264,14 +264,14 @@ def test_an_unknown_variable_stops_the_command(tmp_path):
 
 def test_an_outside_notes_variable_is_flagged_before_the_cohort_is_spent(tmp_path):
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "class_of_case", "--dry-run"])
     assert r.exit_code == 0
     assert "WRONG_DATA_SOURCE" in r.output
 
 
 def test_a_missing_cohort_file_is_a_usage_error(tmp_path):
-    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "nope.csv"),
+    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "nope.csv"),
                             "--variables", "histology", "--dry-run"])
     assert r.exit_code != 0
 
@@ -337,15 +337,27 @@ class ScriptedLLM(LLMClient):
 
 @pytest.fixture
 def scripted(monkeypatch):
+    """The same script, delivered through the seam the runtime actually uses.
+
+    It patched `cli_common.llm_client`, which is the litellm seam; `extract` runs the library
+    graph and reaches the provider through `cli_common.chat_model`. The script itself is
+    unchanged — `LitellmScriptAdapter` translates it — because what these tests assert is the
+    L0-L3 plumbing, not which client shape the provider happens to want.
+    """
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from hooks_harness import LitellmScriptAdapter
+
     llm = ScriptedLLM({"primary_site": "C341", "histology": "8140", "behavior": "3"})
-    monkeypatch.setattr("acr.cli_common.llm_client", lambda *a, **k: llm)
+    monkeypatch.setattr("acr.cli_common.chat_model",
+                        lambda *a, **k: LitellmScriptAdapter(inner=llm))
     return llm
 
 
 def test_extract_runs_the_agent_and_writes_a_usable_artifact(tmp_path, scripted):
     """The whole L0-L3 leg: resolve, run the gated agent per patient x spec, flatten, write."""
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\nSYN0002\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "primary_site,histology,behavior",
                             "--out", str(tmp_path / "runs"), "--seed", "7"])
     assert r.exit_code == 0, r.output
@@ -360,13 +372,15 @@ def test_extract_runs_the_agent_and_writes_a_usable_artifact(tmp_path, scripted)
     assert p1["runs"][0]["proof_basis"] == "WITNESS"
     # Degradation first, before any other number: a non-zero counter means a node silently
     # fell back and the behaviour this test claims to exercise was not exercised.
+    # This runtime's own counters, not the old loop's plan/reflect fallbacks. Non-zero means a
+    # node did less than it claims and no conclusion may be drawn from the run above it.
     assert set(p1["runs"][0]["degradation"].values()) == {0}
     assert p1["answers"][SHB]["evidence"], "the citation must survive into the artifact"
 
 
 def test_the_run_is_traceable_back_to_the_code_and_spec_that_made_it(tmp_path, scripted):
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
+    runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
                         "--variables", "histology", "--out", str(tmp_path / "runs")])
     (path,) = list((tmp_path / "runs").glob("extract__*/extract.json"))
     doc = json.loads(path.read_text(encoding="utf-8"))
@@ -378,7 +392,7 @@ def test_the_run_is_traceable_back_to_the_code_and_spec_that_made_it(tmp_path, s
 def test_a_real_extract_feeds_concord_and_explain(tmp_path, scripted):
     """End to end on an artifact the agent actually produced, not a hand-built one."""
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
+    runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
                         "--variables", "primary_site,histology,behavior",
                         "--out", str(tmp_path / "runs")])
     (ex,) = list((tmp_path / "runs").glob("extract__*/extract.json"))
@@ -402,7 +416,7 @@ def test_one_failing_patient_does_not_shrink_the_cohort_silently(tmp_path, scrip
     carrying the error and the command exits non-zero; dropping it would move a denominator
     with nothing recording that it moved."""
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\nNO_SUCH_PATIENT\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "histology", "--out", str(tmp_path / "runs")])
     assert r.exit_code == 1
     (path,) = list((tmp_path / "runs").glob("extract__*/extract.json"))
@@ -659,39 +673,53 @@ def test_the_existing_commands_still_work():
 # about a number nobody could set. Both halves are pinned here — the value reaches the run,
 # and the run says what it was.
 
-def test_the_token_budget_on_the_command_line_reaches_the_run(tmp_path, scripted, monkeypatch):
-    seen = {}
-    import acr.cli_common as cc
-    real = cc.budget
-    monkeypatch.setattr(cc, "budget",
-                        lambda *a: seen.setdefault("b", real(*a)))
+# ------------------------------------------------ the budget and the plan, on THIS runtime
+# Four tests stood here and they pinned the hand-written loop's plumbing: `cli_common.budget`
+# reaching a `Budget` dataclass, the `run_budget` manifest block, and exactly one
+# `install_plan_block` copy in the transcript. All three are gone with that loop, and the
+# replacements are not renames — they are different mechanisms:
+#
+#     max_steps + Budget(max_tokens, max_seconds) -> max_model_calls + ModelCallLimitMiddleware
+#     run_budget block                            -> max_model_calls / recursion_limit
+#     install_plan_block dedupe                   -> the plan lives in the system message, so
+#                                                    there is nowhere for a copy to accumulate
+#
+# The last one is the point worth keeping: the old defect was ELEVEN plan copies in one real
+# transcript, 41% of its prompt spend. It is now impossible by construction rather than deduped
+# after the fact, and the test that proves that is the one below — it asserts on the mechanism
+# (`ModelRequest.override`, never `messages`), because a count of copies cannot distinguish
+# "deduped" from "cannot accumulate".
+
+
+def test_the_plan_cannot_accumulate_in_the_transcript(tmp_path, scripted):
+    import inspect
+
+    import acr.agent as A
+    hook = inspect.getsource(A.AuditMiddleware.wrap_model_call)
+    assert "override(system_message=" in hook, (
+        "the plan must ride the system message, which is replaced wholesale each call")
+    assert "messages" not in hook.split("return handler")[0].replace("request.messages", ""), (
+        "nothing may append the plan to the message list; that is what accumulated eleven times")
+
+
+def test_the_call_budget_reaches_the_run_and_lands_in_the_manifest(tmp_path, scripted):
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
+    r = runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
                             "--variables", "histology", "--out", str(tmp_path / "runs"),
-                            "--max-steps", "9", "--max-tokens", "12345", "--max-seconds", "77"])
+                            "--max-steps", "9"])
     assert r.exit_code == 0, r.output
-    b = seen["b"]
-    assert (b.max_steps, b.max_tokens, b.max_seconds) == (9, 12345, 77)
-
-
-def test_the_manifest_says_what_the_run_was_allowed_to_spend(tmp_path, scripted):
-    """A BUDGET_EXHAUSTED with no numbers beside it cannot be told from a silent chart."""
-    (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
-                        "--variables", "histology", "--out", str(tmp_path / "runs"),
-                        "--max-tokens", "999999"])
     (m,) = list((tmp_path / "runs").glob("extract__*/*.manifest.json"))
-    rb = json.loads(m.read_text(encoding="utf-8"))["run_budget"]
-    assert rb["max_tokens"] == 999999
-    assert rb["is_library_default"] is False, "an operator-chosen budget must not read as default"
+    d = json.loads(m.read_text(encoding="utf-8"))
+    assert d["max_model_calls"] == 9, "the number the operator set must be the number that binds"
+    # Derived from the graph, so a middleware added later moves it. `ModelCallLimitMiddleware`
+    # must always bind first: it stops with a reason, the recursion limit stops with a trace.
+    assert d["recursion_limit"] > d["max_model_calls"]
 
 
-def test_an_untouched_budget_is_declared_a_default_so_a_reader_can_discount_it(tmp_path, scripted):
-    (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
-                        "--variables", "histology", "--out", str(tmp_path / "runs")])
-    (m,) = list((tmp_path / "runs").glob("extract__*/*.manifest.json"))
-    assert json.loads(m.read_text(encoding="utf-8"))["run_budget"]["is_library_default"] is True
+
+
+
+
 
 
 # -------------------------------------------------- the plan is state, not history
@@ -733,13 +761,3 @@ def test_nothing_but_a_plan_block_is_dropped():
     assert any(m["role"] == "tool" for m in out)
 
 
-def test_a_run_carries_exactly_one_plan_block_end_to_end(tmp_path, scripted):
-    from acr.plan_expansion import is_plan_block
-    (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
-    r = runner.invoke(app, ["extract", "--runtime", "langgraph", "--cohort", str(tmp_path / "c.csv"),
-                            "--variables", "histology", "--out", str(tmp_path / "runs")])
-    assert r.exit_code == 0, r.output
-    sent = [m for call in scripted.seen for m in call if is_plan_block(m)]
-    per_call = [sum(1 for m in call if is_plan_block(m)) for call in scripted.seen]
-    assert sent, "the plan must reach the model at all"
-    assert max(per_call) == 1, f"a call carried {max(per_call)} plan blocks"

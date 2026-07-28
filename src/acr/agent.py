@@ -112,8 +112,13 @@ class RunContext:
         default_factory=collections.Counter)
     n_model_calls: int = 0
     no_tool_call: int = 0
-    #: Floor of 2 is the library's own: one rejection is not a loop.
-    max_rejection_repeats: int = 3
+    undeclared_tools: int = 0
+    #: Repeats WITH THE LEDGERS FROZEN. Not a repeat count — see `_stalled` for why the
+    #: earlier version of that cost a correct answer on a real chart.
+    max_frozen_repeats: int = 3
+    rejection_progress: dict = field(default_factory=dict)
+    spend: Any = None
+    spend_stopped: str | None = None
     stalled: dict | None = None
 
 
@@ -186,6 +191,17 @@ class AuditMiddleware(AgentMiddleware):
         last = msgs[-1] if msgs else None
         if last is None or getattr(last, "type", None) != "ai":
             return None
+        # PRICE THE RUN AS IT GOES. This is the limit that is meant to bind — the absurd case,
+        # tens of dollars on one patient — and it is the only one that should. Step caps and
+        # loop brakes were cutting working runs short while the budget went untouched.
+        self.ctx.spend.add(getattr(last, "usage_metadata", None))
+        if (why := self.ctx.spend.exceeded()) and not self.ctx.accepted:
+            self.ctx.spend_stopped = why
+            self.ctx.tracer.emit("cost_ceiling_reached", severity="error", why=why,
+                                 spend=self.ctx.spend.report(),
+                                 message=("stopped on cost, not on steps: whatever this run was "
+                                          "doing, it was not worth this much"))
+            return {"jump_to": "end"}
         if getattr(last, "tool_calls", None):
             return None
         if self.ctx.accepted:
@@ -220,6 +236,7 @@ class AuditMiddleware(AgentMiddleware):
         # Reached only if something bound a tool after `assert_tool_surface` ran. Refused
         # rather than logged: an undeclared tool is by definition one whose effect on the
         # coverage ledger nobody has reasoned about.
+        self.ctx.undeclared_tools += 1
         self.ctx.tracer.emit("undeclared_tool_refused", severity="error", tool=name)
         return {"error": "UNDECLARED_TOOL", "tool": name,
                 "message": ("This tool is not part of the declared surface for this task and "
@@ -242,11 +259,22 @@ class AuditMiddleware(AgentMiddleware):
         if not blocked:
             return None
         self.ctx.tracer.emit("plan_refused_open", severity="warning", tool=name, blocked=blocked)
-        return {"error": "OUT_OF_PLAN", "blocked": blocked,
-                "types": sorted({b["doc_type"] for b in blocked}),
-                "message": ("The retrieval plan assigns these types to `sample`: the runtime's "
-                            "sampler draws from them and you may not open them directly. This "
-                            "is NOT evidence that they hold nothing.")}
+        types = sorted({b["doc_type"] for b in blocked})
+        return {
+            "error": "OUT_OF_PLAN", "blocked": blocked, "types": types,
+            "message": ("The retrieval plan assigns these document types to `sample`: the "
+                        "runtime's sampler draws from them and you may not open them directly. "
+                        "This is NOT evidence that they hold nothing."),
+            # THE WAY OUT, in the same message as the refusal. Dropping this key is how a
+            # refusal becomes a deadlock: the agent is told it may not open the type and not
+            # told that it can ask for the type to be promoted. The old runtime carried it and
+            # this one had lost it — the same defect as the gate rejection that withheld
+            # `how_to_satisfy`, which cost a run nine repeats of the wrong request.
+            "how_to_proceed": (
+                "if you have a reason to think this type bears on the answer, promote it with "
+                f"revise_plan(promote_types=[{types[0]!r}]). The plan may only ever widen, so "
+                "the promotion is recorded and permanent."),
+        }
 
     def wrap_tool_call(self, request: ToolCallRequest, handler):
         """Every tool call, including one a library adds tomorrow.
@@ -321,42 +349,56 @@ class AuditMiddleware(AgentMiddleware):
             self.ctx.tracer.trigger(runtime="deepagents-hooks", **t.to_dict())
 
     def _stalled(self, submitted: dict, verdict: dict) -> dict | None:
-        """Stop a run that is being refused the same way for the same answer, over and over.
+        """Stop a run only when NOTHING IS MOVING — not when a refusal has repeated.
 
-        MEASURED, NOT HYPOTHETICAL. Two of ten real charts spent their entire 50-call budget
-        on 26 and 28 rejections, of which 24 and 22 were the identical
-        `not_less_specific`/`conflict_requires_nos` pair on a byte-identical value. That
-        particular contradiction is fixed, but the SHAPE is not specific to it: any refusal the
-        agent cannot satisfy produces it, and the run's only signal was a spent budget.
+        THE FIRST VERSION OF THIS COST A CORRECT ANSWER. It counted repeats of
+        (reason, value) and stopped at three. On ten real charts it fired on two, and one of
+        them — a 293-document chart — was stopped into a WRONG histology it would otherwise
+        have had more turns to correct. Measured against the same ten runs: nobody came near
+        the 50-call ceiling (the busiest used 30), and a call costs $0.008, so a full 50-call
+        run is about $0.40. The brake was the binding constraint on quality and the budget was
+        not binding at all. That is backwards: a limit exists to stop the absurd case — tens of
+        dollars, millions of tokens on one patient — not to cut a working run short.
 
-        `evals.py` already detects this — `--max-rejection-repeats`, whose help says "the
-        library floor is 2: one rejection is not a loop". That detector reads FINISHED runs, so
-        it can only tell you afterwards what you paid for. The same rule at runtime turns the
-        spend into a labelled stop.
-
-        The fingerprint is (rejection reason + coded value). Reason alone would stop an agent
-        making real progress against a recurring obligation; value alone would stop one being
-        refused for two different reasons. Only the pair repeating means nothing is moving.
+        So the test is PROGRESS, not repetition. A refusal that repeats while the agent is
+        still recording evidence or still successfully widening the plan is a run doing its
+        job under a hard rule. Only a refusal that repeats with the ledgers frozen means the
+        loop cannot advance, and that is cheap to detect exactly because the ledgers are ours.
         """
-        fp = (str(verdict.get("why") or ""), json.dumps(submitted.get("value") or {}, sort_keys=True))
+        fp = (str(verdict.get("why") or ""),
+              json.dumps(submitted.get("value") or {}, sort_keys=True))
+        # What "moving" means, measured off the ledgers rather than inferred from the text.
+        progress = (len(self.ctx.toolbox.evidence.items) if self.ctx.toolbox else 0,
+                    sum(1 for r in self.ctx.revisions if r["applied"]),
+                    len(self.ctx.threads.threads) - len(self.ctx.threads.unresolved())
+                    if self.ctx.threads else 0)
+        prev = self.ctx.rejection_progress.get(fp)
+        self.ctx.rejection_progress[fp] = progress
+        if prev is None or progress != prev:
+            # Either the first time this refusal has been seen, or something advanced since
+            # the last one. Not a stall.
+            self.ctx.rejection_fingerprints[fp] = 0
+            return None
         self.ctx.rejection_fingerprints[fp] += 1
         n = self.ctx.rejection_fingerprints[fp]
-        if n < self.ctx.max_rejection_repeats:
+        if n < self.ctx.max_frozen_repeats:
             return None
-        self.ctx.stalled = {"fingerprint_repeats": n, "why": fp[0],
-                            "value": submitted.get("value") or {}}
+        self.ctx.stalled = {"frozen_repeats": n, "why": fp[0],
+                            "value": submitted.get("value") or {}, "progress": list(progress)}
         self.ctx.tracer.emit("rejection_loop", severity="error", repeats=n, why=fp[0],
-                             message=("the same rejection fired on the same value this many "
-                                      "times; the run is stopped rather than allowed to spend "
-                                      "the rest of its budget"))
+                             progress=list(progress),
+                             message=("the same refusal fired on the same value with no new "
+                                      "evidence, no applied revision and no settled thread in "
+                                      "between; the loop cannot advance"))
         return {"accepted": False, "stop": True,
-                "why": (f"REJECTION_LOOP: this exact answer has been refused {n} times for the "
-                        f"same reason ({fp[0]}). Resubmitting it again cannot succeed."),
-                "what_to_do": ("Change the VALUE, or submit EVIDENCE_INSUFFICIENT with the "
-                               "reason you cannot satisfy this rule. If the rule itself cannot "
-                               "be satisfied by any value the record supports, submit "
-                               "SPEC_INSUFFICIENT and name the answer_check at fault — that is "
-                               "a finding about the specification and it is wanted.")}
+                "why": (f"REJECTION_LOOP: this answer has been refused {n} times for the same "
+                        f"reason with nothing recorded in between ({fp[0]}). Resubmitting it "
+                        f"cannot succeed."),
+                "what_to_do": ("Change the VALUE, or record evidence that answers the rule, or "
+                               "widen the plan with revise_plan. If no value the record "
+                               "supports can satisfy this rule, submit SPEC_INSUFFICIENT and "
+                               "name the answer_check at fault — that is a finding about the "
+                               "specification and it is wanted.")}
 
     def _record_reads(self, name: str, out: dict) -> None:
         """Hand every read's extent to the thread ledger, and trace what it settled.
@@ -441,7 +483,7 @@ class AuditMiddleware(AgentMiddleware):
 
 def build_agent(*, model, tools: list[StructuredTool], system_prompt: str, ctx: RunContext,
                 backend, max_model_calls: int, summarization_model=None,
-                keep_messages: int = 20):
+                keep_messages: int = 20, max_usd: float = 5.0):
     """The graph. Every node comes from the library; every rule comes from a hook.
 
     Middleware order is composition order. `AuditMiddleware` is last so its `wrap_tool_call`
@@ -452,6 +494,9 @@ def build_agent(*, model, tools: list[StructuredTool], system_prompt: str, ctx: 
     from deepagents.middleware.summarization import SummarizationMiddleware
 
     ctx.declared = {t.name for t in tools}
+    if ctx.spend is None:
+        from .spend import Spend
+        ctx.spend = Spend(max_usd=max_usd, model=getattr(model, "model_name", "") or str(model))
     middleware = [
         # Planning. Todos live in STATE and `write_todos` REPLACES the list, so a revised plan
         # leaves no stale copy in the transcript.
@@ -499,7 +544,8 @@ def recursion_limit_for(agent, max_model_calls: int, *, slack: int = 8) -> int:
 
 def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads, catalogue,
                      tracer, gate, model, tools, system_prompt, backend, max_model_calls,
-                     out_dir, elapsed_fn, expansion_budget) -> dict:
+                     out_dir, elapsed_fn, expansion_budget, ctx_out=None,
+                     max_usd: float = 5.0) -> dict:
     """One patient, one spec, through the library's graph. Returns the manifest."""
     from .answer_contract import NO_COVERAGE_CLAIM, attach_coverage_claim
     from .plan_expansion import budget_report, expansion_is_spent, headroom
@@ -510,9 +556,14 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
                      catalogue=catalogue, tracer=tracer, gate=gate, toolbox=toolbox)
     # The typed channel goes in with the chart tools, so it is declared, audited by
     # `wrap_tool_call`, and counted in the tool surface like everything else.
+    if ctx_out is not None:
+        # A caller that wants the live ledgers gets THIS context, not a second assembly of its
+        # own. Two places wiring the plan and the coverage ledger is the asymmetry the whole
+        # audit layer exists to refuse, and a test harness is not exempt from it.
+        ctx_out.append(ctx)
     tools = list(tools) + [make_revise_plan_tool(ctx, expansion_budget)]
     agent = build_agent(model=model, tools=tools, system_prompt=system_prompt, ctx=ctx,
-                        backend=backend, max_model_calls=max_model_calls)
+                        backend=backend, max_model_calls=max_model_calls, max_usd=max_usd)
 
     crashed = False
     try:
@@ -587,6 +638,22 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
                             planner_terms=len(plan.keywords)),
             "exhausted": expansion_is_spent(plan, expansion_budget, terms_deferred=[]),
             "headroom": headroom(plan, expansion_budget)},
+        # DEGRADATION, with this runtime's OWN counters. The old loop counted plan/reflect
+        # node fallbacks; those nodes are the library's now, so `deep_runner` reported
+        # `degradation: None` and this runtime reported nothing at all — which reads as "clean"
+        # to every consumer that checks it. These are the four ways THIS runtime can quietly do
+        # less than it claims. Read them before any other number: a non-zero entry means the
+        # behaviour a result is being cited for may not have been exercised.
+        "degradation": {
+            "no_tool_call_recoveries": ctx.no_tool_call,
+            "undeclared_tool_calls": ctx.undeclared_tools,
+            "rejection_loop_stopped": 1 if ctx.stalled else 0,
+            "marker_catalogue_incomplete": 1 if catalogue.degraded else 0,
+        },
+        # WHAT IT COST AND WHAT IT WAS ALLOWED TO COST, in one place. `spend_stopped` is
+        # non-null only when the ceiling is what ended the run.
+        "spend": ctx.spend.report() if ctx.spend else None,
+        "spend_stopped": ctx.spend_stopped,
         "n_model_calls": ctx.n_model_calls, "max_model_calls": max_model_calls,
         "recursion_limit": recursion_limit_for(agent, max_model_calls),
         # Non-zero means the model tried to stop without answering and was sent back.
@@ -682,7 +749,8 @@ def make_revise_plan_tool(ctx: RunContext, budget) -> StructuredTool:
 
 
 def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_calls: int,
-                seed: int = 1234, expansion_budget=None, run_id: str | None = None) -> dict:
+                seed: int = 1234, expansion_budget=None, run_id: str | None = None,
+                ctx_out: list | None = None, max_usd: float = 5.0) -> dict:
     """Assemble the ledgers, tools and gate for one patient and run it.
 
     The assembly lived in a scratch harness while this runtime was being proven. It belongs
@@ -737,7 +805,8 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
         model=model, tools=tools,
         system_prompt=spec.as_prompt_block() + "\n\n" + TASK.format(patient=patient_id),
         backend=StateBackend(), max_model_calls=max_model_calls, out_dir=out_dir,
-        elapsed_fn=lambda: round(time.time() - t0, 1),
+        elapsed_fn=lambda: round(time.time() - t0, 1), ctx_out=ctx_out,
+        max_usd=max_usd,
         # PRICED AGAINST THE PLAN, not a constant. The old runtime computed this from the
         # plan's own size — how many types it may promote, how many documents that opens —
         # and this one shipped `ExpansionBudget(40, 8, 40, 6)`, four numbers that fit no

@@ -99,7 +99,7 @@ def _extract(tmp_path, *extra):
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
     return runner.invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
                                "--variables", "primary_site,histology,behavior",
-                               "--runtime", "hooks", "--out", str(tmp_path / "runs"), *extra])
+                               "--out", str(tmp_path / "runs"), *extra])
 
 
 def test_the_hooks_runtime_runs_through_extract_and_writes_an_artifact(tmp_path, scripted_chat):

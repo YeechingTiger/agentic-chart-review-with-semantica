@@ -49,7 +49,7 @@ from pathlib import Path
 
 import pytest
 
-from acr import deep_runner, graph, run_triggers
+from acr import run_triggers
 from acr.corpus import Corpus
 from acr.coverage_planner import (MECHANICALLY_DISCHARGEABLE_MARKERS,
                                   OPEN_REQUEST_ALREADY_OPEN, OPEN_REQUEST_ALREADY_SETTLED,
@@ -65,7 +65,6 @@ from acr.coverage_planner import (MECHANICALLY_DISCHARGEABLE_MARKERS,
                                   PlanRevision, Trigger, load_marker_catalogue, plan_from_spec,
                                   spec_declared_keywords)
 from acr.answer_gate import check_threads
-from acr.graph import ChartReviewAgent
 from acr.llm import LLMClient, LLMConfig, LLMResponse
 from acr.spec import load_spec
 from acr.state import Budget
@@ -188,12 +187,25 @@ def _assignments(chart, sampled=(SAMPLED_TYPE,)):
 
 
 def _run(spec, chart, llm, tmp_path, run_id, *, max_steps=8, expansion_budget=None):
-    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=max_steps), out_dir=tmp_path,
-                             sample_seed=7, expansion_budget=expansion_budget)
-    result = agent.run(chart, run_id=run_id)
-    events = [json.loads(l) for l in (tmp_path / f"{run_id}.jsonl").read_text(
-        encoding="utf-8").splitlines() if l.strip()]
-    return agent, result, events
+    """The live runtime, driven by the same scripts through the adapter.
+
+    Returns (None, manifest, events). The first slot used to be the agent object these tests
+    poked at; there is no such object now — the rules live in `AuditMiddleware` and the ledgers
+    are reachable from the manifest, which is what a consumer of a finished run actually has.
+    """
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from hooks_harness import run_with_script
+
+    from acr.corpus import Corpus
+    corpus = Corpus(ROOT / "corpus" / "patients")
+    ctx_out = []
+    manifest, events = run_with_script(spec, corpus, chart.patient_id, tmp_path, llm,
+                                       run_id=run_id, max_model_calls=max_steps,
+                                       ctx_out=ctx_out)
+    # The live context stands where the agent object used to: same `.plan`, `.threads`,
+    # `.coverage`, and it is the one the run actually used.
+    return (ctx_out[0] if ctx_out else None), manifest, events
 
 
 def _triggers(events, kind=None):
@@ -243,13 +255,6 @@ def test_the_trigger_emitter_keeps_the_two_kinds_apart(tmp_path):
         "the dedicated emitter must not go through the collision fallback")
 
 
-def test_no_runtime_pipes_a_trigger_dict_straight_into_emit():
-    """The typo, inverted into an assertion. It cost every live run its first trigger while
-    34 detector unit tests stayed green, and it is two characters from coming back."""
-    call = re.compile(r'^\s*[\w.]+\.emit\("trigger"', re.M)      # statements, not prose
-    for mod in (graph, deep_runner):
-        assert not call.search(inspect.getsource(mod)), (
-            f"{mod.__name__} is passing a Trigger dict into emit() again; `kind` is in it")
 
 
 def test_a_live_trigger_does_not_kill_the_run(spec, chart, tmp_path):
@@ -1305,37 +1310,3 @@ def test_a_gate_obligation_detector_that_crashed_is_not_an_empty_list(spec, char
     assert "RuntimeError" in ev["error"] and "the gate blew up" in ev["error"]
 
 
-def test_the_deepagents_front_end_counts_threads_and_not_short_reads_either(spec, chart,
-                                                                            tmp_path):
-    """The second runtime carried a byte-identical guard, and broke in the identical way.
-
-    It is worth its own live test rather than a source scan because a trigger count that
-    depends on which binary the operator launched is not a measurement, and `_make_tools` is
-    the only place the deepagents arm turns a tool result into an obligation. No model and no
-    deepagents graph is involved: the wrapped tool is called directly, which is exactly the
-    surface the regression lived on.
-    """
-    from acr.coverage import CoverageLedger, ForcedSampler, strata_from_spec
-    from acr.state import EvidenceLedger
-    from acr.tools.toolbox import Toolbox
-
-    nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    docs = list(chart._docs.values())
-    toolbox = Toolbox(chart, EvidenceLedger(),
-                      CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(7)))
-    tracer = Tracer.create(tmp_path, "deep-threads")
-    threads, plan = OpenThreadLedger(), plan_from_spec(spec, chart)
-    tools = deep_runner._make_tools(toolbox, tracer, plan=plan, catalogue=load_marker_catalogue(),
-                                    threads=threads, chart=chart)
-    read = next(t for t in tools if t.name == "read_document")
-
-    out = [json.loads(read.func(note_id=nid, offset=0, limit=lim)) for lim in (40, 60, 80)]
-    assert all(o.get("truncated") for o in out), (
-        "fixture assumption: three reads of one document, every one stopping short")
-
-    assert [t.thread_id for t in threads.threads] == [f"{nid}#{TRUNCATED}"]
-    fired = [e for e in tracer.events
-             if e.get("kind") == "trigger" and e.get("trigger") == TRIGGER_UNSETTLED_THREAD]
-    assert len(fired) == 1, (
-        f"the deepagents arm fired {len(fired)} UNSETTLED_THREAD triggers for one thread; the "
-        "two front ends must not disagree about what a trigger counts")

@@ -74,3 +74,33 @@ def test_a_positive_is_labelled_ungated_when_it_never_passed_the_gate():
     fin = inspect.getsource(A.run_chart_review)
     assert '"UNGATED"' in fin and "route_to_human" in fin, (
         "a FOUND answer that skipped the gate must say so; the old runtime stamped it True")
+
+
+# ---------------------------------------------------- the wire that has been lost twice
+# `_record_reads` is the route from "I read this document to its end" to "its `truncated`
+# thread is discharged". It has now been deleted twice by accident: once when the runtime was
+# ported (it lived in graph.py and was not carried over), and once by a range-based edit of
+# this very file's neighbour whose slice happened to span the method. Both times the call site
+# survived, so the failure was an AttributeError at the first read rather than anything
+# resembling a missing rule.
+#
+# Pinned directly, not through a scripted run: the integration tests that caught it are exactly
+# the ones a "clean up the old tests" pass is tempted to delete.
+
+def test_the_read_recorder_exists_and_is_called_before_detection():
+    import inspect
+
+    assert hasattr(A.AuditMiddleware, "_record_reads"), (
+        "the wire from a completed read to a discharged thread is gone; the call site will "
+        "raise AttributeError on the first read of every run")
+    hook = inspect.getsource(A.AuditMiddleware.wrap_tool_call)
+    i, j = hook.index("_record_reads"), hook.index("_detect(")
+    assert i < j, ("a read that completes a document must settle its thread BEFORE the same "
+                   "result is rescanned for markers, or a window read can re-open what it closed")
+
+
+def test_only_truncated_may_be_discharged_by_machine():
+    """The recorder hands spans to the ledger; the ledger decides. `truncated` is the only
+    marker whose predicate the runtime owns both sides of."""
+    from acr.coverage_planner import MECHANICALLY_DISCHARGEABLE_MARKERS
+    assert set(MECHANICALLY_DISCHARGEABLE_MARKERS) == {"truncated"}

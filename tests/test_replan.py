@@ -45,7 +45,7 @@ from pathlib import Path
 
 import pytest
 
-import acr.graph as G
+from acr import answer_gate as G
 from acr.corpus import Corpus
 from acr.coverage import CoverageLedger, ForcedSampler, strata_from_spec
 from acr.coverage_planner import (POLICY_RANK, REFUSED_BUDGET, REFUSED_NOT_MONOTONE,
@@ -59,7 +59,6 @@ from acr.coverage_planner import (POLICY_RANK, REFUSED_BUDGET, REFUSED_NOT_MONOT
                                   redundant_against, spec_declared_keywords,
                                   triggers_from_tool_result)
 from acr.answer_gate import check_gate, check_threads, gate_answer
-from acr.graph import ChartReviewAgent
 from acr.llm import LLMClient, LLMConfig, LLMResponse
 from acr.spec import load_spec
 from acr.state import Budget, EvidenceLedger
@@ -791,66 +790,8 @@ class _RevisingLLM(LLMClient):
                                  "arguments": {"note_id": self._target}}])
 
 
-def test_a_revision_travels_from_reflection_json_into_the_dispatch_guard(spec, chart, tmp_path):
-    llm = _RevisingLLM(SAMPLED_TYPE, "right upper lobe")
-    llm._target = _first_note_of_type(chart, SAMPLED_TYPE)
-    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=6), out_dir=tmp_path,
-                             sample_seed=7)
-    res = agent.run(chart)
-
-    errs = [r for r in llm.read_results if r.get("error") == "OUT_OF_PLAN"]
-    oks = [r for r in llm.read_results if r.get("note_id")]
-    assert errs, "the plan never refused anything, so it never governed anything"
-    assert oks, ("the promotion was applied to the plan object but the dispatch guard still "
-                 "refused — IF THE RUNTIME DOES NOT APPLY IT, IT DID NOT HAPPEN")
-    assert agent.plan.policy_for(SAMPLED_TYPE) == "search"
-    assert "right upper lobe" in agent.plan.keywords
 
 
-def test_the_replan_rate_and_its_provenance_land_in_the_manifest(spec, chart, tmp_path):
-    llm = _RevisingLLM(SAMPLED_TYPE, "right upper lobe")
-    llm._target = _first_note_of_type(chart, SAMPLED_TYPE)
-    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=6), out_dir=tmp_path,
-                             sample_seed=7)
-    res = agent.run(chart, run_id="replan-manifest")
-    man = json.loads((tmp_path / "replan-manifest.manifest.json").read_text(encoding="utf-8"))
-
-    r = man["replan"]
-    assert r["n_reflections"] >= 1 and r["n_revisions_applied"] == 1
-    assert 0 < r["replan_rate"] <= 1, (
-        "the health metric for the prior is missing or zero. Zero used to mean 'the agent is "
-        "stable' and actually meant 'REPLAN and CONTINUE were the same instruction'."
-    )
-    assert r["terms_added"] == 1 and r["types_promoted"] == 1
-    # The planner's own proposals are counted against the SPEC, never as replanning.
-    assert r["terms_added_by_reflection"] == 1
-    assert r["plan_refused_opens"] >= 1
-
-    # BOTH LISTS, never merged.
-    plan = man["plan"]
-    assert plan["initial_keywords"] == spec_declared_keywords(spec)
-    assert "right upper lobe" in plan["keywords"]
-    assert plan["initial_keywords"] != plan["keywords"]
-
-    # Harvested candidates, each with the observation that produced it and the trace it came
-    # from. Without those it is a list of words, not an input to the develop plane.
-    d = man["develop_plane_candidates"]
-    assert d["spec_declared_terms"] == spec_declared_keywords(spec)
-    (term,) = [t for t in d["terms_added_at_runtime"] if t["term"] == "right upper lobe"]
-    assert term["trigger"] and term["observation"] and term["step"] >= 0
-    (prom,) = d["types_promoted_at_runtime"]
-    assert prom["type"] == SAMPLED_TYPE and prom["from"] == "sample"
-    assert Path(d["trace"]).exists()
-
-    assert man["expansion_budget"]["source"] == "priced_against_plan"
-    assert "monotone" in man["monotonicity_vs_ledger"]
-    assert man["open_threads"]["marker_catalogue"].endswith("marker-catalogue.md")
-
-    # The runtime-derived REPLAN really was recorded as a verdict, in the trace.
-    events = [json.loads(l) for l in Path(res["trace"]).read_text().splitlines() if l.strip()]
-    assert any(e["kind"] == "reflect" and e["verdict"] == "REPLAN" for e in events)
-    assert any(e["kind"] == "plan_revision" and e["applied"] for e in events)
-    assert any(e["kind"] == "plan_refused_open" for e in events)
 
 
 # ==========================================================================================
@@ -1057,23 +998,42 @@ def test_the_duplicate_refusal_reaches_the_model_in_the_loop_it_understands(spec
 
 
 # ------------------------------------------------------------------------------- helpers
-def _agent(spec, chart, llm) -> ChartReviewAgent:
-    """A ChartReviewAgent wired to real ledgers but never run. Same trick `deep_runner` uses
-    to borrow the gate: hold the object, do not invoke the graph."""
+def _agent(spec, chart, llm=None):
+    """The AUDIT MIDDLEWARE wired to real ledgers — where these rules live now.
+
+    This used to hold a `ChartReviewAgent` and never run it, purely to borrow the plan refusal
+    off the object. That runtime is gone and the rule is `AuditMiddleware._out_of_plan`, so the
+    harness holds the middleware: one object less between the test and the rule it asserts. The
+    `_plan_refusal` / `_expansion_*` aliases keep the assertions below reading as they did, and
+    what they call is the live code.
+    """
+    from acr.agent import AuditMiddleware, RunContext
+    from acr.coverage_planner import OpenThreadLedger, load_marker_catalogue
+    from acr.plan_expansion import expansion_is_spent, price_expansion_budget
     from acr.trace import Tracer
     from acr.tools import Toolbox
 
-    a = ChartReviewAgent(spec, llm)
-    a.chart = chart
-    a.evidence = EvidenceLedger()
-    a.coverage = _ledger(spec, chart)
-    a.toolbox = Toolbox(chart, a.evidence, a.coverage)
-    a.tracer = Tracer.create(Path("/tmp") / "acr-test-traces")
-    a._docs_by_type = documents_by_type(chart)
-    a._pending_triggers = []
-    a._trigger_counts = {}
-    a.markers = load_marker_catalogue()
-    return a
+    evidence = EvidenceLedger()
+    coverage = _ledger(spec, chart)
+    plan = plan_from_spec(spec, chart)
+    threads = OpenThreadLedger()
+    ctx = RunContext(spec=spec, chart=chart, plan=plan, coverage=coverage, threads=threads,
+                     catalogue=load_marker_catalogue(),
+                     tracer=Tracer.create(Path("/tmp") / "acr-test-traces"),
+                     gate=lambda submitted: {"accepted": False},
+                     toolbox=Toolbox(chart, evidence, coverage))
+    mw = AuditMiddleware(ctx)
+    docs_by_type = documents_by_type(chart)
+    mw.plan, mw.coverage, mw.evidence, mw.threads = plan, coverage, evidence, threads
+    mw.toolbox, mw.tracer, mw.markers = ctx.toolbox, ctx.tracer, ctx.catalogue
+    mw._docs_by_type = docs_by_type
+    mw._expansion_budget = price_expansion_budget(plan, docs_by_type, max_revisions=6,
+                                                  supplied=None, planner_terms=len(plan.keywords))
+    mw._plan_refusal = lambda name, args: mw._out_of_plan(name, args)
+    mw._expansion_exhausted_with_obligations = lambda: (
+        expansion_is_spent(plan, mw._expansion_budget, terms_deferred=[])
+        and bool(threads.unresolved()))
+    return mw
 
 
 def _first_note_of_type(chart, doc_type: str) -> str:
@@ -1261,58 +1221,5 @@ def test_a_revision_that_moved_nothing_is_reported_as_a_request_not_as_silence(
     )
 
 
-def test_every_replan_number_in_the_manifest_recomputes_from_its_own_trace(
-        spec, chart, tmp_path):
-    """THE AGREEMENT TEST. Recompute the block from the JSONL and demand equality.
-
-    This is the guard the class of bug needs: a manifest field that summarises trace events
-    is derived by one function, and if a second accumulator ever grows back beside it, this
-    fails instead of publishing a plausible number.
-    """
-    llm = _RevisingLLM(SAMPLED_TYPE, "right upper lobe")
-    llm._target = _first_note_of_type(chart, SAMPLED_TYPE)
-    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=6), out_dir=tmp_path,
-                             sample_seed=7)
-    res = agent.run(chart, run_id="replan-agreement")
-    man = json.loads((tmp_path / "replan-agreement.manifest.json").read_text(encoding="utf-8"))
-
-    recomputed = replan_from_trace(_events(res["trace"]))
-    for k, v in recomputed.items():
-        if k == "triggers_fired":
-            # The manifest also carries the kinds that never fired, at zero — "it fired zero
-            # times" and "this build has no such trigger" must stay distinguishable. Every
-            # count it does carry has to be the one the events support, and no kind the
-            # events show may be missing from it.
-            published = man["replan"]["triggers_fired"]
-            assert {kk: published.get(kk) for kk in v} == v
-            assert all(published[kk] == 0 for kk in published if kk not in v)
-            continue
-        assert man["replan"][k] == v, (
-            f"manifest `replan.{k}` = {man['replan'][k]!r} but the trace of this same run "
-            f"says {v!r}. A summary of trace events that disagrees with the events is an "
-            f"instrument reading plausibly, which is worse than one reading nothing."
-        )
-
-    # The trace really does hold the raw material, in the shape the derivation reads.
-    events = _events(res["trace"])
-    assert [e for e in events if e["kind"] == "plan_revision"]
-    assert len([e for e in events if e["kind"] == "reflect"]) == man["replan"]["n_reflections"]
 
 
-def test_the_runtime_counters_are_cross_checked_against_the_derivation_in_the_artifact(
-        spec, chart, tmp_path):
-    """`graph.py` still increments its own counters. They are no longer what is published —
-    they are compared to the derivation, and the comparison ships inside the manifest so a
-    divergence is visible to a reader who never runs this test."""
-    llm = _RevisingLLM(SAMPLED_TYPE, "right upper lobe")
-    llm._target = _first_note_of_type(chart, SAMPLED_TYPE)
-    agent = ChartReviewAgent(spec, llm, budget=Budget(max_steps=6), out_dir=tmp_path,
-                             sample_seed=7)
-    agent.run(chart, run_id="replan-crosscheck")
-    r = json.loads((tmp_path / "replan-crosscheck.manifest.json").read_text(encoding="utf-8"))["replan"]
-
-    assert r["derived_from"] == "trace_events", "the block must say where its numbers come from"
-    assert r["counter_disagreements"] == {}, (
-        f"the runtime counters and the trace disagree: {r['counter_disagreements']}"
-    )
-    assert r["counters_agree"] is True

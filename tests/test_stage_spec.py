@@ -28,7 +28,6 @@ from acr.answer_checks import check_answer, check_field_formats
 from acr.corpus import Corpus, DocMeta
 from acr.coverage import (CoverageLedger, ForcedSampler, assign_strata, evaluate_gate,
                           strata_from_spec)
-from acr.graph import ChartReviewAgent
 from acr.spec import load_spec
 
 ROOT = Path(__file__).resolve().parents[1]

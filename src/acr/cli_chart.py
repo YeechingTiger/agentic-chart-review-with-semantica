@@ -18,7 +18,7 @@ from rich.table import Table
 from . import cli_common
 from .cli_common import API_BASE, CORPUS, MODEL, con
 from .corpus import Corpus
-from .graph import ChartReviewAgent
+from .agent import run_patient
 from .spec import load_spec, load_specs
 from .trace import load_trace, plan_summary
 
@@ -67,31 +67,21 @@ def run(
     model: str = MODEL,
     api_base: str = API_BASE,
     max_steps: int = cli_common.MAX_STEPS,
-    max_tokens: int = cli_common.MAX_TOKENS,
-    max_seconds: int = cli_common.MAX_SECONDS,
-    reflect_every: int = typer.Option(2, "--reflect-every"),
     out: str = typer.Option("runs", "--out"),
-    temperature: float = typer.Option(0.0, "--temperature"),
-    seed: int = typer.Option(None, "--seed",
+    temperature: float = typer.Option(1.0, "--temperature"),
+    seed: int = typer.Option(1234, "--seed",
                              help="validation-sampling seed; fix it to make two runs comparable"),
 ):
     """Run the agent for one patient and one spec."""
     sp = load_spec(spec)
     c = Corpus(Path(corpus))
     ch = c.chart(patient)
-    # Corpus-wide type vocabulary: without it, "this patient has none" and "no such type"
-    # come back looking identical, and only the first of those is a finding.
-    # Cached, name-only scan. The previous form built a PatientChart per patient, which
-    # stats every file in the corpus (~276k stats, ~39 min on Lustre) to run one patient.
-    vocab = c.doc_type_vocabulary()
-    agent = ChartReviewAgent(sp, cli_common.llm_client(model, api_base, temperature),
-                             budget=cli_common.budget(max_steps, max_tokens, max_seconds),
-                             reflect_every=reflect_every,
-                             out_dir=cli_common.unique_run_dir(out), sample_seed=seed)
     con.print(f"[bold]{sp.spec_id}[/] v{sp.spec_version} (hash {sp.spec_hash}) "
-              f"→ patient {patient} ({len(ch)} docs, {len(vocab)} types in corpus vocabulary)")
-    res = agent.run(ch, known_doc_types=vocab)
-    show(res)
+              f"→ patient {patient} ({len(ch)} docs)")
+    show(run_patient(spec=sp, corpus=c, patient_id=patient,
+                     out_dir=cli_common.unique_run_dir(out),
+                     model=cli_common.chat_model(model, api_base, temperature),
+                     max_model_calls=max_steps, seed=seed))
 
 
 @chart_app.command("batch")
@@ -102,34 +92,38 @@ def batch(
     api_base: str = API_BASE,
     patients_arg: str = typer.Option("", "--patients", help="comma list; default all"),
     max_steps: int = cli_common.MAX_STEPS,
-    max_tokens: int = cli_common.MAX_TOKENS,
-    max_seconds: int = cli_common.MAX_SECONDS,
+    temperature: float = typer.Option(1.0, "--temperature"),
+    seed: int = typer.Option(1234, "--seed"),
     out: str = typer.Option("runs", "--out"),
 ):
-    """Run one spec across many patients."""
+    """Run one spec across many patients.
+
+    `acr extract` is the cohort-scale command and writes the artifact chain; this one is for
+    debugging a handful of charts and writes one JSON summary.
+    """
     sp = load_spec(spec)
     c = Corpus(Path(corpus))
     pids = [p.strip() for p in patients_arg.split(",") if p.strip()] or c.patient_ids()
+    run_dir = cli_common.unique_run_dir(out)
     results = []
     for pid in pids:
-        agent = ChartReviewAgent(sp, cli_common.llm_client(model, api_base),
-                                 budget=cli_common.budget(max_steps, max_tokens, max_seconds),
-                                 out_dir=out)
         con.print(f"[dim]— {pid}[/]")
         try:
-            results.append(agent.run(c.chart(pid)))
+            results.append(run_patient(spec=sp, corpus=c, patient_id=pid, out_dir=run_dir,
+                                       model=cli_common.chat_model(model, api_base, temperature),
+                                       max_model_calls=max_steps, seed=seed, run_id=pid))
         except Exception as e:  # noqa: BLE001
             con.print(f"[red]{pid} failed: {e}[/]")
             results.append({"patient_id": pid, "error": str(e)})
-    Path(out).mkdir(parents=True, exist_ok=True)
-    summ = Path(out) / f"batch-{sp.spec_id}.json"
+    summ = run_dir / f"batch-{sp.spec_id}.json"
     summ.write_text(json.dumps(results, indent=2, default=str), encoding="utf-8")
-    t = Table("patient", "status", "steps", "replans", "rejected", "tokens")
+    t = Table("patient", "status", "calls", "revisions", "rejected")
     for r in results:
         a = r.get("answer", {})
         t.add_row(r.get("patient_id", "?"), str(a.get("status", r.get("error", "?"))),
-                  str(r.get("steps", "-")), str(r.get("plan_revisions", "-")),
-                  str(len(r.get("rejections", []))), str(r.get("usage", {}).get("total_tokens", "-")))
+                  str(r.get("n_model_calls", "-")),
+                  str((r.get("replan") or {}).get("n_requests", "-")),
+                  str(len(r.get("rejections", []))))
     con.print(t)
     con.print(f"→ {summ}")
 
@@ -139,28 +133,30 @@ def consistency(
     patient: str = typer.Argument(...),
     spec: str = typer.Option(..., "--spec", "-s"),
     n: int = typer.Option(3, "--n", help="independent runs"),
-    temperature: float = typer.Option(0.7, "--temperature"),
+    temperature: float = typer.Option(1.0, "--temperature"),
     corpus: str = CORPUS, model: str = MODEL, api_base: str = API_BASE,
+    max_steps: int = cli_common.MAX_STEPS,
     out: str = typer.Option("runs", "--out"),
 ):
     """Run the same spec N times to measure SELF-consistency.
 
-    High self-consistency is not validity: a model can settle on one wrong reading and
-    repeat it. Report this next to accuracy, never instead of it.
+    High self-consistency is not validity: a model can settle on one wrong reading and repeat
+    it. Report this next to accuracy, never instead of it.
     """
     sp = load_spec(spec)
-    ch = Corpus(Path(corpus)).chart(patient)
+    c = Corpus(Path(corpus))
+    run_dir = cli_common.unique_run_dir(out)
     outs = []
     for i in range(n):
-        agent = ChartReviewAgent(sp, cli_common.llm_client(model, api_base, temperature),
-                                 out_dir=out)
-        r = agent.run(ch, run_id=None)
+        r = run_patient(spec=sp, corpus=c, patient_id=patient, out_dir=run_dir,
+                        model=cli_common.chat_model(model, api_base, temperature),
+                        max_model_calls=max_steps, seed=1234, run_id=f"{patient}__c{i}")
         outs.append(r)
         con.print(f"  run {i+1}/{n}: {r['answer'].get('status')} "
                   f"{json.dumps(r['answer'].get('value', {}), ensure_ascii=False)}")
-    keys = [json.dumps({"status": o["answer"].get("status"), "value": o["answer"].get("value")},
-                       sort_keys=True, ensure_ascii=False) for o in outs]
-    counts = Counter(keys)
+    counts = Counter(json.dumps({"status": o["answer"].get("status"),
+                                 "value": o["answer"].get("value")},
+                                sort_keys=True, ensure_ascii=False) for o in outs)
     top, top_n = counts.most_common(1)[0]
     con.print(f"\n[bold]self-consistency[/]: {top_n}/{n} = {top_n/n:.0%} agreement on the modal answer")
     con.print(f"distinct answers: {len(counts)}")
