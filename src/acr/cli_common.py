@@ -30,7 +30,11 @@ API_BASE = typer.Option(None, "--api-base", help="override provider base URL (vL
 # charts, 7 of 10 runs returned EVIDENCE_INSUFFICIENT with `negative_basis: BUDGET_EXHAUSTED`
 # and `max_tokens (400000) reached`, at 8-16 steps against a 24-step cap: the abstention was
 # a property of a number nobody could set, and it read as a property of the charts.
-MAX_STEPS = typer.Option(24, "--max-steps", help="reflect/act cycles before the run is cut off")
+MAX_STEPS = typer.Option(24, "--max-steps",
+                         help="MODEL CALLS before the run is cut off. Not plan/act/reflect "
+                              "cycles — there is no reflect node; one call is one turn in which "
+                              "the model may issue tool calls. The cost ceiling in spend.py is "
+                              "the limit meant to bind; this is a backstop")
 MAX_TOKENS = typer.Option(400_000, "--max-tokens",
                           help="prompt+completion tokens before the run is cut off. Prompt is "
                                "~96% of the spend and grows with the chart, so a large chart "

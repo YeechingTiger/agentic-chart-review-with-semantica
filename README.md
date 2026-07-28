@@ -1,358 +1,447 @@
 # agentic-chart-review
 
-An EHR chart-review agent that works the way a human abstractor does — see what documents
-exist and when, narrow by type and date, search, read only what matters, quote what it
-finds — under a **frozen, machine-checkable extraction specification**.
+An agent that reads a patient chart the way a cancer registrar does, under a **frozen,
+machine-checkable specification**, and cannot report an answer it has not proved it earned.
 
-The design question this repo answers is not "can a model read a note". It is: *what has to
-be in the input, and what has to be enforced in code, for two independent executors — a
-human abstractor and an LLM agent — to reach the same label for the same reason?*
+This file is the handover document. It describes what the pipeline is, what every component
+takes and returns, how to run each one, and — at the end, in detail — **what is not done**.
+
+The design question is not "can a model read a note". It is: *what has to be in the input, and
+what has to be enforced in code, for two independent executors — a human abstractor and an LLM
+agent — to reach the same label for the same reason?*
 
 ---
 
-## Four ideas that shape the whole thing
+## 0. The one idea
 
-**1. The specification is the contract, and it is frozen and hashed.**
-A spec states the decision boundary and the evidentiary rules but deliberately *not* the
-navigation path. How the agent finds the evidence is its own business; what counts as
-evidence, and what must be true before it may assert a negative, are not. Every spec is
-content-hashed, and a label is only comparable to another label produced under the same
-`spec_hash`.
+A wrong answer and an unproved answer are different failures, and only the second can be caught
+mechanically. So the system is built so that **every claim carries the evidence for itself**,
+and a claim that cannot show its evidence is refused rather than shipped with a warning
+attached.
 
-**2. Proof obligation is a first-class field, and it is checked in code.**
-Most extraction failures are not misreadings — they are confident negatives asserted after
-an incomplete search. Each spec declares what "you looked" *means* for that variable. The
-agent's `submit_answer` is **rejected** if the computed coverage ledger does not satisfy
-that obligation. Coverage is derived from real tool calls, never self-reported. Prompting a
-model to "be sure you looked everywhere" is a wish; checking the ledger is a control.
+Four consequences run through everything:
 
-**3. There are two ways to not know, and they mean different things.**
+1. **The gate.** `submit_answer` is the only way an answer comes into existence, and it goes
+   through `answer_gate.gate_answer`. A rejection is not a failure; it is the instruction for
+   what to do next, and it always names the call that satisfies it.
+2. **Enforced / advisory / declarative.** Rules that must hold are **code** (`answer_checks`,
+   `coverage`). Rules that are judgement are **skills** the model may decline to read
+   (`skills/`). Everything domain-specific is **YAML** a registrar can review (`specs/`).
+   Clinical knowledge never lives in Python.
+3. **Two planes.** DEVELOP may see the answer key; RUN may not. The only channel between them
+   is a provenance record plus a human signature.
+4. **A green gate is not a validated answer.** `provenance.reportable_as_validated` is the field
+   a downstream filter must read — never `gate_validated` alone. The gate proves the search was
+   done. It cannot prove the search terms were right.
 
-| status | meaning |
+**The spec states the decision boundary, not the navigation path.** How the agent finds evidence
+is its own business; what counts as evidence, and what must be true before it may assert a
+negative, are not. Every spec is content-hashed, and two labels are comparable only under the
+same `spec_hash`.
+
+**Two ways to not know, and they mean different things.** `EVIDENCE_INSUFFICIENT` is a claim
+about the chart. `SPEC_INSUFFICIENT` is a claim about the specification — the agent's channel
+for saying the rules do not cover this case. Pooling them destroys the only signal that tells
+you which one to fix.
+
+---
+
+## 1. The pipeline
+
+```
+                    specs/*.yaml            corpus/patients/<id>/*.txt
+                    (the question)          (the chart)
+                          │                        │
+   L0  acr ask ───────────┤                        │      route a question to a spec,
+       acr extract        │                        │      or to an explicit gap list
+                          ▼                        ▼
+   L1-L3  ┌──────────────────────────────────────────────────┐
+          │  acr extract   ← THE AGENT                        │
+          │  LangChain/deepagents graph + our rules in hooks  │
+          │  every read through the toolbox, every answer     │
+          │  through the gate                                 │
+          └──────────────────────────────────────────────────┘
+                          │
+                          ▼  extract.json          ← acr.extract/1
+                             per patient x spec: value, status, evidence,
+                             coverage ledger, provenance, spend, trace path
+                          │
+   L4     acr concord ────┤  + guidelines/*.yaml   a rule engine, NO model
+                          ▼  concord.json          ← acr.concord/1
+                             per recommendation: CONCORDANT / NON_CONCORDANT /
+                             INDETERMINATE, and which variable decided it
+                          │
+   L5     acr explain ────┤                        a rule layer, NO model
+                          ▼  explain.json          ← acr.explain/1
+                             for each selected case, the causes the ledger
+                             ELIMINATES — never a cause it invents
+```
+
+Everything after L3 is deterministic and replays from a file. `acr concord` and `acr explain`
+call no model and read no chart, which is why a number they produce can be re-derived six weeks
+later without paying for the agent again.
+
+---
+
+## 2. Components
+
+Line counts are the current tree. "No model" means the module *cannot* reach a provider —
+`tests/test_evals.py` walks the import closure and fails if one appears.
+
+### 2.1 The runtime — 2,107 lines
+
+| module | what it is |
 |---|---|
-| `FOUND` | the answer is established by recorded evidence |
-| `EVIDENCE_INSUFFICIENT` | the spec is clear; **the chart** lacks the evidence |
-| `SPEC_INSUFFICIENT` | **the spec** does not cover this case, or the variable is not derivable from notes at all |
+| `agent.py` | **The agent.** `create_agent` from LangChain plus deepagents middleware; our rules live in hooks. Replaced a 1,197-line hand-written ReAct loop. |
+| `tool_surface.py` | The whitelist. Refuses an agent carrying a tool nobody declared. |
+| `spend.py` | The cost ceiling, priced from `audit/prices.json`. |
+| `audit.py` | Token/cost accounting, wired to LiteLLM or LangChain callbacks. |
+| `corpus.py` | `PatientChart` — the only thing that touches note files. |
+| `state.py` | `EvidenceLedger`, `Budget`. |
+| `llm.py` | LiteLLM client, used by the develop-plane commands. |
 
-Collapsing these destroys the signal that tells you whether to fix your specification or go
-get more data.
+**Where each rule lives, and why that hook:**
 
-**4. Sort every piece by whether it must be *enforced*, merely *known*, or *declared*.**
-
-| | Enforced | Advisory | Declarative |
-|---|---|---|---|
-| what | the plan, forced sampling, the gate, format checks, the quarantine | how an abstractor works; how to code a variable | what a variable means; what counts as evidence |
-| where | **code** | **skills** (`skills/*/SKILL.md`) | **spec** (`specs/*.yaml`) |
-| may the model decline it? | **no** | yes — progressive disclosure means it *chooses* to load | n/a |
-| improved by | adversarial attack + tests | evolution against a held-out reward | corpus measurement + clinician review |
-| signed off by | engineer | engineer | **clinician** |
-
-Making a judgement rule *enforced* turns a wrong answer into no answer. Making an audit rule
-*advisory* is what "let the agent decide what to read" means — the thing under audit choosing
-its own scope.
-
----
-
-## Two planes, and a gate between them
-
-```
-╔═ DEVELOP PLANE ════════════════════════════════════════════════════╗
-║  Consumes an answer key. Learns keyword lists, document-type        ║
-║  policy, spec wording. Held-out splits. Kill criteria.              ║
-╚═════════════════════════╤══════════════════════════════════════════╝
-                          │  the ONLY channel: a provenance record
-                          │  plus a human signature. Not a code path.
-╔═════════════════════════▼══════════════════════════════════════════╗
-║  RUN PLANE — never sees the answer key.                             ║
-║  Produces answers, evidence, and proofs about what was not found.   ║
-╚═════════════════════════════════════════════════════════════════════╝
-```
-
-If an answer key reaches the run plane, every number downstream is void and nothing in the
-output says so. That is why `registry.truth` sits behind a separate credential and why one
-call to it quarantines the run.
-
----
-
-## The modules
-
-46 modules in five groups. Each names its single responsibility in its own docstring; the
-table is that sentence, shortened.
-
-### Run plane — L0 to L5
-
-| module | does |
-|---|---|
-| `intake` | **L0.** An arbitrary question becomes a routing decision, or an explicit gap list |
-| `registry_catalog` | **L0b.** A user's variable names to the specs that produce them. Exact match; ambiguity is an error |
-| `coverage_planner` | **L1.** *The* plan: what may be opened, what is searched with which terms, what is only sampled. Also the open-thread ledger |
-| `graph` | **L2.** The loop: plan → act → reflect → (act \| replan \| finalize), and the single route to an answer |
-| `run_triggers` | Detect, mechanically and without asking a model, the observations a reflection must answer for |
-| `plan_expansion` | The arithmetic of the expansion budget: what a monotone widening costs, and when widening is over |
-| `answer_gate` | **L3.** The single decision on whether a submitted answer may stand — returned as a recoverable rejection, not raised |
-| `answer_contract` | What an answer owes at emission, asserted by every runtime rather than intended by each |
-| `answer_checks` | Deterministic checks on a submitted answer, from the spec's own `answer_checks` |
-| `coverage` | What has to be true before a negative answer is allowed. Strata, forced sampling, the elusion bound |
-| `concordance` | **L4.** Guideline concordance, decided by rule and never by a model |
-| `explain` | **L5.** Why a case is non-concordant. Four causes, and they must not become one number |
-| `deps` | **L4.5.** Which variables a rule reads, in both directions, and what a spec edit invalidates |
-| `state` · `trace` · `run_manifest` | The plan and the ledgers; the trace and its rule attribution; the record a finished run leaves |
-| `corpus` · `llm` · `tools/toolbox` | Chart access, provider access, the tool schemas |
-
-### Spec layer
-
-| module | does |
-|---|---|
-| `spec` | Load, validate, freeze. Provenance is enforced: an unprovenanced enforced element does not load |
-| `speclint` | Spec completeness in four tiers — formal, against the corpus, against an answer key, and irreducibly human |
-| `specview/` | Seven modules that turn a spec into the document a clinician reads and signs: `statements`, `decisions`, `prose`, `basis`, `measurements`, `render`, `signoff` |
-
-### Develop plane
-
-| module | does |
-|---|---|
-| `labelling` | **The full scan.** One cheap reading of every note in a development set against one requirement. Per field: does this note bear on the question, and which terms would find it |
-| `derive` | **First-order derivation.** Read the labelling, price the words by grep, write the plan. The model says what *indicates* the answer; grep says what it *costs* to search for |
-| `assetdev` | The second-order version: hill-climb a candidate, certify on a held-out split |
-| `refine` | One reflective optimizer over **every** text parameter the agent reads — spec, skills, prompts, rejection messages — with a different update policy per parameter |
-
-### Eval plane
-
-| module | does |
-|---|---|
-| `evals` | The precedence registry (what may be judged versus what is already decided exactly), the runtime abnormality detectors, and the regression harness over manifests |
-| `judge` | Agent-as-a-judge, fenced by that registry. A judged number is an **opinion** and never a gate. Evaluators are `evaluators/*.yaml`, not code |
-
-### Front ends
-
-`cli` composes ten command groups and decides nothing: `cli_chart`, `cli_pipeline`,
-`cli_plan`, `cli_spec`, `cli_label`, `cli_eval`, `cli_judge`, `cli_refine`, `cli_common`.
-`mcp_server` exposes the same capability as one MCP tool surface. `deep_runner` is a second
-runtime over the same gate.
-
----
-
-## How they connect
-
-```
-  a question or a cohort
-        │
-   intake ─── registry_catalog ──► spec (frozen, hashed, provenanced)
-        │                            │
-   coverage_planner ◄────────────────┘   THE plan: read_all / search / sample
-        │                                revision is MONOTONE EXPANSION only
-   ┌────▼───────────────────────────────────────────────────┐
-   │ graph      plan → act ⇄ reflect → finalize             │
-   │            run_triggers detect · plan_expansion prices  │
-   └────┬───────────────────────────────────────────────────┘
-        │ submit_answer
-   answer_gate ── coverage (strata · forced sampling · elusion bound)
-        │         answer_checks · answer_contract
-        ├─► rejected, with a reason the agent can act on
-        └─► accepted ──► run_manifest + trace
-                              │
-                        concordance (L4, no model) ──► explain (L5, four causes)
-```
-
-Two rules make the loop auditable rather than decorative. **Forced sampling draws from a
-server-held seed** — if the agent could choose its own validation sample the circularity is
-back. **The gate is the only thing that may mark an answer validated**, and there is exactly
-one of it; `test_gate_validated_has_exactly_one_origin` exists because a second copy grew
-once and had to be removed.
-
-The develop plane runs offline over the same corpus and writes back **only** through a
-provenance record. Keyword lists may be adopted automatically once certified, because they
-change which text reaches the agent and never what an answer means. Document-type policy,
-evidence rules and thresholds are **semantic** — they change what a correct answer *is* — so
-the plane may only propose them, and a clinician signs.
-
----
-
-## Install
-
-Server / GPU / vLLM: see **[DEPLOY.md](DEPLOY.md)**.
-
-```bash
-uv venv --python 3.12
-uv pip install -e ".[dev]"
-./.venv/bin/python tools/generate_corpus.py --out corpus/patients   # synthetic, PHI-free
-```
-
-**Always call the venv's interpreter directly.** The system Python is 3.9 and cannot import
-`acr`; a bare `python3.12` has no pytest. Both failures look like a broken checkout:
-
-```bash
-./.venv/bin/python -m pytest      # correct
-python3 -m pytest                 # ModuleNotFoundError: acr
-```
-
-## Use
-
-```bash
-acr patients                        # what's in the corpus
-acr chart SYN0001                   # document-type summary — what the agent sees first
-acr specs                           # available specs with freeze hashes
-acr spec lint specs/…yaml           # four tiers, and what no linter can check
-acr spec review specs/…yaml         # the document a clinician reads and signs
-
-acr ask "does this patient have resected stage II NSCLC"    # route, do not run
-acr extract --cohort c.txt --variables primary_site,histology,behavior
-acr concord --guideline guidelines/nccn_nsclc_subset.yaml --input extract.json
-acr explain --input concord.json
-acr deps --guideline guidelines/…yaml       # what each rule reads, and the gaps
-
-acr eval dimensions                 # THE FENCE: what may be judged, and what is already exact
-acr eval detect --runs runs/…       # the abnormality detectors over recorded runs
-acr judge evaluators                # load evaluators/*.yaml against the real fence
-acr refine parameters               # the text parameters, and who may update each
-```
-
-Nothing spends by default. Every command that can call a model requires an explicit cost
-ceiling with no default, and `--dry-run` plans and prices without calling.
-
----
-
-## The run plane in detail
-
-`reflect` is a **separate node** with one job: look at what has been gathered and rule
-`CONTINUE` / `REPLAN` / `SUFFICIENT` / `STUCK`. In a plain ReAct loop the stopping decision
-is an afterthought made inside the same generation that just read a document.
-
-Revision is restricted to **monotone expansion** — add a term, promote a document type
-toward more reading, open a thread; never remove, demote or shrink. That restriction is what
-lets the audited party adjust its own scope at all: expansion can only make the evidence
-stronger.
-
-**But monotone in the evidence is not monotone in the bound.** Adding a term moves documents
-out of the *miss* frame the sample was drawn from. Measured on a real ledger: one added term
-left 5 of 25 draws inside the frame, and the ledger went on reporting the 25-draw bound of
-0.1129 against a 0.12 cap where the surviving draws earned 0.4507. A sample is now tied to
-the frame it was drawn from — the bound is recomputed over surviving draws, replacements are
-forced until *n* is restored, and a run that cannot restore *n* is refused.
-
-`finalize` sees **only the evidence ledger**, never the scratchpad, so the model cannot
-remember an uncited detail into the final answer.
-
-### Tools
-
-| tool | purpose |
-|---|---|
-| `list_documents` | metadata only — type, date, size. Never returns text |
-| `document_type_summary` | counts and date span per type; cheap orientation in a large chart |
-| `search_notes` | search, returns note_id + character offsets |
-| `read_document` | paginated read with stable, citable offsets |
-| `read_section` | jump to `IMPRESSION`, `FINAL DIAGNOSIS`, … |
-| `timeline` | chronological view — needed to establish intervals |
-| `record_evidence` | pin a verbatim span; the quote is sliced out of the document by offset, so it cannot be model-authored |
-| `submit_answer` | validated, and rejected if the proof obligation is unmet |
-
----
-
-## Corpus format
-
-One flat directory per patient; the filename carries the metadata:
-
-```
-corpus/patients/SYN0001/Surgical-Pathology-Report_2023-04-27.txt
-```
-
-`<DocType>_<YYYY-MM-DD>[__<n>].txt`. `src/acr/corpus.py` is the only module that knows this;
-point it at a different backend and nothing else changes.
-
-The bundled corpus is **synthetic and PHI-free**, and each patient is built around a
-deliberate evidence pattern so the specs are actually exercised:
-
-| patient | pattern | what it tests |
+| concern | hook | why that one |
 |---|---|---|
-| SYN0001 | cytology precedes pathology | the `[390]` date boundary rule |
-| SYN0002 | biopsy done at an outside hospital | must answer `EVIDENCE_INSUFFICIENT`, not infer histology |
-| SYN0003 | metastatic at presentation | recurrence `70`, not `00` |
-| SYN0004 | recurrence after a disease-free interval | requires establishing **both** halves |
-| SYN0005 | carcinoma in situ | behaviour `2`, not a reflexive `3` |
-| SYN0006 | patient declined biopsy | second evidence-gap mechanism |
-| SYN0007 | intraductal carcinoma with focal invasion | behaviour `3` despite in-situ wording |
-| SYN0008 | consult contradicts the imaging impression | prefer the primary report, cite both |
+| record the plan before the first call | `before_agent` | runs once, inside the run it describes |
+| the CURRENT plan, open threads, mechanical observations | `wrap_model_call` | `ModelRequest.override` never touches `messages`, so none of it can accumulate |
+| tool allowlist, plan refusal, **the gate**, read recording, trigger detection | `wrap_tool_call` | sees every tool call, including one a library adds tomorrow |
+| cost ceiling, expansion dead end, deadlock detector, no-tool-call recovery | `after_model` | fires after every model decision |
+| call budget | `ModelCallLimitMiddleware` | the library's |
+| context compaction | `SummarizationMiddleware` | the library's |
+| the todo list | `TodoListMiddleware` | todos live in STATE, not in messages |
 
-Ground truth lives in `_ground_truth.json` next to the notes, reachable only through the
-quarantined credential.
+`revise_plan` is a **declared tool**, not a hook: the plan may only widen, and a proposal the
+model makes must be auditable like any other tool call.
+
+**Why `create_agent` and not `create_deep_agent`:** the latter injects nine tools nobody asked
+for — `ls glob grep read_file write_file edit_file execute task write_todos`. Four are read
+paths, and a read that does not go through `Toolbox.dispatch` is invisible to the
+`CoverageLedger`, so the gate would still stamp `gate_validated: true` over a chart the ledger
+never saw read. Under `FilesystemBackend(root_dir=".")` its `read` and `grep` reach absolute
+paths outside root_dir — including `ground_truth.csv`. No recorded run exercised that; an
+unexercised open door is not a boundary. `tool_surface.assert_tool_surface` is the boundary, and
+it is a **whitelist** — a blacklist of today's nine would pass the tenth.
+
+### 2.2 The audit layer — 6,508 lines. **This is the product.**
+
+| module | what it decides |
+|---|---|
+| `answer_gate.py` | `gate_answer` — the single decision on whether an answer may be emitted. Every front end calls THIS. |
+| `answer_checks.py` | Deterministic checks on a submitted value (`not_less_specific`, `conflict_requires_nos`, `origin_not_specimen`, …). Declared per spec; no clinical knowledge in the file. |
+| `answer_contract.py` | What an answer owes at emission: `assert_answer_is_reportable`, `build_spec_gap`, `attach_coverage_claim`, `strip_value_from_spec_insufficient`. |
+| `coverage.py` | The stratified coverage ledger, the forced sampler, the elusion bound (Clopper–Pearson). |
+| `coverage_planner.py` | The ONE retrieval plan, monotone expansion, the thread ledger, the marker catalogue, trigger detection. |
+| `plan_expansion.py` | The arithmetic of the expansion budget: pricing, partial application, when widening is over. |
+| `run_triggers.py` | `detect_gate_obligations` — an obligation the current plan structurally cannot discharge. |
+| `spec.py` / `speclint.py` | Load, freeze-hash and lint a spec; bind provenance and refuse an unmarked enforced element. |
+| `trace.py` / `run_manifest.py` | The trace and the run record. |
+
+**Coverage is stratified, not a count.** Each spec assigns document types to
+`can_establish` (search exhaustively) / `may_mention` (search, then sample the misses) /
+`cannot_establish` (validate the exclusion by sampling). `max_tolerated_hits: 0` — one hit in a
+`cannot_establish` stratum overturns the declaration. The elusion bound is Clopper–Pearson, and
+it is tied to **the frame it was drawn from**: adding a search term shrinks the miss frame, so
+draws taken before the term was added no longer bound the population that remains. Monotone
+expansion is monotone in the *evidence*, not in the *bound*.
+
+### 2.3 Downstream, no model — 3,983 lines
+
+`concordance.py` (L4 rule engine) · `explain.py` (L5 cause elimination) · `deps.py` (what a
+recommendation reads, and what a spec edit invalidates) · `registry_catalog.py` (variable → spec
+resolution; a variable belongs to exactly one spec, and ambiguity is an error rather than a
+merge) · `intake.py` (question → spec routing).
+
+### 2.4 The clinician's view — 1,648 lines
+
+`specview/` renders a spec as prose a registrar can review and sign, with every element's
+provenance and measurement beside it.
+
+### 2.5 The develop plane — 3,608 lines. **Never run on data.**
+
+`labelling.py` (read every note of a dev set once) · `derive.py` (labels → keywords + read
+policy) · `assetdev.py` (evolve / certify / adopt retrieval assets). Consumes the answer key;
+must never run in the same process as a RUN-plane job.
+
+### 2.6 The eval plane — 3,066 lines
+
+`evals.py` (precedence registry, abnormal-behaviour detectors, regression harness) ·
+`judge.py` (agent-as-a-judge, fenced) · `refine.py` (route a classified failure at the text
+parameter that caused it).
+
+**The fence:** where a deterministic check exists, a model judge is *forbidden*, not
+discouraged. `correctness` is `==`. A task-completion judge is refused outright because it
+**launders abstention** — it scores a correct `EVIDENCE_INSUFFICIENT` as a failure, and
+optimising against that teaches the agent to guess on exactly the subpopulation where the stakes
+are highest. The fence is **per sub-question**, not per dimension.
+
+### 2.7 Other front end — 941 lines
+
+`mcp_server.py` exposes the chart tools and the gate over MCP. It shares `gate_answer`
+(pinned by `tests/test_mcp_server.py`) but **not** the answer contract — see §5.2.
 
 ---
 
-## Run output is data, not build product
+## 3. How to run each component
 
-A trace that documented a bug in code that has since been fixed **cannot be regenerated** —
-the path that produced it no longer exists. One batch was already lost this way; see
-`runs/_archive/NOTES.md`.
+One environment. `langchain`, `deepagents`, `langfuse` and `pytest` are all in `.venv`.
 
-- Directories are `runs/<label>__<UTC>__<code-sha>/`, created with `exist_ok=False`.
-- Manifests from the **synthetic** corpus are committed (~2KB, evidence). Traces are not.
-- **Real-patient run output never enters git**, manifest or not: a real run writes the
-  patient id into the directory name and into the manifest.
-- To clear runs use `tools/archive_runs.sh`. **Never `rm -rf runs/…`.**
+```bash
+cd /N/project/computable_phenotype/xh_project/agentic-chart-review
+set -a && . /N/project/computable_phenotype/llm/.azure_env && set +a
+export ACR_AUDIT_LOG=/N/project/computable_phenotype/llm/run/<name>/audit.jsonl
+```
 
-Without the trace you cannot distinguish a correct answer from a lucky one, which is the
-whole reason this is built the way it is.
+`.azure_env` exports `ACR_API_BASE`, `ACR_API_KEY`, `ACR_MODEL`. **It is chmod 600 and outside
+the git tree. Keep it that way.**
+
+### Look before you spend
+
+```bash
+.venv/bin/acr patients --corpus corpus/patients      # who is in the corpus
+.venv/bin/acr chart SYN0001                          # one chart's doc-type summary
+.venv/bin/acr specs                                  # specs and their freeze hashes
+.venv/bin/acr extract --cohort c.csv --variables histology --dry-run
+```
+
+`--dry-run` resolves the variables, prices the work, and calls no model.
+
+### L0–L3 · the agent
+
+```bash
+.venv/bin/acr extract \
+  --cohort cohort.txt \                 # csv/tsv/txt/json of patient ids
+  --variables primary_site,histology,behavior \
+  --corpus /N/project/computable_phenotype/acr_real/patients \
+  --max-steps 50 --temperature 1 --seed 1234 \
+  --out runs/
+```
+
+- **in:** a cohort file, a variable list, `specs/`, a corpus
+- **out:** `runs/extract__<utc>__<sha>/extract.json`, plus one `.jsonl` trace and one
+  `.manifest.json` per (patient × spec)
+- The unit of work is the **spec**, not the variable. `--variables primary_site,histology` is
+  ONE pass because that spec answers both; asking per variable pays for the chart twice and can
+  return two different sites for one patient.
+- `--max-steps` is **model calls**, not plan/act/reflect cycles — there is no reflect node. The
+  limit meant to bind is the cost ceiling in `spend.py` ($5/patient default).
+- `--temperature` defaults to **1.0**: `gpt-5.6-luna` rejects any other value and 400s on the
+  first call.
+
+Single chart, for debugging: `acr chart run SYN0001 --spec specs/….yaml`.
+Same chart N times, to measure self-consistency (which is *stability, not validity*):
+`acr chart consistency SYN0001 --spec … --n 3`.
+
+### L4 · concordance — no model
+
+```bash
+.venv/bin/acr concord --guideline guidelines/….yaml -i runs/…/extract.json -o concord.json
+```
+
+### L5 · explanation — no model
+
+```bash
+.venv/bin/acr explain -i concord.json -o explain.json
+```
+
+### The spec, in front of a clinician
+
+```bash
+.venv/bin/acr spec review   --spec specs/….yaml     # prose + provenance + measurements
+.venv/bin/acr spec signoff  --spec specs/….yaml     # records reviewer, date, element hash
+```
+
+### The eval plane — no model
+
+```bash
+.venv/bin/acr eval dimensions            # THE FENCE: what a judge may and may not decide
+.venv/bin/acr eval score   --runs runs/…/ --answer-key key.json \
+                           --fields primary_site,histology,behavior \
+                           --commit $(git rev-parse --short HEAD) --spec-hash … \
+                           --model … --date … --baseline baseline.json
+.venv/bin/acr eval detect  --runs runs/…/ --min-term-chars 3 --max-rejection-repeats 2 \
+                           --token-band 20000,1500000 --turn-band 3,60
+.venv/bin/acr eval compare --before a.json --after b.json     # exits 1 on REGRESSION
+```
+
+**`eval compare` needs `ACR_PSEUDONYM_KEY` set** on real data. Without it every real person_id
+masks to one constant token, the per-instance index collapses, and `compare` returns
+`NOT_COMPARABLE` (exit 2) rather than a wrong `0 regressions`. It reported exactly that once,
+over a comparison that actually held 6 improvements and 3 regressions.
+
+`eval detect` has **no default thresholds** on purpose: a detector that ran with numbers nobody
+chose reports "nothing fired" indistinguishably from "nothing looked".
+
+### The develop plane — spends money, consumes the answer key
+
+```bash
+.venv/bin/acr label scan   --spec … --dev-set … --max-usd 40    # refuses to start without --max-usd
+.venv/bin/acr derive terms --labelling … --min-yield … --min-precision …
+.venv/bin/acr assets evolve   …        # writes nothing
+.venv/bin/acr assets adopt    …        # the only writer
+```
+
+Every `derive` threshold is a **required option**. There are no defaults, because a threshold
+nobody chose is a finding nobody owns.
 
 ---
 
-## On self-consistency
+## 4. Reading a manifest
 
-`acr consistency` measures **stability, not correctness.** A model can settle on one wrong
-reading of an ambiguous specification and repeat it perfectly. High self-consistency with
-low agreement against an adjudicated reference is the signature of a shared misreading, and
-it is a finding about the *specification*.
+The fields that decide whether a number may be used:
 
-Replicate runs of one model are **not** independent raters: their errors are correlated by
-construction. Do not pool them as if they were separate abstractors.
+| field | read it as |
+|---|---|
+| `answer.status` | `FOUND` / `EVIDENCE_INSUFFICIENT` / `SPEC_INSUFFICIENT` / `NO_ANSWER` |
+| `gate_validated` | the proof obligation was met. **Not** "the answer is right." |
+| `provenance.reportable_as_validated` | **the field a filter must read.** False while any element used is `draft`. |
+| `provenance.weakest_status` / `counts_by_origin` | which elements dragged it down |
+| `answer.proof_basis` | `WITNESS` (one qualifying document) / `UNGATED` / `NOT_APPLICABLE` |
+| `answer.downgraded_from` + `withheld_value` | the run stopped owing an obligation; the value is preserved but **not asserted** |
+| `degradation` | any non-zero entry means a node did less than it claims. **Read this first.** |
+| `spend` / `spend_stopped` | what it cost, what it was allowed to cost, whether cost ended it |
+| `expansion_stopped` | the plan could no longer widen and the obligation stood |
+| `rejection_loop` | stopped because the ledgers froze, not because the budget ran out |
+| `develop_plane_candidates` | candidate spec edits observed on a real chart. Score the spec against `spec_declared_terms`, **never** against the expanded list — a runtime rescue folded back into the baseline erases the evidence that the baseline was wrong. |
 
 ---
 
-## Status
+## 5. What is left
 
-v0.2. 1,374 tests pass. Six specs, three guideline recommendations, eight skills, three
-evaluators.
+Ordered by what blocks trust.
 
-**Real:** the spec layer with enforced provenance (90 records — 90 `model_authored`, 90
-`draft`, which is the finding and not an omission); the run plane end to end on the synthetic
-corpus; the rule engine; the four-cause scaffold; the linter, which finds four tier-1
-failures in the shipped histology spec.
+### 5.1 The current runtime has never touched a real chart — **do this first**
 
-**Built but never run against data:** the develop plane and the eval plane. Libraries with
-tests.
+Every real-patient number in this repo's history (5/10 exact, 10/10 gate-validated, $1.54 for
+ten patients) was produced at commit `fbc7d82`, which **predates all sixteen audit fixes**.
+Those manifests have 20 keys and no `provenance` block at all.
 
-**Known broken:**
+The sixteen fixes and the reframed limits are verified **by tests only**. Re-run the ten-patient
+cohort on current code before quoting any figure:
 
-- The quarantine is **not a boundary**. The spelling class is closed and pinned by 62 tests,
-  but one process holds both credentials and the answer key ships in the payload of the very
-  call that quarantines. Damage limitation, not separation.
-- Coupling did not fall. Splitting the hubs took modules 27 → 41 and import edges 62 → 121
-  while total lines held at ~24k: it moved coupling from inside files to between them. What
-  improved is narrower — one hub stopped being the only route to a judgement three other
-  modules need.
+```bash
+B=/N/project/computable_phenotype/llm/run/hooks_current && mkdir -p $B
+cp /N/project/computable_phenotype/llm/run/real_ten/{cohort.txt,answer_key.json} $B/
+export ACR_AUDIT_LOG=$B/audit.jsonl
+.venv/bin/acr extract --cohort $B/cohort.txt --variables primary_site,histology,behavior \
+  --corpus /N/project/computable_phenotype/acr_real/patients \
+  --max-steps 50 --temperature 1 --out $B/runs
+```
 
-**Fixed by running it, on 2026-07-27.** The first true end-to-end run deadlocked: the agent
-identified a truncated pathology report as its blocker, said so in twelve consecutive
-reflections, read to the end of the document, and then re-opened the same thread thirteen
-times because nothing connected *"I read it"* to *"the thread is settled"*. A `truncated`
-thread now settles when the runtime's own read extents cover the document contiguously from
-zero, and is not opened at all against a document already seen whole. Same patient, before
-and after:
+Watch **the 293-document and 34-document patients** specifically: both were cut short by the old
+rejection brake, one of them into a wrong histology. The brake now tests whether the ledgers
+moved rather than whether a refusal repeated, so those two are the cases that should change.
 
-| | steps | reflections | tokens | outcome |
-|---|---|---|---|---|
-| before | 19 | 18 | 434,584 | ungated `FOUND`, thread outstanding |
-| after | 7 | 6 | 81,897 | **`gate_validated: true`** |
+**Do not run two jobs against the deployment at once.** Doing so cost three of ten patients to
+HTTP 429, and the dead runs looked like agent behaviour until their traces were read.
 
-`replan_rate` read `0.0` on that run and was written up as "the model ignores the replanning
-channel". The number was arithmetically right and answered a question nobody asked: the trace
-counts *admissible* revisions, the manifest counted only those that *moved retrieval*, and no
-field recorded that the agent had asked at all. It had asked on 14 of 18 reflections, and
-could move nothing because the up-front planner had already expanded the plan to its maximum
-before the loop began. First non-zero rate this project has measured: SYN0002,
-`request_rate 0.467`, `replan_rate 0.267`.
+### 5.2 `mcp_server.py` is the next `graph.py`
 
-**Not validated against real charts. No clinical use.**
+It shares the gate and **none** of the answer contract:
 
-## Licence
+```
+provenance_for_run       0 references
+downgrade_a_positive     0
+attach_coverage_claim    0
+develop_plane            0
+rule_citation_block      0
+```
 
-MIT.
+The sixteen gaps fixed in `agent.py` were "a port dropped them". These are "they were never
+there". Same class of defect, unaddressed. `tests/test_spec_insufficient.py` already asserts
+that *both* front ends go through the shared builders — extend that assertion to the rest.
+
+### 5.3 Needs a human, not code
+
+- **The 101-document patient** scores 0/3 and passes the gate. Its reasoning quotes the spec's
+  own `not_less_specific` message verbatim ("favor squamous supports 8070 over 8046"); the
+  registry coded 8046. **The spec and the registry disagree, and a registrar has to rule.** That
+  rule's provenance is `model_authored / draft`.
+- **`cached_input_per_1m = $0.10`** in `audit/prices.json` was stated, not measured against an
+  invoice. Every cost conclusion's magnitude depends on it — at full price the same tokens cost
+  4.3× more.
+- **All 90 provenance records are `model_authored`, all `draft`, zero `store_manual`.** No
+  registrar has read a line of any spec. This is why `reportable_as_validated` is false
+  everywhere, and it is the correct answer until someone signs.
+
+### 5.4 Numbers with no evidence behind them
+
+- `max_frozen_repeats = 3` in `agent.py`. The *judgement* is now right (stop when the ledgers
+  freeze, not when a refusal repeats) but the threshold is a guess. It needs arms at 2, 3 and 5
+  on one cohort.
+- `spend.py`'s `max_usd = 5.0` is ~33× a typical run ($0.15). Deliberately generous so it never
+  ends a working run — and therefore never yet fired, so it is untested in anger.
+
+### 5.5 Never run on data
+
+The develop plane (`labelling` / `derive` / `assetdev`, 3,608 lines) has a CLI and tests and
+**has never performed a single real scan**. Until it does, every keyword list in `specs/` is
+model-authored and unmeasured — which is exactly what `develop_plane_candidates` exists to fix.
+
+### 5.6 Architectural, unsolved
+
+**Quarantine is not a boundary.** One process holds both the RUN-plane and DEVELOP-plane
+credentials, the answer key ships in the payload of the very call that quarantines, and the
+ledger is process memory no other front end reads. The spelling class is closed and pinned by
+62 tests; the boundary is not.
+
+**`langfuse` is wired and off.** `lc_callback.langfuse_handler()` attaches when `LANGFUSE_HOST`
+is set. It needs a self-hosted instance inside the approved boundary — six services, and this
+cluster has no container runtime on the login node. Note that `mask` does **not** cover
+LangChain callback spans; only `mask_otel_spans` does. Getting that wrong sends chart text to
+`cloud.langfuse.com`.
+
+### 5.7 Branch state
+
+Four commits on `deepagents-only`, not merged:
+
+```
+0a23097  The migration is finished: 74 failures to zero, and graph.py is gone
+a56a61e  Sixteen audit rules the port had dropped, found by refusing to delete the tests
+1e54ad8  Restore _record_reads, which my own edit deleted, and pin it so it cannot go a third time
+e7e61bb  Port the three things the hooks runtime was missing, before deleting the one that had them
+```
+
+`1410 passed, 12 skipped, 0 failed`.
+
+---
+
+## 6. Rules for whoever takes this over
+
+**Non-negotiable, from IRB and from this tree's history:**
+
+1. Never write a real person_id (`1168` + 12 digits) or note text into any file under the repo.
+   `tests/test_no_phi_in_tree.py` enforces it — and it has caught me.
+2. The only endpoint approved for PHI is the Azure deployment in `.azure_env`. That approval does
+   **not** generalise. It is why Langfuse Cloud and AgentLoop are unusable here.
+3. `/N/project/computable_phenotype/acr_real/` is the real corpus. `corpus/patients/` is
+   synthetic and PHI-free — develop against it.
+4. Never `rm -rf` under `runs/`; use `tools/archive_runs.sh`.
+5. **Another team works in this tree.** Do not touch `authoring/`,
+   `skills/crc-guideline-registry-authoring/`, `tests/test_crc_*.py`. **Do not run
+   `git stash -u`** — it stashes their untracked work. I did, and it looked like I had broken
+   four of their tests.
+6. Write run outputs outside the repo (`/N/project/computable_phenotype/llm/run/`). `/N/slate/`
+   is near quota.
+
+**Three lessons that cost real time:**
+
+**A check that cannot fail is worse than no check.** Found seven times here: a coverage gate that
+never read its own required-keywords field; a keyword matcher that `t` satisfied; a tool-surface
+test skipped in one venv and uninvokable in the other, so it ran nowhere; `_callbacks()`
+swallowing `ModuleNotFoundError` into an empty list so every run recorded `usage: null`. When you
+add a guard, **mutate the code and watch the test go red** before you believe it.
+
+**Do not edit by range slice.** `s[s.index('def X'):s.index('def Y')]` swallows everything
+between the boundaries. It silently deleted `_record_reads` (twice — once in the port, once by my
+own hand), then `SRC`, `OPEN_REQUEST_RETURNING` and `_open_kwargs`. Each time the *call site*
+survived, so the failure looked like a broken runtime rather than a missing rule. Use an
+AST-exact single-node replacement.
+
+**And the one that matters most.** The instruction that produced most of this work was "delete the
+tests that only existed for the old runtime". Thirty-six of them turned out to be the only
+coverage of rules still in the product, and migrating them instead of deleting them surfaced
+**sixteen audit rules the runtime had silently stopped enforcing** — including two fixed hours
+earlier the same day. Every one would have become "how the new architecture behaves", under a
+green suite. When a test looks like scaffolding, check what it is holding up.

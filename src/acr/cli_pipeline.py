@@ -147,7 +147,10 @@ def extract(
     model: str = MODEL,
     api_base: str = API_BASE,
     max_steps: int = cli_common.MAX_STEPS,
-    temperature: float = typer.Option(0.0, "--temperature"),
+    # 1.0, not 0.0. gpt-5.6-luna REJECTS any temperature but its default and 400s on the first
+    # call; litellm's drop_params drops unsupported PARAMETERS, not unsupported VALUES, so a 0.0
+    # reaches the API. A determinism default that cannot run is worse than an honest 1.0.
+    temperature: float = typer.Option(1.0, "--temperature"),
     seed: int = typer.Option(None, "--seed", help="validation-sampling seed; share it across arms"),
     limit: int = typer.Option(0, "--limit", help="first N patients only; 0 = all"),
     out: str = typer.Option("runs", "--out"),
