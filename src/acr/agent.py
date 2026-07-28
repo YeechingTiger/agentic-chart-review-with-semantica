@@ -74,6 +74,22 @@ from .tool_surface import LIBRARY_TOOLS, ToolSurfaceError, assert_tool_surface  
 #: rule, not about which functions happen to exist.
 READ_TOOLS = ("read_document", "read_section", "read_documents_batch")
 
+#: The standing instruction. Beside the runtime it drives, now that the runner it used to live
+#: in is gone. The gate's contract — a rejection is the instruction for what to do next — is
+#: the whole reason this prompt is shaped the way it is.
+TASK = """Determine the answer for patient {patient} using ONLY this chart.
+
+Work by calling tools: list the documents, search them, read what matters, and record every
+claim with record_evidence and a verbatim quote. When you are ready call submit_answer.
+
+submit_answer is GATED. If the proof obligation is not met it will be rejected with the
+reason, and you must act on that reason and submit again. A rejection is not a failure; it
+is the instruction for what to do next.
+
+If a rule refuses every value the record can support, that is a finding about the
+SPECIFICATION: submit SPEC_INSUFFICIENT and name the check at fault."""
+
+
 @dataclass
 class RunContext:
     """Everything the audit hooks read or advance. Plain data; the graph is the library's."""
@@ -246,6 +262,10 @@ class AuditMiddleware(AgentMiddleware):
             if check is not None:
                 return self._refuse(request, check)
         result = handler(request)
+        # BEFORE detection, always. A read that completes a document must settle its thread
+        # before the same result is scanned for markers, or a window read of an
+        # already-complete document can re-open what it just closed.
+        self._record_reads(name, self._payload(result))
         if name == "submit_answer":
             # THE GATE, and it must be here rather than inside the tool. `_t_submit_answer`
             # records the submission and returns `{"received": true, "note": "pending
@@ -317,6 +337,60 @@ class AuditMiddleware(AgentMiddleware):
                                "SPEC_INSUFFICIENT and name the answer_check at fault — that is "
                                "a finding about the specification and it is wanted.")}
 
+    def _record_reads(self, name: str, out: dict) -> None:
+        """Hand every read's extent to the thread ledger, and trace what it settled.
+
+        THE ROUTE FROM "I READ TO THE END OF IT" TO "THE THREAD IS SETTLED". It was ported from
+        the runtime this one replaced, and it had to be: dropping it re-created the deadlock it
+        was written to fix. On a scripted probe the partial read opened a `truncated` thread,
+        the following full read settled nothing, and the run ended with the thread outstanding —
+        the same shape as the run that paged to the end of a report thirteen times because
+        nothing connected "I read it" to "the thread is discharged".
+
+        Deliberately mechanical: no model is asked whether the document is finished, because the
+        runtime computed `truncated` from the character counts and can compute the complement
+        just as well. `truncated` is the only marker this may ever settle — see
+        `MECHANICALLY_DISCHARGEABLE_MARKERS`.
+        """
+        threads = self.ctx.threads
+        if threads is None or not isinstance(out, dict) or out.get("error"):
+            return
+        reads: list[tuple[str, int, int, int | None]] = []
+        if name == "read_document" and out.get("note_id") and "returned_chars" in out:
+            reads.append((str(out["note_id"]), int(out.get("offset") or 0),
+                          int(out.get("returned_chars") or 0), out.get("total_chars")))
+        elif name == "read_documents_batch":
+            for d in (out.get("documents") or []):
+                reads.append((str(d.get("note_id", "")), 0, len(str(d.get("text", ""))),
+                              d.get("total_chars")))
+        elif name == "read_section" and out.get("note_id") and "start" in out and "end" in out:
+            # A named section carries TRUE offsets and no document length, so it contributes
+            # coverage and can never on its own prove the document is complete. Reading FINAL
+            # DIAGNOSIS tells you nothing about what sits after it.
+            reads.append((str(out["note_id"]), int(out.get("start") or 0),
+                          max(0, int(out.get("end") or 0) - int(out.get("start") or 0)), None))
+        for note_id, offset, returned, total in reads:
+            settled = threads.note_read(note_id, offset=offset, returned_chars=returned,
+                                        total_chars=total, step=self.ctx.n_model_calls)
+            if settled:
+                self.ctx.tracer.emit(
+                    "threads_settled_by_read", thread_ids=settled, note_id=note_id,
+                    total_chars=threads.doc_length.get(note_id),
+                    message=("the document has now been returned in full by reads in this run, "
+                             "so its `truncated` thread is discharged deterministically — the "
+                             "runtime owns both sides of that predicate and does not need to "
+                             "ask"))
+
+    @staticmethod
+    def _payload(result: Any) -> dict:
+        """The tool result as a dict. One parser, so read-recording and marker detection can
+        never disagree about what the tool actually returned."""
+        try:
+            out = json.loads(getattr(result, "content", "") or "{}")
+        except (json.JSONDecodeError, TypeError):
+            return {}
+        return out if isinstance(out, dict) else {}
+
     def _detect(self, name: str, args: dict, result: Any) -> None:
         """Triggers and threads, from the result the model just received.
 
@@ -324,11 +398,8 @@ class AuditMiddleware(AgentMiddleware):
         evidence, and opening a thread against text nobody read puts debt on the run for a
         document it never saw.
         """
-        try:
-            payload = json.loads(getattr(result, "content", "") or "{}")
-        except (json.JSONDecodeError, TypeError):
-            return
-        if not isinstance(payload, dict):
+        payload = self._payload(result)
+        if not payload:
             return
         quote = str(payload.get("quote", "")) if name == "record_evidence" else ""
         for t in triggers_from_tool_result(name, args, payload, plan=self.ctx.plan,
@@ -596,7 +667,6 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
                                    plan_from_spec)
     from .answer_gate import gate_answer
     from .audit import _callbacks
-    from .deep_runner import TASK
     from .state import Budget, EvidenceLedger
     from .tools.toolbox import Toolbox
     from .trace import Tracer
