@@ -50,6 +50,76 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "")).strip().lower()
 
 
+# ------------------------------------------------------------------------------- negation
+# `_norm` does not strip hyphens, so "non-small cell carcinoma" CONTAINS "small cell", and a
+# plain `phrase in blob` test reads a negation as its opposite. This is not hypothetical: on
+# the ten-patient real batch of 2026-07-28 a run coded histology 8046 -- the registry's answer
+# -- citing "poorly differentiated non-small cell carcinoma". `not_less_specific` listed
+# "small cell" in `contradicted_by`, matched it inside "non-small cell", declared 8046
+# contradicted by the record, and refused the correct answer. The agent then coded 8070 and
+# that was accepted. A check meant to stop an answer being vaguer than the record made it
+# wrong instead.
+#
+# TWO HALVES, AND ONLY ONE IS MEASURED.
+#
+# `non-` / `non ` immediately before the phrase is exact: the phrase is the tail of its own
+# negation, there is no window to guess at, and it is the form that actually fired. That half
+# is measured on n=1.
+#
+# The phrase list below is NOT measured. It is the small set of negations that are unambiguous
+# in a pathology line, kept deliberately short because the failure mode of over-reaching is
+# the mirror of the bug being fixed: mark a real mention as negated and a genuinely specific
+# record passes as NOS. Bare "no" is excluded for that reason -- "there is no doubt this is
+# adenocarcinoma" is not a negation of adenocarcinoma, and "Accession No." is not a negation
+# of anything. Whether these six are the right six on a few hundred charts is unknown.
+_NEGATIONS = ("no evidence of", "no evidence for", "negative for", "not consistent with",
+              "rule out", "ruled out")
+
+#: How far back a negation reaches. A guess, bounded by a sentence break below.
+_NEGATION_WINDOW = 40
+
+
+def _occurs_unnegated(phrase: str, blob: str) -> bool:
+    """True when `phrase` appears in `blob` at least once with no negation in front of it.
+
+    PER OCCURRENCE, not per blob: "no adenocarcinoma in the left lobe; adenocarcinoma present
+    on the right" mentions it twice and the second one counts. Collapsing to "the blob contains
+    a negation somewhere" would let one negated sentence excuse the whole citation.
+    """
+    p = _norm(phrase)
+    if not p:
+        return False
+    for m in re.finditer(re.escape(p), blob):
+        before = blob[:m.start()]
+        if re.search(r"non[\s-]*$", before):        # "non-small cell" negates "small cell"
+            continue
+        # A sentence boundary ends a negation's reach: "negative for small cell. Adenocarcinoma
+        # is present" must not read as negating the adenocarcinoma.
+        tail = re.split(r"[.;:\n]", before[-_NEGATION_WINDOW:])[-1]
+        if any(n in tail for n in _NEGATIONS):
+            continue
+        return True
+    return False
+
+
+#: THE KINDS `check_answer_detail` DISPATCHES ON, named here so a spec can be refused for
+#: declaring one that does not exist. The dispatch is an if/elif chain over `chk["kind"]` with
+#: no final `else`, so a misspelled kind -- `code_matches_cited_txt` -- matched nothing, raised
+#: nothing, and silently disabled the check. A spec author would see the rule in the YAML, the
+#: rule id in the manifest's `rule_catalog`, and zero rejections, which is indistinguishable
+#: from a check that looked and found nothing. `acr.spec.bind_provenance` reads this list.
+#:
+#: Keep it in step with the chain below. A kind added to one and not the other is the same
+#: two-copies-drift this file's rule-id comment warns about.
+ANSWER_CHECK_KINDS: frozenset[str] = frozenset({
+    "not_less_specific",
+    "nos_requires_search",
+    "conflict_requires_nos",
+    "origin_not_specimen",
+    "code_matches_cited_text",
+})
+
+
 # --------------------------------------------------------------------------- rule identity
 # The id functions live here, next to the code that applies the rules, and are imported by
 # `acr.trace` rather than re-derived there. Two places minting ids for one rule is the same
@@ -166,7 +236,7 @@ def _fields_with_conflicting_evidence(checks: list[dict] | None,
         if not field or len(groups) < 2:
             continue
         blob = " ".join(_norm(e.get("quote")) for e in _evidence_for(field, evidence))
-        if sum(1 for g in groups if any(_norm(a) in blob for a in g)) > 1:
+        if sum(1 for g in groups if any(_occurs_unnegated(a, blob) for a in g)) > 1:
             out.add(field)
     return out
 
@@ -233,7 +303,8 @@ def check_answer_detail(checks: list[dict], value: dict, evidence: list[dict],
         if kind == "not_less_specific":
             if coded not in (chk.get("nos_values") or []):
                 continue
-            found = [p for p in (chk.get("contradicted_by") or []) if _norm(p) in blob]
+            found = [p for p in (chk.get("contradicted_by") or [])
+                     if _occurs_unnegated(p, blob)]
             if found:
                 idx, quote = _first_quote_containing(items, found[0])
                 out.append(Violation(
@@ -284,8 +355,8 @@ def check_answer_detail(checks: list[dict], value: dict, evidence: list[dict],
             # Which groups the CITED evidence names. Deliberately over the cited quotes only,
             # never over the chart: a check that reads documents the answer did not cite is
             # asking the agent to defend text it never saw.
-            present = [(g, next(a for a in g if _norm(a) in blob))
-                       for g in groups if any(_norm(a) in blob for a in g)]
+            present = [(g, next(a for a in g if _occurs_unnegated(a, blob)))
+                       for g in groups if any(_occurs_unnegated(a, blob) for a in g)]
             if len(present) > 1:
                 names = [alias for _, alias in present]
                 idx, quote = _first_quote_containing(items, names[0])
@@ -314,6 +385,46 @@ def check_answer_detail(checks: list[dict], value: dict, evidence: list[dict],
                         f"every quote you cited for {field} is a specimen/biopsy header. That "
                         f"establishes where tissue was taken, not where the tumour arose. "
                         + (chk.get("message") or "Cite a statement of the site of ORIGIN."))))
+
+        elif kind == "code_matches_cited_text":
+            # DOES THE CODE NAME WHAT THE EVIDENCE NAMES? Every other check here asks whether
+            # the code is too vague, or whether the citation is the wrong KIND of document.
+            # None of them compares the code to the words in the quote, and on 2026-07-28 that
+            # let a run through whose cited evidence said "left lower lobe" nine times and
+            # "LLL" once, whose own reasoning said "the primary site is the left lower lobe of
+            # lung", and which coded C342 -- middle lobe. Zero answer_checks fired. It was not
+            # a retrieval failure and not a judgement call: the prose and the code disagreed,
+            # and nothing looked. (The left lung has no middle lobe, so C342 was also
+            # anatomically impossible, but this check does not need to know that.)
+            wordings = {str(c): [str(w) for w in (ws or [])]
+                        for c, ws in (chk.get("code_wordings") or {}).items()}
+            nos = str(chk.get("nos_value") or "").strip()
+            if not wordings or coded == nos or coded not in wordings:
+                # An unlisted code is out of scope, not a violation: this check knows about the
+                # subsites the spec chose to enumerate and must not judge the ones it does not.
+                continue
+            mine = [w for w in wordings[coded] if _occurs_unnegated(w, blob)]
+            if mine:
+                continue
+            others = sorted({c for c, ws in wordings.items() if c != coded
+                             and any(_occurs_unnegated(w, blob) for w in ws)})
+            if not others:
+                # The evidence names no enumerated subsite at all. That is `not_less_specific`'s
+                # and `nos_requires_search`'s question, not this one -- firing here would refuse
+                # the same answer twice for two different stated reasons.
+                continue
+            named = sorted({w for c in others for w in wordings[c] if _occurs_unnegated(w, blob)})
+            idx, quote = _first_quote_containing(items, named[0])
+            out.append(Violation(
+                rule_id=rid, rule_kind=kind, field=field, coded_value=coded,
+                trigger=named[0], quote=quote, evidence_index=idx,
+                message=(
+                    f"{field}={coded} is not what your own cited evidence names. None of "
+                    f"{wordings[coded]} appears in the text you quoted; {named} does, which is "
+                    f"{' or '.join(others)}. Either code what the evidence says, or cite the "
+                    f"statement that makes {coded} the origin anyway"
+                    + (f", or code {nos} if the record cannot settle it. " if nos else ". ")
+                    + (chk.get("message") or ""))))
     return out
 
 

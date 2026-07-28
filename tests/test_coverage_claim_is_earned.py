@@ -44,7 +44,8 @@ def test_a_positive_finding_must_not_carry_a_coverage_claim():
         })
 
 
-@pytest.mark.parametrize("basis", ["AGENT_GAVE_UP", "BUDGET_EXHAUSTED"])
+@pytest.mark.parametrize("basis", ["AGENT_GAVE_UP", "BUDGET_EXHAUSTED",
+                                  "COVERAGE_UNREACHABLE"])
 def test_an_unvalidated_negative_must_not_carry_a_coverage_claim(basis):
     with pytest.raises(CoverageClaimError):
         assert_coverage_claim_is_earned({
@@ -52,6 +53,28 @@ def test_an_unvalidated_negative_must_not_carry_a_coverage_claim(basis):
             "negative_basis": basis,
             "coverage_attested": {},
         })
+
+
+def test_coverage_unreachable_is_a_negative_that_ended_without_earning_anything():
+    """The status added on 2026-07-28, and the reason it is NOT `GATE_VALIDATED`.
+
+    When the exclusion sample turns up a hit, or the elusion bound freezes over its cap, the
+    coverage obligation becomes unmeetable for the rest of the run. The gate stops asking and the
+    abstention stands -- otherwise the agent burns its budget on a demand that cannot be met and
+    then invents an exit, which is what happened: five identical refusals and a SPEC_INSUFFICIENT
+    claiming the specification was inadequate when the specification was fine.
+
+    But "the gate gave up asking" is not "the search was verified". The two must stay
+    distinguishable downstream or the weaker one gets read as the stronger, so this basis carries
+    no ledger, routes to a human, and says what foreclosed it.
+    """
+    assert_coverage_claim_is_earned({
+        "status": "EVIDENCE_INSUFFICIENT",
+        "negative_basis": "COVERAGE_UNREACHABLE",
+        "route_to_human": True,
+        "coverage_note": "no coverage claim is made — the proof obligation cannot be met",
+        "coverage_unreachable": ["exclusion not validated (sampled 25, hits 1)"],
+    })
 
 
 def test_clean_positives_and_give_ups_pass():

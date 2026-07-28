@@ -583,12 +583,38 @@ def test_the_manifest_no_longer_attests_coverage_unconditionally():
     """
     import acr.agent as A
 
-    src = inspect.getsource(A.run_chart_review)
-    # The CALL, not the import line that also names it — `index` found the import and the
-    # window never contained the branch.
-    i = src.rindex("attach_coverage_claim(")
-    window = src[max(0, i - 400):i + 200]
-    assert 'answer.get("status") == "EVIDENCE_INSUFFICIENT"' in window, (
+    # STRUCTURALLY, not by scraping a character window. This used to read src[i-400 : i+200]
+    # around the call and look for the guard's text in it; on 2026-07-28 four lines of comment
+    # pushed the `if` past 400 characters and the test failed while the guard sat right there.
+    # A property worth asserting is worth asserting in a way that survives a comment.
+    import ast
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(A.run_chart_review)))
+
+    def guarded(node, inside_status_test: bool) -> bool:
+        """True if every `attach_coverage_claim(...)` under `node` sits inside the status test."""
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.If):
+                test = ast.unparse(child.test)
+                on_status = "EVIDENCE_INSUFFICIENT" in test and "status" in test
+                if not all(guarded(n, inside_status_test or on_status) for n in child.body):
+                    return False
+                if not all(guarded(n, inside_status_test) for n in child.orelse):
+                    return False
+                continue
+            if (isinstance(child, ast.Call) and isinstance(child.func, ast.Name)
+                    and child.func.id == "attach_coverage_claim" and not inside_status_test):
+                return False
+            if not guarded(child, inside_status_test):
+                return False
+        return True
+
+    calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+             and isinstance(n.func, ast.Name) and n.func.id == "attach_coverage_claim"]
+    assert calls, "attach_coverage_claim is no longer called at all"
+    assert guarded(tree, False), (
+        "attach_coverage_claim is reachable without testing status == EVIDENCE_INSUFFICIENT; "
         "the ledger must be conditional on the one status that earns it")
 
 

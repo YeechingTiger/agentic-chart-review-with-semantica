@@ -106,6 +106,13 @@ class RunContext:
     accepted: bool = False
     answer: dict = field(default_factory=dict)
     rejections: list = field(default_factory=list)
+    #: Set when the gate STOPPED ASKING because nothing further could satisfy it — an exclusion
+    #: sample that turned up a hit, or an elusion bound frozen over its cap. The run ends and the
+    #: abstention stands, but `gate_validated` must stay FALSE: the answer earned no coverage
+    #: claim, it merely ran out of things that could earn one. Kept apart from `accepted` because
+    #: `accepted` means "the gate said yes" everywhere else in this file, and conflating the two
+    #: is how an unearned ledger gets stamped `GATE_VALIDATED`.
+    coverage_unreachable: list = field(default_factory=list)
     declared: set[str] = field(default_factory=set)
     revisions: list = field(default_factory=list)
     rejection_fingerprints: collections.Counter = field(
@@ -423,6 +430,16 @@ class AuditMiddleware(AgentMiddleware):
             self.ctx.accepted = True
             self.ctx.answer = submitted
             out = {"accepted": True}
+            if verdict.get("coverage_unreachable"):
+                # Accepted so the run ENDS, not because the coverage obligation was met. Told to
+                # the agent too: it submitted an answer it had been refused four times and needs
+                # to know it stood for a different reason than the fifth attempt succeeding.
+                self.ctx.coverage_unreachable = list(verdict["coverage_unreachable"])
+                out["coverage_unreachable"] = self.ctx.coverage_unreachable
+                out["note"] = ("accepted, and routed to a human. The proof obligation was NOT "
+                               "met and no coverage claim is attached: the listed failures "
+                               "cannot be discharged in this run, so asking you again would "
+                               "have been asking for something that does not exist.")
         else:
             self.ctx.rejections.append(verdict)
             # A REJECTION IS AN EVENT, not a line in a tool log. `tracer.rejected` is what the
@@ -828,8 +845,19 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
     for k in ("spec_section", "spec_quote", "uncovered_fields"):
         answer.pop(k, None)
     if answer.get("status") == "EVIDENCE_INSUFFICIENT":
-        attach_coverage_claim(answer, gate_validated=ctx.accepted,
-                              ledger=coverage.to_dict(), ungated_basis=termination)
+        # `ctx.accepted and not ctx.coverage_unreachable`: the gate ends the run in both cases and
+        # only one of them earned a coverage claim. Passing `ctx.accepted` alone would attach the
+        # ledger and stamp GATE_VALIDATED over a run whose exclusion sampling was invalidated,
+        # which is the precise thing `assert_answer_is_reportable` exists to refuse.
+        attach_coverage_claim(
+            answer, gate_validated=bool(ctx.accepted and not ctx.coverage_unreachable),
+            ledger=coverage.to_dict(),
+            ungated_basis=("COVERAGE_UNREACHABLE" if ctx.coverage_unreachable else termination))
+        if ctx.coverage_unreachable:
+            answer["coverage_unreachable"] = list(ctx.coverage_unreachable)
+            answer["coverage_note"] = (
+                "no coverage claim is made — the proof obligation cannot be met on this chart: "
+                + "; ".join(ctx.coverage_unreachable))
     claim = ({"coverage_attested": answer["coverage_attested"]} if "coverage_attested" in answer
              else {"coverage_note": answer.get("coverage_note") or NO_COVERAGE_CLAIM})
     # Refuses an unearned ledger AND a gate-validated negative that arrives without one.
@@ -899,6 +927,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
             "undeclared_tool_calls": ctx.undeclared_tools,
             "rejection_loop_stopped": 1 if ctx.stalled else 0,
             "marker_catalogue_incomplete": 1 if catalogue.degraded else 0,
+            "coverage_unreachable": 1 if ctx.coverage_unreachable else 0,
         },
         # WHAT IT COST AND WHAT IT WAS ALLOWED TO COST, in one place. `spend_stopped` is
         # non-null only when the ceiling is what ended the run.
@@ -910,10 +939,18 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # search terms were right. `reportable_as_validated` inside this block is the field a
         # downstream filter must read, never `gate_validated` alone — and this runtime was not
         # emitting the block at all, so every consumer had only the stronger-looking flag.
+        # `and not ctx.coverage_unreachable` for the same reason as `attach_coverage_claim`: a
+        # run the gate stopped asking is not a run the gate validated, and this block decides
+        # what the answer may be REPORTED as.
         "provenance": spec.provenance_for_run(
             answer.get("value") or {}, str(answer.get("status") or ""),
-            gate_validated=ctx.accepted),
+            gate_validated=bool(ctx.accepted and not ctx.coverage_unreachable)),
         "negative_basis": answer.get("negative_basis"),
+        #: Non-empty when the coverage bar could not be met on this chart at all. This is a
+        #: finding about the STRATIFICATION, not about the patient, and it is what the develop
+        #: plane should act on: the document type that produced the exclusion hit belongs in
+        #: `may_mention` in the SPEC, not rescued per-run.
+        "coverage_unreachable": list(ctx.coverage_unreachable),
         "steps": ctx.n_model_calls,
         "plan_revisions": len(ctx.revisions),
         "suspected_recognition_failures": len(getattr(coverage, "suspected_recognition_failures",

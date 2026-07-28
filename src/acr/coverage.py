@@ -773,6 +773,19 @@ class GateResult:
     verdict: str = "FAIL"
     checks: dict[str, bool] = field(default_factory=dict)
     missing: list[str] = field(default_factory=list)
+    #: The subset of `missing` that NO AMOUNT OF FURTHER WORK IN THIS RUN can discharge.
+    #:
+    #: Every other entry in `missing` is an instruction: read these documents, run this search,
+    #: settle that thread. These are not. A recorded hit in the exclusion sample cannot be
+    #: un-hit, and the elusion bound cannot fall once the sampler has stopped drawing. Returning
+    #: them as ordinary refusals is what produced the worst run of the 2026-07-28 batch: eight
+    #: rejections, the last five identical, the ledgers frozen at [4, 3, 3], and an agent that
+    #: escaped through SPEC_INSUFFICIENT -- a status meaning "the specification is inadequate"
+    #: -- because nothing let it say "your coverage bar cannot be met on this chart".
+    #:
+    #: Kept separate from `missing` rather than removed from it: the reader still needs to see
+    #: what failed. This says only that asking again will not change it.
+    terminal: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -781,7 +794,7 @@ class GateResult:
 def evaluate_gate(gate_spec: dict, strata: Sequence[StratumResult],
                   windows: Sequence[Window] | None = None) -> GateResult:
     g = GateResult()
-    c, miss = g.checks, g.missing
+    c, miss, terminal = g.checks, g.missing, g.terminal
     by = {s.name: s for s in strata}
 
     if gate_spec.get("require_can_establish_nonempty") or gate_spec.get("per_claim_can_establish_nonempty"):
@@ -811,10 +824,18 @@ def evaluate_gate(gate_spec: dict, strata: Sequence[StratumResult],
         ok = s is None or (s.sampled >= 1 and s.sample_hits == 0)
         c["exclusion_validated"] = ok
         if not ok and s:
-            miss.append(
-                f"exclusion not validated (sampled {s.sampled}, hits {s.sample_hits}) — "
-                "a hit overturns the declaration; promote that type to may_mention and rerun"
-            )
+            line = (f"exclusion not validated (sampled {s.sampled}, hits {s.sample_hits}) — "
+                    "a hit overturns the declaration; promote that type to may_mention and rerun")
+            miss.append(line)
+            # TERMINAL when a hit is on the record. `exclusion_validated` requires
+            # `sample_hits == 0`, and a document drawn into the exclusion sample that turned out
+            # to contain a keyword stays that document: no further reading, searching or
+            # replanning makes the count zero. The remedy the line names -- promote the type and
+            # RERUN -- is honest about needing a different run. Saying so here is what lets the
+            # runtime stop instead of asking again. A shortfall in the DRAW (sampled == 0) is a
+            # different thing and stays discharge-able: the sampler will draw.
+            if s.sample_hits >= 1:
+                terminal.append(line)
 
     if gate_spec.get("required_keywords_all_searched", True):
         # This key is declared by every stratified spec in the tree and, until now, was read
@@ -889,7 +910,18 @@ def evaluate_gate(gate_spec: dict, strata: Sequence[StratumResult],
         ok = worst <= cap
         c["max_elusion_upper_ok"] = ok
         if not ok:
-            miss.append(f"elusion upper bound {worst:.3f} exceeds cap {cap}")
+            line = f"elusion upper bound {worst:.3f} exceeds cap {cap}"
+            miss.append(line)
+            # TERMINAL when no stratum is still owed draws. `replacement_draws_required` is
+            # `max(0, min(min_sample, N) - n_sampled)`, so once a stratum has reached
+            # `min_sample` the sampler is finished with it and the bound is frozen at whatever
+            # the hits it found imply. On this spec: min_sample 25 and cap 0.12, calibrated (per
+            # its own provenance) on ZERO hits -- 0/25 gives 0.113, just under. ONE hit gives
+            # 0.176, and 1 hit would need about 40 draws to come back under 0.12, which the
+            # sampler will never ask for. So a single hit makes the cap unreachable for the rest
+            # of the run, deterministically, and this is where that stops being an instruction.
+            if all(s.replacement_draws_required <= 0 for s in strata if s.name != "can_establish"):
+                terminal.append(line)
 
     if windows is not None:
         gaps = [w for w in windows if w.disposition == "interior_gap"]

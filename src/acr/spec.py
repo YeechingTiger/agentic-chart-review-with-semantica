@@ -443,6 +443,24 @@ def _validate_record(spec_id: str, rec: ProvenanceRecord) -> None:
 def bind_provenance(spec: "ExtractionSpec") -> None:
     """Attach each record to its element, void signatures on edited elements, then refuse
     the spec if anything enforced is left unmarked. Mutates `spec.provenance` in place."""
+    # A DECLARED CHECK MUST BE A CHECK THAT EXISTS. `check_answer_detail` dispatches on
+    # `chk["kind"]` through an if/elif chain with no final else, so a misspelled kind matched
+    # nothing and raised nothing: the rule appeared in the YAML and in the manifest's
+    # `rule_catalog`, and produced zero rejections forever. Refused here rather than warned
+    # about, because a check that cannot fire is worse than an absent one -- it is an absent one
+    # that a reader counts as present.
+    from .answer_checks import ANSWER_CHECK_KINDS
+    for chk in (spec.answer_checks or []):
+        c = chk if isinstance(chk, dict) else (chk.model_dump() if hasattr(chk, "model_dump")
+                                               else dict(chk))
+        kind = str(c.get("kind") or "not_less_specific")
+        if kind not in ANSWER_CHECK_KINDS:
+            raise ProvenanceError(
+                f"{spec.spec_id}: answer_checks[{c.get('field')}] declares kind {kind!r}, which "
+                f"nothing implements. Known kinds: {sorted(ANSWER_CHECK_KINDS)}. A kind no code "
+                "dispatches on is a rule that can never fire, and it reads in the manifest "
+                "exactly like a rule that fired and found nothing.")
+
     by_path = {e.path: e for e in enforced_elements(spec)}
     seen: set[str] = set()
     for rec in spec.provenance:

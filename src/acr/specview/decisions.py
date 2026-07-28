@@ -161,9 +161,25 @@ def decisions(spec, source_path: str | Path | None = None,
         ("not_less_specific",
          "When the record hedges or is only partly specific, must we still code the more "
          "specific value?",
-         "If a hedge is not enough, these answers stop being rejected and the vaguer code "
-         "stands — a report reading \"favor squamous cell carcinoma\" would be coded as the "
-         "unspecified non-small cell code."),
+         "This is the live one, and it has already cost an answer. On 2026-07-28 a run coded "
+         "8046 for \"poorly differentiated non-small cell carcinoma\" — the registry's answer — "
+         "and the check refused it, because \"small cell\" matched inside \"non-small cell\". "
+         "The negation is fixed. The clinical question is not: a report reading \"favor "
+         "squamous cell carcinoma\" whose final diagnosis line stays at non-small cell "
+         "carcinoma is 8070 if a hedge counts and 8046 if it does not, and nobody clinical has "
+         "chosen. The codes are named here and not in the message the agent sees, because a "
+         "check that supplies the answer is not checking it — the earlier message ended "
+         "'\"favor squamous cell carcinoma\" supports 8070 over 8046' and a run wrote 8070 on a "
+         "chart where neither word appears at all."),
+        ("code_matches_cited_text",
+         "May the coded subsite differ from the lobe the cited evidence names, and if so when?",
+         "Remove it and a run can quote \"left lower lobe\" ten times, write \"the primary site "
+         "is the left lower lobe\" in its reasoning, and code C342 (middle lobe) — which is what "
+         "happened on 2026-07-28, with no check firing. Keep it and a run that believes a later "
+         "document overrides the lobe an earlier one names must quote the line that says so "
+         "rather than deciding silently. The lobe-to-code mapping (C341 upper, C342 middle, "
+         "C343 lower, C340 main bronchus) was recalled by a model and needs checking against "
+         "ICD-O-3 topography C34."),
         ("nos_requires_search",
          "Before we are allowed to record an unknown or unspecified value, which parts of the "
          "chart must have been searched?",

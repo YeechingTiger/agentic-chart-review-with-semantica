@@ -303,7 +303,40 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
                     "missing": ["these were drawn by the runtime, not chosen by you:"] + lines}
         gate = check_gate(spec, coverage, plan)
         if gate.verdict != "PASS":
+            # IS ANYTHING LEFT THAT MORE WORK COULD FIX? If every remaining failure is terminal,
+            # refusing again asks the agent for something that does not exist. On the ten-patient
+            # real batch of 2026-07-28 that produced this run: rejections 1-2 were sampling
+            # draws (satisfied), 5 was a thread (settled), and 3,4,6,7,8 were this line, with the
+            # unread-hit count going 13 -> 13 -> 8 -> 3 -> 0 as the agent did the work. The last
+            # two failures were an exclusion hit and an elusion bound over cap, neither of which
+            # any further reading can change. The ledgers froze at [4, 3, 3], the loop brake
+            # fired, and the agent submitted SPEC_INSUFFICIENT -- a claim that the SPECIFICATION
+            # is inadequate -- because that was the only exit it had. It was the wrong claim: the
+            # spec was fine, this chart's stratification was not.
+            #
+            # So the abstention is ACCEPTED and labelled. `attach_coverage_claim` will see
+            # gate_validated=False, attach no coverage ledger, set route_to_human, and record
+            # `negative_basis: COVERAGE_UNREACHABLE`. The answer is "I could not establish the
+            # value AND I cannot prove I looked hard enough", which is the truth, and it is
+            # distinguishable downstream from both GATE_VALIDATED and SPEC_INSUFFICIENT.
+            remaining = [m for m in gate.missing if m not in set(gate.terminal)]
+            if gate.terminal and not remaining:
+                if tracer:
+                    tracer.emit("coverage_unreachable", terminal=list(gate.terminal),
+                                n_missing=len(gate.missing))
+                return {"accepted": True, "why": "", "missing": [],
+                        "coverage_unreachable": list(gate.terminal)}
             return {"accepted": False,
                     "why": "the proof obligation for asserting absence is not yet met",
-                    "missing": gate.missing}
+                    # WHAT WOULD ACTUALLY HELP, first. A terminal item mixed into the list reads
+                    # as another instruction and the agent retries it; saying which ones are
+                    # dead ends is the difference between eight rejections and three.
+                    "how_to_satisfy": (
+                        "do the items under `missing`. Any listed under `cannot_be_satisfied_in_"
+                        "this_run` are dead ends — do not retry them; they mean this chart's "
+                        "stratification was wrong and a different run is needed. If they are the "
+                        "ONLY thing left, submit the same answer again and it will be accepted "
+                        "and routed to a human."),
+                    "missing": remaining or list(gate.missing),
+                    "cannot_be_satisfied_in_this_run": list(gate.terminal)}
     return {"accepted": True, "why": "", "missing": []}

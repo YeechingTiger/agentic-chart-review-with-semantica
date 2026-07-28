@@ -182,15 +182,40 @@ answer_checks:
       lobe you read is not a decision, it is an order-of-reading artefact. Say which
       statement describes the ORIGIN and why the other does not, or code C349.
 
+  # THE SAME LOBE VOCABULARY, WITH THE CODE EACH GROUP MEANS. `conflict_requires_nos` above
+  # asks whether TWO groups appear; this asks whether the group that appears is the one the code
+  # names. They are the two halves of one question and the aliases must stay identical between
+  # them -- tests/test_answer_checks.py asserts that, because two copies of a vocabulary drift.
+  - field: primary_site
+    kind: code_matches_cited_text
+    nos_value: "C349"
+    code_wordings:
+      C341: ["upper lobe", "RUL", "LUL"]
+      C342: ["middle lobe", "RML"]
+      C343: ["lower lobe", "RLL", "LLL"]
+      C340: ["main bronchus"]
+    message: >
+      A lobe code and a lobe word are the same claim written twice, so they cannot disagree. If
+      you believe the evidence supports the code anyway, quote the line that says so.
+
   - field: histology
     kind: not_less_specific
     nos_values: ["8000", "8010", "8046"]
+    # "favor squamous" is gone: `"squamous" in blob` is true whenever it is, so it never
+    # decided anything -- it existed only because the message below quoted one chart.
     contradicted_by:
-      ["squamous", "adenocarcinoma", "small cell", "large cell",
-       "favor squamous", "adenosquamous"]
+      ["squamous", "adenocarcinoma", "small cell", "large cell", "adenosquamous"]
+    # NAMES NO CODE. This message used to end: '"favor squamous cell carcinoma" supports 8070
+    # over 8046.' -- a worked example from one chart, delivered as instruction on every firing.
+    # On 2026-07-28 it fired on a chart containing neither word (the agent's own searches for
+    # "squamous" and "squamous cell carcinoma" both returned zero hits, and the runtime raised
+    # ZERO_HIT_SEARCH for both), told the agent that phrase supported 8070, and the agent
+    # complied. A check that supplies the answer is not checking it.
     message: >
-      Conflict rule: where the record is more specific than the summary line, take the more
-      specific reading. "favor squamous cell carcinoma" supports 8070 over 8046.
+      Say which line in your cited evidence is more specific than the code you chose, and code
+      what THAT line says. If the more specific wording is hedged -- "favor", "consistent with",
+      "suggestive of" -- and the pathologist's own final diagnosis line stayed at the NOS level,
+      then the NOS code is the answer and this check is wrong to fire; say so.
 
 # ------------------------------------------------------------------------------ provenance
 # WHY THIS BLOCK EXISTS, and it is a fact about this file rather than about the software.
@@ -292,14 +317,64 @@ provenance:
       corpus uses. What is measured is that the conflict occurs and was silently resolved --
       NOT that C349 is the right answer whenever two lobes appear, which is a coding judgement
       no one has reviewed. n=1 failure, 1 chart.
+  - element: "answer_checks[primary_site.code_matches_cited_text.C349]"
+    origin: corpus_derived
+    # DRAFT. What is measured is that the disagreement happened and that nothing looked. What is
+    # NOT measured is the rate, nor whether refusing is the right response every time -- a code
+    # can legitimately differ from the wording if a later document overrides an earlier one, and
+    # this check demands the agent SAY so rather than deciding for it. n=1.
+    status: draft
+    measured:
+      run: "extract__20260728T214551Z__3550858-dirty (hooks_current, seed 1234)"
+      n_patients: 10
+      n_disagreements_observed: 1
+      n_caught_by_any_existing_check: 0
+      verdict: underpowered
+      what_happened: >-
+        one run cited evidence naming "left lower lobe" nine times and "LLL" once, wrote a
+        reasoning paragraph beginning "The primary site is the left lower lobe of lung", and
+        coded C342 -- middle lobe. `answer_check_rejections` was empty: none of the four existing
+        checks compares the code to the words in the quote. The registry coded C343. The left lung
+        has no middle lobe, so the answer was also anatomically impossible, which this check does
+        not need to know to catch it.
+      what_would_settle_it: >-
+        the rate of code-versus-wording disagreement over a few hundred charts, and a registrar's
+        ruling on when a later document may override the lobe an earlier one names. Neither
+        exists.
+    basis: >-
+      no manual section; derived from a measured failure, and written by a language model in
+      commit e5229b0 (2026-07-25) style under a human author's name. The lobe words and
+      abbreviations are the ones this corpus uses and are the SAME LIST as
+      `conflict_requires_nos.mutually_exclusive` above, with the ICD-O-3 subsite each group
+      means attached. That mapping (C341 upper, C342 middle, C343 lower, C340 main bronchus) was
+      recalled by a model, not copied out of the manual; a human should check it against
+      ICD-O-3 topography C34.
   - element: "answer_checks[histology.not_less_specific.8000]"
     origin: model_authored
     status: draft
     basis: >-
       no external source; written by a language model in commit e5229b0 (2026-07-25) and
       committed under a human author's name. Refuses the three vaguest morphology codes when the
-      quoted evidence is more specific. The list of more-specific wordings was invented; nobody
-      has measured how often it fires, or how often it fires wrongly.
+      quoted evidence is more specific. The list of more-specific wordings was invented.
+    measured:
+      run: "extract__20260728T214551Z__3550858-dirty (hooks_current, seed 1234)"
+      n_patients: 10
+      n_fires: 1
+      n_fires_wrongly: 1
+      verdict: falsified
+      what_happened: >-
+        the run coded histology 8046 -- the registry's answer -- citing "poorly differentiated
+        non-small cell carcinoma". `contradicted_by` contained "small cell", which matched INSIDE
+        "non-small cell", so the check read a negation as its opposite and refused the correct
+        answer. Its message then named 8070; the agent submitted 8070 and that was accepted. The
+        rule as written was falsified: on its only observed firing it turned a right answer into
+        a wrong one. Fixed by `_occurs_unnegated` in acr/answer_checks.py and by taking the code
+        out of the message.
+      what_would_settle_it: >-
+        the fire rate and the wrong-fire rate over a few hundred charts. One chart establishes
+        that the negation blindness was real and cost an answer. It does not establish that the
+        six phrases now in `_NEGATIONS` are the right six, nor that the remaining wordings in
+        `contradicted_by` are the right ones.
   - element: "proof_obligation.for_negative.gate.require_can_establish_nonempty"
     origin: model_authored
     status: draft
