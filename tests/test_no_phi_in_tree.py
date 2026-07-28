@@ -23,8 +23,8 @@ Two scopes, because the leak and the commit are different events:
 
   * TRACKED files, via `git ls-files`. This is the one that matters for disclosure: a
     tracked file is a file that gets pushed. It covers content AND path, since
-    `runs/azure_real_<person_id>/` carries the identifier in its name and `.gitignore`
-    deliberately un-ignores `runs/**/*.manifest.json`.
+    `runs/azure_real_<person_id>/` carries the identifier in its name as well as inside
+    the manifest.
   * The SOURCE directories in the working tree, tracked or not. `skills/` and half of
     `src/acr/` were untracked when the ids were found in them, so a tracked-only check
     would have reported all clear on the exact files that were leaking.
@@ -52,9 +52,9 @@ SOURCE_DIRS = ("src", "skills", "specs", "tests", "contracts", "tools", "guideli
 
 #: Not scanned. `.venv*` vendors third parties -- google-genai ships a GCP dataset resource
 #: id that matches the pattern by coincidence and is not PHI. `corpus/` is the fabricated
-#: SYN000x dev corpus. `runs/` is excluded HERE only because it is the experimental record
-#: and is not ours to rewrite; the tracked-file scan below still covers every part of it
-#: that git would actually publish.
+#: SYN000x dev corpus. `runs/` is excluded HERE because it is the experimental record and is
+#: not ours to rewrite -- and because it is now ignored wholesale by git, so nothing in it is
+#: publishable; `test_no_run_output_is_tracked` is what holds that property in place.
 SKIP_PARTS = {".git", ".venv", ".venv-deep", "__pycache__", "node_modules"}
 
 TEXT_SUFFIXES = {".py", ".md", ".yaml", ".yml", ".json", ".txt", ".toml", ".cfg", ".ini",
@@ -104,14 +104,39 @@ def test_no_real_person_id_in_a_tracked_file():
 
 
 def test_no_real_person_id_in_a_tracked_path():
-    """`runs/azure_real_<person_id>/…` carries the id in the directory name, and
-    `.gitignore` un-ignores `runs/**/*.manifest.json`, so a run directory for a real patient
-    is one `git add -A` away from being published — with the id in the path even if the file
-    content is clean."""
+    """`runs/azure_real_<person_id>/…` carries the id in the directory name, so a run
+    directory for a real patient could be published with the id in the PATH even if the file
+    content is clean. `runs/` is ignored now, but `git add -f` overrides an ignore and this
+    check does not depend on the ignore being right."""
     bad = [str(p.relative_to(ROOT)) for p in _tracked() if PERSON_ID.search(bytes(p))]
     assert not bad, (
         f"{len(bad)} tracked path(s) contain a real person_id; rename them to a pseudonym:\n"
         + "\n".join(sorted({b.split('/')[0] + '/…' for b in bad})[:40])
+    )
+
+
+def test_no_run_output_is_tracked():
+    """`runs/` NEVER enters git — the ignore is a policy, this is the enforcement.
+
+    The earlier policy was narrower: traces out, `!runs/**/*.manifest.json` in, on the grounds
+    that a manifest is 2KB of evidence. It then needed a `runs/*_1168*/` patch to keep real
+    patients out, and that patch made the disclosure boundary depend on how a DIRECTORY WAS
+    NAMED rather than on what was inside it. A real manifest under a directory that happened
+    not to match the glob was still one `git add -A` from being pushed, with the person_id in
+    the JSON. `test_no_real_person_id_in_a_tracked_file` would have caught that one — but only
+    for the `1168` shape, and only if someone ran the tests before pushing.
+
+    So the rule is now categorical and checkable without knowing anything about ids: no path
+    under `runs/` is tracked, whatever it is called and whatever is in it. Run output lives
+    outside the repo, under /N/project/computable_phenotype/llm/run/.
+    """
+    tracked = sorted(str(p.relative_to(ROOT)) for p in _tracked()
+                     if p.relative_to(ROOT).parts[:1] == ("runs",))
+    assert not tracked, (
+        f"{len(tracked)} file(s) under runs/ are tracked. Run output is not a build product "
+        "and not evidence git should carry: `git rm -r --cached runs/` (the files stay on "
+        "disk). If you need a manifest reviewable, copy the ONE you mean to a path outside "
+        "runs/ after checking it for identifiers:\n" + "\n".join(tracked[:40])
     )
 
 

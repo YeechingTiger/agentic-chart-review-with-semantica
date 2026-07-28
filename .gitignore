@@ -9,12 +9,21 @@ venv/
 .coverage
 htmlcov/
 
-# Run output is an EXPERIMENTAL RECORD, not a build product. Deleting it destroys data.
-# Traces are large, so they stay out of git; manifests are ~2KB of evidence and go in.
-runs/**/*.jsonl
+# RUN OUTPUT NEVER ENTERS GIT. Not traces, not manifests, not archives.
+#
+# The old rule was "traces are large so they stay out; manifests are ~2KB of evidence and go
+# in", with `!runs/**/*.manifest.json` un-ignoring them. That rule was written when every run
+# was against the synthetic corpus, and it then needed a patch (`runs/*_1168*/`) to keep real
+# patients out — which made the boundary depend on a DIRECTORY NAMING convention rather than on
+# content. A manifest in a directory that happens not to match that glob is committed, and a
+# real manifest carries the person_id inside it.
+#
+# Run output is still an experimental record and must not be deleted — it lives outside the
+# repo, under /N/project/computable_phenotype/llm/run/. Deleting it destroys data; committing
+# it is a disclosure. Those are different problems and this file only solves the second.
+runs/
+*.jsonl
 *.jsonl.gz
-!runs/**/*.manifest.json
-!runs/_archive/**
 
 # Real corpora must never be committed. Synthetic dev corpus IS committed
 # (corpus/patients/) because it is fabricated and PHI-free.
@@ -46,10 +55,5 @@ corpus/patients/.doc_type_vocab.json
 # Document-type vocabulary cache, rebuilt on demand
 corpus/patients/.doc_type_vocab.json
 
-# Run output from REAL patients never enters git, manifest or not. The rule
-# above ("manifests are 2KB of evidence and go in") was written when every run
-# was against the synthetic corpus. A real run puts the patient id in the
-# directory NAME and in the manifest, so committing one is a PHI disclosure
-# that tests/test_no_phi_in_tree.py catches only after the fact -- as it did.
-runs/*_1168*/
-runs/**/*_1168*/
+# (The real-patient globs that used to live here are gone: `runs/` is ignored wholesale
+# above, so there is nothing left for a name-based exception to get wrong.)
