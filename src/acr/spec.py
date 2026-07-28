@@ -276,7 +276,11 @@ def _answer_check_key(chk: dict) -> str:
     is what actually distinguishes the checks that exist (STORE.700_880 declares
     `clinical_t/not_less_specific` twice, for cT1 and for cT2).
     """
-    nos = chk.get("nos_values") or []
+    # `nos_value` singular is `conflict_requires_nos`'s spelling — it names the one code to
+    # fall back to rather than a set of codes to guard. Without it in the discriminator, two
+    # conflict checks on one field would share a rule id, and a sign-off on either would read
+    # as a sign-off on both.
+    nos = chk.get("nos_values") or ([chk["nos_value"]] if chk.get("nos_value") else [])
     return (f"{chk.get('field', '?')}.{chk.get('kind', 'not_less_specific')}"
             + (f".{nos[0]}" if nos else ""))
 

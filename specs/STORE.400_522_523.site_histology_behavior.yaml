@@ -167,6 +167,21 @@ answer_checks:
       Rule 1: code the site of ORIGIN, not the site of a biopsy or a metastasis. A specimen
       taken from the main bronchus does not make the main bronchus the origin.
 
+  - field: primary_site
+    kind: conflict_requires_nos
+    nos_value: "C349"
+    mutually_exclusive:
+      - ["upper lobe", "RUL", "LUL"]
+      - ["middle lobe", "RML"]
+      - ["lower lobe", "RLL", "LLL"]
+      - ["main bronchus"]
+    message: >
+      Two documents can name two different lobes for one tumour -- an operative note
+      describing where the surgeon went, a pathology header naming the container the
+      specimen arrived in, a radiology report describing a second lesion. Coding the first
+      lobe you read is not a decision, it is an order-of-reading artefact. Say which
+      statement describes the ORIGIN and why the other does not, or code C349.
+
   - field: histology
     kind: not_less_specific
     nos_values: ["8000", "8010", "8046"]
@@ -252,6 +267,31 @@ provenance:
       committed under a human author's name. Refuses a site coded from a quote that describes
       the tissue taken rather than where the tumour started. The wordings it recognises were
       invented for this file; a note that phrases it any other way passes the check unexamined.
+  - element: "answer_checks[primary_site.conflict_requires_nos.C349]"
+    origin: corpus_derived
+    # DRAFT, not measured, and the verdict below says why: one chart is not a rate. The
+    # measurement establishes that the conflict occurs and was resolved silently; it does not
+    # establish how often, nor that C349 is the right fallback. Promoting this to `measured`
+    # would rank a check built on n=1 above a check nobody has looked at.
+    status: draft
+    measured:
+      run: "extract__20260727T224009Z__e28d754-dirty (real_ten, seed 20260727)"
+      n_patients: 10
+      n_conflicts_observed: 1
+      verdict: underpowered
+      what_would_settle_it: >-
+        the rate of two-lobe answers over a few hundred charts, and a registrar's ruling on
+        whether C349 is what a coder does when an operative note and a pathology header
+        disagree. Neither exists.
+    basis: >-
+      no manual section; derived from a measured failure. On the 10-patient real-chart batch of
+      2026-07-27 (seed 20260727), one run cited an operative note saying the lesion was "coming
+      and arising from the right middle lobe" AND a pathology header reading "Lung, right lower
+      lobe" in the same answer, coded C342, and passed the coverage gate; the registry coded
+      C349. The lobe groups are ICD-O-3 C34 subsites and the abbreviations are the ones this
+      corpus uses. What is measured is that the conflict occurs and was silently resolved --
+      NOT that C349 is the right answer whenever two lobes appear, which is a coding judgement
+      no one has reviewed. n=1 failure, 1 chart.
   - element: "answer_checks[histology.not_less_specific.8000]"
     origin: model_authored
     status: draft

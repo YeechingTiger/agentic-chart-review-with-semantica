@@ -162,6 +162,20 @@ def check_answer_detail(checks: list[dict], value: dict, evidence: list[dict],
       origin_not_specimen Every piece of evidence offered for this field is a specimen or
                           biopsy header. That locates where tissue was taken from, which is
                           not the same claim as where the tumour arose.
+
+      conflict_requires_nos
+                          The cited evidence names TWO OR MORE mutually exclusive members of
+                          one set, and the answer picked one of them without saying why the
+                          other is wrong. This is the mirror image of `not_less_specific` and
+                          it needed its own kind: that check protects against coding NOS when
+                          the record is specific, and nothing protected against coding
+                          specific when the record disagrees with itself. Measured on a real
+                          chart — an operative note said the lesion was "coming and arising
+                          from the right middle lobe" while the pathology header read "Lung,
+                          right lower lobe", both quoted in the SAME answer, and the run coded
+                          C342 and passed the gate. The registry coded C349. A coder who
+                          cannot tell which lobe codes the NOS value; an agent that quietly
+                          picks the first one it read is not abstracting, it is guessing.
     """
     out: list[Violation] = []
     for pos, chk in enumerate(checks or [], start=1):
@@ -218,6 +232,32 @@ def check_answer_detail(checks: list[dict], value: dict, evidence: list[dict],
                         f"{field}={coded} claims the specific value is not documented, but you "
                         f"never searched for {need}. Search those terms; if they genuinely return "
                         f"nothing, {coded} is then supported. "
+                        + (chk.get("message") or ""))))
+
+        elif kind == "conflict_requires_nos":
+            nos = str(chk.get("nos_value") or "").strip()
+            groups = [g for g in (chk.get("mutually_exclusive") or []) if g]
+            if not nos or len(groups) < 2 or coded == nos:
+                # Already coded NOS: the answer has conceded the conflict, which is the whole
+                # remedy. Firing here would reject the correct answer.
+                continue
+            # Which groups the CITED evidence names. Deliberately over the cited quotes only,
+            # never over the chart: a check that reads documents the answer did not cite is
+            # asking the agent to defend text it never saw.
+            present = [(g, next(a for a in g if _norm(a) in blob))
+                       for g in groups if any(_norm(a) in blob for a in g)]
+            if len(present) > 1:
+                names = [alias for _, alias in present]
+                idx, quote = _first_quote_containing(items, names[0])
+                out.append(Violation(
+                    rule_id=rid, rule_kind=kind, field=field, coded_value=coded,
+                    trigger=", ".join(names), quote=quote, evidence_index=idx,
+                    message=(
+                        f"the evidence you cited for {field} names {names}, which cannot all "
+                        f"be true of one tumour, and you coded {coded} anyway without saying "
+                        f"why the others are wrong. Either cite the statement that settles it "
+                        f"— which document is describing the origin and which is describing a "
+                        f"specimen, a second site or an error — or code {nos}. "
                         + (chk.get("message") or ""))))
 
         elif kind == "origin_not_specimen":

@@ -618,3 +618,60 @@ def test_attribution_never_changes_a_gate_verdict(tmp_path):
     traced = gate_answer(spec, submitted, evidence=ledger, coverage=led, chart=chart,
                          tracer=Tracer.create(tmp_path, "inert"))
     assert untraced == traced
+
+
+# ---------------------------------------------------- conflict_requires_nos, from a real run
+# `not_less_specific` guards one direction only: coding NOS when the record is specific.
+# Nothing guarded the other. On the 10-patient real batch of 2026-07-27, one answer quoted an
+# operative note ("coming and arising from the right middle lobe") AND a pathology header
+# ("Lung, right lower lobe") in the SAME evidence list, coded C342, and passed the gate. The
+# registry coded C349. The quotes below are that answer's, trimmed.
+
+CONFLICT_CHECK = [{
+    "field": "primary_site", "kind": "conflict_requires_nos", "nos_value": "C349",
+    "mutually_exclusive": [["upper lobe", "RUL", "LUL"], ["middle lobe", "RML"],
+                           ["lower lobe", "RLL", "LLL"], ["main bronchus"]],
+    "message": "say which statement describes the origin, or code C349."}]
+
+
+def _two_lobes():
+    return [{"field": "primary_site", "quote": "coming and arising from the right middle lobe",
+             "supports": "primary_site", "stance": "supports"},
+            {"field": "primary_site", "quote": 'B. Lung, right lower lobe "excision"',
+             "supports": "primary_site", "stance": "supports"}]
+
+
+def test_two_lobes_in_one_answer_cannot_be_coded_as_one_of_them():
+    v = check_answer_detail(CONFLICT_CHECK, {"primary_site": "C342"}, _two_lobes())
+    assert len(v) == 1, "the real failing answer must be refused"
+    assert v[0].rule_id == "answer_check.primary_site.conflict_requires_nos.C349"
+    assert v[0].coded_value == "C342"
+    assert "middle lobe" in v[0].trigger and "lower lobe" in v[0].trigger
+    assert v[0].quote, "a refusal has to point at the text that fired it"
+
+
+def test_conceding_the_conflict_is_the_remedy_and_is_not_refused():
+    """C349 IS the answer this check asks for; firing on it would reject the fix."""
+    assert check_answer_detail(CONFLICT_CHECK, {"primary_site": "C349"}, _two_lobes()) == []
+
+
+def test_one_lobe_named_twice_is_not_a_conflict():
+    ev = [{"field": "primary_site", "quote": "right middle lobe mass", "supports": "primary_site"},
+          {"field": "primary_site", "quote": "RML lesion, 2.1 cm", "supports": "primary_site"}]
+    assert check_answer_detail(CONFLICT_CHECK, {"primary_site": "C342"}, ev) == []
+
+
+def test_the_check_reads_only_what_the_answer_cited():
+    """Reading the chart here would ask the agent to defend text it never saw."""
+    ev = [{"field": "primary_site", "quote": "right middle lobe mass", "supports": "primary_site"}]
+    assert check_answer_detail(CONFLICT_CHECK, {"primary_site": "C342"}, ev) == []
+
+
+def test_the_shipped_spec_carries_the_check_and_refuses_the_real_answer():
+    """A check that exists only in a test fixture has never been in front of a run."""
+    from acr.spec import load_spec
+    spec = load_spec("specs/STORE.400_522_523.site_histology_behavior.yaml")
+    kinds = [c.get("kind") for c in spec.answer_checks]
+    assert "conflict_requires_nos" in kinds
+    v = check_answer_detail(spec.answer_checks, {"primary_site": "C342"}, _two_lobes())
+    assert any(x.rule_kind == "conflict_requires_nos" for x in v)

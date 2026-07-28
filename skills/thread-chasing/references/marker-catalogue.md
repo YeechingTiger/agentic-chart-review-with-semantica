@@ -15,6 +15,7 @@ scanned 2026-07-26. "docs" is the number of documents containing the phrase at l
 | `addendum` | 551 | 295 | `Emergency-Dept-MD-Progress-Note` 81, `Surgical-Pathology-Document` 28, `Cytology-Report` 19 |
 | `final diagnosis` | 283 | 202 | `Surgical-Pathology-Document` 71, `Surgical-Pathology-Report` 37, `Cytology-Report` 36, `FN-Aspirate-Report` 21 |
 | `deferred` | 134 | 104 | progress and follow-up notes |
+| `see synoptic` | 125 | 169 | `Hem-Onc-MD-OP-Progress-Note` 86, `Surgical-Pathology-Document` 45, `Surgical-Pathology-Report` 14 |
 | `preliminary` | 88 | 66 | `Blood-Culture` 15, `Discharge-Summary` 6, `EKG` 6 |
 | `immunostain` | 84 | 50 | `Surgical-Pathology-Document` 16, `Cytology-Report` 14 |
 | `amended` | 33 | 15 | spread thinly across report types |
@@ -65,6 +66,7 @@ one until you have looked; do not assume there is one after you have looked and 
 | stains pending, report is long | later in the **same file** — 4 of 18 pathology documents on these charts carry a marker past offset 4,000, the default read window |
 | addendum referenced, report has headings | a section named `ADDENDUM 1` / `ADDENDUM 2` — numbered, so an exact lookup for `ADDENDUM` misses |
 | addendum referenced, report has no headings | a separate document; the corpus has `Path-Rpt-Addendum`, `Addendum`, `Discharge-Summary-Staff-Addendum` as distinct types |
+| `See synoptic report` in a pathology narrative | a **synoptic/CAP-protocol block in the same file**, usually well past the narrative diagnosis. This is the marker that cost a real answer: on 2026-07-27 a run cited a pathology quote ending "Nontumoral lung: Emphysema / See synoptic report", coded histology 8140 from the narrative line "Invasive adenocarcinoma, poorly differentiated", never opened the synoptic block, and passed the gate. The registry coded 8230 (solid adenocarcinoma) — the subtype lives in the synoptic, not the narrative |
 | `correlate clinically` in a radiology report | not in radiology at all — the author is disclaiming their own document. Go to the tissue class |
 | outside-facility biopsy | nowhere. The document is not in this chart |
 

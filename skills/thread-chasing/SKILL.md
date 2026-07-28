@@ -55,6 +55,7 @@ results came back `truncated: true` and only 11 (10%) were ever continued.**
 |---|---|---|
 | `pending`, `results pending`, `stains pending`, `additional sections`, `recut` | the lab had not finished when this text was signed | finish the document, then look for a later report of the same type |
 | `see addendum`, `addendum`, `amended` | a resolution exists and is filed somewhere | section list first, then the addendum document types |
+| `see synoptic`, `synoptic report` | the narrative diagnosis is a **summary**; the CAP-protocol block behind it carries the subtype, grade and stage the narrative left out | the same file, further down — read to the end, do not stop at the narrative diagnosis |
 | `preliminary` | a final version will follow | check the type before spending a step — in a 50-patient sample `preliminary` sat mostly in `Blood-Culture` and imaging, rarely in pathology |
 | `deferred`, `in consultation`, `sent out` | another pathologist or lab holds it | later documents; may legitimately never return |
 | `correlate clinically`, `clinical correlation` | the author is saying **their own document cannot settle it** | a *different class* of document, not a later version of this one |
