@@ -489,7 +489,18 @@ class RunRecord:
                                            int))
     #: Read, never derived from tokens: a price constant belongs to the caller, and a wrong
     #: one silently rescales every cost number in the report.
-    cost_usd = property(lambda s: _num(s.manifest.get("cost_usd"), float))
+    #:
+    #: `spend.usd` FIRST, because that is where the number actually is. This read
+    #: `manifest["cost_usd"]` alone, a key no manifest this repo has ever written contains --
+    #: the priced ceiling in `spend.py` writes `spend: {usd: ..., priced: true, ...}`. So every
+    #: baseline reported `cost None` with `n_cost_unknown` equal to the whole cohort while each
+    #: manifest carried its own price: the ten-patient real batch of 2026-07-28 summed to
+    #: $3.5247 and scored as unmeasured. `spend.usd` is itself None for an unpriced model (never 0.0),
+    #: so an unknown price still reads as unknown here. `cost_usd` stays as the fallback for
+    #: manifests written by anything that does report it.
+    cost_usd = property(lambda s: _num((s.manifest.get("spend") or {}).get("usd"), float)
+                        if (s.manifest.get("spend") or {}).get("usd") is not None
+                        else _num(s.manifest.get("cost_usd"), float))
     #: Trace-first, manifest as fallback. `None` means nobody counted, which is not zero.
     n_documents_read = property(lambda s: sum(
         len((e.get("args") or {}).get("note_ids") or []) or 1

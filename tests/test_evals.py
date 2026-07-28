@@ -398,6 +398,42 @@ def test_run_detectors_reports_the_irb_finding_first():
 
 
 # ==================================================== PART 3: the regression harness
+def test_cost_is_read_from_the_key_a_real_manifest_actually_writes():
+    """`spend.usd`, not `cost_usd`. Every baseline this repo produced reported cost unknown.
+
+    `RunRecord.cost_usd` read `manifest["cost_usd"]`, a key nothing in this repo writes -- the
+    priced ceiling in `spend.py` writes `spend: {usd, priced, cache_hit_rate, ...}`. So the
+    ten-patient real batch of 2026-07-28 scored as `cost None / n_cost_unknown 10` while its
+    manifests summed to $3.5247, each carrying its own price.
+
+    Note that `manifest()` above builds the fictional `cost_usd` key, which is why the whole
+    eval suite was green on a property no real run had: the fixture agreed with the bug. These
+    two use the real shape.
+    """
+    priced = E.RunRecord({**manifest(), "spend": {"usd": 0.6752, "priced": True,
+                                                  "model": "gpt-5.6-luna", "max_usd": 5.0}},
+                         source="real-shape")
+    assert priced.cost_usd == pytest.approx(0.6752)
+
+    # And the legacy key still works, for a manifest written by something that does report it.
+    legacy = E.RunRecord({**manifest(cost=0.11)}, source="legacy-shape")
+    assert legacy.cost_usd == pytest.approx(0.11)
+
+
+def test_an_unpriced_model_reads_as_unknown_and_never_as_zero():
+    """`spend.usd` is None when the model is not in prices.json, and None must survive.
+
+    A cost of 0.0 for an unpriced model is the worst available answer: it sums into a total
+    that reads as measured, and `n_cost_unknown` -- the field whose whole job is to say how
+    much of the total is missing -- goes to zero at the same time.
+    """
+    unpriced = E.RunRecord({**{k: v for k, v in manifest().items() if k != "cost_usd"},
+                            "spend": {"usd": None, "priced": False, "model": "some-local-gguf"}},
+                           source="unpriced")
+    assert unpriced.cost_usd is None, "an unpriced model is unknown, not free"
+
+
+
 KEY = {
     f"SYN0001__{SPEC}": {"fields": {"primary_site": "C341", "histology": "8070"},
                          "subgroups": ["squamous"]},
