@@ -1,0 +1,4 @@
+interface:
+  display_name: "CRC Guideline Evidence Coverage"
+  short_description: "Build CRC rules, variable specs, and registry coverage"
+  default_prompt: "Use $crc-guideline-registry-authoring to build a version-bound CRC guideline denominator, one contract per canonical variable, grouped runtime specs, and registry-only versus observed evidence-coverage reports."

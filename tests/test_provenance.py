@@ -35,7 +35,8 @@ import pytest
 import yaml
 
 from acr.corpus import Corpus
-from acr.graph import Budget, ChartReviewAgent
+from acr.graph import ChartReviewAgent
+from acr.state import Budget
 from acr.llm import LLMClient, LLMConfig, LLMResponse
 from acr.spec import (
     ExtractionSpec,

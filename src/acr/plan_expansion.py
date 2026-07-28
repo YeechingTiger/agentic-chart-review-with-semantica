@@ -119,3 +119,43 @@ def expansion_is_spent(plan: CoveragePlan, budget: ExpansionBudget, *,
         return False
     h = headroom(plan, budget)
     return (h["terms"] <= 0 and h["type_promotions"] <= 0) or h["revisions"] <= 0
+
+
+# ------------------------------------------------------------------ the plan in the prompt
+#: Prefixes of a rendered plan block. Model-visible on purpose: the agent reads them as a
+#: heading, and the runtime uses them to find the block it must replace.
+#:
+#: NOT the bare word "PLAN". `"PLANNING the next read".startswith("PLAN")` is true, and a
+#: marker that matches ordinary prose deletes the agent's own words out of its transcript —
+#: a silent amnesia that would look like the model forgetting rather than like a bug here.
+#: Every header the runtime writes ends the word with `:` or ` (`.
+PLAN_BLOCK_PREFIXES = ("PLAN:", "PLAN (")
+
+
+def install_plan_block(msgs: list[dict], body: str) -> list[dict]:
+    """Put the plan in the transcript ONCE, at the end, replacing any earlier copy.
+
+    THE PLAN IS STATE, NOT HISTORY, and appending it was the single largest line item in the
+    bill. Measured on a real 293-document chart: `plan.render()` is 6,310 characters, the run
+    appended it eleven times — six from the plan node, five from `reflect` announcing an
+    applied revision — and every copy was re-sent on all forty-nine subsequent calls. That is
+    ~425,000 of the run's 1,030,179 prompt tokens, 41%, spent re-reading ten stale copies of
+    a document whose current version was sitting at the bottom of the same prompt.
+
+    Only the CURRENT plan is a fact about the run. What changed between revisions is history
+    and stays in the transcript, as the one-line note `reflect` writes — a reader of the
+    thread can still see that the scope widened and why, without carrying the full listing
+    of every doc type and keyword for each step it was true.
+
+    Position matters as much as uniqueness: the block goes at the END, because the plan
+    governs the next tool call and a plan buried twenty messages up is a plan being recalled
+    rather than read.
+    """
+    kept = [m for m in msgs if not is_plan_block(m)]
+    return kept + [{"role": "user", "content": body}]
+
+
+def is_plan_block(m: dict) -> bool:
+    """A message the runtime wrote to carry the plan — never one the model wrote."""
+    return (m.get("role") == "user"
+            and str(m.get("content") or "").startswith(PLAN_BLOCK_PREFIXES))

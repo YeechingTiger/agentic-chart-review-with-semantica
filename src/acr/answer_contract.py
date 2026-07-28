@@ -323,3 +323,48 @@ def strip_value_from_spec_insufficient(ans: dict, tracer=None) -> None:
     if tracer:
         tracer.emit("spec_insufficient_value_withheld", severity="warning",
                     fields=sorted(dropped))
+
+
+# ---------------------------------------------------------------- the coverage claim
+# MOVED HERE FROM `deep_runner`, where it was defined beside one runtime and imported by
+# another. Whether an answer may claim coverage is an answer rule, not a property of the
+# loop that produced it — and this module is where `assert_answer_is_reportable` already
+# lives, which is the check that refuses an unearned claim. A rule and the assertion that
+# enforces it belong in one file, or the two can be edited apart.
+
+#: What a manifest says when it makes no coverage claim at all. A key, not an omission:
+#: "this run claimed nothing" and "this manifest predates the field" must stay distinguishable
+#: to a reader filtering a directory of them.
+NO_COVERAGE_CLAIM = "no coverage claim is made — see answer.status"
+
+
+def attach_coverage_claim(answer: dict, *, gate_validated: bool, ledger: dict,
+                          ungated_basis: str) -> None:
+    """Everything this runtime says about coverage, derived from the gate and nothing else.
+
+    A coverage ledger asserts "I searched the universe this spec defines". The only thing
+    that establishes that is the proof obligation, and the only thing that evaluates the
+    proof obligation is `ChartReviewAgent._gate`. So the ledger is attached on the branch the
+    gate accepted, and on the other branch the answer says in words that it makes no claim —
+    because downstream an unearned ledger is indistinguishable from an earned one, which is
+    the entire failure mode.
+
+    Written ONTO THE ANSWER, exactly where `graph._n_finalize` writes it. The manifest used
+    to carry a top-level `coverage_attested` and the answer to carry nothing, which put the
+    claim outside the reach of `assert_answer_is_reportable` — so the one rule that says who
+    may claim coverage was never asked. It is asked now, and it refuses in both directions:
+    an unearned ledger raises, and a gate-validated negative WITHOUT its ledger raises too.
+
+    Only EVIDENCE_INSUFFICIENT belongs here. FOUND is proved by witness and never claimed the
+    universe was searched; SPEC_INSUFFICIENT is not a claim about this chart at all.
+    """
+    if gate_validated:
+        answer["negative_basis"] = "GATE_VALIDATED"
+        answer["coverage_attested"] = ledger
+        return
+    # `ungated_basis` and not a literal: a negative that never passed the gate still owes the
+    # reader WHY it ended, and every value but GATE_VALIDATED routes to a human.
+    answer["negative_basis"] = ungated_basis
+    answer["route_to_human"] = True
+    answer["coverage_note"] = ("no coverage claim is made — this answer did not pass the "
+                               "proof obligation")

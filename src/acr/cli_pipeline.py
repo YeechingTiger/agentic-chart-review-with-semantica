@@ -11,6 +11,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -154,6 +155,21 @@ def extract(
     seed: int = typer.Option(None, "--seed", help="validation-sampling seed; share it across arms"),
     limit: int = typer.Option(0, "--limit", help="first N patients only; 0 = all"),
     out: str = typer.Option("runs", "--out"),
+    # STILL `langgraph`, and the reason is a test gap rather than a preference. On ten real
+    # charts `hooks` is better on every axis measured — 5/10 vs 3/10 exact, 10/10 vs 5/10
+    # gate-validated, $1.54 vs $6.58 — so the default should move. It cannot yet: the eight
+    # CLI tests that drive `extract` end to end inject a `ScriptedLLM` at
+    # `cli_common.llm_client`, and the hooks branch constructs its own `ChatOpenAI` and never
+    # passes through that seam. Flipping the default turns those eight red, which would trade
+    # a measured improvement for the loss of the only end-to-end coverage `extract` has.
+    # What unblocks it: a LangChain-shaped test double and a seam for the hooks branch to take
+    # it through. Until then the better runtime is one flag away and the tests still mean
+    # something.
+    runtime: str = typer.Option("langgraph", "--runtime",
+                                help="langgraph (the hand-written loop, still the default: the "
+                                     "end-to-end CLI tests can only drive this one) or hooks "
+                                     "(the library graph with our rules as middleware, better "
+                                     "on every axis measured over 10 real charts)"),
     dry_run: bool = typer.Option(False, "--dry-run",
                                  help="resolve, plan and cost the work without calling a model"),
 ):
@@ -199,12 +215,30 @@ def extract(
             sp = specs[sid]
             con.print(f"[dim]— {pid} / {sid}[/]")
             try:
-                agent = ChartReviewAgent(sp, cli_common.llm_client(model, api_base, temperature),
-                                         budget=cli_common.budget(max_steps, max_tokens,
-                                                                  max_seconds),
-                                         reflect_every=reflect_every, out_dir=run_dir,
-                                         sample_seed=seed)
-                r = agent.run(c.chart(pid), run_id=f"{pid}__{sid}", known_doc_types=vocab)
+                if runtime == "hooks":
+                    # The library graph. `max_steps` is model CALLS here, not plan/act/reflect
+                    # cycles, and there is no reflect node — the two arms are not comparable
+                    # step for step, only end to end.
+                    from .agent import run_patient
+                    from langchain_openai import ChatOpenAI
+                    from .audit import _callbacks
+                    r = run_patient(
+                        spec=sp, corpus=c, patient_id=pid, out_dir=run_dir,
+                        model=ChatOpenAI(model=(model or os.getenv("ACR_MODEL_NAME",
+                                                                   "gpt-5.6-luna")),
+                                         base_url=api_base or os.getenv("ACR_API_BASE"),
+                                         api_key=os.getenv("ACR_API_KEY"),
+                                         temperature=temperature, timeout=600, max_retries=3,
+                                         callbacks=_callbacks()),
+                        max_model_calls=max_steps, seed=seed or 1234,
+                        run_id=f"{pid}__{sid}")
+                else:
+                    agent = ChartReviewAgent(sp, cli_common.llm_client(model, api_base, temperature),
+                                             budget=cli_common.budget(max_steps, max_tokens,
+                                                                      max_seconds),
+                                             reflect_every=reflect_every, out_dir=run_dir,
+                                             sample_seed=seed)
+                    r = agent.run(c.chart(pid), run_id=f"{pid}__{sid}", known_doc_types=vocab)
             except Exception as e:  # noqa: BLE001
                 # One patient failing must not silently shrink the cohort: the row survives,
                 # carries the error, and the command exits non-zero at the end.

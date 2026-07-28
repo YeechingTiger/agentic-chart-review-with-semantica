@@ -64,7 +64,8 @@ from acr.coverage_planner import (MECHANICALLY_DISCHARGEABLE_MARKERS,
                                   OpenThreadLedger,
                                   PlanRevision, Trigger, load_marker_catalogue, plan_from_spec,
                                   spec_declared_keywords)
-from acr.graph import ChartReviewAgent, check_threads
+from acr.answer_gate import check_threads
+from acr.graph import ChartReviewAgent
 from acr.llm import LLMClient, LLMConfig, LLMResponse
 from acr.spec import load_spec
 from acr.state import Budget

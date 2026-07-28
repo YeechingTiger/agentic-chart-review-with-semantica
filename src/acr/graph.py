@@ -69,7 +69,7 @@ from .coverage_planner import (REFUSED_BUDGET, REFUSED_THREAD_NOOP, TRIGGERS, Co
                                PlanRevision, RevisionOutcome, Trigger, documents_by_type,
                                load_marker_catalogue, plan_coverage, plan_from_spec)
 from .plan_expansion import (budget_report, expansion_is_spent, fit_terms_to_budget,
-                             headroom, price_expansion_budget)
+                             headroom, install_plan_block, price_expansion_budget)
 from .run_manifest import ExpansionRecord, RunCounters, SeedRecord, build_manifest
 from .run_triggers import detect_from_tool_result, detect_gate_obligations
 from .state import Budget, EvidenceLedger, RunState
@@ -343,8 +343,7 @@ class ChartReviewAgent:
         ]
         header = ("PLAN (revision %d — the scope was widened; the additions are marked):\n"
                   % rev if rev else "PLAN:\n")
-        msgs = msgs + [{"role": "user",
-                        "content": header + self.plan.render(self._docs_by_type)}]
+        msgs = install_plan_block(msgs, header + self.plan.render(self._docs_by_type))
         return {"plan": self.plan.to_dict(), "plan_revisions": rev + 1, "messages": msgs}
 
     def _n_act(self, s: RunState) -> dict:
@@ -734,18 +733,24 @@ class ChartReviewAgent:
             upd["plan"] = self.plan.to_dict()
         msgs = list(s["messages"])
         tail = ""
+        refresh_plan = False
         if outcome is not None and outcome.applied and deferred:
             # PARTIAL APPLICATION IS ONLY HONEST IF IT IS SAID. An agent that asked for six
             # terms, got five and was told nothing would believe it had all six and would
             # never re-ask for the sixth.
+            # "The plan now reads: <full listing>" — five times in one run, on top of the six
+            # the plan node wrote. What the agent needs here is that the revision landed and
+            # what did not fit; the plan itself is re-installed once, at the end of the
+            # transcript, by `install_plan_block`. See its docstring for the measurement.
             tail = (f"Your revision was APPLIED IN PART ({REFUSED_BUDGET} on the term list "
                     f"only). These terms did NOT fit the remaining expansion budget and were "
                     f"not added: {deferred}. Re-ask for "
-                    f"the one that matters most if budget frees up. The plan now reads:\n"
-                    + self.plan.render(self._docs_by_type))
+                    f"the one that matters most if budget frees up. The current plan is at "
+                    f"the end of this thread.")
+            refresh_plan = True
         elif outcome is not None and outcome.applied:
-            tail = ("Your revision was APPLIED. The plan now reads:\n"
-                    + self.plan.render(self._docs_by_type))
+            tail = ("Your revision was APPLIED. The current plan is at the end of this thread.")
+            refresh_plan = True
             if outcome.refused:
                 # APPLIED IS NOT THE SAME AS "ALL OF IT LANDED". A revision that promoted a
                 # type already at read_all and re-opened a thread already open used to come
@@ -766,6 +771,12 @@ class ChartReviewAgent:
             tail = "If you have what you need, call submit_answer now."
         msgs.append({"role": "user", "content":
                      f"[supervisor] verdict={verdict}. {j.get('reason','')}\n" + tail})
+        if refresh_plan:
+            # The revision moved retrieval, so the resident plan block is stale. Replace it —
+            # the message above says WHAT changed, this puts the current plan back at the end
+            # where the next act step reads it.
+            msgs = install_plan_block(msgs, "PLAN (current):\n"
+                                      + self.plan.render(self._docs_by_type))
         upd["messages"] = msgs
         return upd
 

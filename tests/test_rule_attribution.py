@@ -36,7 +36,8 @@ from acr.answer_checks import (Violation, answer_check_rule_id, check_answer,
 from acr.corpus import Corpus
 from acr.coverage import (ADMITTED, REFUSED, UNDECLARED, CoverageLedger, ForcedSampler,
                           admissibility_for_citations, strata_from_spec)
-from acr.graph import ChartReviewAgent, gate_answer
+from acr.answer_gate import gate_answer
+from acr.graph import ChartReviewAgent
 from acr.spec import load_spec
 from acr.state import Budget, Evidence, EvidenceLedger
 from acr.trace import (MAX_KEPT_UNRECOGNISED, PROV_DETERMINISTIC, PROV_SELF_REPORTED, Tracer,
@@ -675,3 +676,59 @@ def test_the_shipped_spec_carries_the_check_and_refuses_the_real_answer():
     assert "conflict_requires_nos" in kinds
     v = check_answer_detail(spec.answer_checks, {"primary_site": "C342"}, _two_lobes())
     assert any(x.rule_kind == "conflict_requires_nos" for x in v)
+
+
+# --------------------------------------------------- the two checks were a trap with two jaws
+# Measured on a real 40-document chart whose registry truth is C349 (lung NOS). The agent
+# coded C349; `not_less_specific` refused it because the cited evidence mentioned a lobe. It
+# coded C348; `conflict_requires_nos` refused THAT because the evidence named three mutually
+# exclusive lobes. No value satisfied both, so it resubmitted 24 times, burned the whole call
+# budget and returned nothing — and the answer refused first was the correct one.
+#
+# `conflict_requires_nos` was added the same day, by me, which is how the second jaw arrived.
+
+THREE_LOBES = [
+    {"field": "primary_site", "quote": "mass in the right upper lobe", "supports": "primary_site"},
+    {"field": "primary_site", "quote": "lesion in the middle lobe", "supports": "primary_site"},
+    {"field": "primary_site", "quote": 'Lung, right lower lobe "excision"', "supports": "primary_site"}]
+ONE_LOBE = [
+    {"field": "primary_site", "quote": "mass in the right upper lobe", "supports": "primary_site"}]
+
+
+def _site_checks():
+    from acr.spec import load_spec
+    return load_spec("specs/STORE.400_522_523.site_histology_behavior.yaml").answer_checks
+
+
+def _kinds(ev, code):
+    v = check_answer_detail(_site_checks(),
+                            {"primary_site": code, "histology": "8070", "behavior": "3"},
+                            ev, searched=["lobe", "bronchus"])
+    return sorted({x.rule_kind for x in v})
+
+
+def test_self_contradicting_evidence_leaves_nos_reachable():
+    """The trap: some value has to be admissible, or the loop cannot terminate."""
+    assert _kinds(THREE_LOBES, "C349") == [], "NOS must be allowed when the record conflicts"
+    admissible = [c for c in ("C349", "C348", "C341", "C342", "C343") if not _kinds(THREE_LOBES, c)]
+    assert admissible, "every candidate refused is a deadlock, not a check"
+
+
+def test_a_specific_code_is_still_refused_when_the_record_conflicts():
+    assert _kinds(THREE_LOBES, "C341") == ["conflict_requires_nos"]
+    assert _kinds(THREE_LOBES, "C348") == ["conflict_requires_nos"]
+
+
+def test_one_documented_lobe_still_forbids_the_nos_code():
+    """The exemption is for CONFLICT, not for any mention. P03's failure must stay caught."""
+    assert _kinds(ONE_LOBE, "C349") == ["not_less_specific"]
+    assert _kinds(ONE_LOBE, "C341") == []
+
+
+def test_the_exemption_is_driven_by_the_spec_and_not_by_code():
+    """Drop the conflict declaration and not_less_specific fires again — the exclusive sets
+    live in the spec, so no clinical judgement moved into answer_checks.py."""
+    without = [c for c in _site_checks() if c.get("kind") != "conflict_requires_nos"]
+    v = check_answer_detail(without, {"primary_site": "C349", "histology": "8070",
+                                      "behavior": "3"}, THREE_LOBES, searched=["lobe", "bronchus"])
+    assert [x.rule_kind for x in v] == ["not_less_specific"]

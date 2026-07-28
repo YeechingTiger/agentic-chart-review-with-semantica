@@ -58,7 +58,8 @@ from acr.coverage_planner import (POLICY_RANK, REFUSED_BUDGET, REFUSED_NOT_MONOT
                                   load_marker_catalogue, normalise_term, plan_from_spec,
                                   redundant_against, spec_declared_keywords,
                                   triggers_from_tool_result)
-from acr.graph import ChartReviewAgent, check_gate, check_threads, gate_answer
+from acr.answer_gate import check_gate, check_threads, gate_answer
+from acr.graph import ChartReviewAgent
 from acr.llm import LLMClient, LLMConfig, LLMResponse
 from acr.spec import load_spec
 from acr.state import Budget, EvidenceLedger

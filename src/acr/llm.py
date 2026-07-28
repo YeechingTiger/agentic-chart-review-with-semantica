@@ -82,6 +82,7 @@ class LLMClient:
         self.calls = 0
         self.prompt_tokens = 0
         self.completion_tokens = 0
+        self.cached_tokens = 0
         self.reasoning_fallbacks = 0   # completions that arrived only in the thinking channel
         self.empty_completions = 0     # completions with no text AND no tool call
 
@@ -126,8 +127,25 @@ class LLMClient:
         usage = getattr(resp, "usage", None)
         pt = int(getattr(usage, "prompt_tokens", 0) or 0)
         ct = int(getattr(usage, "completion_tokens", 0) or 0)
+        # CACHED PROMPT TOKENS, because without them a cost comparison is not a comparison.
+        # This client recorded prompt and completion only, so every run on this arm reported
+        # `cached: 0` — which reads as "no cache hits" and is actually "never looked". The
+        # LangChain arm records it (lc_callback._usage), and on two real charts its hit rate
+        # was 86.9%; billing this arm's prompt at the full $1/1M while the other arm's cached
+        # tokens go at $0.10/1M compares a measured number against an unmeasured one.
+        # Providers return this block as an object or as a dict depending on SDK version, and
+        # a `.get` on the object form raises inside the usage path — which would turn a
+        # bookkeeping detail into a dead run. Both shapes, neither fatal.
+        det = getattr(usage, "prompt_tokens_details", None)
+        if det is None:
+            cached = 0
+        elif isinstance(det, dict):
+            cached = int(det.get("cached_tokens") or 0)
+        else:
+            cached = int(getattr(det, "cached_tokens", 0) or 0)
         self.prompt_tokens += pt
         self.completion_tokens += ct
+        self.cached_tokens += cached
 
         # Hybrid reasoning models (qwen3.x among them) can spend the whole completion budget
         # on thinking and return `content: ""` with the reasoning in a side channel. That
@@ -168,6 +186,7 @@ class LLMClient:
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
             "total_tokens": self.prompt_tokens + self.completion_tokens,
+            "cached_tokens": self.cached_tokens,
             "reasoning_fallbacks": self.reasoning_fallbacks,
             "empty_completions": self.empty_completions,
         }

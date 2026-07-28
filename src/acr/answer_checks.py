@@ -148,6 +148,29 @@ def check_answer(checks: list[dict], value: dict, evidence: list[dict],
     return [v.message for v in check_answer_detail(checks, value, evidence, searched)]
 
 
+def _fields_with_conflicting_evidence(checks: list[dict] | None,
+                                      evidence: list[dict]) -> set[str]:
+    """Fields whose CITED evidence names two or more mutually exclusive alternatives.
+
+    Read off the `conflict_requires_nos` declarations, so the exclusive sets live in the spec
+    and not in code. Independent of what was coded: this answers "what can the record
+    support", which has to be settled before asking "is this code too vague", or the two
+    checks can demand opposite things at once.
+    """
+    out: set[str] = set()
+    for chk in checks or []:
+        if chk.get("kind") != "conflict_requires_nos":
+            continue
+        field = chk.get("field")
+        groups = [g for g in (chk.get("mutually_exclusive") or []) if g]
+        if not field or len(groups) < 2:
+            continue
+        blob = " ".join(_norm(e.get("quote")) for e in _evidence_for(field, evidence))
+        if sum(1 for g in groups if any(_norm(a) in blob for a in g)) > 1:
+            out.add(field)
+    return out
+
+
 def check_answer_detail(checks: list[dict], value: dict, evidence: list[dict],
                         searched: Iterable[str] = ()) -> list[Violation]:
     """Return a list of `Violation`s; empty means the answer passes.
@@ -178,6 +201,21 @@ def check_answer_detail(checks: list[dict], value: dict, evidence: list[dict],
                           picks the first one it read is not abstracting, it is guessing.
     """
     out: list[Violation] = []
+    # WHICH FIELDS THE RECORD CONTRADICTS ITSELF ABOUT, computed before any check runs.
+    #
+    # `not_less_specific` and `conflict_requires_nos` were a TRAP with two jaws, and it closed
+    # on a real chart. Patient with registry truth C349 (lung NOS): the agent coded C349,
+    # `not_less_specific` refused it because the cited evidence mentioned a lobe; the agent
+    # coded C348, `conflict_requires_nos` refused THAT because the evidence named three
+    # mutually exclusive lobes. No value satisfies both. It resubmitted 24 times and burned the
+    # whole call budget, and the answer it was refused first — C349 — was the right one.
+    #
+    # The rule that was wrong is `not_less_specific`. It reads "a lobe appears in the cited
+    # text" as "the subsite is known". Three conflicting lobes are not a known subsite; they
+    # are the exact situation an NOS code exists to express, and the registrar coded it that
+    # way. So a field whose evidence is self-contradicting is EXEMPT from not_less_specific:
+    # you may not be told to be more specific than the record can support.
+    conflicted = _fields_with_conflicting_evidence(checks, evidence)
     for pos, chk in enumerate(checks or [], start=1):
         field = chk.get("field")
         if not field:
@@ -189,6 +227,8 @@ def check_answer_detail(checks: list[dict], value: dict, evidence: list[dict],
         blob = " ".join(_norm(e.get("quote")) for e in items)
         kind = chk.get("kind", "not_less_specific")
         rid = answer_check_rule_id(chk, pos)
+        if kind == "not_less_specific" and field in conflicted:
+            continue
 
         if kind == "not_less_specific":
             if coded not in (chk.get("nos_values") or []):

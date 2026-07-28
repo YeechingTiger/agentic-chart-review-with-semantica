@@ -40,18 +40,30 @@ import time
 from pathlib import Path
 
 from .answer_checks import check_answer  # noqa: F401  (used via the shared gate)
+from .audit import AUDIT_DIR, _callbacks  # noqa: F401  (re-exported for callers)
+from .answer_contract import (NO_COVERAGE_CLAIM, SPEC_SECTIONS, assert_answer_is_reportable,
+                              attach_coverage_claim, build_spec_gap,
+                              strip_value_from_spec_insufficient)
 from .corpus import Corpus
 from .coverage import CoverageLedger, ForcedSampler, strata_from_spec
 from .coverage_planner import (MONOTONICITY_VS_LEDGER, OPEN_REQUEST_OPENED, OpenThreadLedger,
                                documents_by_type, load_marker_catalogue, plan_from_spec,
                                triggers_from_tool_result)
-from .graph import (SPEC_SECTIONS, ChartReviewAgent, assert_answer_is_reportable,
-                    build_spec_gap, strip_value_from_spec_insufficient)
+# Only the gate holder comes from `graph`. The answer rules come from `answer_contract`
+# directly: importing them THROUGH graph made a 1,197-line runtime a load-bearing dependency
+# of every front end that only wanted a rule, and it is why `agent.py` had to import graph too.
+from .graph import ChartReviewAgent
 from .spec import load_spec
 from .state import Budget, EvidenceLedger
 from .tools.toolbox import Toolbox
 from .trace import Tracer
 
+# TASK STAYS HERE, and the reason is a hard constraint rather than a preference. `agent.py`
+# must import langchain at module scope (`AuditMiddleware` subclasses `AgentMiddleware`), so
+# anything importing `agent` at module scope requires langchain to be installed. This module
+# imports langchain lazily on purpose, so the test suite can exercise it in the base venv.
+# Moving one prompt string broke collection of two test files; the string stays and `agent`
+# imports it lazily, which keeps the dependency pointing the way the environments allow.
 TASK = """Determine the answer for patient {patient} using ONLY this chart.
 
 Work by calling tools: list the documents, search them, read what matters, and record every
@@ -59,44 +71,10 @@ claim with record_evidence and a verbatim quote. When you are ready call submit_
 
 submit_answer is GATED. If the proof obligation is not met it will be rejected with the
 reason, and you must act on that reason and submit again. A rejection is not a failure; it
-is the instruction for what to do next."""
+is the instruction for what to do next.
 
-#: What a manifest says when it makes no coverage claim at all. A key, not an omission:
-#: "this run claimed nothing" and "this manifest predates the field" must stay distinguishable
-#: to a reader filtering a directory of them.
-NO_COVERAGE_CLAIM = "no coverage claim is made — see answer.status"
-
-
-def attach_coverage_claim(answer: dict, *, gate_validated: bool, ledger: dict,
-                          ungated_basis: str) -> None:
-    """Everything this runtime says about coverage, derived from the gate and nothing else.
-
-    A coverage ledger asserts "I searched the universe this spec defines". The only thing
-    that establishes that is the proof obligation, and the only thing that evaluates the
-    proof obligation is `ChartReviewAgent._gate`. So the ledger is attached on the branch the
-    gate accepted, and on the other branch the answer says in words that it makes no claim —
-    because downstream an unearned ledger is indistinguishable from an earned one, which is
-    the entire failure mode.
-
-    Written ONTO THE ANSWER, exactly where `graph._n_finalize` writes it. The manifest used
-    to carry a top-level `coverage_attested` and the answer to carry nothing, which put the
-    claim outside the reach of `assert_answer_is_reportable` — so the one rule that says who
-    may claim coverage was never asked. It is asked now, and it refuses in both directions:
-    an unearned ledger raises, and a gate-validated negative WITHOUT its ledger raises too.
-
-    Only EVIDENCE_INSUFFICIENT belongs here. FOUND is proved by witness and never claimed the
-    universe was searched; SPEC_INSUFFICIENT is not a claim about this chart at all.
-    """
-    if gate_validated:
-        answer["negative_basis"] = "GATE_VALIDATED"
-        answer["coverage_attested"] = ledger
-        return
-    # `ungated_basis` and not a literal: a negative that never passed the gate still owes the
-    # reader WHY it ended, and every value but GATE_VALIDATED routes to a human.
-    answer["negative_basis"] = ungated_basis
-    answer["route_to_human"] = True
-    answer["coverage_note"] = ("no coverage claim is made — this answer did not pass the "
-                               "proof obligation")
+If a rule refuses every value the record can support, that is a finding about the
+SPECIFICATION: submit SPEC_INSUFFICIENT and name the check at fault."""
 
 
 def _make_tools(toolbox: Toolbox, tracer: Tracer, *, plan, catalogue, threads, chart):
@@ -183,21 +161,6 @@ def _plan_refusal(name: str, args: dict, *, plan, chart, coverage) -> dict | Non
                         "NOT evidence that they hold nothing. Under this runtime the plan "
                         "cannot be widened — there is no typed reflection channel here — so "
                         "work the types the plan does allow.")}
-
-
-def _callbacks():
-    """Audit + optional langfuse. deepagents bypasses LiteLLM, so sitecustomize's hook
-    never fires here and a run's cost would otherwise be invisible -- as it was on the
-    first deepagents run."""
-    cbs = []
-    try:
-        from lc_callback import make_handler, langfuse_handler
-        for h in (make_handler(), langfuse_handler()):
-            if h is not None:
-                cbs.append(h)
-    except Exception:
-        pass
-    return cbs
 
 
 def _model(model_name: str, api_base: str | None, api_key: str | None, temperature: float):
