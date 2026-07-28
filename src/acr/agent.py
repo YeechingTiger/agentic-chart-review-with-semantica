@@ -295,9 +295,30 @@ class AuditMiddleware(AgentMiddleware):
             self.ctx.answer = submitted
         else:
             self.ctx.rejections.append(verdict)
+            self._detect_deadlock()
         return ToolMessage(content=json.dumps(verdict, default=str)[:8000],
                            tool_call_id=request.tool_call["id"], name="submit_answer",
                            status="success" if verdict.get("accepted") else "error")
+
+    def _detect_deadlock(self) -> None:
+        """An obligation the CURRENT plan structurally cannot discharge is a deadlock.
+
+        THE FOURTH TRIGGER, and it was not ported. A gate that says "read these search hits"
+        while the plan says "you may not open that type" is not a rejection the agent can
+        satisfy — it is a loop, and the old runtime spent the rest of its budget inside one.
+        The `revise_plan` tool is the way out, so the detector fires here, right after the
+        refusal, where the agent is about to decide what to do next.
+
+        `tracer` is required by the detector and passed for the reason its own docstring
+        gives: it swallows its own exceptions, so without a channel to say so a detector that
+        has stopped working is indistinguishable from a run with no deadlock to report.
+        """
+        from .run_triggers import detect_gate_obligations
+        for t in detect_gate_obligations(spec=self.ctx.spec, coverage=self.ctx.coverage,
+                                         chart=self.ctx.chart, plan=self.ctx.plan,
+                                         step=self.ctx.n_model_calls,
+                                         tracer=self.ctx.tracer):
+            self.ctx.tracer.trigger(runtime="deepagents-hooks", **t.to_dict())
 
     def _stalled(self, submitted: dict, verdict: dict) -> dict | None:
         """Stop a run that is being refused the same way for the same answer, over and over.
@@ -481,6 +502,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
                      out_dir, elapsed_fn, expansion_budget) -> dict:
     """One patient, one spec, through the library's graph. Returns the manifest."""
     from .answer_contract import NO_COVERAGE_CLAIM, attach_coverage_claim
+    from .plan_expansion import budget_report, expansion_is_spent, headroom
     from .answer_contract import (assert_answer_is_reportable, build_spec_gap,
                                   strip_value_from_spec_insufficient)
 
@@ -557,6 +579,14 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
                    "n_applied": sum(1 for r in ctx.revisions if r["applied"]),
                    "n_refused": sum(1 for r in ctx.revisions if not r["applied"]),
                    "revisions": ctx.revisions},
+        # The budget the plan was priced for, in the manifest. "EXPANSION_BUDGET_EXHAUSTED"
+        # without the numbers cannot be told from a chart that needed no widening, and the old
+        # runtime recorded them.
+        "expansion_budget": {
+            **budget_report(plan, expansion_budget, source="priced_against_plan",
+                            planner_terms=len(plan.keywords)),
+            "exhausted": expansion_is_spent(plan, expansion_budget, terms_deferred=[]),
+            "headroom": headroom(plan, expansion_budget)},
         "n_model_calls": ctx.n_model_calls, "max_model_calls": max_model_calls,
         "recursion_limit": recursion_limit_for(agent, max_model_calls),
         # Non-zero means the model tried to stop without answering and was sent back.
@@ -663,8 +693,8 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
     import time
 
     from .coverage import CoverageLedger, ForcedSampler, strata_from_spec
-    from .coverage_planner import (ExpansionBudget, OpenThreadLedger, load_marker_catalogue,
-                                   plan_from_spec)
+    from .coverage_planner import OpenThreadLedger, load_marker_catalogue, plan_from_spec
+    from .plan_expansion import price_expansion_budget
     from .answer_gate import gate_answer
     from .audit import _callbacks
     from .state import Budget, EvidenceLedger
@@ -708,9 +738,15 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
         system_prompt=spec.as_prompt_block() + "\n\n" + TASK.format(patient=patient_id),
         backend=StateBackend(), max_model_calls=max_model_calls, out_dir=out_dir,
         elapsed_fn=lambda: round(time.time() - t0, 1),
-        expansion_budget=expansion_budget or ExpansionBudget(
-            max_terms_added=40, max_type_promotions=8,
-            max_documents_opened_by_promotion=40, max_revisions=6))
+        # PRICED AGAINST THE PLAN, not a constant. The old runtime computed this from the
+        # plan's own size — how many types it may promote, how many documents that opens —
+        # and this one shipped `ExpansionBudget(40, 8, 40, 6)`, four numbers that fit no
+        # particular chart. A 34-document chart and a 293-document chart were given the same
+        # room to widen, which makes "the expansion budget was exhausted" a fact about the
+        # constant rather than about the chart.
+        expansion_budget=expansion_budget or price_expansion_budget(
+            plan, {r["doc_type"]: r["count"] for r in chart.type_summary()},
+            max_revisions=6, supplied=None, planner_terms=len(plan.keywords)))
 
 
 # ===================================================== the chart tools, as LangChain tools
