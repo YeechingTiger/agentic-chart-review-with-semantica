@@ -114,6 +114,19 @@ class RunContext:
     #: is how an unearned ledger gets stamped `GATE_VALIDATED`.
     coverage_unreachable: list = field(default_factory=list)
     declared: set[str] = field(default_factory=set)
+
+    @property
+    def gate_validated(self) -> bool:
+        """DID THE GATE SAY YES, as opposed to having stopped asking.
+
+        Five call sites needed this and each passed `ctx.accepted`, which was the same thing
+        until `COVERAGE_UNREACHABLE` existed. Patching them one at a time is how the first
+        attempt shipped with the manifest's own `gate_validated: true` sitting next to
+        `negative_basis: COVERAGE_UNREACHABLE` -- `attach_coverage_claim` and
+        `provenance_for_run` had been corrected and the manifest field had not. One property,
+        one name that says which question it answers, and no site left to forget.
+        """
+        return bool(self.accepted and not self.coverage_unreachable)
     revisions: list = field(default_factory=list)
     rejection_fingerprints: collections.Counter = field(
         default_factory=collections.Counter)
@@ -818,7 +831,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
     # BEFORE the FOUND labelling: a downgraded answer must not also be given WITNESS.
     downgrade_a_positive_that_owes_something(
         answer, spec=spec, coverage=coverage, plan=plan, threads=threads,
-        gate_validated=ctx.accepted, termination=termination, tracer=tracer)
+        gate_validated=ctx.gate_validated, termination=termination, tracer=tracer)
     if answer.get("status") == "FOUND":
         # Witness proof: one qualifying document settles it, which is what the FOUND branch of
         # the gate checks. It never claims the universe was searched, so no coverage ledger is
@@ -834,7 +847,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
     if answer.get("status") == "SPEC_INSUFFICIENT":
         spec_gap, remedy = build_spec_gap(
             spec, answer, reported_by=("runtime" if forced_from is not None else "agent"),
-            gate_validated=ctx.accepted)
+            gate_validated=ctx.gate_validated)
         if forced_from is not None:
             spec_gap["forced_over_status"] = forced_from
         answer.update({"spec_gap": spec_gap, "remedy_class": remedy,
@@ -850,7 +863,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # ledger and stamp GATE_VALIDATED over a run whose exclusion sampling was invalidated,
         # which is the precise thing `assert_answer_is_reportable` exists to refuse.
         attach_coverage_claim(
-            answer, gate_validated=bool(ctx.accepted and not ctx.coverage_unreachable),
+            answer, gate_validated=ctx.gate_validated,
             ledger=coverage.to_dict(),
             ungated_basis=("COVERAGE_UNREACHABLE" if ctx.coverage_unreachable else termination))
         if ctx.coverage_unreachable:
@@ -874,7 +887,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         "trace": str(tracer.path),
         "runtime": "deepagents-hooks", "patient_id": chart.patient_id,
         "spec_id": spec.spec_id, "spec_hash": spec.spec_hash,
-        "answer": answer, "spec_gap": spec_gap, "gate_validated": ctx.accepted,
+        "answer": answer, "spec_gap": spec_gap, "gate_validated": ctx.gate_validated,
         "rejections": ctx.rejections, "rule_attribution": tracer.rule_attribution(),
         "plan": plan.to_dict(),
         # THE DEVELOP-PLANE HARVEST. Lost in the port because this function assembles its own
@@ -944,7 +957,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # what the answer may be REPORTED as.
         "provenance": spec.provenance_for_run(
             answer.get("value") or {}, str(answer.get("status") or ""),
-            gate_validated=bool(ctx.accepted and not ctx.coverage_unreachable)),
+            gate_validated=ctx.gate_validated),
         "negative_basis": answer.get("negative_basis"),
         #: Non-empty when the coverage bar could not be met on this chart at all. This is a
         #: finding about the STRATIFICATION, not about the patient, and it is what the develop

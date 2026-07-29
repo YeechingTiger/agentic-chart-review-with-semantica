@@ -77,6 +77,37 @@ def test_coverage_unreachable_is_a_negative_that_ended_without_earning_anything(
     })
 
 
+def test_nothing_can_report_gate_validated_alongside_coverage_unreachable():
+    """One property, because patching each site is how the first attempt shipped broken.
+
+    `RunContext.gate_validated` is `accepted and not coverage_unreachable`. Before it existed,
+    five sites each passed `ctx.accepted` -- identical until COVERAGE_UNREACHABLE was added. Two
+    were corrected and three were not, so the 2026-07-29 re-run produced a manifest reading
+    `gate_validated: true` next to `negative_basis: COVERAGE_UNREACHABLE`: the unearned stamp
+    this whole module exists to prevent, reintroduced by the fix for something else.
+
+    Asserted on the property AND on the absence of the old expression, so a future site cannot
+    quietly reintroduce it.
+    """
+    import inspect
+
+    import acr.agent as A
+
+    ctx = A.RunContext.__new__(A.RunContext)
+    for accepted, unreachable, expect in [(False, [], False), (True, [], True),
+                                          (True, ["exclusion not validated"], False),
+                                          (False, ["exclusion not validated"], False)]:
+        object.__setattr__(ctx, "accepted", accepted)
+        object.__setattr__(ctx, "coverage_unreachable", unreachable)
+        assert ctx.gate_validated is expect, (
+            f"accepted={accepted} unreachable={unreachable!r} must give {expect}")
+
+    src = inspect.getsource(A.run_chart_review)
+    assert "gate_validated=ctx.accepted" not in src and '"gate_validated": ctx.accepted' not in src, (
+        "a site is passing `ctx.accepted` where it means `ctx.gate_validated`; the two differ "
+        "exactly when the gate stopped asking instead of saying yes")
+
+
 def test_clean_positives_and_give_ups_pass():
     assert_coverage_claim_is_earned({"status": "FOUND", "proof_basis": "WITNESS",
                                      "witness_count": 2})

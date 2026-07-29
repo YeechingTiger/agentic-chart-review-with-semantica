@@ -910,18 +910,28 @@ def evaluate_gate(gate_spec: dict, strata: Sequence[StratumResult],
         ok = worst <= cap
         c["max_elusion_upper_ok"] = ok
         if not ok:
-            line = f"elusion upper bound {worst:.3f} exceeds cap {cap}"
-            miss.append(line)
-            # TERMINAL when no stratum is still owed draws. `replacement_draws_required` is
-            # `max(0, min(min_sample, N) - n_sampled)`, so once a stratum has reached
-            # `min_sample` the sampler is finished with it and the bound is frozen at whatever
-            # the hits it found imply. On this spec: min_sample 25 and cap 0.12, calibrated (per
-            # its own provenance) on ZERO hits -- 0/25 gives 0.113, just under. ONE hit gives
-            # 0.176, and 1 hit would need about 40 draws to come back under 0.12, which the
-            # sampler will never ask for. So a single hit makes the cap unreachable for the rest
-            # of the run, deterministically, and this is where that stops being an instruction.
-            if all(s.replacement_draws_required <= 0 for s in strata if s.name != "can_establish"):
-                terminal.append(line)
+            miss.append(f"elusion upper bound {worst:.3f} exceeds cap {cap}")
+            # NOT MARKED TERMINAL, and the first attempt at this was wrong in a way worth
+            # recording. It read: terminal when `all(replacement_draws_required <= 0)`, on the
+            # reasoning that once every stratum has reached its sample size the sampler draws no
+            # more and the bound is frozen. That is true of `cannot_establish`, whose frame is
+            # fixed. It is FALSE of the miss frame, which this module's own docstring says MOVES
+            # whenever the term list grows: the frame is "this stratum minus whatever the searches
+            # hit", so extending the keywords changes N, the draws and the bound.
+            #
+            # Measured cost of getting that wrong: on the 2026-07-29 re-run one patient who had
+            # been three-for-three correct came back EVIDENCE_INSUFFICIENT. The gate had walked it
+            # down to a single remaining item whose own message read "keyword list not validated
+            # (misses sampled 8, hits 1) -- extend the keywords and re-search this stratum" -- a
+            # discharge-able instruction, and `revise_plan` exists to carry it out. CP upper for
+            # 1 hit in 8 draws is 0.527, over the 0.12 cap, and the terminal test fired because
+            # `replacement_draws_required` was 0 for a frame that had merely got SMALL. The run
+            # stopped and its correct answer was lost. `eval compare` caught it as a per-instance
+            # regression while all three headline rates were flat or better.
+            #
+            # An over-cap bound is a refusal, and the refusal names the remedy. The one condition
+            # that genuinely forecloses is a hit in the fixed-frame exclusion sample, marked
+            # above -- and the run that motivated all of this had that too, so nothing is lost.
 
     if windows is not None:
         gaps = [w for w in windows if w.disposition == "interior_gap"]

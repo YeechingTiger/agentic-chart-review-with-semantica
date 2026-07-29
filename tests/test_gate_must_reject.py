@@ -110,15 +110,22 @@ def test_an_overturned_exclusion_is_marked_TERMINAL_not_merely_failing():
         "terminal is a SUBSET of missing — the reader still needs to see what failed")
 
 
-def test_the_elusion_cap_becomes_terminal_once_the_sampler_is_finished_drawing():
-    """The cap was calibrated on ZERO hits and nothing draws more once min_sample is reached.
+def test_an_over_cap_elusion_bound_is_NEVER_terminal():
+    """A bound over cap is a refusal that names its own remedy, so it must stay a refusal.
 
-    Its own provenance says so: "25 documents drawn with no relevant hit supports 11.3% at 95%
-    confidence, so this is the nearest round number above the floor the sample size makes
-    reachable". 0/25 gives 0.113, under the 0.12 cap. 1/25 gives 0.176, over it — and
-    `replacement_draws_required` is `max(0, min(min_sample, N) - n_sampled)`, which is 0 at
-    n=25, so the sampler never asks for the ~40 draws that would bring 1 hit back under. The bar
-    is unreachable from that point, deterministically, and must say so.
+    THE REGRESSION THIS REPLACES, because the first version of the terminal test asserted the
+    opposite and shipped. The reasoning was: once every stratum has reached its sample size the
+    sampler draws no more, so the bound is frozen. True of `cannot_establish`, whose frame is
+    fixed. FALSE of the miss frame -- this module's docstring says it MOVES when the term list
+    grows, since the frame is "this stratum minus whatever the searches hit".
+
+    Cost on real charts: on the 2026-07-29 re-run, one patient who had been three-for-three
+    correct came back EVIDENCE_INSUFFICIENT. The gate had walked it down to ONE remaining item,
+    reading "keyword list not validated (misses sampled 8, hits 1) -- extend the keywords and
+    re-search this stratum". CP upper for 1 in 8 is 0.527, over the 0.12 cap, and the terminal
+    test fired because `replacement_draws_required` was 0 for a frame that had merely got SMALL.
+    The run stopped and the correct answer was lost. `eval compare` caught it as a per-instance
+    regression while all three headline rates were flat or better.
     """
     spec = load_spec(STRATIFIED)
     gate_spec = (spec.proof_obligation.for_negative or {}).get("gate") or {}
@@ -129,48 +136,14 @@ def test_the_elusion_cap_becomes_terminal_once_the_sampler_is_finished_drawing()
         led.record_sample_verdict("cannot_establish", d.note_id, relevant=False)
     led.record_sample_verdict("cannot_establish", drawn[0].note_id, relevant=True)
 
-    # THIS STRATUM ONLY, on purpose. `may_mention` here has had no searches, so its miss frame
-    # is empty, its bound is 1.0 and it is still owed draws — which correctly makes the whole
-    # gate NOT terminal, and is the state a run is in early on rather than at the end. The
-    # arithmetic claim being tested belongs to `cannot_establish`: at min_sample with one hit,
-    # is the cap foreclosed? (The real run reached exactly this end-state, having finished the
-    # may_mention work first — which is why only two failures were left.)
     only = [s for s in led.stratum_results() if s.name == "cannot_establish"]
-    assert only and only[0].replacement_draws_required == 0, (
-        "precondition: the sampler must be finished with this stratum")
+    assert only[0].replacement_draws_required == 0, "precondition: the sampler is finished here"
     g = evaluate_gate({"max_elusion_upper": cap}, only)
     over = [m for m in g.missing if "elusion upper bound" in m]
     assert over, f"one hit in {len(drawn)} draws must exceed the {cap} cap"
-    assert over[0] in g.terminal, (
-        "the sampler will draw no more, so the bound cannot fall: this is a dead end, not a "
-        f"to-do. missing={g.missing} terminal={g.terminal}")
-
-
-def test_a_bound_over_cap_is_not_terminal_while_that_stratum_still_owes_draws():
-    """The mirror. Over cap because nothing was sampled yet is the ordinary early state."""
-    spec = load_spec(STRATIFIED)
-    gate_spec = (spec.proof_obligation.for_negative or {}).get("gate") or {}
-    led = _fresh_ledger(spec)
-    only = [s for s in led.stratum_results() if s.name == "cannot_establish"]
-    assert only[0].replacement_draws_required > 0, "precondition: draws are still owed"
-    g = evaluate_gate({"max_elusion_upper": gate_spec["max_elusion_upper"]}, only)
-    assert any("elusion upper bound" in m for m in g.missing), "unsampled means bound 1.0"
-    assert not g.terminal, f"the sampler has not finished; nothing is foreclosed: {g.terminal}"
-
-
-def test_a_stratum_still_owed_draws_is_not_terminal():
-    """The fix must not declare a dead end while the sampler is still working.
-
-    A shortfall in the DRAW is the ordinary case and discharges itself: the runtime hands over
-    more documents. Marking it terminal would end runs that had barely started.
-    """
-    spec = load_spec(STRATIFIED)
-    gate_spec = (spec.proof_obligation.for_negative or {}).get("gate") or {}
-    led = _fresh_ledger(spec)
-    g = evaluate_gate(gate_spec, led.stratum_results())
-    assert g.verdict == "FAIL", "an untouched chart must fail"
-    assert not g.terminal, (
-        f"nothing is foreclosed on an untouched chart; sampling has not happened yet: {g.terminal}")
+    assert not [t for t in g.terminal if "elusion upper bound" in t], (
+        "an over-cap bound must never be terminal: extending the keywords moves the miss frame "
+        f"and changes the bound. terminal={g.terminal}")
 
 
 def test_unstratified_arm_is_honestly_labelled_not_silently_passing():
