@@ -1,0 +1,12 @@
+schema: acr.certification_suite/1
+suite_id: evidence-validity-certification
+version: 1.0.0
+module_ref: evidence-validity@1.0.0
+must_pass: [SYN-EVIDENCE-001-grounded-found]
+must_fail:
+  - SYN-EVIDENCE-002-found-without-citation
+  - SYN-EVIDENCE-003-found-without-proof
+metric_thresholds:
+  fixture_accuracy: 1.0
+max_cost_usd: 0
+required_citation_validity: 1.0

@@ -1,0 +1,86 @@
+schema_version: '2.0'
+category: rectal_adjuvant
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 1
+rules:
+- candidate_id: ER25-TX-25
+  parent_recommendation_id: ER25-TX-R24
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Postoperative treatment recommendation
+  category: rectal_adjuvant
+  title: MDT consideration of postoperative treatment
+  core_or_supplemental: core
+  source_context:
+    eligibility: Resected rectal cancer after neoadjuvant pathway
+    action: Consider adjuvant chemotherapy or chemoradiation by clinical risk
+    timing: Postoperative
+    exceptions: MDT judgment and prior treatment
+    predicate_logic: postoperative AND clinical_risk => MDT_consider_adjuvant
+  requirements:
+    eligibility:
+      expression: Resected rectal cancer after neoadjuvant pathway
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.pathology.resection_margin_status
+      - crc.rectal_postoperative.clinical_risk_assessment
+      - crc.rectal_stage.pathologic_stage_group.resection
+      - crc.rectal_treatment.prior_neoadjuvant_therapy
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_stage.pathologic_stage_group.resection
+        - variable: crc.pathology.resection_margin_status
+        - variable: crc.rectal_treatment.prior_neoadjuvant_therapy
+        - variable: crc.rectal_postoperative.clinical_risk_assessment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Consider adjuvant chemotherapy or chemoradiation by clinical risk
+      variables:
+      - crc.multidisciplinary_team.decision
+      - crc.rectal_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.multidisciplinary_team.decision
+        - variable: crc.rectal_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Postoperative
+      variables:
+      - crc.rectal_adjuvant.decision_date
+      - crc.rectal_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_adjuvant.decision_date
+        - variable: crc.rectal_adjuvant.start_date
+    exceptions:
+      expression: MDT judgment and prior treatment
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.multidisciplinary_team.decision
+  - crc.pathology.resection_margin_status
+  - crc.rectal_adjuvant.decision_date
+  - crc.rectal_adjuvant.start_date
+  - crc.rectal_adjuvant.therapy_plan_at_decision
+  - crc.rectal_postoperative.clinical_risk_assessment
+  - crc.rectal_stage.pathologic_stage_group.resection
+  - crc.rectal_treatment.prior_neoadjuvant_therapy
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

@@ -1,0 +1,1560 @@
+schema_version: '2.0'
+category: molecular_testing
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 21
+rules:
+- candidate_id: E26-MOL-006
+  parent_recommendation_id: E26-MOL-R06
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations testing site
+  category: molecular_testing
+  title: Molecular testing for all newly diagnosed mCRC
+  core_or_supplemental: core
+  source_context:
+    eligibility: Newly diagnosed metastatic colorectal cancer
+    action: Perform molecular testing on primary or metastatic tumor tissue
+    timing: At diagnosis for treatment selection
+    exceptions: Neither site is preferred by this source
+    predicate_logic: new_mcrc => molecular_test(primary OR metastasis)
+  requirements:
+    eligibility:
+      expression: Newly diagnosed metastatic colorectal cancer
+      variables:
+      - crc.diagnosis_date
+      - crc.metastatic_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.diagnosis_date
+        - variable: crc.metastatic_status
+    action:
+      expression: Perform molecular testing on primary or metastatic tumor tissue
+      variables:
+      - crc.molecular_panel_version
+      - crc.molecular_specimen_site
+      - crc.molecular_testing_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_panel_version
+        - variable: crc.molecular_specimen_site
+        - variable: crc.molecular_testing_status
+    timing:
+      expression: At diagnosis for treatment selection
+      variables:
+      - crc.diagnosis_date
+      - crc.molecular_test_order_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.diagnosis_date
+        - variable: crc.molecular_test_order_date
+    exceptions:
+      expression: Neither site is preferred by this source
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Neither site is preferred by this source
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.diagnosis_date
+  - crc.metastatic_status
+  - crc.molecular_panel_version
+  - crc.molecular_specimen_site
+  - crc.molecular_test_order_date
+  - crc.molecular_testing_status
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_SOURCE_CONFLICT
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-008
+  parent_recommendation_id: E26-MOL-R08
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations ctDNA
+  category: molecular_testing
+  title: ctDNA when rapid results or tissue limitations apply
+  core_or_supplemental: core
+  source_context:
+    eligibility: Rapid result is clinically important or tissue biopsy is impossible or inappropriate
+    action: Use a plasma ctDNA assay
+    timing: At treatment-selection workup
+    exceptions: Negative-plasma tissue reflex is not specified in this source
+    predicate_logic: rapid_need OR tissue_impossible OR tissue_inappropriate => ctDNA
+  requirements:
+    eligibility:
+      expression: Rapid result is clinically important or tissue biopsy is impossible or inappropriate
+      variables:
+      - crc.rapid_result_need_reason
+      - crc.tissue_biopsy_feasibility
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.rapid_result_need_reason
+        - variable: crc.tissue_biopsy_feasibility
+    action:
+      expression: Use a plasma ctDNA assay
+      variables:
+      - crc.ctdna_assay_result
+      - crc.ctdna_tumor_fraction
+      - crc.plasma_ctdna_assay
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ctdna_assay_result
+        - variable: crc.ctdna_tumor_fraction
+        - variable: crc.plasma_ctdna_assay
+    timing:
+      expression: At treatment-selection workup
+      variables:
+      - crc.plasma_collection_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.plasma_collection_date
+    exceptions:
+      expression: Negative-plasma tissue reflex is not specified in this source
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Negative-plasma tissue reflex is not specified in this source
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.ctdna_assay_result
+  - crc.ctdna_tumor_fraction
+  - crc.plasma_collection_date
+  - crc.plasma_ctdna_assay
+  - crc.rapid_result_need_reason
+  - crc.tissue_biopsy_feasibility
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_ASSAY_DEFINITION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-009
+  parent_recommendation_id: E26-MOL-R09
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations RAS testing
+  category: molecular_testing
+  title: Extended RAS testing for anti-EGFR candidacy
+  core_or_supplemental: core
+  source_context:
+    eligibility: mCRC being considered for anti-EGFR therapy
+    action: Test KRAS and NRAS exons 2, 3, and 4
+    timing: Before anti-EGFR treatment selection
+    exceptions: None stated
+    predicate_logic: antiEGFR_candidate => KRAS_ex2_4 AND NRAS_ex2_4
+  requirements:
+    eligibility:
+      expression: mCRC being considered for anti-EGFR therapy
+      variables:
+      - crc.anti_egfr_plan
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.anti_egfr_plan
+    action:
+      expression: Test KRAS and NRAS exons 2, 3, and 4
+      variables:
+      - crc.molecular_assay_method
+      - crc.molecular_specimen_id
+      - crc.molecular_variant_allele_fraction
+      - crc.molecular_variant_codon
+      - crc.molecular_variant_exon
+      - crc.molecular_variant_gene
+      - crc.molecular_variant_hgvs
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_assay_method
+        - variable: crc.molecular_specimen_id
+        - variable: crc.molecular_variant_allele_fraction
+        - variable: crc.molecular_variant_codon
+        - variable: crc.molecular_variant_exon
+        - variable: crc.molecular_variant_gene
+        - variable: crc.molecular_variant_hgvs
+    timing:
+      expression: Before anti-EGFR treatment selection
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before anti-EGFR treatment selection
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: None stated
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.anti_egfr_plan
+  - crc.molecular_assay_method
+  - crc.molecular_specimen_id
+  - crc.molecular_variant_allele_fraction
+  - crc.molecular_variant_codon
+  - crc.molecular_variant_exon
+  - crc.molecular_variant_gene
+  - crc.molecular_variant_hgvs
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-011
+  parent_recommendation_id: E26-MOL-R10
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations BRAF prognosis
+  category: molecular_testing
+  title: BRAF V600E baseline testing
+  core_or_supplemental: core
+  source_context:
+    eligibility: Metastatic colorectal cancer
+    action: Test BRAF V600E for prognostic classification
+    timing: At baseline molecular workup
+    exceptions: Other BRAF variants are not equivalent
+    predicate_logic: mcrc => exact_BRAF_V600E_status
+  requirements:
+    eligibility:
+      expression: Metastatic colorectal cancer
+      variables:
+      - crc.metastatic_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastatic_status
+    action:
+      expression: Test BRAF V600E for prognostic classification
+      variables:
+      - crc.braf_variant_class
+      - crc.braf_variant_hgvs
+      - crc.molecular_specimen_id
+      - crc.molecular_variant_allele_fraction
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.braf_variant_class
+        - variable: crc.braf_variant_hgvs
+        - variable: crc.molecular_specimen_id
+        - variable: crc.molecular_variant_allele_fraction
+    timing:
+      expression: At baseline molecular workup
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: At baseline molecular workup
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Other BRAF variants are not equivalent
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Other BRAF variants are not equivalent
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.braf_variant_class
+  - crc.braf_variant_hgvs
+  - crc.metastatic_status
+  - crc.molecular_specimen_id
+  - crc.molecular_variant_allele_fraction
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-012
+  parent_recommendation_id: E26-MOL-R10
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations BRAF treatment qualifier
+  category: molecular_testing
+  title: Identify the BRAF-targetable subgroup
+  core_or_supplemental: core
+  source_context:
+    eligibility: mCRC undergoing treatment selection
+    action: Use exact BRAF V600E evidence to identify the targeted-therapy branch
+    timing: Before BRAF-targeted treatment
+    exceptions: Non-V600E alterations do not qualify
+    predicate_logic: BRAF_V600E => candidate_BRAF_target_branch
+  requirements:
+    eligibility:
+      expression: mCRC undergoing treatment selection
+      variables:
+      - crc.braf_variant_hgvs
+      - crc.line_of_therapy
+      - crc.prior_braf_inhibitor_exposure
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.braf_variant_hgvs
+        - variable: crc.line_of_therapy
+        - variable: crc.prior_braf_inhibitor_exposure
+    action:
+      expression: Use exact BRAF V600E evidence to identify the targeted-therapy branch
+      variables:
+      - crc.braf_targeted_therapy_eligibility
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.braf_targeted_therapy_eligibility
+    timing:
+      expression: Before BRAF-targeted treatment
+      variables:
+      - crc.line_of_therapy
+      - crc.molecular_decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.line_of_therapy
+        - variable: crc.molecular_decision_date
+    exceptions:
+      expression: Non-V600E alterations do not qualify
+      variables:
+      - crc.regulatory_jurisdiction
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.regulatory_jurisdiction
+  required_variables:
+  - crc.braf_targeted_therapy_eligibility
+  - crc.braf_variant_hgvs
+  - crc.line_of_therapy
+  - crc.molecular_decision_date
+  - crc.prior_braf_inhibitor_exposure
+  - crc.regulatory_jurisdiction
+  computability:
+    status: not_computable
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - B_SOURCE_CONFLICT
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-013
+  parent_recommendation_id: E26-MOL-R11
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations anti-EGFR rechallenge
+  category: molecular_testing
+  title: ctDNA testing before anti-EGFR rechallenge
+  core_or_supplemental: core
+  source_context:
+    eligibility: Prior anti-EGFR exposure and proposed rechallenge
+    action: Test plasma RAS and BRAF and preferably EGFR ectodomain
+    timing: Before rechallenge
+    exceptions: EGFR is preferred rather than an absolute requirement in the source
+    predicate_logic: prior_antiEGFR AND rechallenge_plan => RAS_ctDNA AND BRAF_ctDNA AND preferred_EGFR_ctDNA
+  requirements:
+    eligibility:
+      expression: Prior anti-EGFR exposure and proposed rechallenge
+      variables:
+      - crc.anti_egfr_washout_interval
+      - crc.prior_anti_egfr_agent
+      - crc.prior_anti_egfr_response
+      - crc.progression_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.anti_egfr_washout_interval
+        - variable: crc.prior_anti_egfr_agent
+        - variable: crc.prior_anti_egfr_response
+        - variable: crc.progression_date
+    action:
+      expression: Test plasma RAS and BRAF and preferably EGFR ectodomain
+      variables:
+      - crc.ctdna_braf_status
+      - crc.ctdna_egfr_ectodomain_status
+      - crc.ctdna_kras_status
+      - crc.ctdna_nras_status
+      - crc.molecular_assay_lod
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ctdna_braf_status
+        - variable: crc.ctdna_egfr_ectodomain_status
+        - variable: crc.ctdna_kras_status
+        - variable: crc.ctdna_nras_status
+        - variable: crc.molecular_assay_lod
+    timing:
+      expression: Before rechallenge
+      variables:
+      - crc.anti_egfr_washout_interval
+      - crc.plasma_collection_date
+      - crc.progression_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.anti_egfr_washout_interval
+        - variable: crc.plasma_collection_date
+        - variable: crc.progression_date
+    exceptions:
+      expression: EGFR is preferred rather than an absolute requirement in the source
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: EGFR is preferred rather than an absolute requirement in the source
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.anti_egfr_washout_interval
+  - crc.ctdna_braf_status
+  - crc.ctdna_egfr_ectodomain_status
+  - crc.ctdna_kras_status
+  - crc.ctdna_nras_status
+  - crc.molecular_assay_lod
+  - crc.plasma_collection_date
+  - crc.prior_anti_egfr_agent
+  - crc.prior_anti_egfr_response
+  - crc.progression_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_ASSAY_DEFINITION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-014
+  parent_recommendation_id: E26-MOL-R12
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations MMR and MSI
+  category: molecular_testing
+  title: MMR or MSI testing for checkpoint-inhibitor eligibility
+  core_or_supplemental: core
+  source_context:
+    eligibility: mCRC treatment selection
+    action: Determine MMR deficiency or MSI-high status
+    timing: Before immunotherapy selection
+    exceptions: Preserve discordant and indeterminate raw results
+    predicate_logic: dMMR OR MSI_H => ICI_branch
+  requirements:
+    eligibility:
+      expression: mCRC treatment selection
+      variables:
+      - crc.metastatic_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastatic_status
+    action:
+      expression: Determine MMR deficiency or MSI-high status
+      variables:
+      - crc.ici_biomarker_eligibility
+      - crc.mmr_ihc_controls_status
+      - crc.mmr_mlh1
+      - crc.mmr_msh2
+      - crc.mmr_msh6
+      - crc.mmr_pms2
+      - crc.msi_assay_method
+      - crc.msi_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ici_biomarker_eligibility
+        - op: any_of
+          operands:
+          - op: all_of
+            operands:
+            - variable: crc.mmr_mlh1
+            - variable: crc.mmr_pms2
+            - variable: crc.mmr_msh2
+            - variable: crc.mmr_msh6
+            - variable: crc.mmr_ihc_controls_status
+          - op: all_of
+            operands:
+            - variable: crc.msi_assay_method
+            - variable: crc.msi_status
+    timing:
+      expression: Before immunotherapy selection
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before immunotherapy selection
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Preserve discordant and indeterminate raw results
+      variables:
+      - crc.mmr_msi_discordance_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mmr_msi_discordance_status
+  required_variables:
+  - crc.ici_biomarker_eligibility
+  - crc.metastatic_status
+  - crc.mmr_ihc_controls_status
+  - crc.mmr_mlh1
+  - crc.mmr_msh2
+  - crc.mmr_msh6
+  - crc.mmr_msi_discordance_status
+  - crc.mmr_pms2
+  - crc.msi_assay_method
+  - crc.msi_status
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_ASSAY_DEFINITION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-016
+  parent_recommendation_id: E26-MOL-R13
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations HER2
+  category: molecular_testing
+  title: HER2 testing for later-line target discovery
+  core_or_supplemental: core
+  source_context:
+    eligibility: mCRC undergoing later-line target discovery
+    action: Test HER2 overexpression and or amplification
+    timing: Before HER2-directed treatment selection
+    exceptions: IHC, ISH, and copy-number results are not interchangeable
+    predicate_logic: HER2_overexpression OR HER2_amplification => HER2_branch_candidate
+  requirements:
+    eligibility:
+      expression: mCRC undergoing later-line target discovery
+      variables:
+      - crc.metastatic_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastatic_status
+    action:
+      expression: Test HER2 overexpression and or amplification
+      variables:
+      - crc.her2_copy_number
+      - crc.her2_ihc_score
+      - crc.her2_ish_ratio
+      - crc.her2_ngs_copy_number
+      - crc.her2_targeted_therapy_eligibility
+      - crc.molecular_assay_method
+      - crc.molecular_specimen_id
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.her2_targeted_therapy_eligibility
+        - variable: crc.molecular_assay_method
+        - variable: crc.molecular_specimen_id
+        - op: any_of
+          operands:
+          - variable: crc.her2_ihc_score
+          - variable: crc.her2_ish_ratio
+          - variable: crc.her2_copy_number
+          - variable: crc.her2_ngs_copy_number
+    timing:
+      expression: Before HER2-directed treatment selection
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before HER2-directed treatment selection
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: IHC, ISH, and copy-number results are not interchangeable
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: IHC, ISH, and copy-number results are not interchangeable
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.her2_copy_number
+  - crc.her2_ihc_score
+  - crc.her2_ish_ratio
+  - crc.her2_ngs_copy_number
+  - crc.her2_targeted_therapy_eligibility
+  - crc.metastatic_status
+  - crc.molecular_assay_method
+  - crc.molecular_specimen_id
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_ASSAY_DEFINITION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-017
+  parent_recommendation_id: E26-MOL-R13
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations broad NGS optional targets
+  category: molecular_testing
+  title: Optional POLE and POLD1 testing on applicable broad NGS
+  core_or_supplemental: core
+  source_context:
+    eligibility: Broad multigene tumor NGS is available and applicable
+    action: May test POLE and POLD1
+    timing: During broad profiling
+    exceptions: A mutation alone does not establish actionability
+    predicate_logic: broad_NGS_available AND applicable => may_test_POLE_POLD1
+  requirements:
+    eligibility:
+      expression: Broad multigene tumor NGS is available and applicable
+      variables:
+      - crc.broad_tumor_ngs_available
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.broad_tumor_ngs_available
+    action:
+      expression: May test POLE and POLD1
+      variables:
+      - crc.molecular_variant_gene
+      - crc.molecular_variant_hgvs
+      - crc.molecular_variant_pathogenicity
+      - crc.msi_status
+      - crc.pole_pold1_proofreading_domain_status
+      - crc.tmb_unit
+      - crc.tmb_value
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_variant_gene
+        - variable: crc.molecular_variant_hgvs
+        - variable: crc.molecular_variant_pathogenicity
+        - variable: crc.msi_status
+        - variable: crc.pole_pold1_proofreading_domain_status
+        - variable: crc.tmb_unit
+        - variable: crc.tmb_value
+    timing:
+      expression: During broad profiling
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: During broad profiling
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: A mutation alone does not establish actionability
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: A mutation alone does not establish actionability
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.broad_tumor_ngs_available
+  - crc.molecular_variant_gene
+  - crc.molecular_variant_hgvs
+  - crc.molecular_variant_pathogenicity
+  - crc.msi_status
+  - crc.pole_pold1_proofreading_domain_status
+  - crc.tmb_unit
+  - crc.tmb_value
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_ASSAY_DEFINITION
+    - B_HUMAN_REVIEW
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-018
+  parent_recommendation_id: E26-MOL-R13
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations tumor-agnostic targets
+  category: molecular_testing
+  title: Optional testing for approved tumor-agnostic aberrations
+  core_or_supplemental: core
+  source_context:
+    eligibility: Broad NGS is available and applicable
+    action: May test approved tumor-agnostic alterations including NTRK and RET fusions
+    timing: During broad profiling
+    exceptions: Fusion, point mutation, and expression are distinct; approval is dynamic
+    predicate_logic: approved_tumor_agnostic_aberration => candidate_target_branch
+  requirements:
+    eligibility:
+      expression: Broad NGS is available and applicable
+      variables:
+      - crc.broad_tumor_ngs_available
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.broad_tumor_ngs_available
+    action:
+      expression: May test approved tumor-agnostic alterations including NTRK and RET fusions
+      variables:
+      - crc.fusion_assay_nucleic_acid
+      - crc.fusion_in_frame_status
+      - crc.fusion_partner
+      - crc.molecular_variant_gene
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.fusion_assay_nucleic_acid
+        - variable: crc.fusion_in_frame_status
+        - variable: crc.fusion_partner
+        - variable: crc.molecular_variant_gene
+    timing:
+      expression: During broad profiling
+      variables:
+      - crc.regulatory_approval_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.regulatory_approval_date
+    exceptions:
+      expression: Fusion, point mutation, and expression are distinct; approval is dynamic
+      variables:
+      - crc.regulatory_approval_date
+      - crc.regulatory_jurisdiction
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.regulatory_approval_date
+        - variable: crc.regulatory_jurisdiction
+  required_variables:
+  - crc.broad_tumor_ngs_available
+  - crc.fusion_assay_nucleic_acid
+  - crc.fusion_in_frame_status
+  - crc.fusion_partner
+  - crc.molecular_variant_gene
+  - crc.regulatory_approval_date
+  - crc.regulatory_jurisdiction
+  computability:
+    status: not_computable
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_ASSAY_DEFINITION
+    - B_DYNAMIC_LABEL
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-019
+  parent_recommendation_id: E26-MOL-R13
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations DPD
+  category: molecular_testing
+  title: DPD testing before fluoropyrimidine treatment
+  core_or_supplemental: core
+  source_context:
+    eligibility: Planned 5-FU, capecitabine, or S-1
+    action: Test for DPD deficiency
+    timing: Before treatment starts
+    exceptions: Testing method and dose action require an implementation guideline
+    predicate_logic: planned_5FU OR capecitabine OR S1 => pretest_DPD
+  requirements:
+    eligibility:
+      expression: Planned 5-FU, capecitabine, or S-1
+      variables:
+      - crc.planned_drug
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.planned_drug
+    action:
+      expression: Test for DPD deficiency
+      variables:
+      - crc.dpd_phenotype
+      - crc.dpyd_genotype
+      - crc.pretreatment_uracil_level
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.dpyd_genotype
+        - variable: crc.dpd_phenotype
+        - variable: crc.pretreatment_uracil_level
+    timing:
+      expression: Before treatment starts
+      variables:
+      - crc.treatment_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.treatment_start_date
+    exceptions:
+      expression: Testing method and dose action require an implementation guideline
+      variables:
+      - crc.fluoropyrimidine_dose_action
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.fluoropyrimidine_dose_action
+  required_variables:
+  - crc.dpd_phenotype
+  - crc.dpyd_genotype
+  - crc.fluoropyrimidine_dose_action
+  - crc.planned_drug
+  - crc.pretreatment_uracil_level
+  - crc.treatment_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DPD_IMPLEMENTATION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP22-MMR-001
+  parent_recommendation_id: CAP22-REC1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_mmr_msi_2022
+  source_anchor: Recommendation 1
+  category: molecular_testing
+  title: CRC MMR or MSI methods for ICI
+  core_or_supplemental: core
+  source_context:
+    eligibility: CRC considered for checkpoint inhibitor
+    action: Use MMR-IHC and or MSI-PCR; allow MSI-NGS only if validated and equivalent
+    timing: Before ICI selection
+    exceptions: NGS requires CRC equivalency validation
+    predicate_logic: ICI_candidate => IHC OR PCR OR validated_equivalent_NGS
+  requirements:
+    eligibility:
+      expression: CRC considered for checkpoint inhibitor
+      variables:
+      - crc.ici_plan
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ici_plan
+    action:
+      expression: Use MMR-IHC and or MSI-PCR; allow MSI-NGS only if validated and equivalent
+      variables:
+      - crc.mmr_ihc_controls_status
+      - crc.mmr_mlh1
+      - crc.mmr_msh2
+      - crc.mmr_msh6
+      - crc.mmr_pms2
+      - crc.molecular_panel_version
+      - crc.msi_pcr_result
+      evidence_logic:
+        op: any_of
+        operands:
+        - op: all_of
+          operands:
+          - variable: crc.mmr_mlh1
+          - variable: crc.mmr_pms2
+          - variable: crc.mmr_msh2
+          - variable: crc.mmr_msh6
+          - variable: crc.mmr_ihc_controls_status
+        - variable: crc.msi_pcr_result
+        - variable: crc.molecular_panel_version
+    timing:
+      expression: Before ICI selection
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before ICI selection
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: NGS requires CRC equivalency validation
+      variables:
+      - crc.mmr_msi_ngs_equivalence_status
+      - crc.mmr_msi_ngs_validation_comparator
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mmr_msi_ngs_equivalence_status
+        - variable: crc.mmr_msi_ngs_validation_comparator
+  required_variables:
+  - crc.ici_plan
+  - crc.mmr_ihc_controls_status
+  - crc.mmr_mlh1
+  - crc.mmr_msh2
+  - crc.mmr_msh6
+  - crc.mmr_msi_ngs_equivalence_status
+  - crc.mmr_msi_ngs_validation_comparator
+  - crc.mmr_pms2
+  - crc.molecular_panel_version
+  - crc.msi_pcr_result
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASSAY_DEFINITION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP22-MMR-003
+  parent_recommendation_id: CAP22-REC6
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_mmr_msi_2022
+  source_anchor: Recommendation 6
+  category: molecular_testing
+  title: Direct MMR or MSI testing in a TMB-high tumor
+  core_or_supplemental: core
+  source_context:
+    eligibility: TMB-high tumor where the cause of high TMB is being assessed
+    action: May perform MMR-IHC and or MSI-PCR
+    timing: After TMB-high result
+    exceptions: Optional; CRC direct testing is otherwise already indicated
+    predicate_logic: TMB_high => may(IHC OR PCR)
+  requirements:
+    eligibility:
+      expression: TMB-high tumor where the cause of high TMB is being assessed
+      variables:
+      - crc.tmb_assay_panel
+      - crc.tmb_high_cutoff
+      - crc.tmb_value
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.tmb_assay_panel
+        - variable: crc.tmb_high_cutoff
+        - variable: crc.tmb_value
+    action:
+      expression: May perform MMR-IHC and or MSI-PCR
+      variables:
+      - crc.direct_mmr_msi_test_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_pcr_result
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.direct_mmr_msi_test_status
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_pcr_result
+    timing:
+      expression: After TMB-high result
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: After TMB-high result
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Optional; CRC direct testing is otherwise already indicated
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Optional; CRC direct testing is otherwise already indicated
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.direct_mmr_msi_test_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_pcr_result
+  - crc.tmb_assay_panel
+  - crc.tmb_high_cutoff
+  - crc.tmb_value
+  computability:
+    status: partially_specified
+    blockers:
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-01
+  parent_recommendation_id: CAP17-STMT1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 1
+  category: molecular_testing
+  title: Extended RAS loci for anti-EGFR
+  core_or_supplemental: core
+  source_context:
+    eligibility: CRC considered for anti-EGFR
+    action: Test KRAS and NRAS codons 12, 13, 59, 61, 117, and 146
+    timing: Before treatment
+    exceptions: Incomplete hotspot testing is insufficient
+    predicate_logic: antiEGFR_candidate => all_extended_RAS_loci
+  requirements:
+    eligibility:
+      expression: CRC considered for anti-EGFR
+      variables:
+      - crc.anti_egfr_plan
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.anti_egfr_plan
+    action:
+      expression: Test KRAS and NRAS codons 12, 13, 59, 61, 117, and 146
+      variables:
+      - crc.expanded_ras_coverage
+      - crc.molecular_variant_allele_fraction
+      - crc.molecular_variant_codon
+      - crc.molecular_variant_exon
+      - crc.molecular_variant_gene
+      - crc.molecular_variant_hgvs
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.expanded_ras_coverage
+        - variable: crc.molecular_variant_allele_fraction
+        - variable: crc.molecular_variant_codon
+        - variable: crc.molecular_variant_exon
+        - variable: crc.molecular_variant_gene
+        - variable: crc.molecular_variant_hgvs
+    timing:
+      expression: Before treatment
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before treatment
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Incomplete hotspot testing is insufficient
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Incomplete hotspot testing is insufficient
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.anti_egfr_plan
+  - crc.expanded_ras_coverage
+  - crc.molecular_variant_allele_fraction
+  - crc.molecular_variant_codon
+  - crc.molecular_variant_exon
+  - crc.molecular_variant_gene
+  - crc.molecular_variant_hgvs
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-02
+  parent_recommendation_id: CAP17-STMT2
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 2a
+  category: molecular_testing
+  title: BRAF V600 prognostic testing
+  core_or_supplemental: core
+  source_context:
+    eligibility: CRC prognostic stratification
+    action: Analyze BRAF V600
+    timing: At molecular workup
+    exceptions: Other BRAF variants are not equivalent
+    predicate_logic: CRC => BRAF_V600_status
+  requirements:
+    eligibility:
+      expression: CRC prognostic stratification
+      variables:
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.primary_site
+    action:
+      expression: Analyze BRAF V600
+      variables:
+      - crc.braf_variant_hgvs
+      - crc.molecular_assay_method
+      - crc.molecular_variant_allele_fraction
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.braf_variant_hgvs
+        - variable: crc.molecular_assay_method
+        - variable: crc.molecular_variant_allele_fraction
+    timing:
+      expression: At molecular workup
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: At molecular workup
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Other BRAF variants are not equivalent
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Other BRAF variants are not equivalent
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.braf_variant_hgvs
+  - crc.molecular_assay_method
+  - crc.molecular_variant_allele_fraction
+  - crc.primary_site
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-04
+  parent_recommendation_id: CAP17-STMT3
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 3
+  category: molecular_testing
+  title: MMR testing for Lynch risk and prognosis
+  core_or_supplemental: core
+  source_context:
+    eligibility: Any colorectal cancer
+    action: Order MMR status
+    timing: At diagnosis
+    exceptions: Tumor testing is not germline diagnosis
+    predicate_logic: CRC => MMR_status
+  requirements:
+    eligibility:
+      expression: Any colorectal cancer
+      variables:
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.primary_site
+    action:
+      expression: Order MMR status
+      variables:
+      - crc.mmr_loss_pattern
+      - crc.mmr_mlh1
+      - crc.mmr_msh2
+      - crc.mmr_msh6
+      - crc.mmr_pms2
+      - crc.msi_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mmr_loss_pattern
+        - variable: crc.mmr_mlh1
+        - variable: crc.mmr_msh2
+        - variable: crc.mmr_msh6
+        - variable: crc.mmr_pms2
+        - variable: crc.msi_status
+    timing:
+      expression: At diagnosis
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: At diagnosis
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Tumor testing is not germline diagnosis
+      variables:
+      - crc.genetics_referral_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genetics_referral_status
+  required_variables:
+  - crc.genetics_referral_status
+  - crc.mmr_loss_pattern
+  - crc.mmr_mlh1
+  - crc.mmr_msh2
+  - crc.mmr_msh6
+  - crc.mmr_pms2
+  - crc.msi_status
+  - crc.primary_site
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - B_HEREDITARY_PARTIAL
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO-SGT-07
+  parent_recommendation_id: ASCO-SGT-PCO2.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_somatic_genomic_2022
+  source_anchor: PCO 2.1
+  category: molecular_testing
+  title: Direct dMMR or MSI evaluation for ICI
+  core_or_supplemental: core
+  source_context:
+    eligibility: Advanced solid-tumor patient considered for ICI
+    action: Evaluate dMMR or MSI
+    timing: Before ICI selection
+    exceptions: CRC implementation follows CAP22 method hierarchy
+    predicate_logic: ICI_candidate => MMR_MSI_test
+  requirements:
+    eligibility:
+      expression: Advanced solid-tumor patient considered for ICI
+      variables:
+      - crc.ici_plan
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ici_plan
+    action:
+      expression: Evaluate dMMR or MSI
+      variables:
+      - crc.mmr_ihc_integrated_status
+      - crc.molecular_assay_validation_status
+      - crc.msi_ngs_result
+      - crc.msi_pcr_result
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_assay_validation_status
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_pcr_result
+          - variable: crc.msi_ngs_result
+    timing:
+      expression: Before ICI selection
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before ICI selection
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: CRC implementation follows CAP22 method hierarchy
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: CRC implementation follows CAP22 method hierarchy
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.ici_plan
+  - crc.mmr_ihc_integrated_status
+  - crc.molecular_assay_validation_status
+  - crc.msi_ngs_result
+  - crc.msi_pcr_result
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASSAY_DEFINITION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-MMR-01
+  parent_recommendation_id: EC20-MMR-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: MMR and MSI recommendation
+  category: molecular_testing
+  title: MMR or MSI in stage II and III
+  core_or_supplemental: core
+  source_context:
+    eligibility: Stage II or III colon cancer
+    action: Require MMR or MSI in stage II; use in stage III mainly for Lynch identification
+    timing: Postoperative risk workup
+    exceptions: Stage-specific purpose differs
+    predicate_logic: stage_II => required; stage_III => Lynch_purpose
+  requirements:
+    eligibility:
+      expression: Stage II or III colon cancer
+      variables:
+      - crc.primary_site
+      - crc.stage_group
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.primary_site
+        - variable: crc.stage_group
+    action:
+      expression: Require MMR or MSI in stage II; use in stage III mainly for Lynch identification
+      variables:
+      - crc.mmr_ihc_integrated_status
+      - crc.molecular_assay_method
+      - crc.msi_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_assay_method
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+    timing:
+      expression: Postoperative risk workup
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Postoperative risk workup
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Stage-specific purpose differs
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Stage-specific purpose differs
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.mmr_ihc_integrated_status
+  - crc.molecular_assay_method
+  - crc.msi_status
+  - crc.primary_site
+  - crc.stage_group
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HEREDITARY_PARTIAL
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-DPD-01
+  parent_recommendation_id: EC20-DPD-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: DPD recommendation
+  category: molecular_testing
+  title: DPD testing before fluoropyrimidine
+  core_or_supplemental: core
+  source_context:
+    eligibility: Planned fluoropyrimidine
+    action: Perform DPD genotype or phenotype testing
+    timing: Before therapy
+    exceptions: Method and action need implementation guidance
+    predicate_logic: planned_fluoropyrimidine => DPD_test
+  requirements:
+    eligibility:
+      expression: Planned fluoropyrimidine
+      variables:
+      - crc.planned_drug
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.planned_drug
+    action:
+      expression: Perform DPD genotype or phenotype testing
+      variables:
+      - crc.dpd_phenotype
+      - crc.dpyd_genotype
+      - crc.pretreatment_uracil_level
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.dpyd_genotype
+        - variable: crc.dpd_phenotype
+        - variable: crc.pretreatment_uracil_level
+    timing:
+      expression: Before therapy
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before therapy
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Method and action need implementation guidance
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Method and action need implementation guidance
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.dpd_phenotype
+  - crc.dpyd_genotype
+  - crc.planned_drug
+  - crc.pretreatment_uracil_level
+  computability:
+    status: partially_specified
+    blockers:
+    - B_DPD_IMPLEMENTATION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-GEX-01
+  parent_recommendation_id: EC20-GEX-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Gene-expression recommendation
+  category: molecular_testing
+  title: Gene-expression signatures not routine
+  core_or_supplemental: core
+  source_context:
+    eligibility: Intermediate-risk stage II
+    action: Do not use routinely; may complement prognosis
+    timing: Risk refinement
+    exceptions: Predictive benefit is uncertain
+    predicate_logic: intermediate_stage_II => may_prognostic_not_predictive
+  requirements:
+    eligibility:
+      expression: Intermediate-risk stage II
+      variables:
+      - crc.recurrence_risk_group
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.recurrence_risk_group
+    action:
+      expression: Do not use routinely; may complement prognosis
+      variables:
+      - crc.biomarker_prognostic_use
+      - crc.gene_expression_signature_result
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.biomarker_prognostic_use
+        - variable: crc.gene_expression_signature_result
+    timing:
+      expression: Risk refinement
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Risk refinement
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Predictive benefit is uncertain
+      variables:
+      - crc.biomarker_predictive_claim
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.biomarker_predictive_claim
+  required_variables:
+  - crc.biomarker_predictive_claim
+  - crc.biomarker_prognostic_use
+  - crc.gene_expression_signature_result
+  - crc.recurrence_risk_group
+  computability:
+    status: partially_specified
+    blockers:
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-IMMUNOSCORE-01
+  parent_recommendation_id: EC20-IMMUNOSCORE-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Immunoscore recommendation
+  category: molecular_testing
+  title: Immunoscore for prognostic refinement
+  core_or_supplemental: core
+  source_context:
+    eligibility: Stage II or low-risk stage III
+    action: May refine prognosis
+    timing: Risk refinement
+    exceptions: Predictive treatment benefit is uncertain
+    predicate_logic: stage_II_or_lowrisk_III => may_prognostic
+  requirements:
+    eligibility:
+      expression: Stage II or low-risk stage III
+      variables:
+      - crc.recurrence_risk_group
+      - crc.stage_group
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.recurrence_risk_group
+        - variable: crc.stage_group
+    action:
+      expression: May refine prognosis
+      variables:
+      - crc.immunoscore
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.immunoscore
+    timing:
+      expression: Risk refinement
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Risk refinement
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Predictive treatment benefit is uncertain
+      variables:
+      - crc.biomarker_predictive_claim
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.biomarker_predictive_claim
+  required_variables:
+  - crc.biomarker_predictive_claim
+  - crc.immunoscore
+  - crc.recurrence_risk_group
+  - crc.stage_group
+  computability:
+    status: partially_specified
+    blockers:
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

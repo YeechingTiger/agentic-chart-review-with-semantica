@@ -1,0 +1,982 @@
+coverage_schema_version: '1.0'
+bundle_id: CRC.CORE.MOLECULAR_TREATMENT.v1
+clinical_use: NOT_FOR_CLINICAL_USE
+coverage_claim:
+  scope: structured_seed_rules_only_not_guideline_denominator
+  standards_level: structural_upper_bound
+  observed_crc: NOT_ASSESSED
+  reason: No compatible tumor-level linked CRC registry profile is bound.
+summary:
+  executable_candidates: 12
+  formal_recommendations: 12
+  canonical_variables: 68
+  logic_normalized_rules: 0
+  reportable_registry_only_nonconcordance:
+    full: 0
+    partial: 0
+    none: 0
+    not_assessed: 12
+  conservative_flat_registry_support_nonconcordance:
+    full: 0
+    partial: 0
+    none: 12
+    not_assessed: 0
+  variable_use_semantic_support:
+    absent: 83
+    coarsened: 49
+    exact: 21
+  variable_use_temporal_alignment:
+    conditional: 53
+    exact: 21
+    misaligned: 79
+  agent_validation_projection:
+    coarsened: 52
+    direct: 21
+    none: 80
+profiles:
+- profile_id: CRC_LINKED_PROFILE_PENDING
+  profile_status: NOT_ASSESSED
+  disease: colorectal_carcinoma
+  case_unit: tumor_record
+  compatibility_with_crc: null
+  canonical_variables_present_in_schema: 0
+  canonical_variables_present: []
+  crc_observed_availability: NOT_ASSESSED
+- profile_id: R6249_LUNG_SCHEMA_2026-07-25
+  profile_status: measured_schema_non_crc
+  disease: lung_cancer
+  case_unit: patient_after_last_row_deduplication
+  compatibility_with_crc: SCHEMA_ONLY_NON_CRC
+  canonical_variables_present_in_schema: 4
+  canonical_variables_present:
+  - crc.clinical_n
+  - crc.clinical_t
+  - crc.histology
+  - crc.primary_site
+  crc_observed_availability: NOT_ASSESSED
+categories:
+  hereditary_risk_workup:
+    executable_candidates: 1
+    formal_recommendations: 1
+    logic_normalized: 0
+    reportable_nonconcordance_defensibility:
+      full: 0
+      partial: 0
+      none: 0
+      not_assessed: 1
+    conservative_flat_nonconcordance_support:
+      full: 0
+      partial: 0
+      none: 1
+      not_assessed: 0
+    top_structural_bottlenecks:
+    - - crc.genetics_referral_status
+      - 1
+    - - crc.germline_result
+      - 1
+    - - crc.lynch_risk_communication
+      - 1
+    - - crc.mlh1_promoter_methylation_status
+      - 1
+    - - crc.mmr_mlh1
+      - 1
+    - - crc.mmr_pms2
+      - 1
+    - - crc.molecular_result_date
+      - 1
+  locally_advanced_rectal_treatment:
+    executable_candidates: 3
+    formal_recommendations: 3
+    logic_normalized: 0
+    reportable_nonconcordance_defensibility:
+      full: 0
+      partial: 0
+      none: 0
+      not_assessed: 3
+    conservative_flat_nonconcordance_support:
+      full: 0
+      partial: 0
+      none: 3
+      not_assessed: 0
+    top_structural_bottlenecks:
+    - - crc.larc_status
+      - 3
+    - - crc.emvi_status
+      - 2
+    - - crc.intersphincteric_plane_status
+      - 2
+    - - crc.mrf_status
+      - 2
+    - - crc.mri_tumor_deposits
+      - 2
+    - - crc.rectal_tumor_height
+      - 2
+    - - crc.extramural_depth_mm
+      - 1
+    - - crc.pelvic_mri_date
+      - 1
+    - - crc.rectal_mri_protocol
+      - 1
+    - - crc.rectal_mri_quality
+      - 1
+    - - crc.sphincter_relation
+      - 1
+    - - crc.comorbidity_constraints
+      - 1
+    - - crc.ecog_performance_status
+      - 1
+    - - crc.ici_agent
+      - 1
+    - - crc.molecular_qc_status
+      - 1
+  metastatic_systemic_treatment:
+    executable_candidates: 4
+    formal_recommendations: 4
+    logic_normalized: 0
+    reportable_nonconcordance_defensibility:
+      full: 0
+      partial: 0
+      none: 0
+      not_assessed: 4
+    conservative_flat_nonconcordance_support:
+      full: 0
+      partial: 0
+      none: 4
+      not_assessed: 0
+    top_structural_bottlenecks:
+    - - crc.line_of_therapy
+      - 4
+    - - crc.biologic_agent
+      - 3
+    - - crc.prior_systemic_therapy
+      - 3
+    - - crc.comorbidity_constraints
+      - 1
+    - - crc.ecog_performance_status
+      - 1
+    - - crc.multidisciplinary_review
+      - 1
+    - - crc.organ_function_constraints
+      - 1
+    - - crc.resectability_status
+      - 1
+    - - crc.ici_agent
+      - 1
+    - - crc.molecular_qc_status
+      - 1
+    - - crc.expanded_ras_coverage
+      - 1
+    - - crc.prior_braf_egfr_targeted_therapy
+      - 1
+    - - crc.progression_date
+      - 1
+  molecular_testing:
+    executable_candidates: 4
+    formal_recommendations: 4
+    logic_normalized: 0
+    reportable_nonconcordance_defensibility:
+      full: 0
+      partial: 0
+      none: 0
+      not_assessed: 4
+    conservative_flat_nonconcordance_support:
+      full: 0
+      partial: 0
+      none: 4
+      not_assessed: 0
+    top_structural_bottlenecks:
+    - - crc.molecular_result_date
+      - 4
+    - - crc.molecular_qc_status
+      - 3
+    - - crc.mmr_mlh1
+      - 2
+    - - crc.mmr_msh2
+      - 2
+    - - crc.mmr_msh6
+      - 2
+    - - crc.mmr_msi_discordance_status
+      - 2
+    - - crc.mmr_pms2
+      - 2
+    - - crc.molecular_assay_method
+      - 2
+    - - crc.molecular_specimen_id
+      - 2
+    - - crc.ici_plan
+      - 1
+    - - crc.molecular_assay_validation_status
+      - 1
+    - - crc.molecular_specimen_date
+      - 1
+    - - crc.mmr_subclonal_loss
+      - 1
+    - - crc.molecular_final_interpretation
+      - 1
+    - - crc.molecular_peer_review_status
+      - 1
+rules:
+- rule_id: CRC.MOL.MMR_ICI_METHOD.v1
+  parent_recommendation_id: CRC.MOL.MMR_ICI_METHOD.v1
+  candidate_kind: unspecified
+  category: molecular_testing
+  logic_status: LOGIC_NOT_NORMALIZED
+  blocks:
+    eligibility:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id001
+      - crc.primary_site
+      - crc.histology
+      - crc.ici_plan
+      ast_missing_declared_variables: *id001
+      ast_undeclared_variables: []
+    action:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id002
+      - crc.mmr_ihc_integrated_status
+      - crc.mmr_mlh1
+      - crc.mmr_pms2
+      - crc.mmr_msh2
+      - crc.mmr_msh6
+      - crc.msi_status
+      - crc.molecular_assay_method
+      - crc.molecular_assay_validation_status
+      - crc.molecular_qc_status
+      - crc.molecular_specimen_id
+      ast_missing_declared_variables: *id002
+      ast_undeclared_variables: []
+    timing:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id003
+      - crc.molecular_specimen_date
+      - crc.molecular_result_date
+      - crc.ici_start_date
+      ast_missing_declared_variables: *id003
+      ast_undeclared_variables: []
+    exceptions:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id004
+      - crc.mmr_msi_discordance_status
+      ast_missing_declared_variables: *id004
+      ast_undeclared_variables: []
+  reportable_registry_only:
+    denominator_evaluability: not_assessed
+    concordance_evaluability: not_assessed
+    nonconcordance_defensibility: not_assessed
+  conservative_flat_registry_support:
+    denominator_evaluability: none
+    concordance_evaluability: none
+    nonconcordance_defensibility: none
+  registry_validation:
+    direct_variable_uses: 2
+    coarsened_variable_uses: 3
+    unvalidated_variable_uses: 12
+  structural_missing_variables:
+  - crc.ici_plan
+  - crc.mmr_mlh1
+  - crc.mmr_msh2
+  - crc.mmr_msh6
+  - crc.mmr_msi_discordance_status
+  - crc.mmr_pms2
+  - crc.molecular_assay_method
+  - crc.molecular_assay_validation_status
+  - crc.molecular_qc_status
+  - crc.molecular_result_date
+  - crc.molecular_specimen_date
+  - crc.molecular_specimen_id
+  observed_crc_availability: NOT_ASSESSED
+- rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1
+  parent_recommendation_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1
+  candidate_kind: unspecified
+  category: molecular_testing
+  logic_status: LOGIC_NOT_NORMALIZED
+  blocks:
+    eligibility:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id005
+      - crc.mmr_mlh1
+      - crc.mmr_pms2
+      - crc.mmr_msh2
+      - crc.mmr_msh6
+      - crc.msi_status
+      - crc.mmr_msi_discordance_status
+      - crc.mmr_subclonal_loss
+      ast_missing_declared_variables: *id005
+      ast_undeclared_variables: []
+    action:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id006
+      - crc.molecular_assay_method
+      - crc.molecular_peer_review_status
+      - crc.molecular_repeat_test_result
+      - crc.molecular_final_interpretation
+      ast_missing_declared_variables: *id006
+      ast_undeclared_variables: []
+    timing:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id007
+      - crc.molecular_result_date
+      - crc.ici_start_date
+      ast_missing_declared_variables: *id007
+      ast_undeclared_variables: []
+    exceptions:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id008
+      - crc.trial_context
+      - crc.molecular_specimen_id
+      ast_missing_declared_variables: *id008
+      ast_undeclared_variables: []
+  reportable_registry_only:
+    denominator_evaluability: not_assessed
+    concordance_evaluability: not_assessed
+    nonconcordance_defensibility: not_assessed
+  conservative_flat_registry_support:
+    denominator_evaluability: none
+    concordance_evaluability: none
+    nonconcordance_defensibility: none
+  registry_validation:
+    direct_variable_uses: 0
+    coarsened_variable_uses: 2
+    unvalidated_variable_uses: 13
+  structural_missing_variables:
+  - crc.mmr_mlh1
+  - crc.mmr_msh2
+  - crc.mmr_msh6
+  - crc.mmr_msi_discordance_status
+  - crc.mmr_pms2
+  - crc.mmr_subclonal_loss
+  - crc.molecular_assay_method
+  - crc.molecular_final_interpretation
+  - crc.molecular_peer_review_status
+  - crc.molecular_repeat_test_result
+  - crc.molecular_result_date
+  - crc.molecular_specimen_id
+  - crc.trial_context
+  observed_crc_availability: NOT_ASSESSED
+- rule_id: CRC.MOL.EXTENDED_RAS_BEFORE_ANTIEGFR.v1
+  parent_recommendation_id: CRC.MOL.EXTENDED_RAS_BEFORE_ANTIEGFR.v1
+  candidate_kind: unspecified
+  category: molecular_testing
+  logic_status: LOGIC_NOT_NORMALIZED
+  blocks:
+    eligibility:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id009
+      - crc.primary_site
+      - crc.disease_setting
+      - crc.anti_egfr_plan
+      ast_missing_declared_variables: *id009
+      ast_undeclared_variables: []
+    action:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id010
+      - crc.kras_status
+      - crc.nras_status
+      - crc.expanded_ras_coverage
+      ast_missing_declared_variables: *id010
+      ast_undeclared_variables: []
+    timing:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id011
+      - crc.molecular_result_date
+      - crc.anti_egfr_start_date
+      ast_missing_declared_variables: *id011
+      ast_undeclared_variables: []
+    exceptions:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id012
+      - crc.molecular_qc_status
+      ast_missing_declared_variables: *id012
+      ast_undeclared_variables: []
+  reportable_registry_only:
+    denominator_evaluability: not_assessed
+    concordance_evaluability: not_assessed
+    nonconcordance_defensibility: not_assessed
+  conservative_flat_registry_support:
+    denominator_evaluability: none
+    concordance_evaluability: none
+    nonconcordance_defensibility: none
+  registry_validation:
+    direct_variable_uses: 3
+    coarsened_variable_uses: 1
+    unvalidated_variable_uses: 5
+  structural_missing_variables:
+  - crc.anti_egfr_plan
+  - crc.anti_egfr_start_date
+  - crc.expanded_ras_coverage
+  - crc.molecular_qc_status
+  - crc.molecular_result_date
+  observed_crc_availability: NOT_ASSESSED
+- rule_id: CRC.MOL.MLH1_LOSS_LYNCH_REFLEX.v1
+  parent_recommendation_id: CRC.MOL.MLH1_LOSS_LYNCH_REFLEX.v1
+  candidate_kind: unspecified
+  category: hereditary_risk_workup
+  logic_status: LOGIC_NOT_NORMALIZED
+  blocks:
+    eligibility:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id013
+      - crc.mmr_ihc_integrated_status
+      - crc.mmr_mlh1
+      - crc.mmr_pms2
+      ast_missing_declared_variables: *id013
+      ast_undeclared_variables: []
+    action:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id014
+      - crc.braf_v600e_status
+      - crc.mlh1_promoter_methylation_status
+      - crc.lynch_risk_communication
+      ast_missing_declared_variables: *id014
+      ast_undeclared_variables: []
+    timing:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id015
+      - crc.molecular_result_date
+      - crc.genetics_referral_status
+      ast_missing_declared_variables: *id015
+      ast_undeclared_variables: []
+    exceptions:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id016
+      - crc.germline_result
+      ast_missing_declared_variables: *id016
+      ast_undeclared_variables: []
+  reportable_registry_only:
+    denominator_evaluability: not_assessed
+    concordance_evaluability: not_assessed
+    nonconcordance_defensibility: not_assessed
+  conservative_flat_registry_support:
+    denominator_evaluability: none
+    concordance_evaluability: none
+    nonconcordance_defensibility: none
+  registry_validation:
+    direct_variable_uses: 1
+    coarsened_variable_uses: 1
+    unvalidated_variable_uses: 7
+  structural_missing_variables:
+  - crc.genetics_referral_status
+  - crc.germline_result
+  - crc.lynch_risk_communication
+  - crc.mlh1_promoter_methylation_status
+  - crc.mmr_mlh1
+  - crc.mmr_pms2
+  - crc.molecular_result_date
+  observed_crc_availability: NOT_ASSESSED
+- rule_id: CRC.RECT.MMR_BEFORE_TREATMENT.v1
+  parent_recommendation_id: CRC.RECT.MMR_BEFORE_TREATMENT.v1
+  candidate_kind: unspecified
+  category: molecular_testing
+  logic_status: LOGIC_NOT_NORMALIZED
+  blocks:
+    eligibility:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id017
+      - crc.primary_site
+      - crc.histology
+      - crc.larc_status
+      ast_missing_declared_variables: *id017
+      ast_undeclared_variables: []
+    action:
+      status: partial
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id018
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      ast_missing_declared_variables: *id018
+      ast_undeclared_variables: []
+    timing:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id019
+      - crc.molecular_result_date
+      - crc.treatment_start_date
+      ast_missing_declared_variables: *id019
+      ast_undeclared_variables: []
+    exceptions:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id020
+      - crc.molecular_qc_status
+      ast_missing_declared_variables: *id020
+      ast_undeclared_variables: []
+  reportable_registry_only:
+    denominator_evaluability: not_assessed
+    concordance_evaluability: not_assessed
+    nonconcordance_defensibility: not_assessed
+  conservative_flat_registry_support:
+    denominator_evaluability: none
+    concordance_evaluability: none
+    nonconcordance_defensibility: none
+  registry_validation:
+    direct_variable_uses: 3
+    coarsened_variable_uses: 2
+    unvalidated_variable_uses: 3
+  structural_missing_variables:
+  - crc.larc_status
+  - crc.molecular_qc_status
+  - crc.molecular_result_date
+  observed_crc_availability: NOT_ASSESSED
+- rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1
+  parent_recommendation_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1
+  candidate_kind: unspecified
+  category: locally_advanced_rectal_treatment
+  logic_status: LOGIC_NOT_NORMALIZED
+  blocks:
+    eligibility:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id021
+      - crc.primary_site
+      - crc.histology
+      - crc.larc_status
+      ast_missing_declared_variables: *id021
+      ast_undeclared_variables: []
+    action:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id022
+      - crc.rectal_mri_protocol
+      - crc.rectal_tumor_height
+      - crc.sphincter_relation
+      - crc.clinical_t
+      - crc.clinical_n
+      - crc.extramural_depth_mm
+      - crc.mrf_status
+      - crc.emvi_status
+      - crc.mri_tumor_deposits
+      - crc.intersphincteric_plane_status
+      ast_missing_declared_variables: *id022
+      ast_undeclared_variables: []
+    timing:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id023
+      - crc.pelvic_mri_date
+      - crc.treatment_start_date
+      ast_missing_declared_variables: *id023
+      ast_undeclared_variables: []
+    exceptions:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id024
+      - crc.rectal_mri_quality
+      ast_missing_declared_variables: *id024
+      ast_undeclared_variables: []
+  reportable_registry_only:
+    denominator_evaluability: not_assessed
+    concordance_evaluability: not_assessed
+    nonconcordance_defensibility: not_assessed
+  conservative_flat_registry_support:
+    denominator_evaluability: none
+    concordance_evaluability: none
+    nonconcordance_defensibility: none
+  registry_validation:
+    direct_variable_uses: 5
+    coarsened_variable_uses: 0
+    unvalidated_variable_uses: 11
+  structural_missing_variables:
+  - crc.emvi_status
+  - crc.extramural_depth_mm
+  - crc.intersphincteric_plane_status
+  - crc.larc_status
+  - crc.mrf_status
+  - crc.mri_tumor_deposits
+  - crc.pelvic_mri_date
+  - crc.rectal_mri_protocol
+  - crc.rectal_mri_quality
+  - crc.rectal_tumor_height
+  - crc.sphincter_relation
+  observed_crc_availability: NOT_ASSESSED
+- rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1
+  parent_recommendation_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1
+  candidate_kind: unspecified
+  category: locally_advanced_rectal_treatment
+  logic_status: LOGIC_NOT_NORMALIZED
+  blocks:
+    eligibility:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id025
+      - crc.larc_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.rectal_tumor_height
+      - crc.clinical_t
+      - crc.emvi_status
+      - crc.mri_tumor_deposits
+      - crc.mrf_status
+      - crc.intersphincteric_plane_status
+      - crc.metastatic_status
+      ast_missing_declared_variables: *id025
+      ast_undeclared_variables: []
+    action:
+      status: partial
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id026
+      - crc.systemic_regimen
+      - crc.radiation_type
+      - crc.treatment_sequence
+      ast_missing_declared_variables: *id026
+      ast_undeclared_variables: []
+    timing:
+      status: full
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id027
+      - crc.treatment_start_date
+      ast_missing_declared_variables: *id027
+      ast_undeclared_variables: []
+    exceptions:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id028
+      - crc.ecog_performance_status
+      - crc.comorbidity_constraints
+      - crc.treatment_contraindication
+      - crc.patient_preference
+      ast_missing_declared_variables: *id028
+      ast_undeclared_variables: []
+  reportable_registry_only:
+    denominator_evaluability: not_assessed
+    concordance_evaluability: not_assessed
+    nonconcordance_defensibility: not_assessed
+  conservative_flat_registry_support:
+    denominator_evaluability: none
+    concordance_evaluability: none
+    nonconcordance_defensibility: none
+  registry_validation:
+    direct_variable_uses: 2
+    coarsened_variable_uses: 8
+    unvalidated_variable_uses: 8
+  structural_missing_variables:
+  - crc.comorbidity_constraints
+  - crc.ecog_performance_status
+  - crc.emvi_status
+  - crc.intersphincteric_plane_status
+  - crc.larc_status
+  - crc.mrf_status
+  - crc.mri_tumor_deposits
+  - crc.rectal_tumor_height
+  observed_crc_availability: NOT_ASSESSED
+- rule_id: CRC.RECT.DMMR_ICI_INITIAL.v1
+  parent_recommendation_id: CRC.RECT.DMMR_ICI_INITIAL.v1
+  candidate_kind: unspecified
+  category: locally_advanced_rectal_treatment
+  logic_status: LOGIC_NOT_NORMALIZED
+  blocks:
+    eligibility:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id029
+      - crc.larc_status
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.molecular_qc_status
+      ast_missing_declared_variables: *id029
+      ast_undeclared_variables: []
+    action:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id030
+      - crc.ici_agent
+      - crc.ici_start_date
+      ast_missing_declared_variables: *id030
+      ast_undeclared_variables: []
+    timing:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id031
+      - crc.prior_systemic_therapy
+      - crc.treatment_start_date
+      ast_missing_declared_variables: *id031
+      ast_undeclared_variables: []
+    exceptions:
+      status: partial
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id032
+      - crc.ici_contraindication
+      - crc.treatment_contraindication
+      ast_missing_declared_variables: *id032
+      ast_undeclared_variables: []
+  reportable_registry_only:
+    denominator_evaluability: not_assessed
+    concordance_evaluability: not_assessed
+    nonconcordance_defensibility: not_assessed
+  conservative_flat_registry_support:
+    denominator_evaluability: none
+    concordance_evaluability: none
+    nonconcordance_defensibility: none
+  registry_validation:
+    direct_variable_uses: 1
+    coarsened_variable_uses: 7
+    unvalidated_variable_uses: 3
+  structural_missing_variables:
+  - crc.ici_agent
+  - crc.larc_status
+  - crc.molecular_qc_status
+  - crc.prior_systemic_therapy
+  observed_crc_availability: NOT_ASSESSED
+- rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1
+  parent_recommendation_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1
+  candidate_kind: unspecified
+  category: metastatic_systemic_treatment
+  logic_status: LOGIC_NOT_NORMALIZED
+  blocks:
+    eligibility:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id033
+      - crc.disease_setting
+      - crc.line_of_therapy
+      - crc.resectability_status
+      - crc.multidisciplinary_review
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      ast_missing_declared_variables: *id033
+      ast_undeclared_variables: []
+    action:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id034
+      - crc.systemic_regimen
+      - crc.systemic_regimen_intensity
+      - crc.biologic_agent
+      ast_missing_declared_variables: *id034
+      ast_undeclared_variables: []
+    timing:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id035
+      - crc.prior_systemic_therapy
+      - crc.systemic_therapy_start_date
+      ast_missing_declared_variables: *id035
+      ast_undeclared_variables: []
+    exceptions:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id036
+      - crc.ecog_performance_status
+      - crc.organ_function_constraints
+      - crc.comorbidity_constraints
+      - crc.patient_preference
+      ast_missing_declared_variables: *id036
+      ast_undeclared_variables: []
+  reportable_registry_only:
+    denominator_evaluability: not_assessed
+    concordance_evaluability: not_assessed
+    nonconcordance_defensibility: not_assessed
+  conservative_flat_registry_support:
+    denominator_evaluability: none
+    concordance_evaluability: none
+    nonconcordance_defensibility: none
+  registry_validation:
+    direct_variable_uses: 0
+    coarsened_variable_uses: 7
+    unvalidated_variable_uses: 8
+  structural_missing_variables:
+  - crc.biologic_agent
+  - crc.comorbidity_constraints
+  - crc.ecog_performance_status
+  - crc.line_of_therapy
+  - crc.multidisciplinary_review
+  - crc.organ_function_constraints
+  - crc.prior_systemic_therapy
+  - crc.resectability_status
+  observed_crc_availability: NOT_ASSESSED
+- rule_id: CRC.MCRC.MSIH_FIRST_LINE_ASCO2022.v1
+  parent_recommendation_id: CRC.MCRC.MSIH_FIRST_LINE_ASCO2022.v1
+  candidate_kind: unspecified
+  category: metastatic_systemic_treatment
+  logic_status: LOGIC_NOT_NORMALIZED
+  blocks:
+    eligibility:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id037
+      - crc.disease_setting
+      - crc.line_of_therapy
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.molecular_qc_status
+      ast_missing_declared_variables: *id037
+      ast_undeclared_variables: []
+    action:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id038
+      - crc.ici_agent
+      ast_missing_declared_variables: *id038
+      ast_undeclared_variables: []
+    timing:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id039
+      - crc.prior_systemic_therapy
+      - crc.ici_start_date
+      ast_missing_declared_variables: *id039
+      ast_undeclared_variables: []
+    exceptions:
+      status: partial
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id040
+      - crc.ici_contraindication
+      ast_missing_declared_variables: *id040
+      ast_undeclared_variables: []
+  reportable_registry_only:
+    denominator_evaluability: not_assessed
+    concordance_evaluability: not_assessed
+    nonconcordance_defensibility: not_assessed
+  conservative_flat_registry_support:
+    denominator_evaluability: none
+    concordance_evaluability: none
+    nonconcordance_defensibility: none
+  registry_validation:
+    direct_variable_uses: 0
+    coarsened_variable_uses: 6
+    unvalidated_variable_uses: 3
+  structural_missing_variables:
+  - crc.ici_agent
+  - crc.line_of_therapy
+  - crc.molecular_qc_status
+  - crc.prior_systemic_therapy
+  observed_crc_availability: NOT_ASSESSED
+- rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1
+  parent_recommendation_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1
+  candidate_kind: unspecified
+  category: metastatic_systemic_treatment
+  logic_status: LOGIC_NOT_NORMALIZED
+  blocks:
+    eligibility:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id041
+      - crc.disease_setting
+      - crc.line_of_therapy
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.kras_status
+      - crc.nras_status
+      - crc.expanded_ras_coverage
+      - crc.primary_tumor_sidedness
+      - crc.braf_v600e_status
+      ast_missing_declared_variables: *id041
+      ast_undeclared_variables: []
+    action:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id042
+      - crc.biologic_agent
+      - crc.systemic_regimen
+      - crc.systemic_regimen_intensity
+      ast_missing_declared_variables: *id042
+      ast_undeclared_variables: []
+    timing:
+      status: partial
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id043
+      - crc.systemic_therapy_start_date
+      ast_missing_declared_variables: *id043
+      ast_undeclared_variables: []
+    exceptions:
+      status: partial
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id044
+      - crc.treatment_contraindication
+      - crc.patient_preference
+      ast_missing_declared_variables: *id044
+      ast_undeclared_variables: []
+  reportable_registry_only:
+    denominator_evaluability: not_assessed
+    concordance_evaluability: not_assessed
+    nonconcordance_defensibility: not_assessed
+  conservative_flat_registry_support:
+    denominator_evaluability: none
+    concordance_evaluability: none
+    nonconcordance_defensibility: none
+  registry_validation:
+    direct_variable_uses: 3
+    coarsened_variable_uses: 9
+    unvalidated_variable_uses: 3
+  structural_missing_variables:
+  - crc.biologic_agent
+  - crc.expanded_ras_coverage
+  - crc.line_of_therapy
+  observed_crc_availability: NOT_ASSESSED
+- rule_id: CRC.MCRC.BRAF_POST_LINE_ASCO2022.v1
+  parent_recommendation_id: CRC.MCRC.BRAF_POST_LINE_ASCO2022.v1
+  candidate_kind: unspecified
+  category: metastatic_systemic_treatment
+  logic_status: LOGIC_NOT_NORMALIZED
+  blocks:
+    eligibility:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id045
+      - crc.disease_setting
+      - crc.braf_v600e_status
+      - crc.line_of_therapy
+      - crc.prior_systemic_therapy
+      - crc.progression_date
+      ast_missing_declared_variables: *id045
+      ast_undeclared_variables: []
+    action:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id046
+      - crc.systemic_regimen
+      - crc.biologic_agent
+      ast_missing_declared_variables: *id046
+      ast_undeclared_variables: []
+    timing:
+      status: partial
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id047
+      - crc.systemic_therapy_start_date
+      ast_missing_declared_variables: *id047
+      ast_undeclared_variables: []
+    exceptions:
+      status: none
+      logic_status: LOGIC_NOT_NORMALIZED
+      variables: &id048
+      - crc.prior_braf_egfr_targeted_therapy
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      ast_missing_declared_variables: *id048
+      ast_undeclared_variables: []
+  reportable_registry_only:
+    denominator_evaluability: not_assessed
+    concordance_evaluability: not_assessed
+    nonconcordance_defensibility: not_assessed
+  conservative_flat_registry_support:
+    denominator_evaluability: none
+    concordance_evaluability: none
+    nonconcordance_defensibility: none
+  registry_validation:
+    direct_variable_uses: 1
+    coarsened_variable_uses: 6
+    unvalidated_variable_uses: 4
+  structural_missing_variables:
+  - crc.biologic_agent
+  - crc.line_of_therapy
+  - crc.prior_braf_egfr_targeted_therapy
+  - crc.prior_systemic_therapy
+  - crc.progression_date
+  observed_crc_availability: NOT_ASSESSED

@@ -1,0 +1,111 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.braf_v600e_status
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.braf_v600e_status
+contract_kind: registry_projection_and_chart_extraction
+label: BRAF V600E status
+roles:
+- action
+- eligibility
+temporal_meaning: tumor_molecular_characterization
+field_contract:
+  name: braf_registry_code
+  type: string
+  allowable_values:
+  - '0'
+  - '1'
+  - '2'
+  - '3'
+  - '4'
+  - '7'
+  - '8'
+  - '9'
+  nullable: true
+  description: NAACCR item 3940 for diagnosis year 2021+; code 1 is BRAF V600E.
+registry_mapping:
+  standard: NAACCR_v26
+  item_name: BRAF Mutational Analysis
+  item_number: '3940'
+  xml_id: brafMutationalAnalysis
+  effective_years: 2021+
+evidence_coverage:
+  registry_to_rule:
+    semantic: exact
+    temporal: exact
+    decision_boundary_preserved: true
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: direct
+    transformation_id: null
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: NAACCR SSDI v3.3 / NAACCR v26 Colon and Rectum schema
+  items:
+  - KRAS [3866]
+  - Microsatellite Instability (MSI) [3890]
+  - BRAF Mutational Analysis [3940]
+  - NRAS Mutational Analysis [3941]
+  source_refs:
+  - NAACCR.SSDI.3_3
+  - COC.STORE.2026
+question: What is the BRAF V600E status for the indexed CRC tumor or decision at tumor_molecular_characterization?
+applicability_guard:
+  schema_id: '00200'
+  primary_sites:
+  - C180
+  - C182-C189
+  - C199
+  - C209
+  diagnosis_years:
+    kras: 2018+
+    msi_mmr: 2018+
+    braf: 2021+
+    nras: 2021+
+evidence_contract:
+  establishing_source_documents:
+  - molecular_report
+  - pathology_addendum
+  - registry
+  excluded_sources:
+  - BRAF_mutated_without_variant_for_V600E_claim
+  positive_witness: A tumor-linked source appropriate to tumor_molecular_characterization establishes braf_registry_code.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - BRAF
+    - V600E
+    - code
+    statement: Code 1 is V600E; other mutation/ordered/not applicable/not documented remain distinct.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Code 1 is V600E; other mutation/ordered/not applicable/not documented remain distinct.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish braf_registry_code.
+  SPEC_INSUFFICIENT: The requested meaning of braf_registry_code is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.STORE.molecular_summary
+  output_field: braf_registry_code
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[braf_registry_code].allowable_values
+  origin: store_manual
+  basis: NAACCR v26 item [3940] BRAF Mutational Analysis allowable values.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate contract loads natively, but runtime proves keyword searches rather than the required molecular-report/pathology-addendum
+    document coverage.
+  - Add a document-category coverage operator before codes 8 or 9 can satisfy the declared proof obligation.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 6411688509025d1e8415d3373c029e846b38d6ae7b8f96b35df270561239c55b

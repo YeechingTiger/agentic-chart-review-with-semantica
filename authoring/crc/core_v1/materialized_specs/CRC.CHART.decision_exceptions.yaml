@@ -1,0 +1,167 @@
+spec_id: CRC.CHART.decision_exceptions
+spec_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+source_authority:
+  document: Rule-required local clinical context; not represented by a single STORE item
+  items:
+  - ASCO LARC 2024 general note and recommendation qualifiers
+  - ASCO mCRC 2022 qualifying statements
+  source_refs:
+  - ASCO.LARC.2024
+  - ASCO.MCRC.2022
+  - ESMO.MCRC.2026
+data_source: notes
+question: 'What performance status, organ/comorbidity constraints, treatment or ICI contraindications, and patient preference
+  are explicitly documented for the indexed CRC decision?
+
+  '
+applicability_guard:
+  indexed_rule_decision_required: true
+  decision_date_required: true
+fields:
+- name: ecog_performance_status
+  type: string
+  allowable_values:
+  - '0'
+  - '1'
+  - '2'
+  - '3'
+  - '4'
+  - '5'
+  - not_assessed
+  - unknown
+  nullable: true
+  description: Explicit ECOG at/near the indexed decision; do not convert narrative function without a separate derivation
+    rule.
+- name: organ_function_constraints
+  type: string
+  allowable_values:
+  - none_material_documented
+  - material_constraint
+  - not_assessed
+  - unknown
+  nullable: true
+  description: High-level decision relevance; exact organ/lab thresholds require a treatment-specific extension.
+- name: comorbidity_constraints
+  type: string
+  allowable_values:
+  - none_material_documented
+  - material_constraint
+  - not_assessed
+  - unknown
+  nullable: true
+  description: High-level treatment constraint at the indexed decision.
+- name: treatment_contraindication
+  type: string
+  allowable_values:
+  - present
+  - absent_explicit
+  - not_assessed
+  - unknown
+  nullable: true
+  description: Contraindication to the indexed action; exact reason remains in evidence.
+- name: ici_contraindication
+  type: string
+  allowable_values:
+  - present
+  - absent_explicit
+  - not_assessed
+  - unknown
+  - not_applicable
+  nullable: true
+  description: ICI-specific contraindication state; never inferred solely from nonreceipt.
+- name: patient_preference
+  type: string
+  allowable_values:
+  - accepts
+  - declines
+  - prefers_alternative
+  - undecided
+  - not_documented
+  - not_applicable
+  nullable: true
+  description: Preference for the indexed option after a documented discussion.
+decision_rule:
+- Every field is tied to one indexed decision and date; do not carry an old exception forward without confirmation.
+- Nonreceipt is not a contraindication, and a clinician's alternative choice is not automatically a patient refusal.
+- Not assessed, unknown, and explicitly absent are different.
+- A future non-concordance reason taxonomy should consume these facts but must not overwrite them.
+evidence_rules:
+  counts_as_evidence:
+  - Dated oncology/surgery/radiation note, pharmacist assessment, treatment consent/refusal, tumor-board note, or relevant
+    specialist documentation.
+  does_not_count:
+  - Treatment nonreceipt alone.
+  - Administrative cancellation without clinical reason.
+  - A remote ECOG or comorbidity statement without linkage to the indexed decision.
+conflict_rules:
+- if: patient preference changes over time
+  then: use the latest documented preference before the indexed action and retain the trajectory
+- if: notes disagree on contraindication
+  then: retain the conflict and route to clinical review rather than coding absent
+proof_obligation:
+  for_positive: A dated decision-linked source explicitly establishes the state.
+  for_negative:
+    mode: stratified_exclusion
+    required_coverage:
+    - Review the decision note, consent/refusal documentation and relevant specialty assessment.
+    required_keywords:
+    - ECOG
+    - contraindication
+    - declined
+    - preference
+    statement: Absent is allowed only when explicitly documented; silence yields not_assessed, unknown, or not_documented.
+abstention:
+  EVIDENCE_INSUFFICIENT: The record does not establish the decision-specific exception context.
+  SPEC_INSUFFICIENT: The decision requires treatment-specific toxicity, lab-threshold, pregnancy, transplant, autoimmune or
+    other detail not represented here.
+boundary_cases:
+- case: No immunotherapy was given and no reason is documented
+  result: ici_contraindication=unknown, not present
+- case: Patient initially declined but later accepted before treatment
+  result: use accepts for the indexed treatment decision and retain prior refusal as history
+search_hints:
+- ECOG
+- contraindication
+- declined
+- preference
+- refused
+- autoimmune
+- organ_function
+- comorbidity
+downstream_warning:
+- These candidate categories are deliberately coarse and cannot yet assign a final non-concordance reason.
+provenance:
+- element: fields[ecog_performance_status].allowable_values
+  origin: model_authored
+  basis: no external source; local extraction states including missingness.
+  status: draft
+- element: fields[organ_function_constraints].allowable_values
+  origin: model_authored
+  basis: no external source; high-level local decision context.
+  status: draft
+- element: fields[comorbidity_constraints].allowable_values
+  origin: model_authored
+  basis: no external source; high-level local decision context.
+  status: draft
+- element: fields[treatment_contraindication].allowable_values
+  origin: model_authored
+  basis: no external source; local explicit/unknown contraindication states.
+  status: draft
+- element: fields[ici_contraindication].allowable_values
+  origin: model_authored
+  basis: no external source; local ICI-specific contraindication states.
+  status: draft
+- element: fields[patient_preference].allowable_values
+  origin: model_authored
+  basis: no external source; local decision-specific preference states.
+  status: draft
+- element: proof_obligation.for_negative.required_coverage
+  origin: model_authored
+  basis: no external source; project-specific decision-context coverage requirement.
+  status: draft
+- element: proof_obligation.for_negative.required_keywords
+  origin: model_authored
+  basis: no external source; unmeasured candidate search vocabulary.
+  status: draft

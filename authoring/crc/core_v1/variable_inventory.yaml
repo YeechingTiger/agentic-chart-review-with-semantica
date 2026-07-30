@@ -1,0 +1,2797 @@
+schema_version: '1.0'
+bundle_id: CRC.CORE.MOLECULAR_TREATMENT.v1
+clinical_use: NOT_FOR_CLINICAL_USE
+templates:
+  no_registry: &id003
+    standard: none
+    item_name: none
+    item_number: none
+    xml_id: none
+    effective_years: none
+  runtime_coverage_blocked: &id004
+    verdict: needs_revision
+    issues:
+    - The candidate contract loads natively, but runtime proves keyword searches rather than the required molecular-report/pathology-addendum document coverage.
+    - Add a document-category coverage operator before codes 8 or 9 can satisfy the declared proof obligation.
+  needs_review: &id002
+    verdict: needs_revision
+    issues:
+    - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring specialist review.
+  production_owner_blocked: &id001
+    verdict: needs_revision
+    issues:
+    - A candidate contract exists, but the current production owner in specs/ fails provenance enforcement and promotion/collision resolution is pending.
+variables:
+- variable_id: crc.primary_site
+  label: Primary site ICD-O-3
+  roles:
+  - eligibility
+  datatype: string
+  value_domain: CRC.CANDIDATE.disease_context#primary_site_icdo3
+  temporal_meaning: tumor_record_identity
+  mapping_level: registry_direct
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: Primary Site
+    item_number: '400'
+    xml_id: primarySite
+    effective_years: all
+  extraction:
+    spec_id: CRC.CANDIDATE.disease_context
+    field: primary_site_icdo3
+    status: specified
+  source_documents:
+  - pathology
+  - endoscopy
+  - operative_report
+  - registry
+  excluded_sources:
+  - problem_list_only
+  missingness_semantics: Null/unknown is not C189/C209; NOS topography requires an absence proof.
+  conformance: *id001
+  variable_contract:
+    contract_id: CRC.VAR.primary_site
+    contract_version: 0.1.0
+    contract_hash: c5e50443270e743c9b8f68f22f7251f9f5af4785851ad1c0e5bf00a76f265d99
+    path: variable_contracts/CRC.VAR.primary_site.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: exact
+      temporal: exact
+      decision_boundary_preserved: true
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: direct
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.histology
+  label: Histology ICD-O-3
+  roles:
+  - eligibility
+  datatype: string
+  value_domain: CRC.CANDIDATE.disease_context#histology_icdo3
+  temporal_meaning: tumor_record_identity
+  mapping_level: registry_direct
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: Histologic Type ICD-O-3
+    item_number: '522'
+    xml_id: histologicTypeIcdO3
+    effective_years: all
+  extraction:
+    spec_id: CRC.CANDIDATE.disease_context
+    field: histology_icdo3
+    status: specified
+  source_documents:
+  - final_pathology
+  - pathology_addendum
+  - registry
+  excluded_sources:
+  - imaging_only
+  missingness_semantics: Unspecified carcinoma codes are positive specificity claims, not defaults.
+  conformance: *id001
+  variable_contract:
+    contract_id: CRC.VAR.histology
+    contract_version: 0.1.0
+    contract_hash: 1348dc66afde91128f86c73d2be5c152bc436f04578decb0273a841a3e3c4784
+    path: variable_contracts/CRC.VAR.histology.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: exact
+      temporal: exact
+      decision_boundary_preserved: true
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: direct
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.disease_setting
+  label: Decision-time disease setting
+  roles:
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CANDIDATE.disease_context#disease_setting
+  temporal_meaning: at_indexed_rule_decision
+  mapping_level: registry_coarsened
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: AJCC/Summary Stage/recurrence composite
+    item_number: 1004/764/1860/1880
+    xml_id: composite_not_single_item
+    effective_years: varies
+  extraction:
+    spec_id: CRC.CANDIDATE.disease_context
+    field: disease_setting
+    status: specified
+  source_documents:
+  - staging_imaging
+  - oncology
+  - tumor_board
+  - registry
+  excluded_sources:
+  - initial_stage_without_time_anchor
+  missingness_semantics: Initial M0 does not establish absence of later metastatic recurrence.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.disease_setting
+    contract_version: 0.1.0
+    contract_hash: e4a2eb5737618a08d7b294f067508a02b70ec1ae8cae745c3220fdbe973d883e
+    path: variable_contracts/CRC.VAR.disease_setting.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: coarsened
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.larc_status
+  label: Locally advanced rectal cancer status
+  roles:
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CANDIDATE.disease_context#larc_status
+  temporal_meaning: pretreatment
+  mapping_level: derived
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CANDIDATE.disease_context
+    field: larc_status
+    status: specified
+  source_documents:
+  - pelvic_mri
+  - endoscopy
+  - pathology
+  - oncology
+  - tumor_board
+  excluded_sources:
+  - stage_group_without_local_definition
+  missingness_semantics: Indeterminate remains distinct from no.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.larc_status
+    contract_version: 0.1.0
+    contract_hash: 57c77e3f32bd6ae45f0e5902a73bfbbe1b15c8bd2226a54a7ea37d0c39cb5beb
+    path: variable_contracts/CRC.VAR.larc_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.metastatic_status
+  label: Metastatic status
+  roles:
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CANDIDATE.disease_context#metastatic_status
+  temporal_meaning: at_indexed_rule_decision
+  mapping_level: registry_coarsened
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: AJCC M and Mets at Diagnosis
+    item_number: 1003/1013/1023/1112-1117
+    xml_id: multiple_items
+    effective_years: varies
+  extraction:
+    spec_id: CRC.CANDIDATE.disease_context
+    field: metastatic_status
+    status: specified
+  source_documents:
+  - imaging
+  - pathology
+  - oncology
+  - registry
+  excluded_sources:
+  - diagnosis_timepoint_only_for_later_decision
+  missingness_semantics: Registry items are strong at diagnosis but do not fully represent later recurrence.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.metastatic_status
+    contract_version: 0.1.0
+    contract_hash: 8d3c2b39ecf7e29f3f12b5dd7519b3afaf869c108241fc329e50e0078c3aefcc
+    path: variable_contracts/CRC.VAR.metastatic_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: coarsened
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.resectability_status
+  label: Resectability status
+  roles:
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CANDIDATE.disease_context#resectability_status
+  temporal_meaning: immediately_before_indexed_treatment_decision
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CANDIDATE.disease_context
+    field: resectability_status
+    status: specified
+  source_documents:
+  - multidisciplinary_note
+  - surgical_oncology
+  - medical_oncology
+  excluded_sources:
+  - M_category_alone
+  missingness_semantics: Not assessed and indeterminate are different; metastatic does not mean unresectable.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.resectability_status
+    contract_version: 0.1.0
+    contract_hash: 3dbabfcb4f039f5fa5dd2fc2e350e6ec7550c946639e6b88a1e40d9719700519
+    path: variable_contracts/CRC.VAR.resectability_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.line_of_therapy
+  label: Indexed systemic line of therapy
+  roles:
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CANDIDATE.disease_context#line_of_therapy
+  temporal_meaning: at_indexed_systemic_treatment
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CANDIDATE.disease_context
+    field: line_of_therapy
+    status: specified
+  source_documents:
+  - oncology_timeline
+  - administration
+  - pharmacy
+  - outside_history
+  excluded_sources:
+  - first_course_registry_flag_alone
+  missingness_semantics: Incomplete outside history yields indeterminate, never default first line.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.line_of_therapy
+    contract_version: 0.1.0
+    contract_hash: ca180747a577b821e23f2246b3950dc0a399206247b733a899b5e1893bc36a1b
+    path: variable_contracts/CRC.VAR.line_of_therapy.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.primary_tumor_sidedness
+  label: Primary tumor sidedness
+  roles:
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CANDIDATE.disease_context#primary_tumor_sidedness
+  temporal_meaning: primary_tumor_identity
+  mapping_level: derived
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: Derived from Primary Site
+    item_number: '400'
+    xml_id: primarySite
+    effective_years: all
+  extraction:
+    spec_id: CRC.CANDIDATE.disease_context
+    field: primary_tumor_sidedness
+    status: specified
+  source_documents:
+  - registry_primary_site
+  - pathology
+  - endoscopy
+  - operative_report
+  excluded_sources:
+  - metastasis_location
+  missingness_semantics: Transverse, rectosigmoid and rectum remain explicit until a versioned mapping is approved.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.primary_tumor_sidedness
+    contract_version: 0.1.0
+    contract_hash: c65a7f5f209e35b7f0288b526e62123d102571a57fdf7a307da0109205ad6a33
+    path: variable_contracts/CRC.VAR.primary_tumor_sidedness.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: coarsened
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.clinical_t
+  label: Pretreatment clinical T
+  roles:
+  - action
+  - eligibility
+  datatype: string
+  value_domain: CRC.CANDIDATE.disease_context#clinical_t
+  temporal_meaning: before_first_treatment
+  mapping_level: registry_direct
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: AJCC TNM Clin T
+    item_number: '1001'
+    xml_id: ajccTnmClinT
+    effective_years: 2018+
+  extraction:
+    spec_id: CRC.CANDIDATE.disease_context
+    field: clinical_t
+    status: specified
+  source_documents:
+  - pelvic_mri
+  - staging_imaging
+  - examination
+  - tumor_board
+  - registry
+  excluded_sources:
+  - pathologic_T_copied_without_clinical_basis
+  missingness_semantics: cTX is an assessed-indeterminate category; null is missing evidence.
+  conformance: *id001
+  variable_contract:
+    contract_id: CRC.VAR.clinical_t
+    contract_version: 0.1.0
+    contract_hash: 3f500bd3f57666e47e01262a167bb26f8bb9893fea8df242118c7548a766ec9f
+    path: variable_contracts/CRC.VAR.clinical_t.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: exact
+      temporal: exact
+      decision_boundary_preserved: true
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: direct
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.clinical_n
+  label: Pretreatment clinical N
+  roles:
+  - action
+  datatype: string
+  value_domain: CRC.CANDIDATE.disease_context#clinical_n
+  temporal_meaning: before_first_treatment
+  mapping_level: registry_direct
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: AJCC TNM Clin N
+    item_number: '1002'
+    xml_id: ajccTnmClinN
+    effective_years: 2018+
+  extraction:
+    spec_id: CRC.CANDIDATE.disease_context
+    field: clinical_n
+    status: specified
+  source_documents:
+  - pelvic_mri
+  - staging_imaging
+  - examination
+  - tumor_board
+  - registry
+  excluded_sources:
+  - pathologic_N_copied_without_clinical_basis
+  missingness_semantics: Unknown/null is not node negative.
+  conformance: *id001
+  variable_contract:
+    contract_id: CRC.VAR.clinical_n
+    contract_version: 0.1.0
+    contract_hash: 0a1c833586164ab0aabe9f6f85824906b3c2fe3cc74fe5686776bcdbcf8ca74c
+    path: variable_contracts/CRC.VAR.clinical_n.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: exact
+      temporal: exact
+      decision_boundary_preserved: true
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: direct
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.multidisciplinary_review
+  label: Multidisciplinary review documented
+  roles:
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CANDIDATE.disease_context#multidisciplinary_review
+  temporal_meaning: before_indexed_decision
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CANDIDATE.disease_context
+    field: multidisciplinary_review
+    status: specified
+  source_documents:
+  - tumor_board
+  - multidisciplinary_clinic
+  - oncology
+  excluded_sources:
+  - implicit_team_membership
+  missingness_semantics: Not documented does not prove review did not occur.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.multidisciplinary_review
+    contract_version: 0.1.0
+    contract_hash: 45e8bdece4b97974b0a167efa6dd666b4bc1242e2f59c1db0f7b591d45321ec2
+    path: variable_contracts/CRC.VAR.multidisciplinary_review.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.kras_status
+  label: KRAS registry summary status
+  roles:
+  - action
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.STORE.molecular_summary#kras_registry_code
+  temporal_meaning: tumor_molecular_characterization
+  mapping_level: registry_direct
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: KRAS
+    item_number: '3866'
+    xml_id: kras
+    effective_years: 2018+
+  extraction:
+    spec_id: CRC.STORE.molecular_summary
+    field: kras_registry_code
+    status: specified
+  source_documents:
+  - molecular_report
+  - pathology_addendum
+  - registry
+  excluded_sources:
+  - treatment_choice_proxy
+  missingness_semantics: Codes 7, 8 and 9 remain distinct; wild type does not prove expanded coverage.
+  conformance: *id004
+  variable_contract:
+    contract_id: CRC.VAR.kras_status
+    contract_version: 0.1.0
+    contract_hash: c924a7da098f372d174c8fc2aa4f65e9555d7f92abc8c24a2857cce53c97d715
+    path: variable_contracts/CRC.VAR.kras_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: exact
+      temporal: exact
+      decision_boundary_preserved: true
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: direct
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.nras_status
+  label: NRAS registry summary status
+  roles:
+  - action
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.STORE.molecular_summary#nras_registry_code
+  temporal_meaning: tumor_molecular_characterization
+  mapping_level: registry_direct
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: NRAS Mutational Analysis
+    item_number: '3941'
+    xml_id: nrasMutationalAnalysis
+    effective_years: 2021+
+  extraction:
+    spec_id: CRC.STORE.molecular_summary
+    field: nras_registry_code
+    status: specified
+  source_documents:
+  - molecular_report
+  - pathology_addendum
+  - registry
+  excluded_sources:
+  - generic_RAS_statement_without_gene
+  missingness_semantics: Codes 7, 8 and 9 remain distinct; wild type does not prove expanded coverage.
+  conformance: *id004
+  variable_contract:
+    contract_id: CRC.VAR.nras_status
+    contract_version: 0.1.0
+    contract_hash: 107e67be06a12d7c5f3646a34b53347b280882b6d47e9f32f83b46551bad7a12
+    path: variable_contracts/CRC.VAR.nras_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: exact
+      temporal: exact
+      decision_boundary_preserved: true
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: direct
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.braf_v600e_status
+  label: BRAF V600E status
+  roles:
+  - action
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.STORE.molecular_summary#braf_registry_code
+  temporal_meaning: tumor_molecular_characterization
+  mapping_level: registry_direct
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: BRAF Mutational Analysis
+    item_number: '3940'
+    xml_id: brafMutationalAnalysis
+    effective_years: 2021+
+  extraction:
+    spec_id: CRC.STORE.molecular_summary
+    field: braf_registry_code
+    status: specified
+  source_documents:
+  - molecular_report
+  - pathology_addendum
+  - registry
+  excluded_sources:
+  - BRAF_mutated_without_variant_for_V600E_claim
+  missingness_semantics: Code 1 is V600E; other mutation/ordered/not applicable/not documented remain distinct.
+  conformance: *id004
+  variable_contract:
+    contract_id: CRC.VAR.braf_v600e_status
+    contract_version: 0.1.0
+    contract_hash: 6411688509025d1e8415d3373c029e846b38d6ae7b8f96b35df270561239c55b
+    path: variable_contracts/CRC.VAR.braf_v600e_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: exact
+      temporal: exact
+      decision_boundary_preserved: true
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: direct
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.msi_status
+  label: Raw MSI result
+  roles:
+  - action
+  - eligibility
+  - exceptions
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#msi_status
+  temporal_meaning: indexed_specimen_result
+  mapping_level: registry_coarsened
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: Microsatellite Instability MSI
+    item_number: '3890'
+    xml_id: microsatelliteInstability
+    effective_years: 2018+
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: msi_status
+    status: specified
+  source_documents:
+  - molecular_report
+  - pathology_addendum
+  excluded_sources:
+  - MMR_IHC_as_raw_MSI
+  missingness_semantics: NAACCR item 3890 combines MSI and MMR; raw assay status requires the chart extension.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.msi_status
+    contract_version: 0.1.0
+    contract_hash: 0b647357f8ca24c9546eb6679715903389a79ad12478a97e77f8d7ddea86e7f1
+    path: variable_contracts/CRC.VAR.msi_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: coarsened
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.mmr_ihc_integrated_status
+  label: Integrated MMR-IHC status
+  roles:
+  - action
+  - eligibility
+  - exceptions
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#mmr_ihc_integrated_status
+  temporal_meaning: indexed_specimen_result
+  mapping_level: registry_coarsened
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: Microsatellite Instability MSI
+    item_number: '3890'
+    xml_id: microsatelliteInstability
+    effective_years: 2018+
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: mmr_ihc_integrated_status
+    status: specified
+  source_documents:
+  - MMR_IHC_report
+  - pathology_addendum
+  excluded_sources:
+  - MSI_assay_as_raw_IHC
+  missingness_semantics: Registry code 0/2 may represent pMMR/dMMR but loses method and protein pattern.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.mmr_ihc_integrated_status
+    contract_version: 0.1.0
+    contract_hash: e1b01f7f4c17c5e807230496f673965ad40d258bf281a751aa579bf4107f0798
+    path: variable_contracts/CRC.VAR.mmr_ihc_integrated_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: coarsened
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.mmr_mlh1
+  label: MLH1 IHC result
+  roles:
+  - action
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#mmr_mlh1
+  temporal_meaning: indexed_specimen_result
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: mmr_mlh1
+    status: specified
+  source_documents:
+  - MMR_IHC_report
+  excluded_sources:
+  - registry_MSI_summary
+  missingness_semantics: Not documented, not performed, equivocal and retained are distinct.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.mmr_mlh1
+    contract_version: 0.1.0
+    contract_hash: c100f65b555c62ccd9fa4843d0e7cc43a8fcc1bbf576274074374542ee6f33c5
+    path: variable_contracts/CRC.VAR.mmr_mlh1.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.mmr_pms2
+  label: PMS2 IHC result
+  roles:
+  - action
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#mmr_pms2
+  temporal_meaning: indexed_specimen_result
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: mmr_pms2
+    status: specified
+  source_documents:
+  - MMR_IHC_report
+  excluded_sources:
+  - registry_MSI_summary
+  missingness_semantics: Not documented, not performed, equivocal and retained are distinct.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.mmr_pms2
+    contract_version: 0.1.0
+    contract_hash: 553aead31011a43815a0ac1830db4f1a8ab1492d1f7e82111bea3e6ae9cb9514
+    path: variable_contracts/CRC.VAR.mmr_pms2.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.mmr_msh2
+  label: MSH2 IHC result
+  roles:
+  - action
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#mmr_msh2
+  temporal_meaning: indexed_specimen_result
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: mmr_msh2
+    status: specified
+  source_documents:
+  - MMR_IHC_report
+  excluded_sources:
+  - registry_MSI_summary
+  missingness_semantics: Not documented, not performed, equivocal and retained are distinct.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.mmr_msh2
+    contract_version: 0.1.0
+    contract_hash: aae62f6c43bbdceb35c7723898864af7b200abc42f9bf9b6dbc759319b4f2dba
+    path: variable_contracts/CRC.VAR.mmr_msh2.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.mmr_msh6
+  label: MSH6 IHC result
+  roles:
+  - action
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#mmr_msh6
+  temporal_meaning: indexed_specimen_result
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: mmr_msh6
+    status: specified
+  source_documents:
+  - MMR_IHC_report
+  excluded_sources:
+  - registry_MSI_summary
+  missingness_semantics: Not documented, not performed, equivocal and retained are distinct.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.mmr_msh6
+    contract_version: 0.1.0
+    contract_hash: d9fabec6419efb2dfb6f31298734563d4100264e7295861c281f348f05010411
+    path: variable_contracts/CRC.VAR.mmr_msh6.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.molecular_assay_method
+  label: Molecular assay method
+  roles:
+  - action
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#molecular_assay_method
+  temporal_meaning: indexed_result
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: molecular_assay_method
+    status: specified
+  source_documents:
+  - molecular_report
+  - pathology_addendum
+  excluded_sources:
+  - registry_summary_code
+  missingness_semantics: Method not documented is distinct from assay not performed.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.molecular_assay_method
+    contract_version: 0.1.0
+    contract_hash: 891090596fa62e7493126d609f6d79ce7361f6b77ec76bb1a8382810aee72def
+    path: variable_contracts/CRC.VAR.molecular_assay_method.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.molecular_assay_validation_status
+  label: Assay validation status for intended use
+  roles:
+  - action
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#molecular_assay_validation_status
+  temporal_meaning: assay_version_at_indexed_result
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: molecular_assay_validation_status
+    status: specified
+  source_documents:
+  - laboratory_report
+  - validation_documentation
+  excluded_sources:
+  - platform_name_only
+  missingness_semantics: Validation cannot be inferred from a result or platform.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.molecular_assay_validation_status
+    contract_version: 0.1.0
+    contract_hash: 61680220fadc65180908390768d116f35e7dfb19b4a0827cc318da324f94ca4d
+    path: variable_contracts/CRC.VAR.molecular_assay_validation_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.molecular_qc_status
+  label: Molecular test/specimen QC status
+  roles:
+  - action
+  - eligibility
+  - exceptions
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#molecular_qc_status
+  temporal_meaning: indexed_result
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: molecular_qc_status
+    status: specified
+  source_documents:
+  - molecular_report
+  - pathology_addendum
+  excluded_sources:
+  - result_without_QC_context_as_QC_pass
+  missingness_semantics: Not documented, insufficient tumor, controls failed and indeterminate remain distinct.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.molecular_qc_status
+    contract_version: 0.1.0
+    contract_hash: bb09361e5c5b1705f0fd62d6b30856e702e2471d11a0408292b441ce4c7d51c4
+    path: variable_contracts/CRC.VAR.molecular_qc_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.molecular_specimen_id
+  label: Molecular specimen/block identifier
+  roles:
+  - action
+  - exceptions
+  datatype: string
+  value_domain: CRC.CHART.molecular_detail#molecular_specimen_id
+  temporal_meaning: indexed_result_specimen
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: molecular_specimen_id
+    status: specified
+  source_documents:
+  - molecular_report
+  - pathology_accession
+  excluded_sources:
+  - invented_or_inferred_identifier
+  missingness_semantics: Null means specimen identity is not established; never manufacture an accession.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.molecular_specimen_id
+    contract_version: 0.1.0
+    contract_hash: 6f4eb372b8cacb163c71129fe2d27a42d8b86ae138345d912ab5ed823ef29abd
+    path: variable_contracts/CRC.VAR.molecular_specimen_id.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.molecular_specimen_date
+  label: Molecular specimen date
+  roles:
+  - timing
+  datatype: partial_date
+  value_domain: CRC.CHART.molecular_detail#molecular_specimen_date
+  temporal_meaning: specimen_collection_or_accession_as_labeled
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: molecular_specimen_date
+    status: specified
+  source_documents:
+  - molecular_report
+  - pathology_accession
+  excluded_sources:
+  - report_date_substitution
+  missingness_semantics: Preserve YYYY/YYYYMM/YYYYMMDD precision; no imputed month/day.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.molecular_specimen_date
+    contract_version: 0.1.0
+    contract_hash: 95bc8252223a3bf550a263ae7af4237ffe3210b9cb0bb585b5d86cdd702abc66
+    path: variable_contracts/CRC.VAR.molecular_specimen_date.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.molecular_result_date
+  label: Molecular final result date
+  roles:
+  - timing
+  datatype: partial_date
+  value_domain: CRC.CHART.molecular_detail#molecular_result_date
+  temporal_meaning: final_report_availability
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: molecular_result_date
+    status: specified
+  source_documents:
+  - final_molecular_report
+  excluded_sources:
+  - specimen_date_substitution
+  - order_date_substitution
+  missingness_semantics: Preserve documented precision; null does not imply result was unavailable before treatment.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.molecular_result_date
+    contract_version: 0.1.0
+    contract_hash: 193170bdae47d3104466654889195779f0593981ff39ccba980efe475344c59c
+    path: variable_contracts/CRC.VAR.molecular_result_date.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.mmr_msi_discordance_status
+  label: MMR/MSI method relationship
+  roles:
+  - eligibility
+  - exceptions
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#mmr_msi_discordance_status
+  temporal_meaning: after_available_indexed_methods
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: mmr_msi_discordance_status
+    status: specified
+  source_documents:
+  - MMR_IHC_report
+  - MSI_report
+  - molecular_pathology_review
+  excluded_sources:
+  - single_method_as_concordant
+  missingness_semantics: Single method, indeterminate and unresolved discordance are distinct.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.mmr_msi_discordance_status
+    contract_version: 0.1.0
+    contract_hash: 31b9f7596b77fbde1e3bbb09ae2405d51309030d935cde0e0f174371ee55c846
+    path: variable_contracts/CRC.VAR.mmr_msi_discordance_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.mmr_subclonal_loss
+  label: Subclonal MMR protein loss
+  roles:
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#mmr_subclonal_loss
+  temporal_meaning: indexed_IHC_specimen
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: mmr_subclonal_loss
+    status: specified
+  source_documents:
+  - MMR_IHC_report
+  - pathology_review
+  excluded_sources:
+  - integrated_dMMR_summary_only
+  missingness_semantics: Not assessed is not absent.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.mmr_subclonal_loss
+    contract_version: 0.1.0
+    contract_hash: 1c634ed46dbfbb5800d782764d9ab9d6bca3b72f765540f57fe44025f39f8a84
+    path: variable_contracts/CRC.VAR.mmr_subclonal_loss.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.molecular_peer_review_status
+  label: Molecular pathology peer-review status
+  roles:
+  - action
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#molecular_peer_review_status
+  temporal_meaning: after_discordant_or_indeterminate_result
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: molecular_peer_review_status
+    status: specified
+  source_documents:
+  - pathology_review
+  - amended_report
+  excluded_sources:
+  - implicit_review
+  missingness_semantics: Not documented does not prove review was not performed.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.molecular_peer_review_status
+    contract_version: 0.1.0
+    contract_hash: c5d85c68d21a83f990e1cf3eb3795acec4b5610bca6243d53e92ba515adb6b36
+    path: variable_contracts/CRC.VAR.molecular_peer_review_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.molecular_repeat_test_result
+  label: Repeat or alternate molecular test outcome
+  roles:
+  - action
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#molecular_repeat_test_result
+  temporal_meaning: after_indexed_problem_result
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: molecular_repeat_test_result
+    status: specified
+  source_documents:
+  - repeat_molecular_report
+  - pathology_addendum
+  excluded_sources:
+  - plan_to_repeat_without_result
+  missingness_semantics: Planned repeat is not a completed repeat result.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.molecular_repeat_test_result
+    contract_version: 0.1.0
+    contract_hash: 0ce3c1ad6a1ef006d028ec3651183fdff63079c54a08c711eb7c5c604ec7e496
+    path: variable_contracts/CRC.VAR.molecular_repeat_test_result.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.molecular_final_interpretation
+  label: Final integrated molecular interpretation
+  roles:
+  - action
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#molecular_final_interpretation
+  temporal_meaning: after_review_of_all_indexed_methods
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: molecular_final_interpretation
+    status: specified
+  source_documents:
+  - final_or_amended_molecular_report
+  - treating_team_interpretation
+  excluded_sources:
+  - model_only_resolution
+  missingness_semantics: No final interpretation leaves discordance unresolved.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.molecular_final_interpretation
+    contract_version: 0.1.0
+    contract_hash: 9195480e6731b4f004ca488bd192d4a7fea31170df520c260cd3587a9cad4d5e
+    path: variable_contracts/CRC.VAR.molecular_final_interpretation.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.trial_context
+  label: Molecular testing trial context
+  roles:
+  - exceptions
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#trial_context
+  temporal_meaning: at_indexed_test_and_treatment_decision
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: trial_context
+    status: specified
+  source_documents:
+  - trial_consent
+  - protocol_note
+  - oncology
+  excluded_sources:
+  - research_assay_without_trial_link
+  missingness_semantics: Not documented and routine care remain distinct.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.trial_context
+    contract_version: 0.1.0
+    contract_hash: 906a57742f4164755099426fd6e722110a406c9f511d5ba32e919991634178dc
+    path: variable_contracts/CRC.VAR.trial_context.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.expanded_ras_coverage
+  label: Expanded KRAS/NRAS assay coverage
+  roles:
+  - action
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#expanded_ras_coverage
+  temporal_meaning: assay_version_for_indexed_RAS_result
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: expanded_ras_coverage
+    status: specified
+  source_documents:
+  - molecular_report
+  - assay_technical_specification
+  excluded_sources:
+  - wild_type_registry_codes_alone
+  missingness_semantics: Not documented coverage cannot be treated as complete.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.expanded_ras_coverage
+    contract_version: 0.1.0
+    contract_hash: e23f058c8b5fd5a0612d229971651bd2a65df5ebeb53fabf3799bf7dfd230130
+    path: variable_contracts/CRC.VAR.expanded_ras_coverage.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.mlh1_promoter_methylation_status
+  label: MLH1 promoter methylation result
+  roles:
+  - action
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#mlh1_promoter_methylation_status
+  temporal_meaning: indexed_Lynch_triage_workup
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: mlh1_promoter_methylation_status
+    status: specified
+  source_documents:
+  - methylation_report
+  - pathology_addendum
+  excluded_sources:
+  - BRAF_result_as_methylation
+  missingness_semantics: Not tested, not documented and unmethylated are distinct.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.mlh1_promoter_methylation_status
+    contract_version: 0.1.0
+    contract_hash: 037f1121ac53cdbf7404e2290adedae8cc1433980493a299184e70dd8c7464b1
+    path: variable_contracts/CRC.VAR.mlh1_promoter_methylation_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.lynch_risk_communication
+  label: Lynch-risk communication
+  roles:
+  - action
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#lynch_risk_communication
+  temporal_meaning: after_abnormal_tumor_result
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: lynch_risk_communication
+    status: specified
+  source_documents:
+  - pathology_report
+  - clinician_message
+  - oncology
+  excluded_sources:
+  - abnormal_result_without_communication_evidence
+  missingness_semantics: Report-only communication and direct clinician communication remain distinct.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.lynch_risk_communication
+    contract_version: 0.1.0
+    contract_hash: 1b338a4cb765e05a9a645e6206c5173351d864e9b838e382965a4df1ce125c53
+    path: variable_contracts/CRC.VAR.lynch_risk_communication.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.genetics_referral_status
+  label: Genetics referral status
+  roles:
+  - timing
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#genetics_referral_status
+  temporal_meaning: after_Lynch_risk_identification
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: genetics_referral_status
+    status: specified
+  source_documents:
+  - genetics_referral
+  - genetics_visit
+  - oncology
+  excluded_sources:
+  - recommendation_without_referral
+  missingness_semantics: Referred, completed, declined and not documented are distinct.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.genetics_referral_status
+    contract_version: 0.1.0
+    contract_hash: e79a06ff524ed66739fda99502b7ddd1d63b92166d783d435546c03ba1cda541
+    path: variable_contracts/CRC.VAR.genetics_referral_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.germline_result
+  label: High-level germline testing result
+  roles:
+  - exceptions
+  datatype: categorical
+  value_domain: CRC.CHART.molecular_detail#germline_result
+  temporal_meaning: after_germline_testing
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.molecular_detail
+    field: germline_result
+    status: specified
+  source_documents:
+  - germline_report
+  - genetics_note
+  excluded_sources:
+  - tumor_only_result_as_germline
+  missingness_semantics: VUS, negative, pending, not tested and not documented are distinct.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.germline_result
+    contract_version: 0.1.0
+    contract_hash: 2bf8559f13d3a35062b5bfb733e331386f56de35d0e308bb127ccc152dcb1992
+    path: variable_contracts/CRC.VAR.germline_result.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.rectal_mri_protocol
+  label: Dedicated rectal MRI protocol
+  roles:
+  - action
+  datatype: categorical
+  value_domain: CRC.CHART.rectal_mri_risk#rectal_mri_protocol
+  temporal_meaning: pretreatment
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.rectal_mri_risk
+    field: rectal_mri_protocol
+    status: specified
+  source_documents:
+  - pelvic_mri_report
+  excluded_sources:
+  - pelvic_CT
+  missingness_semantics: Protocol unclear is not a dedicated protocol.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.rectal_mri_protocol
+    contract_version: 0.1.0
+    contract_hash: 791199f48c10530c55743a5c1f5f85292814cf3044cd08cf49438c72f2cd0a0e
+    path: variable_contracts/CRC.VAR.rectal_mri_protocol.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.rectal_mri_quality
+  label: Rectal MRI adequacy
+  roles:
+  - exceptions
+  datatype: categorical
+  value_domain: CRC.CHART.rectal_mri_risk#rectal_mri_quality
+  temporal_meaning: pretreatment
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.rectal_mri_risk
+    field: rectal_mri_quality
+    status: specified
+  source_documents:
+  - pelvic_mri_report
+  - radiology_review
+  excluded_sources:
+  - assumed_quality
+  missingness_semantics: Not documented is not adequate.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.rectal_mri_quality
+    contract_version: 0.1.0
+    contract_hash: 7a95f4164ab4e50e913d2bc4695f0e1e13dd2b2ffc9631a996f61e1388fc5928
+    path: variable_contracts/CRC.VAR.rectal_mri_quality.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.pelvic_mri_date
+  label: Pretreatment pelvic MRI date
+  roles:
+  - timing
+  datatype: partial_date
+  value_domain: CRC.CHART.rectal_mri_risk#pelvic_mri_date
+  temporal_meaning: pretreatment_exam
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.rectal_mri_risk
+    field: pelvic_mri_date
+    status: specified
+  source_documents:
+  - pelvic_mri_report
+  excluded_sources:
+  - order_date
+  missingness_semantics: Preserve documented date precision.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.pelvic_mri_date
+    contract_version: 0.1.0
+    contract_hash: a75aae9a83aa5d456c786eed9afa434658e894730a7547102e170882456cd5d0
+    path: variable_contracts/CRC.VAR.pelvic_mri_date.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.rectal_tumor_height
+  label: Rectal tumor height
+  roles:
+  - action
+  - eligibility
+  datatype: decimal_cm
+  value_domain: CRC.CHART.rectal_mri_risk#rectal_tumor_height_cm
+  temporal_meaning: pretreatment
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.rectal_mri_risk
+    field: rectal_tumor_height_cm
+    status: specified
+  source_documents:
+  - pelvic_mri_report
+  - endoscopy
+  excluded_sources:
+  - number_without_landmark
+  missingness_semantics: A distance without landmark is incomplete, not a usable height.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.rectal_tumor_height
+    contract_version: 0.1.0
+    contract_hash: 0d1fc18b6c3694eb2100253f710f79a19ce26e966e1471f8163cc28f58718a5c
+    path: variable_contracts/CRC.VAR.rectal_tumor_height.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.sphincter_relation
+  label: Tumor relation to sphincter complex
+  roles:
+  - action
+  datatype: categorical
+  value_domain: CRC.CHART.rectal_mri_risk#sphincter_relation
+  temporal_meaning: pretreatment
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.rectal_mri_risk
+    field: sphincter_relation
+    status: specified
+  source_documents:
+  - pelvic_mri_report
+  excluded_sources:
+  - tumor_height_alone
+  missingness_semantics: Not reported is not clear.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.sphincter_relation
+    contract_version: 0.1.0
+    contract_hash: 078f5e16c8237b55b87bf70c1c584761a5091166c1fd52c381155fbb489b5e56
+    path: variable_contracts/CRC.VAR.sphincter_relation.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.extramural_depth_mm
+  label: MRI extramural depth
+  roles:
+  - action
+  datatype: decimal_mm
+  value_domain: CRC.CHART.rectal_mri_risk#extramural_depth_mm
+  temporal_meaning: pretreatment
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.rectal_mri_risk
+    field: extramural_depth_mm
+    status: specified
+  source_documents:
+  - pelvic_mri_report
+  excluded_sources:
+  - pathologic_depth
+  missingness_semantics: Null means not established; do not impute from cT3.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.extramural_depth_mm
+    contract_version: 0.1.0
+    contract_hash: 554c940fd9bebae4b59d547052df19d027ae36fa0fbc866c8415b592c33a4498
+    path: variable_contracts/CRC.VAR.extramural_depth_mm.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.mrf_status
+  label: Mesorectal fascia status
+  roles:
+  - action
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CHART.rectal_mri_risk#mrf_status
+  temporal_meaning: pretreatment
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.rectal_mri_risk
+    field: mrf_status
+    status: specified
+  source_documents:
+  - pelvic_mri_report
+  - radiology_review
+  excluded_sources:
+  - postoperative_CRM_as_MRF
+  missingness_semantics: Not reported/indeterminate are not clear.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.mrf_status
+    contract_version: 0.1.0
+    contract_hash: ffdb8300862525622be6b44bfc069bafba4ad75082e9cfe424c38bc55114030b
+    path: variable_contracts/CRC.VAR.mrf_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.emvi_status
+  label: MRI EMVI status
+  roles:
+  - action
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CHART.rectal_mri_risk#emvi_status
+  temporal_meaning: pretreatment
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.rectal_mri_risk
+    field: emvi_status
+    status: specified
+  source_documents:
+  - pelvic_mri_report
+  excluded_sources:
+  - pathologic_LVI_as_MRI_EMVI
+  missingness_semantics: Not reported/indeterminate are not absent.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.emvi_status
+    contract_version: 0.1.0
+    contract_hash: 61743313dfb20620e4a5034d2d4f279770cbe8c354744a86ed6c7551c0eb8c0a
+    path: variable_contracts/CRC.VAR.emvi_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.mri_tumor_deposits
+  label: MRI tumor deposits
+  roles:
+  - action
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CHART.rectal_mri_risk#mri_tumor_deposits
+  temporal_meaning: pretreatment
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.rectal_mri_risk
+    field: mri_tumor_deposits
+    status: specified
+  source_documents:
+  - pelvic_mri_report
+  excluded_sources:
+  - pathologic_STORE_item_3934_as_MRI_finding
+  missingness_semantics: Not reported/indeterminate are not absent.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.mri_tumor_deposits
+    contract_version: 0.1.0
+    contract_hash: e3df884702920b09b47e50bd62cd2df9b64b01a18c368d5da68874490c9a7b7f
+    path: variable_contracts/CRC.VAR.mri_tumor_deposits.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.intersphincteric_plane_status
+  label: Intersphincteric plane status
+  roles:
+  - action
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.CHART.rectal_mri_risk#intersphincteric_plane_status
+  temporal_meaning: pretreatment
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.rectal_mri_risk
+    field: intersphincteric_plane_status
+    status: specified
+  source_documents:
+  - pelvic_mri_report
+  excluded_sources:
+  - tumor_height_alone
+  missingness_semantics: Not reported/indeterminate are not clear.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.intersphincteric_plane_status
+    contract_version: 0.1.0
+    contract_hash: 3ec138e3da48b29f62ce43bb816c857060c3720eff613a6b07e013e6084ad80e
+    path: variable_contracts/CRC.VAR.intersphincteric_plane_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.ici_plan
+  label: ICI decision state
+  roles:
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.STORE_CHART.systemic_treatment#ici_plan
+  temporal_meaning: before_indexed_ICI_decision
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: ici_plan
+    status: specified
+  source_documents:
+  - oncology_plan
+  - treatment_consent
+  - pharmacy_plan
+  excluded_sources:
+  - actual_nonreceipt_as_plan
+  missingness_semantics: Planned, considered, not planned, contraindicated and unknown are distinct.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.ici_plan
+    contract_version: 0.1.0
+    contract_hash: 4511c29104dc3b6936b25952888c9897c198b2bd321081be03949cbbc6fbf249
+    path: variable_contracts/CRC.VAR.ici_plan.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.anti_egfr_plan
+  label: Anti-EGFR decision state
+  roles:
+  - eligibility
+  datatype: categorical
+  value_domain: CRC.STORE_CHART.systemic_treatment#anti_egfr_plan
+  temporal_meaning: before_indexed_anti_EGFR_decision
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: anti_egfr_plan
+    status: specified
+  source_documents:
+  - oncology_plan
+  - treatment_consent
+  - pharmacy_plan
+  excluded_sources:
+  - cetuximab_or_panitumumab_in_options_list_only
+  missingness_semantics: Under consideration is not planned or administered.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.anti_egfr_plan
+    contract_version: 0.1.0
+    contract_hash: 23b78a19362c4398c76628273a36880e9c078c478e52ece1253cf2e4c1358696
+    path: variable_contracts/CRC.VAR.anti_egfr_plan.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.anti_egfr_start_date
+  label: Anti-EGFR start date
+  roles:
+  - timing
+  datatype: partial_date
+  value_domain: CRC.STORE_CHART.systemic_treatment#anti_egfr_start_date
+  temporal_meaning: first_administration_of_indexed_anti_EGFR
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: anti_egfr_start_date
+    status: specified
+  source_documents:
+  - medication_administration
+  - infusion_record
+  excluded_sources:
+  - order_date
+  - plan_date
+  missingness_semantics: No administration date means treatment receipt is not established.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.anti_egfr_start_date
+    contract_version: 0.1.0
+    contract_hash: 727dcbe369b7510b553b9f733f7374b01f0b74b64ab82eb4542039d6634e0cd7
+    path: variable_contracts/CRC.VAR.anti_egfr_start_date.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.ici_start_date
+  label: ICI/immunotherapy start date
+  roles:
+  - action
+  - timing
+  datatype: partial_date
+  value_domain: CRC.STORE_CHART.systemic_treatment#immunotherapy_start_date
+  temporal_meaning: first_course_registry_date_or_indexed_chart_event_as_labeled
+  mapping_level: registry_coarsened
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: RX Date BRM
+    item_number: '1240'
+    xml_id: rxDateBrm
+    effective_years: all_with_historical_support_notes
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: immunotherapy_start_date
+    status: specified
+  source_documents:
+  - medication_administration
+  - infusion_record
+  - registry
+  excluded_sources:
+  - plan_date
+  missingness_semantics: Registry date is first-course immunotherapy and may not represent later-line indexed ICI.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.ici_start_date
+    contract_version: 0.1.0
+    contract_hash: bf3a35c380984b9cb83ab848cb5e5cfab53bd7427611648d056e39a92c88d7a0
+    path: variable_contracts/CRC.VAR.ici_start_date.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: coarsened
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.systemic_therapy_start_date
+  label: Systemic therapy start date
+  roles:
+  - timing
+  datatype: partial_date
+  value_domain: CRC.STORE_CHART.systemic_treatment#systemic_therapy_start_date
+  temporal_meaning: first_course_registry_date_or_indexed_chart_event_as_labeled
+  mapping_level: registry_coarsened
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: RX Date Systemic
+    item_number: '3230'
+    xml_id: rxDateSystemic
+    effective_years: 2003+
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: systemic_therapy_start_date
+    status: specified
+  source_documents:
+  - medication_administration
+  - infusion_record
+  - registry
+  excluded_sources:
+  - plan_date
+  missingness_semantics: Registry date covers first course only; later lines require chart chronology.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.systemic_therapy_start_date
+    contract_version: 0.1.0
+    contract_hash: e6c3833e59f6fc3746bcf004757f46306c79c9964d5db6cb00db5e58740c1b97
+    path: variable_contracts/CRC.VAR.systemic_therapy_start_date.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: coarsened
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.treatment_start_date
+  label: First cancer-directed treatment/decision date
+  roles:
+  - timing
+  datatype: partial_date
+  value_domain: CRC.STORE_CHART.systemic_treatment#treatment_start_date
+  temporal_meaning: CoC_first_course_boundary
+  mapping_level: registry_direct
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: Date 1st Crs RX CoC
+    item_number: '1270'
+    xml_id: date1stCrsRxCoc
+    effective_years: all
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: treatment_start_date
+    status: specified
+  source_documents:
+  - registry
+  - operative_report
+  - radiation_summary
+  - administration
+  - treatment_decision
+  excluded_sources:
+  - later_course_start_as_first_course
+  missingness_semantics: Under CoC rules a decision not to treat may establish this date; field meaning must accompany the value.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.treatment_start_date
+    contract_version: 0.1.0
+    contract_hash: 6e94079dc5d2ca668f18a2dc960de226db31cda672ea48c1c03d1f632666ab9a
+    path: variable_contracts/CRC.VAR.treatment_start_date.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: exact
+      temporal: exact
+      decision_boundary_preserved: true
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: direct
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.systemic_regimen
+  label: Indexed systemic regimen
+  roles:
+  - action
+  datatype: string
+  value_domain: CRC.STORE_CHART.systemic_treatment#systemic_regimen
+  temporal_meaning: indexed_line
+  mapping_level: registry_coarsened
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: RX Summ--Chemo
+    item_number: '1390'
+    xml_id: rxSummChemo
+    effective_years: all
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: systemic_regimen
+    status: specified
+  source_documents:
+  - oncology_plan
+  - administration
+  - pharmacy
+  excluded_sources:
+  - registry_agent_count_as_regimen
+  missingness_semantics: Registry single/multiple-agent codes do not identify FOLFOX/FOLFIRI/CAPOX/FOLFOXIRI or targeted combinations.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.systemic_regimen
+    contract_version: 0.1.0
+    contract_hash: ebeb159eb68081c8741f95695999f4f69f520cc851c88edc2401a042e1a55670
+    path: variable_contracts/CRC.VAR.systemic_regimen.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: coarsened
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.systemic_regimen_intensity
+  label: Indexed regimen composition/intensity
+  roles:
+  - action
+  datatype: categorical
+  value_domain: CRC.STORE_CHART.systemic_treatment#systemic_regimen_intensity
+  temporal_meaning: indexed_line
+  mapping_level: registry_coarsened
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: RX Summ--Chemo
+    item_number: '1390'
+    xml_id: rxSummChemo
+    effective_years: all
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: systemic_regimen_intensity
+    status: specified
+  source_documents:
+  - oncology_plan
+  - administration
+  - pharmacy
+  excluded_sources:
+  - registry_code_03_as_doublet_or_triplet
+  missingness_semantics: Multiple-agent registry code cannot distinguish doublet, triplet or targeted combination.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.systemic_regimen_intensity
+    contract_version: 0.1.0
+    contract_hash: 37b23225a00a14595cd2990904ccda8ed842ae543b79334b2831292564feb4cb
+    path: variable_contracts/CRC.VAR.systemic_regimen_intensity.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: coarsened
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.radiation_type
+  label: Rectal treatment radiation strategy
+  roles:
+  - action
+  datatype: categorical
+  value_domain: CRC.STORE_CHART.systemic_treatment#radiation_type
+  temporal_meaning: indexed_neoadjuvant_strategy
+  mapping_level: registry_coarsened
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: Phase I-III Radiation Treatment Modality and dates
+    item_number: 1506/1516/1526/1210/3220
+    xml_id: multiple_radiation_items
+    effective_years: varies
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: radiation_type
+    status: specified
+  source_documents:
+  - radiation_plan
+  - radiation_summary
+  excluded_sources:
+  - modality_code_alone_as_long_or_short_course
+  missingness_semantics: No radiation, unknown and an unclassified radiation course remain distinct.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.radiation_type
+    contract_version: 0.1.0
+    contract_hash: 3c2ae6100adcce72cba8b0b31717620adc584a9612d9ca894412e2fba6eb4b75
+    path: variable_contracts/CRC.VAR.radiation_type.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: coarsened
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.treatment_sequence
+  label: Indexed multimodality sequence
+  roles:
+  - action
+  datatype: categorical
+  value_domain: CRC.STORE_CHART.systemic_treatment#treatment_sequence
+  temporal_meaning: indexed_treatment_course
+  mapping_level: registry_coarsened
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: RX Summ--Surg/Rad Seq and RX Summ--Systemic/Sur Seq
+    item_number: 1380/1639
+    xml_id: rxSummSurgRadSeq/rxSummSystemicSurSeq
+    effective_years: varies
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: treatment_sequence
+    status: specified
+  source_documents:
+  - dated_administration
+  - radiation_summary
+  - operative_report
+  - registry
+  excluded_sources:
+  - plan_without_delivery
+  missingness_semantics: Coarse first-course sequence does not establish TNT sub-sequence or regimen.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.treatment_sequence
+    contract_version: 0.1.0
+    contract_hash: 1207aa5198722297ed23a58db60ae3fc967ed7eabfd8dc5159032c72da31214f
+    path: variable_contracts/CRC.VAR.treatment_sequence.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: coarsened
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.ici_agent
+  label: Indexed immune checkpoint agent/combination
+  roles:
+  - action
+  datatype: categorical
+  value_domain: CRC.STORE_CHART.systemic_treatment#ici_agent
+  temporal_meaning: indexed_line
+  mapping_level: chart_extension
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: RX Summ--BRM
+    item_number: '1410'
+    xml_id: rxSummBrm
+    effective_years: all
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: ici_agent
+    status: specified
+  source_documents:
+  - administration
+  - oncology_plan
+  - pharmacy
+  excluded_sources:
+  - registry_immunotherapy_yes_as_agent
+  missingness_semantics: Registry item 1410 establishes immunotherapy summary only, not drug or combination.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.ici_agent
+    contract_version: 0.1.0
+    contract_hash: fa303cac52cfb5d283cbf3b4ee85cfd0dd830cce29d0b6e1b664e885432503eb
+    path: variable_contracts/CRC.VAR.ici_agent.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.biologic_agent
+  label: Indexed biologic/targeted agent
+  roles:
+  - action
+  datatype: categorical
+  value_domain: CRC.STORE_CHART.systemic_treatment#biologic_agent
+  temporal_meaning: indexed_line
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: biologic_agent
+    status: specified
+  source_documents:
+  - administration
+  - oncology_plan
+  - pharmacy
+  excluded_sources:
+  - molecular_result_as_treatment
+  missingness_semantics: Unknown/none are distinct; options lists are not administration.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.biologic_agent
+    contract_version: 0.1.0
+    contract_hash: da9ec17e9e104729386e12d1650888e92f1c603980728d30e19bbbc9486040f9
+    path: variable_contracts/CRC.VAR.biologic_agent.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.prior_systemic_therapy
+  label: Prior systemic therapy exposure
+  roles:
+  - eligibility
+  - timing
+  datatype: categorical
+  value_domain: CRC.STORE_CHART.systemic_treatment#prior_systemic_therapy
+  temporal_meaning: before_indexed_line
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: prior_systemic_therapy
+    status: specified
+  source_documents:
+  - oncology_timeline
+  - administration
+  - outside_records
+  excluded_sources:
+  - registry_first_course_only_as_complete_history
+  missingness_semantics: Incomplete outside history prevents a confident line count.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.prior_systemic_therapy
+    contract_version: 0.1.0
+    contract_hash: bf122d5d1b390f28cc65d469771b3ad785dfd3105712a6a9f780f827720e0b74
+    path: variable_contracts/CRC.VAR.prior_systemic_therapy.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.prior_braf_egfr_targeted_therapy
+  label: Prior BRAF/EGFR targeted exposure
+  roles:
+  - exceptions
+  datatype: categorical
+  value_domain: CRC.STORE_CHART.systemic_treatment#prior_braf_egfr_targeted_therapy
+  temporal_meaning: before_indexed_BRAF_line
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: prior_braf_egfr_targeted_therapy
+    status: specified
+  source_documents:
+  - oncology_timeline
+  - administration
+  - pharmacy
+  - outside_records
+  excluded_sources:
+  - planned_but_not_administered
+  missingness_semantics: Unknown is not absent.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.prior_braf_egfr_targeted_therapy
+    contract_version: 0.1.0
+    contract_hash: 7445818ec0f0823de18a130e91683d310bf0f9e3b8c747e4ac167fa2bb01ae43
+    path: variable_contracts/CRC.VAR.prior_braf_egfr_targeted_therapy.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.progression_date
+  label: Qualifying progression date
+  roles:
+  - eligibility
+  datatype: partial_date
+  value_domain: CRC.STORE_CHART.systemic_treatment#progression_date
+  temporal_meaning: progression_on_qualifying_prior_line
+  mapping_level: chart_extension
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: Recurrence Date--1st is not equivalent
+    item_number: '1860'
+    xml_id: recurrenceDate1st
+    effective_years: facility_followup
+  extraction:
+    spec_id: CRC.STORE_CHART.systemic_treatment
+    field: progression_date
+    status: specified
+  source_documents:
+  - imaging
+  - oncology_response_assessment
+  - pathology
+  excluded_sources:
+  - first_recurrence_date_without_regimen_link
+  missingness_semantics: Recurrence and progression on a specified regimen are different events.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.progression_date
+    contract_version: 0.1.0
+    contract_hash: 86096f60d2622bd442c9020850b81d6ad30ad3e38e75fbf2649a44c2023f51df
+    path: variable_contracts/CRC.VAR.progression_date.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.ecog_performance_status
+  label: ECOG performance status
+  roles:
+  - exceptions
+  datatype: categorical
+  value_domain: CRC.CHART.decision_exceptions#ecog_performance_status
+  temporal_meaning: at_or_near_indexed_decision
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.decision_exceptions
+    field: ecog_performance_status
+    status: specified
+  source_documents:
+  - oncology
+  - surgery
+  - radiation_oncology
+  excluded_sources:
+  - remote_ECOG_without_decision_link
+  missingness_semantics: Not assessed and unknown remain distinct; narrative function is not automatically converted.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.ecog_performance_status
+    contract_version: 0.1.0
+    contract_hash: 4c29a2d1a090e6001f7caa712a75194ec03b9df8dfd9463e6b0e83c467c60d37
+    path: variable_contracts/CRC.VAR.ecog_performance_status.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.organ_function_constraints
+  label: Material organ-function constraint
+  roles:
+  - exceptions
+  datatype: categorical
+  value_domain: CRC.CHART.decision_exceptions#organ_function_constraints
+  temporal_meaning: at_indexed_decision
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.decision_exceptions
+    field: organ_function_constraints
+    status: specified
+  source_documents:
+  - oncology
+  - labs
+  - pharmacy
+  - specialty_assessment
+  excluded_sources:
+  - old_lab_without_decision_link
+  missingness_semantics: Not assessed, unknown and explicitly no material constraint are different.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.organ_function_constraints
+    contract_version: 0.1.0
+    contract_hash: 5b03ae4f8e162e3afc922c490367824efdf7eab600c30627eec8588e4b2114b9
+    path: variable_contracts/CRC.VAR.organ_function_constraints.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.comorbidity_constraints
+  label: Material comorbidity constraint
+  roles:
+  - exceptions
+  datatype: categorical
+  value_domain: CRC.CHART.decision_exceptions#comorbidity_constraints
+  temporal_meaning: at_indexed_decision
+  mapping_level: chart_extension
+  registry_mapping: *id003
+  extraction:
+    spec_id: CRC.CHART.decision_exceptions
+    field: comorbidity_constraints
+    status: specified
+  source_documents:
+  - oncology
+  - medicine
+  - specialty_assessment
+  excluded_sources:
+  - diagnosis_list_without_treatment_relevance
+  missingness_semantics: Comorbidity presence alone does not establish a material treatment constraint.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.comorbidity_constraints
+    contract_version: 0.1.0
+    contract_hash: 219892ea3000ea5206d006e5d361f044852c38ae0dfd5c44d50cbb7566534393
+    path: variable_contracts/CRC.VAR.comorbidity_constraints.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: absent
+      temporal: misaligned
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: none
+      transformation_id: null
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.treatment_contraindication
+  label: Contraindication to indexed treatment
+  roles:
+  - exceptions
+  datatype: categorical
+  value_domain: CRC.CHART.decision_exceptions#treatment_contraindication
+  temporal_meaning: at_indexed_decision
+  mapping_level: registry_coarsened
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: Coarse no-treatment reasons within treatment summary items
+    item_number: 1390/1410/1430
+    xml_id: multiple_items
+    effective_years: varies
+  extraction:
+    spec_id: CRC.CHART.decision_exceptions
+    field: treatment_contraindication
+    status: specified
+  source_documents:
+  - oncology
+  - consent
+  - pharmacy
+  - specialty_assessment
+  excluded_sources:
+  - nonreceipt_alone
+  missingness_semantics: Only explicit absence supports absent_explicit; silence is unknown/not assessed.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.treatment_contraindication
+    contract_version: 0.1.0
+    contract_hash: 98807e1743fac4205f2c5ce6387467464ad579ea6927c43bfc4fa1736dcb692e
+    path: variable_contracts/CRC.VAR.treatment_contraindication.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: coarsened
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.ici_contraindication
+  label: ICI-specific contraindication
+  roles:
+  - exceptions
+  datatype: categorical
+  value_domain: CRC.CHART.decision_exceptions#ici_contraindication
+  temporal_meaning: at_indexed_ICI_decision
+  mapping_level: registry_coarsened
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: RX Summ--BRM coarse reason
+    item_number: '1410'
+    xml_id: rxSummBrm
+    effective_years: all
+  extraction:
+    spec_id: CRC.CHART.decision_exceptions
+    field: ici_contraindication
+    status: specified
+  source_documents:
+  - oncology
+  - transplant_or_autoimmune_specialty_note
+  - pharmacy
+  excluded_sources:
+  - ICI_nonreceipt_alone
+  missingness_semantics: Registry contraindicated code is coarse; detailed ICI reason requires chart evidence.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.ici_contraindication
+    contract_version: 0.1.0
+    contract_hash: 1dbaa40d702312d749aed9719b3ae6f4dd00940575f5e05fd82c596309442a8f
+    path: variable_contracts/CRC.VAR.ici_contraindication.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: coarsened
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null
+- variable_id: crc.patient_preference
+  label: Patient preference for indexed option
+  roles:
+  - exceptions
+  datatype: categorical
+  value_domain: CRC.CHART.decision_exceptions#patient_preference
+  temporal_meaning: latest_before_indexed_action
+  mapping_level: registry_coarsened
+  registry_mapping:
+    standard: NAACCR_v26
+    item_name: Coarse refusal codes within treatment summaries
+    item_number: 1390/1410/1430
+    xml_id: multiple_items
+    effective_years: varies
+  extraction:
+    spec_id: CRC.CHART.decision_exceptions
+    field: patient_preference
+    status: specified
+  source_documents:
+  - shared_decision_note
+  - consent
+  - refusal
+  - oncology
+  excluded_sources:
+  - clinician_choice_as_patient_preference
+  missingness_semantics: Not documented, undecided, declines and prefers an alternative are distinct.
+  conformance: *id002
+  variable_contract:
+    contract_id: CRC.VAR.patient_preference
+    contract_version: 0.1.0
+    contract_hash: 40c3fbd0d6454e57e2b4844726b255dab2b63f947181458cce5f5dff10892035
+    path: variable_contracts/CRC.VAR.patient_preference.yaml
+  evidence_coverage:
+    registry_to_rule:
+      semantic: coarsened
+      temporal: conditional
+      decision_boundary_preserved: false
+      status: inferred_from_mapping_level_requires_use_specific_review
+    canonical_to_registry:
+      level: coarsened
+      transformation_id: PENDING_VERSIONED_PROJECTION
+      status: candidate
+    observed_availability:
+      status: NOT_ASSESSED
+      profile_id: null

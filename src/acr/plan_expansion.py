@@ -80,21 +80,30 @@ def fit_terms_to_budget(rev: PlanRevision, plan: CoveragePlan,
     The order is the model's own priority order, and the truncation is reported back by
     name, so "you may have 5 of the 6" is a statement the agent can act on. Terms already
     in the plan are kept and cost nothing: `apply_revision` prices only what is new.
+
+    NOTHING IS TRIMMED ANY MORE, and the docstring above is kept as the record of what was.
+    Measured over every recorded trace on 2026-07-30: this function deleted **103 search terms
+    the model had proposed for itself**, 32 distinct, including `lobe`, `bronchus`, `right
+    upper lobe`, `left lower lobe`, `pathology addendum` and `pleuropulmonary blastoma`.
+
+    Then the contradiction, which no single rule could show. On CASE009 of the planning ablation
+    this function deleted `lobe` and `bronchus` from the plan, and
+    `answer_checks.nos_requires_search` refused the answer because the run "never searched for
+    ['lobe', 'bronchus']". One rule punished the agent for not running a term another rule had
+    taken away. That run submitted the registry-correct C341 five times, was refused five
+    times, and shipped C349.
+
+    A cap on how many words the model may search for is not a cost control. The cost controls
+    are the model-call limit and the spend limit and both are still enforced. This was a cap on
+    the model's own retrieval vocabulary, which is precisely what it has a `search` tool to
+    decide.
+
+    The signature and the two-tuple stay because `agent` and `run_manifest` both record the
+    second element. It is now always empty, so `terms_deferred` is empty everywhere and
+    `expansion_is_spent`'s deferral arm can never arm. Removing the seam as well is a change to
+    the reflect loop and is not smuggled in here.
     """
-    room = max(0, headroom(plan, budget)["terms"])
-    kept: list[str] = []
-    deferred: list[str] = []
-    for t in rev.add_terms:
-        if t in plan.keywords:
-            kept.append(t)
-        elif room > 0:
-            kept.append(t)
-            room -= 1
-        else:
-            deferred.append(t)
-    if not deferred:
-        return rev, []
-    return _dc_replace(rev, add_terms=tuple(kept)), deferred
+    return rev, []
 
 
 def expansion_is_spent(plan: CoveragePlan, budget: ExpansionBudget, *,

@@ -1,0 +1,1426 @@
+schema_version: '2.0'
+category: rectal_tnt
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 18
+rules:
+- candidate_id: ER25-TX-05
+  parent_recommendation_id: ER25-TX-R05
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: TNT recommendation 1
+  category: rectal_tnt
+  title: MDT selection for TNT
+  core_or_supplemental: core
+  source_context:
+    eligibility: Locally advanced rectal cancer considered for TNT
+    action: Base decision on MDT, high-quality MRI, and patient factors
+    timing: Before treatment
+    exceptions: None
+    predicate_logic: TNT_considered => MDT AND quality_MRI AND patient_factors
+  requirements:
+    eligibility:
+      expression: Locally advanced rectal cancer considered for TNT
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_mri.image_quality.pretreatment
+      - crc.rectal_risk.high_risk_features.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_mri.image_quality.pretreatment
+        - variable: crc.rectal_risk.high_risk_features.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Base decision on MDT, high-quality MRI, and patient factors
+      variables:
+      - crc.multidisciplinary_team.review_documented
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.multidisciplinary_team.review_documented
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Before treatment
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables:
+      - crc.comorbidity_constraints
+      - crc.patient_preference
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.comorbidity_constraints
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.comorbidity_constraints
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.multidisciplinary_team.review_documented
+  - crc.patient_preference
+  - crc.rectal_mri.image_quality.pretreatment
+  - crc.rectal_risk.high_risk_features.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-TX-06
+  parent_recommendation_id: ER25-TX-R06
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: TNT radiation recommendation
+  category: rectal_tnt
+  title: TNT radiation component
+  core_or_supplemental: core
+  source_context:
+    eligibility: TNT selected
+    action: Use long-course CRT 50 to 50.4 Gy in 25 to 28 fractions with capecitabine or infusional 5-FU, or SCRT 25 Gy in
+      five
+    timing: TNT
+    exceptions: Regimen contraindications
+    predicate_logic: TNT => LC_CRT_option OR SCRT_option
+  requirements:
+    eligibility:
+      expression: TNT selected
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use long-course CRT 50 to 50.4 Gy in 25 to 28 fractions with capecitabine or infusional 5-FU, or SCRT 25
+        Gy in five
+      variables:
+      - crc.rectal_radiation.fraction_count
+      - crc.rectal_radiation.radiosensitizer
+      - crc.rectal_radiation.total_dose_cgy
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.total_dose_cgy
+        - variable: crc.rectal_radiation.fraction_count
+        - variable: crc.rectal_radiation.radiosensitizer
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: TNT
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Regimen contraindications
+      variables:
+      - crc.dpd_status.before_fluoropyrimidine
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.dpd_status.before_fluoropyrimidine
+  required_variables:
+  - crc.dpd_status.before_fluoropyrimidine
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.fraction_count
+  - crc.rectal_radiation.radiosensitizer
+  - crc.rectal_radiation.total_dose_cgy
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_DPD_IMPLEMENTATION
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-TX-07
+  parent_recommendation_id: ER25-TX-R07
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: TNT chemotherapy recommendation
+  category: rectal_tnt
+  title: TNT chemotherapy component
+  core_or_supplemental: core
+  source_context:
+    eligibility: TNT selected
+    action: Use CAPOX or FOLFOX for 3 to 4.5 months
+    timing: Within TNT
+    exceptions: Fitness and DPD status
+    predicate_logic: TNT => CAPOX_or_FOLFOX_3_to_4_5_months
+  requirements:
+    eligibility:
+      expression: TNT selected
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use CAPOX or FOLFOX for 3 to 4.5 months
+      variables:
+      - crc.rectal_neoadjuvant.systemic_regimen
+      - crc.rectal_treatment.planned_pathway_at_decision
+      - crc.rectal_treatment.sequence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.systemic_regimen
+        - variable: crc.rectal_treatment.sequence
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Within TNT
+      variables:
+      - crc.rectal_neoadjuvant.systemic_duration_months
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.systemic_duration_months
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Fitness and DPD status
+      variables:
+      - crc.dpd_status.before_fluoropyrimidine
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.dpd_status.before_fluoropyrimidine
+  required_variables:
+  - crc.dpd_status.before_fluoropyrimidine
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_neoadjuvant.systemic_duration_months
+  - crc.rectal_neoadjuvant.systemic_regimen
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.sequence
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_DPD_IMPLEMENTATION
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-TX-08
+  parent_recommendation_id: ER25-TX-R08
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: TNT irinotecan recommendation
+  category: rectal_tnt
+  title: Restrict irinotecan TNT to PRODIGE-23 protocol
+  core_or_supplemental: core
+  source_context:
+    eligibility: Irinotecan proposed in TNT
+    action: Use only a PRODIGE-23-type protocol
+    timing: TNT
+    exceptions: Do not generalize irinotecan to other TNT regimens
+    predicate_logic: TNT_with_irinotecan => PRODIGE23_protocol
+  requirements:
+    eligibility:
+      expression: Irinotecan proposed in TNT
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use only a PRODIGE-23-type protocol
+      variables:
+      - crc.rectal_neoadjuvant.irinotecan_included
+      - crc.rectal_neoadjuvant.protocol_name
+      - crc.rectal_neoadjuvant.systemic_regimen
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.systemic_regimen
+        - variable: crc.rectal_neoadjuvant.protocol_name
+        - variable: crc.rectal_neoadjuvant.irinotecan_included
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: TNT
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Do not generalize irinotecan to other TNT regimens
+      variables:
+      - crc.patient.treatment_fitness_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.patient.treatment_fitness_at_decision
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.patient.treatment_fitness_at_decision
+  - crc.rectal_neoadjuvant.irinotecan_included
+  - crc.rectal_neoadjuvant.protocol_name
+  - crc.rectal_neoadjuvant.systemic_regimen
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-TX-09
+  parent_recommendation_id: ER25-TX-R09
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Upper-third high-risk TNT recommendation
+  category: rectal_tnt
+  title: TNT for upper-third cT4 or MRF-threatened disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Upper-third cT4 or threatened or involved MRF
+    action: Use TNT
+    timing: Neoadjuvant
+    exceptions: TNT-infeasible branch follows
+    predicate_logic: upper_third AND (cT4 OR MRF_threatened) => TNT
+  requirements:
+    eligibility:
+      expression: Upper-third cT4 or threatened or involved MRF
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_anatomy.third.pretreatment
+      - crc.rectal_mri.mrf_distance_mm.pretreatment
+      - crc.rectal_mri.mrf_status.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.rectal_anatomy.third.pretreatment
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_mri.mrf_distance_mm.pretreatment
+        - variable: crc.rectal_mri.mrf_status.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use TNT
+      variables:
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Neoadjuvant
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: TNT-infeasible branch follows
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_anatomy.third.pretreatment
+  - crc.rectal_mri.mrf_distance_mm.pretreatment
+  - crc.rectal_mri.mrf_status.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-TX-11
+  parent_recommendation_id: ER25-TX-R10
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Lower-mid high-risk surgery-intent TNT recommendation
+  category: rectal_tnt
+  title: TNT for lower or mid high-risk surgery-intent disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Lower or mid, surgery intended, any MRI high-risk feature
+    action: Use TNT
+    timing: Neoadjuvant
+    exceptions: None stated
+    predicate_logic: lower_mid AND surgery_intent AND any_highrisk => TNT
+  requirements:
+    eligibility:
+      expression: Lower or mid, surgery intended, any MRI high-risk feature
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_anatomy.third.pretreatment
+      - crc.rectal_mri.emvi_status.pretreatment
+      - crc.rectal_mri.lateral_node_status.pretreatment
+      - crc.rectal_mri.mrf_status.pretreatment
+      - crc.rectal_stage.clinical_n.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      - crc.rectal_surgery.intent_at_neoadjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_anatomy.third.pretreatment
+        - variable: crc.rectal_surgery.intent_at_neoadjuvant_decision
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_mri.mrf_status.pretreatment
+        - variable: crc.rectal_mri.emvi_status.pretreatment
+        - variable: crc.rectal_stage.clinical_n.pretreatment
+        - variable: crc.rectal_mri.lateral_node_status.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use TNT
+      variables:
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Neoadjuvant
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_anatomy.third.pretreatment
+  - crc.rectal_mri.emvi_status.pretreatment
+  - crc.rectal_mri.lateral_node_status.pretreatment
+  - crc.rectal_mri.mrf_status.pretreatment
+  - crc.rectal_stage.clinical_n.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_surgery.intent_at_neoadjuvant_decision
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-TX-12
+  parent_recommendation_id: ER25-TX-R11
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Lower-mid organ-preservation TNT recommendation
+  category: rectal_tnt
+  title: TNT for higher-stage organ preservation
+  core_or_supplemental: core
+  source_context:
+    eligibility: Lower or mid with preservation goal and high-risk, cT2N-positive, or cT3 any N
+    action: Use TNT
+    timing: Neoadjuvant
+    exceptions: None stated
+    predicate_logic: lower_mid AND organ_preservation AND (highrisk OR cT2Npos OR cT3) => TNT
+  requirements:
+    eligibility:
+      expression: Lower or mid with preservation goal and high-risk, cT2N-positive, or cT3 any N
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_anatomy.third.pretreatment
+      - crc.rectal_risk.high_risk_features.pretreatment
+      - crc.rectal_stage.clinical_n.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.rectal_anatomy.third.pretreatment
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_stage.clinical_n.pretreatment
+        - variable: crc.rectal_risk.high_risk_features.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use TNT
+      variables:
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Neoadjuvant
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables:
+      - crc.rectal_treatment.organ_preservation_goal
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.organ_preservation_goal
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_anatomy.third.pretreatment
+  - crc.rectal_risk.high_risk_features.pretreatment
+  - crc.rectal_stage.clinical_n.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.organ_preservation_goal
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-TX-13
+  parent_recommendation_id: ER25-TX-R12
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Organ-preservation sequence recommendation
+  category: rectal_tnt
+  title: CRT followed by consolidation for organ preservation
+  core_or_supplemental: core
+  source_context:
+    eligibility: TNT with organ-preservation goal
+    action: Use upfront CRT followed by consolidation chemotherapy
+    timing: Neoadjuvant sequence
+    exceptions: Patient fitness
+    predicate_logic: organ_preservation_TNT => CRT_then_consolidation
+  requirements:
+    eligibility:
+      expression: TNT with organ-preservation goal
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use upfront CRT followed by consolidation chemotherapy
+      variables:
+      - crc.rectal_tnt.radiation_component
+      - crc.rectal_tnt.systemic_component
+      - crc.rectal_treatment.planned_pathway_at_decision
+      - crc.rectal_treatment.sequence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.sequence
+        - variable: crc.rectal_tnt.radiation_component
+        - variable: crc.rectal_tnt.systemic_component
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Neoadjuvant sequence
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Patient fitness
+      variables:
+      - crc.rectal_treatment.goal
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.goal
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_tnt.radiation_component
+  - crc.rectal_tnt.systemic_component
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.goal
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.sequence
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO24-LARC-2.1
+  parent_recommendation_id: ASCO24-LARC-R2.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_larc_2024
+  source_anchor: Recommendation 2.1
+  category: rectal_tnt
+  title: TNT for low rectum or higher-risk pMMR disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: pMMR or MSS with low rectum, T4, EMVI, tumor deposits, threatened MRF, or threatened intersphincteric plane
+    action: Use initial TNT
+    timing: Neoadjuvant
+    exceptions: dMMR or MSI-H follows immunotherapy branch
+    predicate_logic: pMMR_MSS AND any_highrisk_or_low_rectum => TNT
+  requirements:
+    eligibility:
+      expression: pMMR or MSS with low rectum, T4, EMVI, tumor deposits, threatened MRF, or threatened intersphincteric plane
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.rectal_anatomy.height_category.pretreatment
+      - crc.rectal_mri.emvi_status.pretreatment
+      - crc.rectal_mri.intersphincteric_plane_status.pretreatment
+      - crc.rectal_mri.mrf_status.pretreatment
+      - crc.rectal_mri.tumor_deposit_status.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.rectal_anatomy.height_category.pretreatment
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_mri.emvi_status.pretreatment
+        - variable: crc.rectal_mri.tumor_deposit_status.pretreatment
+        - variable: crc.rectal_mri.mrf_status.pretreatment
+        - variable: crc.rectal_mri.intersphincteric_plane_status.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use initial TNT
+      variables:
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Neoadjuvant
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: dMMR or MSI-H follows immunotherapy branch
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.rectal_anatomy.height_category.pretreatment
+  - crc.rectal_mri.emvi_status.pretreatment
+  - crc.rectal_mri.intersphincteric_plane_status.pretreatment
+  - crc.rectal_mri.mrf_status.pretreatment
+  - crc.rectal_mri.tumor_deposit_status.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO24-LARC-3.1
+  parent_recommendation_id: ASCO24-LARC-R3.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_larc_2024
+  source_anchor: Recommendation 3.1
+  category: rectal_tnt
+  title: Prefer consolidation chemotherapy in TNT
+  core_or_supplemental: core
+  source_context:
+    eligibility: TNT selected
+    action: Prefer chemotherapy after radiation; discuss triplet induction for high distant-risk disease
+    timing: TNT sequencing
+    exceptions: Age, comorbidity, and toxicity
+    predicate_logic: TNT => prefer_RT_then_chemo; high_distant_risk => discuss_triplet_induction
+  requirements:
+    eligibility:
+      expression: TNT selected
+      variables:
+      - crc.ecog_performance_status
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_risk.distant_recurrence_risk.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_risk.distant_recurrence_risk.pretreatment
+        - variable: crc.ecog_performance_status
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Prefer chemotherapy after radiation; discuss triplet induction for high distant-risk disease
+      variables:
+      - crc.rectal_treatment.planned_pathway_at_decision
+      - crc.rectal_treatment.sequence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.sequence
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: TNT sequencing
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Age, comorbidity, and toxicity
+      variables:
+      - crc.age_at_decision
+      - crc.comorbidity_constraints
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.age_at_decision
+        - variable: crc.comorbidity_constraints
+  required_variables:
+  - crc.age_at_decision
+  - crc.comorbidity_constraints
+  - crc.ecog_performance_status
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_risk.distant_recurrence_risk.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.sequence
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ1-06
+  parent_recommendation_id: ASTRO25-KQ1-R6
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ1 recommendation 6
+  category: rectal_tnt
+  title: Include RT in TNT when NOM is pursued
+  core_or_supplemental: core
+  source_context:
+    eligibility: Stage II or III pursuing NOM
+    action: Include radiation within TNT
+    timing: Neoadjuvant
+    exceptions: dMMR immunotherapy cCR branch
+    predicate_logic: stage_II_III AND NOM_goal => TNT_with_RT
+  requirements:
+    eligibility:
+      expression: Stage II or III pursuing NOM
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.mmr_ihc_integrated_status
+      - crc.rectal_stage.clinical_stage_group.pretreatment
+      - crc.rectal_treatment.nonoperative_management_goal
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_stage.clinical_stage_group.pretreatment
+        - variable: crc.rectal_treatment.nonoperative_management_goal
+        - variable: crc.mmr_ihc_integrated_status
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Include radiation within TNT
+      variables:
+      - crc.rectal_tnt.radiation_component
+      - crc.rectal_tnt.systemic_component
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_tnt.radiation_component
+        - variable: crc.rectal_tnt.systemic_component
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Neoadjuvant
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: dMMR immunotherapy cCR branch
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.rectal_stage.clinical_stage_group.pretreatment
+  - crc.rectal_tnt.radiation_component
+  - crc.rectal_tnt.systemic_component
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.nonoperative_management_goal
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ2-04
+  parent_recommendation_id: ASTRO25-KQ2-R4
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ2 recommendation 4
+  category: rectal_tnt
+  title: TNT for cT3-4 or node-positive disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: cT3-4 or cN-positive rectal cancer
+    action: Use TNT
+    timing: Neoadjuvant
+    exceptions: Lower-risk omission pathway
+    predicate_logic: cT3_4 OR cNpos => TNT
+  requirements:
+    eligibility:
+      expression: cT3-4 or cN-positive rectal cancer
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_risk.lower_risk_status.pretreatment
+      - crc.rectal_stage.clinical_n.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_stage.clinical_n.pretreatment
+        - variable: crc.rectal_risk.lower_risk_status.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use TNT
+      variables:
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Neoadjuvant
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Lower-risk omission pathway
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_risk.lower_risk_status.pretreatment
+  - crc.rectal_stage.clinical_n.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ2-05
+  parent_recommendation_id: ASTRO25-KQ2-R5
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ2 recommendation 5
+  category: rectal_tnt
+  title: Flexible TNT sequence without high local-risk factors
+  core_or_supplemental: core
+  source_context:
+    eligibility: No increased local-recurrence factors
+    action: Give chemotherapy before or after LC-CRT or after SCRT
+    timing: TNT sequence
+    exceptions: Treatment goal and toxicity
+    predicate_logic: no_high_localrisk => chemo_before_or_after_LCCRT OR after_SCRT
+  requirements:
+    eligibility:
+      expression: No increased local-recurrence factors
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_risk.local_recurrence_features.pretreatment
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.rectal_risk.local_recurrence_features.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Give chemotherapy before or after LC-CRT or after SCRT
+      variables:
+      - crc.rectal_radiation.course_type
+      - crc.rectal_tnt.systemic_component
+      - crc.rectal_treatment.planned_pathway_at_decision
+      - crc.rectal_treatment.sequence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.sequence
+        - variable: crc.rectal_radiation.course_type
+        - variable: crc.rectal_tnt.systemic_component
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: TNT sequence
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Treatment goal and toxicity
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.course_type
+  - crc.rectal_risk.local_recurrence_features.pretreatment
+  - crc.rectal_tnt.systemic_component
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.sequence
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ2-06
+  parent_recommendation_id: ASTRO25-KQ2-R6
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ2 recommendation 6
+  category: rectal_tnt
+  title: Long-course CRT TNT for increased local risk
+  core_or_supplemental: core
+  source_context:
+    eligibility: Low cT3, mrCRM under 2 mm, cT4, mrEMVI, or lateral pelvic nodes
+    action: Use chemotherapy before or after long-course CRT
+    timing: TNT
+    exceptions: None stated
+    predicate_logic: any_high_localrisk => chemo_before_or_after_LCCRT
+  requirements:
+    eligibility:
+      expression: Low cT3, mrCRM under 2 mm, cT4, mrEMVI, or lateral pelvic nodes
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_anatomy.height_category.pretreatment
+      - crc.rectal_mri.emvi_status.pretreatment
+      - crc.rectal_mri.lateral_node_status.pretreatment
+      - crc.rectal_mri.mrf_distance_mm.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.rectal_anatomy.height_category.pretreatment
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_mri.mrf_distance_mm.pretreatment
+        - variable: crc.rectal_mri.emvi_status.pretreatment
+        - variable: crc.rectal_mri.lateral_node_status.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use chemotherapy before or after long-course CRT
+      variables:
+      - crc.rectal_treatment.planned_pathway_at_decision
+      - crc.rectal_treatment.sequence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.sequence
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: TNT
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_anatomy.height_category.pretreatment
+  - crc.rectal_mri.emvi_status.pretreatment
+  - crc.rectal_mri.lateral_node_status.pretreatment
+  - crc.rectal_mri.mrf_distance_mm.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.sequence
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ2-07
+  parent_recommendation_id: ASTRO25-KQ2-R7
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ2 recommendation 7
+  category: rectal_tnt
+  title: Short-course RT TNT option for increased local risk
+  core_or_supplemental: core
+  source_context:
+    eligibility: Increased local-recurrence factors
+    action: May use SCRT followed by chemotherapy
+    timing: TNT
+    exceptions: Conditional evidence
+    predicate_logic: high_localrisk => may_SCRT_then_chemo
+  requirements:
+    eligibility:
+      expression: Increased local-recurrence factors
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_risk.local_recurrence_features.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_risk.local_recurrence_features.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: May use SCRT followed by chemotherapy
+      variables:
+      - crc.rectal_radiation.course_type
+      - crc.rectal_treatment.planned_pathway_at_decision
+      - crc.rectal_treatment.sequence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.sequence
+        - variable: crc.rectal_radiation.course_type
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: TNT
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Conditional evidence
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.course_type
+  - crc.rectal_risk.local_recurrence_features.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.sequence
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_SOURCE_CONFLICT
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ2-08a
+  parent_recommendation_id: ASTRO25-KQ2-R8
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: astro_rectal_2025
+  source_anchor: KQ2 recommendation 8 doublet branch
+  category: rectal_tnt
+  title: FOLFOX or CAPOX TNT chemotherapy
+  core_or_supplemental: core
+  source_context:
+    eligibility: TNT chemotherapy selected
+    action: Use FOLFOX or CAPOX for three to four months
+    timing: Before or after CRT or after SCRT
+    exceptions: Fitness and DPD status
+    predicate_logic: TNT_chemo => FOLFOX_or_CAPOX_3_to_4m
+  requirements:
+    eligibility:
+      expression: TNT chemotherapy selected
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use FOLFOX or CAPOX for three to four months
+      variables:
+      - crc.rectal_neoadjuvant.systemic_regimen
+      - crc.rectal_treatment.planned_pathway_at_decision
+      - crc.rectal_treatment.sequence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.systemic_regimen
+        - variable: crc.rectal_treatment.sequence
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Before or after CRT or after SCRT
+      variables:
+      - crc.rectal_neoadjuvant.systemic_duration_months
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.systemic_duration_months
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Fitness and DPD status
+      variables:
+      - crc.dpd_status.before_fluoropyrimidine
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.dpd_status.before_fluoropyrimidine
+  required_variables:
+  - crc.dpd_status.before_fluoropyrimidine
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_neoadjuvant.systemic_duration_months
+  - crc.rectal_neoadjuvant.systemic_regimen
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.sequence
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_DPD_IMPLEMENTATION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ2-08b
+  parent_recommendation_id: ASTRO25-KQ2-R8
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: astro_rectal_2025
+  source_anchor: KQ2 recommendation 8 triplet branch
+  category: rectal_tnt
+  title: Induction modified FOLFIRINOX option
+  core_or_supplemental: core
+  source_context:
+    eligibility: Selected fit TNT candidate
+    action: Use induction modified FOLFIRINOX for three months before CRT
+    timing: TNT induction
+    exceptions: Caution in older age, poor PS, or comorbidity
+    predicate_logic: selected_fit => mFOLFIRINOX_3m_then_CRT
+  requirements:
+    eligibility:
+      expression: Selected fit TNT candidate
+      variables:
+      - crc.ecog_performance_status
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ecog_performance_status
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use induction modified FOLFIRINOX for three months before CRT
+      variables:
+      - crc.rectal_neoadjuvant.systemic_regimen
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.systemic_regimen
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: TNT induction
+      variables:
+      - crc.rectal_neoadjuvant.systemic_duration_months
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.systemic_duration_months
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Caution in older age, poor PS, or comorbidity
+      variables:
+      - crc.age_at_decision
+      - crc.comorbidity_constraints
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.age_at_decision
+        - variable: crc.comorbidity_constraints
+  required_variables:
+  - crc.age_at_decision
+  - crc.comorbidity_constraints
+  - crc.ecog_performance_status
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_neoadjuvant.systemic_duration_months
+  - crc.rectal_neoadjuvant.systemic_regimen
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ3-05
+  parent_recommendation_id: ASTRO25-KQ3-R5
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ3 recommendation 5
+  category: rectal_tnt
+  title: Consolidation sequence when NOM is priority
+  core_or_supplemental: core
+  source_context:
+    eligibility: NOM is treatment priority
+    action: Use concurrent CRT followed by consolidation chemotherapy
+    timing: TNT
+    exceptions: Patient fitness
+    predicate_logic: NOM_priority => CRT_then_consolidation
+  requirements:
+    eligibility:
+      expression: NOM is treatment priority
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use concurrent CRT followed by consolidation chemotherapy
+      variables:
+      - crc.rectal_tnt.radiation_component
+      - crc.rectal_tnt.systemic_component
+      - crc.rectal_treatment.planned_pathway_at_decision
+      - crc.rectal_treatment.sequence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.sequence
+        - variable: crc.rectal_tnt.systemic_component
+        - variable: crc.rectal_tnt.radiation_component
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: TNT
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Patient fitness
+      variables:
+      - crc.rectal_treatment.goal
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.goal
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_tnt.radiation_component
+  - crc.rectal_tnt.systemic_component
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.goal
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.sequence
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

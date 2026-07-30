@@ -30,10 +30,11 @@ fields:
     format: "CCYYMMDD"        # rejects 20100612 and every other valid date
 ```
 
-This is live in `STORE.390.date_of_initial_diagnosis` and `STORE.1860_1880.first_recurrence`
-right now. It raises nothing: `check_field_formats` swallows `re.error` so a typo cannot block
-a patient run, and `CCYYMMDD` is not an error — it is a valid pattern that happens to accept
-no date. Every submitted answer is rejected with a message blaming the value.
+This historical defect shipped in `STORE.390.date_of_initial_diagnosis` and
+`STORE.1860_1880.first_recurrence` before being repaired. It raised nothing:
+`check_field_formats` swallows `re.error` so a typo cannot block a patient run, and
+`CCYYMMDD` is not an error — it is a valid pattern that happens to accept no date. Every
+submitted answer was rejected with a message blaming the value.
 
 The notation belongs in `description`, where the model reads it and the runtime does not:
 

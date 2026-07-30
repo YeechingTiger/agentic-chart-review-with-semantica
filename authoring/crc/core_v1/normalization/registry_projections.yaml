@@ -1,0 +1,310 @@
+projection_schema_version: '1.0'
+clinical_use: NOT_FOR_CLINICAL_USE
+projection_contract_count: 9
+projections:
+- projection_schema_version: '1.0'
+  transformation_id: CRC.PROJECTION.ici_contraindication.v1
+  transformation_version: 0.1.0
+  clinical_use: NOT_FOR_CLINICAL_USE
+  canonical_variable_id: crc.ici_contraindication
+  direction: canonical_to_registry
+  projection_kind: coarsened
+  input_domain: CRC.CHART.decision_exceptions#ici_contraindication
+  output_domain:
+    standard: NAACCR_v26
+    item_name: RX Summ--BRM coarse reason
+    item_number: '1410'
+    xml_id: rxSummBrm
+    code_domain_status: registrar_crosswalk_review_pending
+  effective_years: all
+  transformation:
+    operation: versioned_value_crosswalk
+    implementation_status: planned_not_materialized
+    unknown_handling: Preserve documented unknown/not-applicable distinctions where the target standard supports them; otherwise
+      abstain from agreement scoring.
+  explicit_loss_list:
+  - ICI-specific reason is collapsed into a broad biological-response-modifier code.
+  - Onset, severity, duration, resolution, and decision-time applicability are lost.
+  - Patient preference and contraindication may not remain distinguishable.
+  review_status:
+    clinical: pending
+    registrar: pending
+    runtime: pending
+  provenance:
+    origin: model_authored
+    basis: No external source directly specifies this canonical-to-registry crosswalk; the target item is registered, but
+      value-level transformation requires registrar review.
+    status: review_pending
+  transformation_hash: 2689718f9b8bacb9a62393433783472ce123d92f01c0076758571bcaafff2e18
+- projection_schema_version: '1.0'
+  transformation_id: CRC.PROJECTION.metastatic_status.v1
+  transformation_version: 0.1.0
+  clinical_use: NOT_FOR_CLINICAL_USE
+  canonical_variable_id: crc.metastatic_status
+  direction: canonical_to_registry
+  projection_kind: coarsened
+  input_domain: CRC.CANDIDATE.disease_context#metastatic_status
+  output_domain:
+    standard: NAACCR_v26
+    item_name: AJCC M and Mets at Diagnosis
+    item_number: 1003/1013/1023/1112-1117
+    xml_id: multiple_items
+    code_domain_status: registrar_crosswalk_review_pending
+  effective_years: varies
+  transformation:
+    operation: versioned_value_crosswalk
+    implementation_status: planned_not_materialized
+    unknown_handling: Preserve documented unknown/not-applicable distinctions where the target standard supports them; otherwise
+      abstain from agreement scoring.
+  explicit_loss_list:
+  - Decision-time disease status is collapsed into diagnosis/recurrence-oriented registry items.
+  - Initial metastatic disease and later recurrence may not remain distinguishable.
+  - Evidence source, lesion context, resectability, and decision date are lost.
+  review_status:
+    clinical: pending
+    registrar: pending
+    runtime: pending
+  provenance:
+    origin: model_authored
+    basis: No external source directly specifies this canonical-to-registry crosswalk; the target item is registered, but
+      value-level transformation requires registrar review.
+    status: review_pending
+  transformation_hash: d3894cef1befe8edc38844e34cd213ec4f466c828c3e148605379212167a7a03
+- projection_schema_version: '1.0'
+  transformation_id: CRC.PROJECTION.mmr_ihc_integrated_status.v1
+  transformation_version: 0.1.0
+  clinical_use: NOT_FOR_CLINICAL_USE
+  canonical_variable_id: crc.mmr_ihc_integrated_status
+  direction: canonical_to_registry
+  projection_kind: coarsened
+  input_domain: CRC.CHART.molecular_detail#mmr_ihc_integrated_status
+  output_domain:
+    standard: NAACCR_v26
+    item_name: Microsatellite Instability MSI
+    item_number: '3890'
+    xml_id: microsatelliteInstability
+    code_domain_status: registrar_crosswalk_review_pending
+  effective_years: 2018+
+  transformation:
+    operation: versioned_value_crosswalk
+    implementation_status: planned_not_materialized
+    unknown_handling: Preserve documented unknown/not-applicable distinctions where the target standard supports them; otherwise
+      abstain from agreement scoring.
+  explicit_loss_list:
+  - Individual MLH1, PMS2, MSH2, and MSH6 results are lost.
+  - IHC method, controls, specimen, result date, subclonal loss, and discordance are lost.
+  - The registry item combines MMR and MSI summary semantics.
+  review_status:
+    clinical: pending
+    registrar: pending
+    runtime: pending
+  provenance:
+    origin: model_authored
+    basis: No external source directly specifies this canonical-to-registry crosswalk; the target item is registered, but
+      value-level transformation requires registrar review.
+    status: review_pending
+  transformation_hash: 874d3854b8bb9ae2d1739fc4869d28308a7e589d7363f9b525cc84e6a53c082c
+- projection_schema_version: '1.0'
+  transformation_id: CRC.PROJECTION.msi_status.v1
+  transformation_version: 0.1.0
+  clinical_use: NOT_FOR_CLINICAL_USE
+  canonical_variable_id: crc.msi_status
+  direction: canonical_to_registry
+  projection_kind: coarsened
+  input_domain: CRC.CHART.molecular_detail#msi_status
+  output_domain:
+    standard: NAACCR_v26
+    item_name: Microsatellite Instability MSI
+    item_number: '3890'
+    xml_id: microsatelliteInstability
+    code_domain_status: registrar_crosswalk_review_pending
+  effective_years: 2018+
+  transformation:
+    operation: versioned_value_crosswalk
+    implementation_status: planned_not_materialized
+    unknown_handling: Preserve documented unknown/not-applicable distinctions where the target standard supports them; otherwise
+      abstain from agreement scoring.
+  explicit_loss_list:
+  - Raw MSI assay status is not distinguishable from an MMR-IHC-derived summary.
+  - Assay method, loci/panel, QC, specimen, result date, and discordance are lost.
+  - Indeterminate and not-assessed states may collapse into standard summary codes.
+  review_status:
+    clinical: pending
+    registrar: pending
+    runtime: pending
+  provenance:
+    origin: model_authored
+    basis: No external source directly specifies this canonical-to-registry crosswalk; the target item is registered, but
+      value-level transformation requires registrar review.
+    status: review_pending
+  transformation_hash: 52eddbfdd9700e76c235ebfce61e46787110dc9370deb2f9e035077253c21ec8
+- projection_schema_version: '1.0'
+  transformation_id: CRC.PROJECTION.patient_preference.v1
+  transformation_version: 0.1.0
+  clinical_use: NOT_FOR_CLINICAL_USE
+  canonical_variable_id: crc.patient_preference
+  direction: canonical_to_registry
+  projection_kind: coarsened
+  input_domain: CRC.CHART.decision_exceptions#patient_preference
+  output_domain:
+    standard: NAACCR_v26
+    item_name: Coarse refusal codes within treatment summaries
+    item_number: 1390/1410/1430
+    xml_id: multiple_items
+    code_domain_status: registrar_crosswalk_review_pending
+  effective_years: varies
+  transformation:
+    operation: versioned_value_crosswalk
+    implementation_status: planned_not_materialized
+    unknown_handling: Preserve documented unknown/not-applicable distinctions where the target standard supports them; otherwise
+      abstain from agreement scoring.
+  explicit_loss_list:
+  - Preference among clinically acceptable options is reduced to coarse refusal/nonreceipt coding.
+  - Discussion content, alternatives, decision date, and change over time are lost.
+  - Access barriers and contraindications may not remain distinguishable from preference.
+  review_status:
+    clinical: pending
+    registrar: pending
+    runtime: pending
+  provenance:
+    origin: model_authored
+    basis: No external source directly specifies this canonical-to-registry crosswalk; the target item is registered, but
+      value-level transformation requires registrar review.
+    status: review_pending
+  transformation_hash: a0fb3f47fd5d24edfaddf4af7491821666fb8a830856035eb97f5bf07f271c33
+- projection_schema_version: '1.0'
+  transformation_id: CRC.PROJECTION.systemic_regimen.v1
+  transformation_version: 0.1.0
+  clinical_use: NOT_FOR_CLINICAL_USE
+  canonical_variable_id: crc.systemic_regimen
+  direction: canonical_to_registry
+  projection_kind: coarsened
+  input_domain: CRC.STORE_CHART.systemic_treatment#systemic_regimen
+  output_domain:
+    standard: NAACCR_v26
+    item_name: RX Summ--Chemo
+    item_number: '1390'
+    xml_id: rxSummChemo
+    code_domain_status: registrar_crosswalk_review_pending
+  effective_years: all
+  transformation:
+    operation: versioned_value_crosswalk
+    implementation_status: planned_not_materialized
+    unknown_handling: Preserve documented unknown/not-applicable distinctions where the target standard supports them; otherwise
+      abstain from agreement scoring.
+  explicit_loss_list:
+  - Exact agents and named regimen are reduced to a broad chemotherapy summary class.
+  - Line, intent, dose, schedule, cycles, completion, and progression context are lost.
+  - Later-line and outside-facility treatment are not represented as complete longitudinal history.
+  review_status:
+    clinical: pending
+    registrar: pending
+    runtime: pending
+  provenance:
+    origin: model_authored
+    basis: No external source directly specifies this canonical-to-registry crosswalk; the target item is registered, but
+      value-level transformation requires registrar review.
+    status: review_pending
+  transformation_hash: e589e9a323cc5460c3871cf40d21cf5b59aad5ceba49525bb78343692766cd34
+- projection_schema_version: '1.0'
+  transformation_id: CRC.PROJECTION.systemic_therapy_start_date.v1
+  transformation_version: 0.1.0
+  clinical_use: NOT_FOR_CLINICAL_USE
+  canonical_variable_id: crc.systemic_therapy_start_date
+  direction: canonical_to_registry
+  projection_kind: coarsened
+  input_domain: CRC.STORE_CHART.systemic_treatment#systemic_therapy_start_date
+  output_domain:
+    standard: NAACCR_v26
+    item_name: RX Date Systemic
+    item_number: '3230'
+    xml_id: rxDateSystemic
+    code_domain_status: registrar_crosswalk_review_pending
+  effective_years: 2003+
+  transformation:
+    operation: versioned_value_crosswalk
+    implementation_status: planned_not_materialized
+    unknown_handling: Preserve documented unknown/not-applicable distinctions where the target standard supports them; otherwise
+      abstain from agreement scoring.
+  explicit_loss_list:
+  - A generic indexed systemic-therapy start is reduced to a first-course registry date.
+  - Line, regimen, intent, ordering versus administration, and later starts are lost.
+  - Outside-facility and recurrent-disease treatment timing may be absent.
+  review_status:
+    clinical: pending
+    registrar: pending
+    runtime: pending
+  provenance:
+    origin: model_authored
+    basis: No external source directly specifies this canonical-to-registry crosswalk; the target item is registered, but
+      value-level transformation requires registrar review.
+    status: review_pending
+  transformation_hash: d5af849cdfb33d409f63b4b5dd2edefe4294ac8396c0c1e7eeca540c9b9ff3cc
+- projection_schema_version: '1.0'
+  transformation_id: CRC.PROJECTION.treatment_contraindication.v1
+  transformation_version: 0.1.0
+  clinical_use: NOT_FOR_CLINICAL_USE
+  canonical_variable_id: crc.treatment_contraindication
+  direction: canonical_to_registry
+  projection_kind: coarsened
+  input_domain: CRC.CHART.decision_exceptions#treatment_contraindication
+  output_domain:
+    standard: NAACCR_v26
+    item_name: Coarse no-treatment reasons within treatment summary items
+    item_number: 1390/1410/1430
+    xml_id: multiple_items
+    code_domain_status: registrar_crosswalk_review_pending
+  effective_years: varies
+  transformation:
+    operation: versioned_value_crosswalk
+    implementation_status: planned_not_materialized
+    unknown_handling: Preserve documented unknown/not-applicable distinctions where the target standard supports them; otherwise
+      abstain from agreement scoring.
+  explicit_loss_list:
+  - Modality-specific clinical contraindications are reduced to coarse non-treatment reasons.
+  - Severity, temporality, reversibility, and the indexed treatment option are lost.
+  - Preference, access, comorbidity, and true contraindication may not remain distinguishable.
+  review_status:
+    clinical: pending
+    registrar: pending
+    runtime: pending
+  provenance:
+    origin: model_authored
+    basis: No external source directly specifies this canonical-to-registry crosswalk; the target item is registered, but
+      value-level transformation requires registrar review.
+    status: review_pending
+  transformation_hash: ec48930742ade8057a27a9a3457f805048a3dad5d860fde89e28f52cbb99dbfd
+- projection_schema_version: '1.0'
+  transformation_id: CRC.PROJECTION.treatment_sequence.v1
+  transformation_version: 0.1.0
+  clinical_use: NOT_FOR_CLINICAL_USE
+  canonical_variable_id: crc.treatment_sequence
+  direction: canonical_to_registry
+  projection_kind: coarsened
+  input_domain: CRC.STORE_CHART.systemic_treatment#treatment_sequence
+  output_domain:
+    standard: NAACCR_v26
+    item_name: RX Summ--Surg/Rad Seq and RX Summ--Systemic/Sur Seq
+    item_number: 1380/1639
+    xml_id: rxSummSurgRadSeq/rxSummSystemicSurSeq
+    code_domain_status: registrar_crosswalk_review_pending
+  effective_years: varies
+  transformation:
+    operation: versioned_value_crosswalk
+    implementation_status: planned_not_materialized
+    unknown_handling: Preserve documented unknown/not-applicable distinctions where the target standard supports them; otherwise
+      abstain from agreement scoring.
+  explicit_loss_list:
+  - Exact event order and dates are reduced to broad modality-sequence categories.
+  - Regimen, line, intent, overlap, interruption, and completion are lost.
+  - Later-line and outside-facility sequences are not represented completely.
+  review_status:
+    clinical: pending
+    registrar: pending
+    runtime: pending
+  provenance:
+    origin: model_authored
+    basis: No external source directly specifies this canonical-to-registry crosswalk; the target item is registered, but
+      value-level transformation requires registrar review.
+    status: review_pending
+  transformation_hash: 943a4ae18e502526dea33ce1ef5b511ded60cff71096e522607f51b8f952a173

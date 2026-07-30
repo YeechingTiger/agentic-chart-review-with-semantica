@@ -1,0 +1,14 @@
+schema: acr.certification_suite/1
+suite_id: causal-attribution-certification
+version: 2.0.0
+module_ref: causal-attribution@2.0.0
+must_pass:
+  - SYN-ATTR-001-target-linked-counterfactual-cause
+must_fail:
+  - SYN-ATTR-002-unrelated-defect-as-primary
+  - SYN-ATTR-003-strong-cause-without-counterfactual
+metric_thresholds:
+  citation_validity: 1.0
+  cross_patient_access_rate: 0.0
+max_cost_usd: 1.0
+required_citation_validity: 1.0

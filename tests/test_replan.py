@@ -36,6 +36,34 @@ Six things, and the fifth is the one the whole design rests on:
 
 No provider is called anywhere in this file and no chart text is written into it.
 """
+
+# ---------------------------------------------------------------------------------------------
+# TESTS REMOVED 2026-07-30, with the rules they specified.
+#
+# `answer_checks` carried five checks that decided clinical questions by matching word lists
+# against the model's own cited quotes. Measured over every trace this project has recorded
+# (266 traces, 202 joinable to registry gold, 122 firings):
+#
+#   not_less_specific        22 fires   22 rejected the registry's own value    0 ever helped
+#   nos_requires_search      24 fires   21 rejected the registry's own value    0 ever helped
+#   conflict_requires_nos    67 fires   18 rejected the registry's own value   15 "helped",
+#                                       all 15 of them the same push to the NOS code
+#   origin_not_specimen       2 fires    0                                      0
+#   code_matches_cited_text   0 fires    -                                      -
+#
+# `fit_terms_to_budget` deleted 103 search terms the model had proposed for itself, and on
+# CASE009 it deleted `lobe` and `bronchus` while `nos_requires_search` refused the answer for
+# never having searched them. The required-keyword gate enforced a list measured at 87.4%
+# recall over 276,054 documents.
+#
+# A test that pins a rule in place is part of the rule, so these went with them:
+#   - test_add_terms_changes_what_the_gate_demands
+#   - test_coverage_is_evaluated_against_the_final_list
+#
+# Nothing replaced them here. A wrong clinical value is an instruction-following failure and is
+# measured as one. tests/test_answer_checks.py holds what survives: field `format` and
+# `allowable_values`, the only check with a positive measured record.
+# ---------------------------------------------------------------------------------------------
 from __future__ import annotations
 
 import inspect
@@ -122,8 +150,15 @@ def test_the_prose_plan_is_gone_and_the_coverage_plan_is_wired_in():
     assert not re.search(r"^\w*PLAN_PROMPT\s*=", src, re.M), (
         "a second planning prompt has appeared. The REPLAN bug existed because there were two "
         "plans and only one mattered; a second one is the bug returning")
-    for token in ("plan.render", "may_open", "apply_revision"):
+    for token in ("plan.render", "apply_revision"):
         assert token in src, f"the runtime must consult the coverage plan; {token!r} is absent"
+    # `may_open` is deliberately NOT in this list any more. The runtime used to consult it to
+    # REFUSE A READ, and that hook was removed on 2026-07-30: see `_out_of_plan: REMOVED` in
+    # acr.agent. Which documents to open is the model's decision.
+    assert "_out_of_plan" not in src or "REMOVED" in src, (
+        "the read refusal is back. It fired 138 times over the recorded traces, and the bucket "
+        "it enforced came from a substring over local type names that missed the FNA and "
+        "surgical-pathology reports carrying the answer for 107 patients")
 
 
 
@@ -131,42 +166,40 @@ def test_the_prose_plan_is_gone_and_the_coverage_plan_is_wired_in():
 # ==========================================================================================
 # 2. THE PLAN GOVERNS WHAT MAY BE OPENED
 # ==========================================================================================
-def test_a_sampled_type_may_not_be_opened_and_the_refusal_names_the_way_out(spec, chart, plan):
+def test_any_document_in_the_chart_may_be_opened(spec, chart, plan):
+    """The runtime no longer rules on what may be read.
+
+    `_out_of_plan` refused a read whenever the plan had filed the document's type in the
+    `sample` bucket, and told the model to ask for a promotion first. It fired 138 times across
+    the recorded traces. The bucket came from `doc_type_matches`, a case-insensitive substring
+    over local type names, measured wrong in both directions here: it matched
+    `Speech-Language-Pathology-Note` and missed `Non-Gyn-Cyto-FNA` (1,285 documents),
+    `FN-Aspirate-Report` (881) and `SURG-PATH-RESULT` (231). 107 of the 219 patients whose
+    `can_establish` count is zero hold one of those reports anyway, so the hook could stand
+    between the agent and the only document carrying the answer -- and on CASE001 it did.
+    """
     agent = _agent(spec, chart, llm=None)
     agent.plan = plan
+    assert not hasattr(agent, "_out_of_plan"), "the read refusal must not come back"
+
     nid = _first_note_of_type(chart, SAMPLED_TYPE)
-
-    refusal = agent._plan_refusal("read_document", {"note_id": nid})
-    assert refusal is not None and refusal["error"] == "OUT_OF_PLAN"
-    assert SAMPLED_TYPE in refusal["types"]
-    # The refusal has to carry the escape hatch or it is just a wall. Monotone expansion is
-    # only a design if the agent can actually reach it from where it is standing.
-    assert "promote_types" in refusal["how_to_proceed"]
-    assert "NOT evidence that they hold nothing" in refusal["message"], (
-        "an OUT_OF_PLAN refusal that reads like an empty result would teach the agent the "
-        "type holds nothing — the same inversion as UNKNOWN_DOC_TYPE returning []"
-    )
+    out, _ = agent.ctx.toolbox.dispatch("read_document", {"note_id": nid, "limit": 500})
+    assert "error" not in out, out
+    assert out["text"], "a document in the chart is readable, whatever bucket its type is in"
+    assert nid in agent.ctx.coverage.read_notes, "and the read is still recorded"
 
 
-def test_a_runtime_drawn_document_is_always_openable(spec, chart, plan):
-    """The sampler's draws are the runtime's choice, so the plan must never block them —
-    otherwise the forced-sampling obligation becomes unsatisfiable by construction."""
+def test_the_undeclared_tool_refusal_is_kept(spec, chart):
+    """What survives in `wrap_tool_call`, and why it is a different kind of thing.
+
+    An undeclared tool is a statement about the tool surface, not about a clinical document: a
+    read that does not go through `Toolbox.dispatch` is invisible to the coverage ledger, so the
+    gate would stamp a chart the ledger never saw read.
+    """
     agent = _agent(spec, chart, llm=None)
-    agent.plan = plan
-    nid = _first_note_of_type(chart, SAMPLED_TYPE)
-    assert agent._plan_refusal("read_document", {"note_id": nid}) is not None
-    agent.coverage.drawn["cannot_establish"] = [nid]
-    assert agent._plan_refusal("read_document", {"note_id": nid}) is None
-
-
-def test_searching_a_sampled_type_stays_legal(spec, chart, plan):
-    """The plan says what must be READ. A cheap search that turns up a hit in a sampled type
-    is exactly the observation that should trigger a promotion, so blocking it would remove
-    the only evidence that the sampling declaration was wrong."""
-    agent = _agent(spec, chart, llm=None)
-    agent.plan = plan
-    assert agent._plan_refusal("search_notes", {"query": "lobe",
-                                                "doc_type_contains": SAMPLED_TYPE}) is None
+    assert agent._undeclared("read_document") is None
+    refusal = agent._undeclared("some_tool_nobody_declared")
+    assert refusal is not None and refusal["error"] == "UNDECLARED_TOOL"
 
 
 # ==========================================================================================
@@ -460,27 +493,6 @@ def test_the_planners_own_terms_are_additions_not_baseline(spec, chart):
         "a term the spec already declared must not be logged as an addition")
 
 
-def test_coverage_is_evaluated_against_the_final_list(spec, chart, plan, budget):
-    """Adding a term must not be free: the gate then requires that the search actually ran."""
-    cov = _ledger(spec, chart)
-    cov.listed_documents = True
-    for k in plan.keywords:
-        cov.note_search(k, [])
-    assert not [m for m in check_gate(spec, cov, plan).missing if "mucinous" in m]
-
-    _apply(plan, PlanRevision(add_terms=("mucinous",)), budget=budget, chart=chart)
-    missing = check_gate(spec, cov, plan).missing
-    assert any("mucinous" in m for m in missing), (
-        "a term added at run time and never run widened nothing, yet the gate accepted the "
-        "shorter list — expansion has to bind the expander"
-    )
-    cov.note_search("mucinous", [])
-    assert not [m for m in check_gate(spec, cov, plan).missing if "mucinous" in m]
-
-
-# ==========================================================================================
-# 6. TRIGGERS ARE DETECTED, NOT ASKED
-# ==========================================================================================
 def test_the_marker_catalogue_comes_from_the_skill_not_from_src():
     """Read the catalogue, do not invent one. A second hand-written list in src/ drifts from
     the measured one within a week and then the two disagree about what blocks an answer."""
@@ -570,38 +582,37 @@ def test_an_obligation_the_plan_forbids_discharging_is_a_trigger(plan):
 # ==========================================================================================
 # 7. THE TYPED REVISION IS APPLIED — tested by the behaviour each field changes
 # ==========================================================================================
-def test_add_terms_changes_what_the_gate_demands(spec, chart, plan, budget):
-    """BEHAVIOUR, not state. `plan.keywords == [...]` would pass on a plan nobody reads."""
-    cov = _ledger(spec, chart)
-    cov.listed_documents = True
-    for k in plan.keywords:
-        cov.note_search(k, [])
-    before = check_gate(spec, cov, plan).missing
-
-    _apply(plan, PlanRevision(add_terms=("psammoma",)), budget=budget, chart=chart)
-    after = check_gate(spec, cov, plan).missing
-    assert len(after) > len(before) and any("psammoma" in m for m in after)
-
-
-def test_promote_types_changes_what_may_be_opened(spec, chart, plan, budget):
-    agent = _agent(spec, chart, llm=None)
-    agent.plan = plan
+def test_promote_types_still_widens_the_plan_but_no_longer_gates_a_read(spec, chart, plan,
+                                                                          budget):
+    """Promotion still records that the agent widened its own plan -- monotonically, refusing a
+    demotion -- which is a useful audit fact. What it no longer does is unlock a read, because
+    reads are not locked."""
     nid = _first_note_of_type(chart, SAMPLED_TYPE)
-    assert agent._plan_refusal("read_document", {"note_id": nid}) is not None
+    assert plan.policy_for(SAMPLED_TYPE) == "sample"
 
-    out = _apply(plan, PlanRevision(promote_types=((SAMPLED_TYPE, "search"),)),
-                 budget=budget, chart=chart)
-    assert out.applied
-    assert agent._plan_refusal("read_document", {"note_id": nid}) is None, (
-        "the revision was recorded but the dispatch guard still refuses — the runtime did "
-        "not apply it, so it did not happen"
-    )
+    agent = _agent(spec, chart, llm=None)
+    out, _ = agent.ctx.toolbox.dispatch("read_document", {"note_id": nid, "limit": 300})
+    assert "error" not in out, "readable before any promotion"
 
+    outcome = _apply(plan, PlanRevision(promote_types=((SAMPLED_TYPE, "read_all"),)),
+                     budget=budget, chart=chart)
+    assert outcome.applied
+    assert plan.policy_for(SAMPLED_TYPE) == "read_all", "the widening is still recorded"
 
-def test_open_threads_blocks_the_answer_and_resolve_threads_unblocks_it(spec, chart, plan,
-                                                                        budget):
-    """The 8046 error, as a control. A histology coded off "special stains pending" with the
-    addendum never chased must not be able to reach a manifest."""
+def test_a_text_matched_marker_opens_a_thread_and_advises_without_blocking(spec, chart, plan,
+                                                                           budget):
+    """`stains pending` is a SUBSTRING SCAN, and it no longer refuses an answer.
+
+    It used to. Measured over every recorded trace on 2026-07-30: 39 thread refusals, 11 of them
+    (28%) rejecting a tuple that was exactly the registry's. `addendum` refused 40 times while
+    `read_section("ADDENDUM")` could address that heading in 0 of the 2,401 documents containing
+    the word.
+
+    What the thread still does is everything except refuse: it is opened, it is recorded, and
+    `render()` puts it in the prompt with the settling call and the thread_id filled in. Whether
+    a `pending` matters to this question is a clinical judgement, and the model is the thing
+    being asked to make it.
+    """
     threads = OpenThreadLedger()
     ev, cov = EvidenceLedger(), _ledger(spec, chart)
     nid = _first_note_of_type(chart, "Surgical-Pathology-Document")
@@ -610,22 +621,52 @@ def test_open_threads_blocks_the_answer_and_resolve_threads_unblocks_it(spec, ch
                     "histology"))
     submitted = {"status": "FOUND", "value": {"histology": "8046"}, "reasoning": "coded"}
 
-    assert gate_answer(spec, submitted, evidence=ev, coverage=cov, chart=chart,
-                       threads=threads, plan=plan)["accepted"] in (True, False)
-
     out = _apply(plan, PlanRevision(open_threads=((nid, "stains pending", "the report defers"),)),
                  budget=budget, chart=chart, threads=threads)
-    assert out.threads_opened == [f"{nid}#stains pending"]
+    assert out.threads_opened == [f"{nid}#stains pending"], "still detected and opened"
+    assert threads.unresolved(), "still on the ledger"
+    assert "stains pending" in threads.render(), "still reaches the model as advice"
+
+    assert check_threads(threads) == [], "a text-matched marker must not refuse the answer"
     verdict = gate_answer(spec, submitted, evidence=ev, coverage=cov, chart=chart,
                           threads=threads, plan=plan)
-    assert verdict["accepted"] is False
-    assert any("unsettled thread" in m for m in verdict["missing"])
+    assert not any("unsettled thread" in m for m in verdict["missing"])
 
     out = _apply(plan, PlanRevision(resolve_threads=((f"{nid}#stains pending",
                                                       "the addendum is later in the same file"),)),
                  budget=budget, chart=chart, threads=threads, step=4)
-    assert out.threads_resolved == [f"{nid}#stains pending"]
-    assert check_threads(threads) == []
+    assert out.threads_resolved == [f"{nid}#stains pending"], "resolution still recorded"
+
+
+def test_a_computed_truncated_marker_still_blocks_the_answer(spec, chart, plan, budget):
+    """The one that survived, and the reason it is not the same kind of thing.
+
+    `truncated` is computed from the character counts of the run's own read against the length
+    that read reported. It is a fact about what this run did, not a guess about what a word
+    means; it cannot be wrong about the corpus; and the agent discharges it by reading to the
+    end.
+    """
+    from acr.coverage_planner import MARKER_TRUNCATED, marker_blocks_answer
+    assert marker_blocks_answer(MARKER_TRUNCATED)
+    assert not marker_blocks_answer("stains pending")
+    assert not marker_blocks_answer("addendum")
+
+    threads = OpenThreadLedger()
+    ev, cov = EvidenceLedger(), _ledger(spec, chart)
+    nid = _first_note_of_type(chart, "Surgical-Pathology-Document")
+    from acr.state import Evidence
+    ev.add(Evidence(nid, "Surgical-Pathology-Document", "2019-01-01", 0, 5, "xxxxx",
+                    "histology"))
+    submitted = {"status": "FOUND", "value": {"histology": "8046"}, "reasoning": "coded"}
+
+    threads.open_thread(note_id=nid, doc_type="Surgical-Pathology-Document",
+                        marker=MARKER_TRUNCATED, excerpt="read stopped 353 characters short",
+                        obligation="page to the end before reasoning about it", step=1)
+    assert check_threads(threads), "a computed marker still refuses"
+    verdict = gate_answer(spec, submitted, evidence=ev, coverage=cov, chart=chart,
+                          threads=threads, plan=plan)
+    assert verdict["accepted"] is False
+    assert any("unsettled thread" in m for m in verdict["missing"])
 
 
 def test_dismiss_threads_requires_a_reason_and_records_it(plan, budget, chart):
@@ -903,27 +944,31 @@ def test_one_revision_pays_once_for_a_term_and_its_narrower_variant(plan, chart,
     assert len(plan.terms_added()) == 1
 
 
-def test_a_revision_that_was_all_variants_is_refused_by_name_not_silently_swallowed(plan,
-                                                                                    chart,
-                                                                                    budget):
-    """A duplicate the agent is never told about is a duplicate it sends again.
+def test_a_revision_that_was_all_variants_is_applied_and_the_duplication_is_reported(plan,
+                                                                                     chart,
+                                                                                     budget):
+    """The redundancy is still told to the agent; it no longer rejects the revision.
 
-    Refused rather than applied-as-a-no-op on purpose: `graph._after_reflect` renders
-    `outcome.refused` into the message stream only on the refusal branch, so "applied" over
-    a plan that did not move is a lie the agent has no way to detect.
+    The old behaviour refused the whole revision, on the reasoning that reporting "APPLIED" over
+    a plan that did not move would let the agent believe it had widened its search. That reasoning
+    depended on the keyword list being a CONTRACT -- the gate discharged against it, so a term
+    that was not really added would be demanded later. Both halves are gone: `check_gate` no
+    longer refuses over an unsearched term and `fit_terms_to_budget` no longer trims, so the list
+    is a record of what the model said it would search. A refusal over a record costs a round trip
+    and buys nothing.
     """
     out = _apply(plan, PlanRevision(add_terms=("CARCINOMA", "  biopsy")),
                  budget=budget, chart=chart)
 
-    assert out.applied is False and out.refusal_class == REFUSED_REDUNDANT_TERM
-    assert out.changed_retrieval() is False
-    assert len(out.refused) == 2
+    assert out.applied is True, "a revision of duplicates is not a failure"
+    assert out.refusal_class == "", "nothing was refused, so nothing is classified as refused"
+    assert out.changed_retrieval() is False, "nothing new was added, and that is still true"
+    # Still reported, through the channel that already carried the already-at-that-policy
+    # promote no-ops on the applied path: a request that vanished without a word is one nobody
+    # can audit.
+    assert len(out.refused) == 2, "the agent is still told why"
     for term, covered_by in (("carcinoma", "carcinoma"), ("biopsy", "biopsy")):
         assert any(repr(term) in why and repr(covered_by) in why for why in out.refused)
-    # Countable over a directory of manifests, and never mistaken for the budget refusal
-    # that ends a run: this one leaves the allowance untouched.
-    row = plan.refused_revisions[-1]
-    assert row["refusal_class"] == REFUSED_REDUNDANT_TERM and row["step"] == 1
     assert plan.budget_exhausted(budget) is False
 
 
@@ -1012,10 +1057,12 @@ def _agent(spec, chart, llm=None):
     """The AUDIT MIDDLEWARE wired to real ledgers — where these rules live now.
 
     This used to hold a `ChartReviewAgent` and never run it, purely to borrow the plan refusal
-    off the object. That runtime is gone and the rule is `AuditMiddleware._out_of_plan`, so the
-    harness holds the middleware: one object less between the test and the rule it asserts. The
-    `_plan_refusal` / `_expansion_*` aliases keep the assertions below reading as they did, and
-    what they call is the live code.
+    off the object. That runtime is gone, so the harness holds the middleware: one object less
+    between the test and the rule it asserts. The `_expansion_*` aliases keep the assertions
+    below reading as they did, and what they call is the live code.
+
+    `declared` is populated because `_undeclared` refuses anything outside it, and an empty set
+    means every tool is undeclared.
     """
     from acr.agent import AuditMiddleware, RunContext
     from acr.coverage_planner import OpenThreadLedger, load_marker_catalogue
@@ -1032,6 +1079,8 @@ def _agent(spec, chart, llm=None):
                      tracer=Tracer.create(Path("/tmp") / "acr-test-traces"),
                      gate=lambda submitted: {"accepted": False},
                      toolbox=Toolbox(chart, evidence, coverage))
+    ctx.declared = {"read_document", "read_documents_batch", "search_notes", "list_documents",
+                    "document_type_summary", "timeline", "record_evidence", "submit_answer"}
     mw = AuditMiddleware(ctx)
     docs_by_type = documents_by_type(chart)
     mw.plan, mw.coverage, mw.evidence, mw.threads = plan, coverage, evidence, threads
@@ -1039,19 +1088,14 @@ def _agent(spec, chart, llm=None):
     mw._docs_by_type = docs_by_type
     mw._expansion_budget = price_expansion_budget(plan, docs_by_type, max_revisions=6,
                                                   supplied=None, planner_terms=len(plan.keywords))
-    def _refusal(name, args):
-        # The tests swap a plan in with `agent.plan = ...`; the rule reads `ctx.plan`, so the
-        # two are synced at the call. Without this the assignment set an attribute nothing read
-        # and the guard answered about the plan the context happened to hold.
-        ctx.plan = mw.plan
-        return mw._out_of_plan(name, args)
+    # `_plan_refusal` is gone with `AuditMiddleware._out_of_plan`: the runtime no longer refuses
+    # a read because of the bucket its document type is in. See the REMOVED note in acr.agent.
 
     def _spent():
         ctx.plan = mw.plan
         return (expansion_is_spent(mw.plan, mw._expansion_budget, terms_deferred=[])
                 and bool(mw.threads.unresolved()))
 
-    mw._plan_refusal = _refusal
     mw._expansion_exhausted_with_obligations = _spent
     mw._outstanding_obligations = lambda: ctx.outstanding_obligations()
     return mw

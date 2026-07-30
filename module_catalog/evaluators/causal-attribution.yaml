@@ -1,0 +1,27 @@
+schema: acr.module_asset/1
+module_id: causal-attribution
+version: 2.0.0
+kind: EVALUATOR
+runner: AGENT
+inputs: [trajectory, spec]
+output_schema: acr.attribution_report/2
+implementation: attribution.causal.v2
+truth_modes: [BLIND, REGISTRY_REFERENCE, GOLD]
+capabilities:
+  - name: trace-reader
+    scope: patient_under_review
+    version: 1.0.0
+  - name: spec-reader
+    scope: patient_under_review
+    version: 1.0.0
+  - name: patient-chart-reader
+    scope: patient_under_review
+    version: 1.0.0
+  - name: gate-replay
+    scope: patient_under_review
+    version: 1.0.0
+skills: []
+maximum_authority: SCREEN_AND_ROUTE
+description: Target-framed causal attribution with counterfactual and skeptic gates.
+owner: evaluation-engineer
+tags: [attribution, agent, causal]

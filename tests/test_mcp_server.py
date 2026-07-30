@@ -270,11 +270,20 @@ def test_a_run_with_zero_searches_must_not_reach_keyword_list_validated():
     assert may.miss_sample_hits == 0, "precondition: the clean sample that used to buy a pass"
     assert may.keywords_unsearched == may.required_keywords != []
 
+    # THE FACT IS STILL COMPUTED, and that was always the load-bearing half: a keyword list
+    # nobody searched cannot have been validated by sampling its misses, and the stratum says so
+    # regardless of what the gate does with it.
     assert may.keyword_list_validated is False, (
         "a keyword list nobody searched cannot have been validated by sampling its misses")
-    assert out["verdict"] == "FAIL"
-    assert run.validated is False
-    assert any("never ran" in m for m in out["missing"]), out["missing"]
+
+    # WHAT CHANGED 2026-07-30: it is reported, not refused. Coverage is advisory — see
+    # `coverage.evaluate_gate` and `skills/coverage-judgement/SKILL.md`. Measured over every
+    # recorded trace, coverage obligations produced ~150 answer rejections and 27 of them refused
+    # a tuple that was exactly the registry's answer, so "you have not searched enough" is now
+    # information the model acts on rather than a condition on its answer.
+    assert out["verdict"] == "PASS"
+    assert not out["missing"], "coverage no longer refuses"
+    assert any("never ran" in a for a in out.get("advisories") or []), out.get("advisories")
 
 
 def test_an_untouched_chart_cannot_pass_the_gate():
@@ -300,18 +309,31 @@ def test_a_witness_proved_positive_carries_no_coverage_claim():
     assert "coverage_attested" not in out["answer"]
 
 
-def test_a_malformed_code_is_refused_before_any_clinical_judgement():
-    """`C3412` reached a manifest on 2026-07-26 because the declared format was rendered into
-    the prompt and never enforced. The MCP front end must not reopen that."""
+def test_a_malformed_code_is_recorded_and_no_longer_refused():
+    """`C3412` reached a manifest on 2026-07-26 because the declared format was rendered into the
+    prompt and never enforced. It now reaches one again, and is counted rather than blocked.
+
+    RECORDED, NOT REFUSED, as of 2026-07-30. `field_format` was the last check in `gate_answer`
+    that judged an answer's CONTENT, and the constraint is already in the prompt:
+    `as_prompt_block` renders every field's `format` and `allowable_values`, and STORE.400's own
+    field description reads "no decimal point". A model that writes a malformed code against that
+    has failed to follow an instruction rather than been under-informed, and 4 of that check's 6
+    useful firings rejected `C34.9`/`C34.11`/`C34.2` -- the punctuated form ICD-O-3 itself writes
+    -- so it was largely creating the round trips it then resolved.
+
+    The measurement survives: `answer_shape_miss` carries which declared shape was missed, with
+    `refused: False`, so the eval plane counts instruction-following failures instead of a gate
+    absorbing them silently.
+    """
     svc = service()
     run_id = plan(svc, FOUND_PATIENT)
     out = svc.call("gate.check", {"run_id": run_id, "answer": {
         "status": "FOUND", "value": {**FOUND_VALUE, "primary_site": "C3412"},
         "reasoning": "x", "evidence": FOUND_EVIDENCE}})
 
-    assert out["verdict"] == "FAIL"
-    assert any("C3412" in m for m in out["missing"])
-    assert svc._runs_by_id[run_id].validated is False
+    assert out["verdict"] == "PASS"
+    assert not any("C3412" in m for m in out["missing"])
+    assert svc._runs_by_id[run_id].validated is True
 
 
 def test_a_fabricated_quote_cannot_enter_the_ledger():

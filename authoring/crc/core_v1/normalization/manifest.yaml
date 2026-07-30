@@ -1,0 +1,35 @@
+schema_version: '1.0'
+bundle_id: CRC.CORE.FULL_NORMALIZATION.v1
+clinical_use: NOT_FOR_CLINICAL_USE
+source_candidate_count: 280
+normalized_rule_count: 280
+distinct_source_concept_count: 568
+candidate_scoped_binding_status: complete
+source_slice_crosswalk_status: complete
+source_document_hash_status: pending
+source_register_documents_without_hash: 19
+evidence_block_root_counts:
+  all_of: 845
+  any_of: 22
+  conditional: 1
+  constant: 51
+  unresolved: 82
+  variable: 119
+computability_status_counts:
+  not_computable: 27
+  partially_specified: 253
+canonical_variable_count: 576
+variable_contract_count: 576
+registry_projection_contract_count: 9
+execution_group_plan_count: 8
+category_file_count: 39
+module_counts:
+  crc_core_v1_localized_normalization: 111
+  crc.normalization.metastatic.v1: 92
+  CRC.NORMALIZATION.molecular_biomarker.v1: 77
+canonical_alias_count: 12
+contract_set_hash: 9fccdeefafde22b546806038415482a877e709fac791adedd5b73813f3b5f8c0
+review_status:
+  clinical: pending
+  registrar: pending
+  runtime_materialization: pending

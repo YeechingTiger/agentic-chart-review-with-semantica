@@ -1,0 +1,287 @@
+schema_version: "1.0"
+bundle_id: CRC.CORE.MOLECULAR_TREATMENT.v1
+clinical_use: NOT_FOR_CLINICAL_USE
+templates:
+  official_source_draft: &official_source_draft
+    license: "Official publisher terms apply; only short paraphrases and locators are stored in this bundle."
+    document_hash: NOT_CAPTURED
+    review_status: agent_verified_official_source_human_pending
+  licensed_source_pending: &licensed_source_pending
+    license: "Institutional authorization required; content was not extracted."
+    document_hash: NOT_CAPTURED
+    review_status: authorized_snapshot_pending
+sources:
+  - <<: *official_source_draft
+    source_id: CAP.CRC_BIOMARKERS.2017
+    authority: ASCP_CAP_AMP_ASCO
+    title: Molecular Biomarkers for the Evaluation of Colorectal Carcinoma
+    source_type: clinical_practice_guideline
+    version: "May 2017; DOI 10.1200/JCO.2016.71.9807"
+    publication_or_update_date: "2017-05"
+    status: superseded_or_update_pending
+    url: https://documents.cap.org/documents/2017-v141-arpa.2016-0554-cp.pdf
+    accessed_on: "2026-07-27"
+    scope: RAS, BRAF, MMR/MSI, tissue handling, laboratory validation and turnaround
+    use: >
+      Exact source for retained RAS and MLH1-loss/BRAF candidate statements and
+      laboratory-operational context.
+    limitations: >
+      CAP reports that an update is in development. This source is not sufficient for
+      modern HER2/NTRK/BRAF treatment selection and requires an update check before promotion.
+
+  - <<: *official_source_draft
+    source_id: CAP.MMR_MSI_ICI.2022
+    authority: CAP_AMP_Fight_CRC
+    title: Mismatch Repair and Microsatellite Instability Testing for Immune Checkpoint Inhibitor Therapy
+    source_type: clinical_practice_guideline
+    version: "October 2022; DOI 10.5858/arpa.2021-0632-CP"
+    publication_or_update_date: "2022-10"
+    status: version_bound
+    url: https://www.cap.org/cap-guidelines/mismatch-repair-and-microsatellite-instability-testing-for-immune-checkpoint-inhibitor-therapy/
+    accessed_on: "2026-07-27"
+    scope: MMR/MSI assay choice, discordance, indeterminate results, subclonal loss and Lynch communication
+    use: Primary molecular-testing source for ICI eligibility evidence.
+    limitations: Does not define the complete CRC treatment pathway or a registry data model.
+
+  - <<: *official_source_draft
+    source_id: ASCO.CAP_MMR_MSI_ENDORSEMENT.2023
+    authority: ASCO
+    title: Mismatch Repair and Microsatellite Instability Testing for Immune Checkpoint Inhibitor Therapy ASCO Endorsement
+    source_type: guideline_endorsement
+    version: "2023; DOI 10.1200/JCO.22.02462"
+    publication_or_update_date: "2023"
+    status: version_bound
+    url: https://doi.org/10.1200/JCO.22.02462
+    accessed_on: "2026-07-27"
+    scope: ASCO endorsement of CAP/AMP/Fight CRC MMR/MSI testing recommendations
+    use: US oncology cross-endorsement for CAP 2022 testing rules.
+    limitations: Use with the endorsed CAP guideline; it is not a separate treatment algorithm.
+
+  - <<: *official_source_draft
+    source_id: ASCO.LARC.2024
+    authority: ASCO
+    title: Management of Locally Advanced Rectal Cancer
+    source_type: clinical_practice_guideline
+    version: "2024; DOI 10.1200/JCO.24.01160"
+    publication_or_update_date: "2024-08-08"
+    status: version_bound
+    url: https://ascopubs.org/doi/10.1200/JCO.24.01160
+    accessed_on: "2026-07-27"
+    scope: pretreatment MMR/MSI and MRI assessment, TNT, selective radiation, nonoperative management and dMMR immunotherapy
+    use: Primary source for first-tranche locally advanced rectal rules.
+    limitations: >
+      Conditional recommendations and preference-sensitive choices are not binary quality
+      measures; ESMO 2025 and licensed NCCN require reconciliation before a unified rule.
+
+  - <<: *official_source_draft
+    source_id: ASCO.MCRC.2022
+    authority: ASCO
+    title: Treatment of Metastatic Colorectal Cancer
+    source_type: clinical_practice_guideline
+    version: "online 2022 / print 2023; DOI 10.1200/JCO.22.01690"
+    publication_or_update_date: "2022"
+    status: version_bound
+    url: https://ascopubs.org/doi/10.1200/JCO.22.01690
+    accessed_on: "2026-07-27"
+    scope: first-line chemotherapy, MSI-H/dMMR immunotherapy, sidedness/RAS and BRAF V600E treatment
+    use: Source-specific ASCO audit candidates.
+    limitations: >
+      Several treatment branches differ from ESMO 2026 and newer regulatory/possibly NCCN
+      pathways. These candidates must retain ASCO version identity and cannot represent the
+      current universal standard.
+
+  - <<: *official_source_draft
+    source_id: ESMO.MCRC.2026
+    authority: ESMO
+    title: Metastatic colorectal cancer clinical practice guideline for diagnosis, treatment and follow-up
+    source_type: clinical_practice_guideline
+    version: "2026; DOI 10.1016/j.annonc.2026.03.005; last update March 2026"
+    publication_or_update_date: "2026-04-14"
+    status: version_bound
+    url: https://www.annalsofoncology.org/article/S0923-7534%2826%2900108-0/fulltext
+    accessed_on: "2026-07-27"
+    scope: current ESMO metastatic CRC molecular characterization and systemic/local treatment
+    use: Current cross-check and conflict detector for ASCO 2022 treatment candidates.
+    limitations: European guideline; jurisdiction and drug-label realization require explicit adapters.
+
+  - <<: *official_source_draft
+    source_id: ESMO.RECTAL_LOCALIZED.2025
+    authority: ESMO
+    title: Localised rectal cancer clinical practice guideline for diagnosis, treatment and follow-up
+    source_type: clinical_practice_guideline
+    version: "2025; DOI 10.1016/j.annonc.2025.05.528"
+    publication_or_update_date: "2025-05-22"
+    status: version_bound
+    url: https://www.annalsofoncology.org/article/S0923-7534%2825%2900731-8/fulltext
+    accessed_on: "2026-07-27"
+    scope: current ESMO localized rectal assessment and treatment
+    use: Cross-check ASCO 2024 before promotion.
+    limitations: Not yet normalized into source-specific executable candidates in this tranche.
+
+  - <<: *official_source_draft
+    source_id: ASCO.COLON_STAGE_II.2022
+    authority: ASCO
+    title: Adjuvant Therapy for Stage II Colon Cancer Guideline Update
+    source_type: clinical_practice_guideline
+    version: "2022; DOI 10.1200/JCO.21.02538 including published correction"
+    publication_or_update_date: "2022"
+    status: version_bound
+    url: https://ascopubs.org/doi/10.1200/JCO.21.02538
+    accessed_on: "2026-07-27"
+    scope: resected stage II colon adjuvant therapy and high-risk features
+    use: Required source for the next localized-colon tranche.
+    limitations: Registered here but no candidate rules promoted into core_v1.
+
+  - <<: *official_source_draft
+    source_id: ASCO.COLON_STAGE_III_DURATION.2019
+    authority: ASCO
+    title: Duration of Oxaliplatin-Containing Adjuvant Therapy for Stage III Colon Cancer
+    source_type: clinical_practice_guideline
+    version: "2019; DOI 10.1200/JCO.19.00281"
+    publication_or_update_date: "2019"
+    status: version_bound
+    url: https://doi.org/10.1200/JCO.19.00281
+    accessed_on: "2026-07-27"
+    scope: three versus six months of oxaliplatin-containing adjuvant therapy
+    use: Required source for the next localized-colon tranche.
+    limitations: Answers duration, not the full question of who should receive adjuvant therapy.
+
+  - <<: *official_source_draft
+    source_id: ESMO.COLON_LOCALIZED.2020_2026
+    authority: ESMO
+    title: Localised colon cancer guideline with 2026 Express Update
+    source_type: clinical_practice_guideline_and_update
+    version: "2020 DOI 10.1016/j.annonc.2020.06.022 + 2026 Express Update DOI 10.1016/j.esmoop.2025.106019"
+    publication_or_update_date: "2026-01-27"
+    status: version_bound
+    url: https://www.esmoopen.com/article/S2059-7029%2825%2901889-7/fulltext
+    accessed_on: "2026-07-27"
+    scope: localized colon diagnosis, treatment, follow-up and updated adjuvant algorithms
+    use: Cross-check for the next localized-colon tranche.
+    limitations: Source-specific European recommendations require US reconciliation.
+
+  - <<: *official_source_draft
+    source_id: ASTRO.RECTAL_RT.2025
+    authority: ASTRO
+    title: Radiation Therapy for Rectal Cancer Focused Update
+    source_type: clinical_practice_guideline
+    version: "2025; DOI 10.1016/j.prro.2024.11.003"
+    publication_or_update_date: "2025"
+    status: version_bound
+    url: https://www.practicalradonc.org/article/S1879-8500%2824%2900304-7/fulltext
+    accessed_on: "2026-07-27"
+    scope: neoadjuvant radiation indications, dose/fractionation, TNT sequence and selective omission
+    use: Required cross-check for the later rectal radiation tranche.
+    limitations: Does not replace systemic-therapy or molecular-testing guidance.
+
+  - <<: *official_source_draft
+    source_id: ASCO.SOMATIC_GENOMIC.2022
+    authority: ASCO
+    title: Somatic Genomic Testing in Patients With Metastatic or Advanced Cancer
+    source_type: clinical_practice_guideline
+    version: "2022; DOI 10.1200/JCO.21.02767"
+    publication_or_update_date: "2022"
+    status: version_bound
+    url: https://ascopubs.org/doi/10.1200/JCO.21.02767
+    accessed_on: "2026-07-27"
+    scope: pan-tumor somatic genomic testing principles used by CRC genomic candidates
+    use: Source-specific supplemental genomic-testing candidates.
+    limitations: Pan-tumor guidance; CRC-specific assay and treatment realization requires disease-specific sources.
+
+  - <<: *official_source_draft
+    source_id: SITC.GI_IMMUNOTHERAPY.2023
+    authority: SITC
+    title: Clinical Practice Guideline on Immunotherapy for Gastrointestinal Cancer
+    source_type: clinical_practice_guideline
+    version: "2023; DOI 10.1136/jitc-2022-006658"
+    publication_or_update_date: "2023"
+    status: version_bound
+    url: https://jitc.bmj.com/content/11/6/e006658
+    accessed_on: "2026-07-27"
+    scope: CRC immunotherapy biomarker guardrails
+    use: Supplemental cross-check for CRC immunotherapy candidates.
+    limitations: Living immunotherapy guidance; current disease-specific treatment sources take precedence.
+
+  - <<: *licensed_source_pending
+    source_id: NCCN.COLON.CURRENT
+    authority: NCCN
+    title: NCCN Clinical Practice Guidelines in Oncology - Colon Cancer
+    source_type: licensed_clinical_practice_guideline
+    version: UNBOUND_CURRENT_VERSION
+    publication_or_update_date: "unknown_until_authorized_snapshot"
+    status: source_pending
+    url: https://www.nccn.org/guidelines/category_1
+    accessed_on: "2026-07-27"
+    scope: US colon cancer workup and treatment
+    use: Mandatory licensed dependency before US production promotion.
+    limitations: No authorized version/effective date/hash was available; no rule was reconstructed from secondary material.
+
+  - <<: *licensed_source_pending
+    source_id: NCCN.RECTAL.CURRENT
+    authority: NCCN
+    title: NCCN Clinical Practice Guidelines in Oncology - Rectal Cancer
+    source_type: licensed_clinical_practice_guideline
+    version: UNBOUND_CURRENT_VERSION
+    publication_or_update_date: "unknown_until_authorized_snapshot"
+    status: source_pending
+    url: https://www.nccn.org/guidelines/category_1
+    accessed_on: "2026-07-27"
+    scope: US rectal cancer workup and treatment
+    use: Mandatory licensed dependency before US production promotion.
+    limitations: No authorized version/effective date/hash was available; no rule was reconstructed from secondary material.
+
+  - <<: *licensed_source_pending
+    source_id: NCCN.HEREDITARY_CRC.CURRENT
+    authority: NCCN
+    title: NCCN Genetic/Familial High-Risk Assessment - Colorectal, Endometrial, and Gastric
+    source_type: licensed_clinical_practice_guideline
+    version: UNBOUND_CURRENT_VERSION
+    publication_or_update_date: "unknown_until_authorized_snapshot"
+    status: source_pending
+    url: https://www.nccn.org/guidelines/category_2
+    accessed_on: "2026-07-27"
+    scope: Lynch risk evaluation, referral and germline testing pathways
+    use: Mandatory dependency for completing the MLH1-loss referral rule.
+    limitations: No authorized snapshot; the full referral pathway remains explicitly blocked.
+
+  - <<: *official_source_draft
+    source_id: COC.STORE.2026
+    authority: American_College_of_Surgeons_Commission_on_Cancer
+    title: Standards for Oncology Registry Entry
+    source_type: registry_standard
+    version: STORE_2026
+    publication_or_update_date: "2026"
+    status: version_bound
+    url: https://www.facs.org/media/iiajly3g/store-manual-2026.pdf
+    accessed_on: "2026-07-27"
+    scope: registry data items and first-course treatment coding for diagnosis year 2026+
+    use: Primary STORE-centered mapping authority.
+    limitations: Required status is not evidence that a field exists or is complete in the linked extract.
+
+  - <<: *official_source_draft
+    source_id: NAACCR.SSDI.3_3
+    authority: NAACCR
+    title: Site-Specific Data Items and Grade Manual
+    source_type: registry_standard
+    version: "SSDI v3.3 aligned with NAACCR v26"
+    publication_or_update_date: "2025-12-17"
+    status: version_bound
+    url: https://apps.naaccr.org/ssdi/schema/colon_rectum/
+    accessed_on: "2026-07-27"
+    scope: colon/rectum schema applicability and SSDI value domains
+    use: Exact item numbers, XML IDs, effective years and code semantics.
+    limitations: Applicability depends on primary site, histology, diagnosis year and standard setter.
+
+  - <<: *official_source_draft
+    source_id: NCI.COLON_RECTAL_PDQ.2025
+    authority: National_Cancer_Institute
+    title: Colon and Rectal Cancer Treatment PDQ Health Professional Summaries
+    source_type: evidence_summary
+    version: "Colon last updated 2025-02-12; page dates vary"
+    publication_or_update_date: "2025"
+    status: context_only
+    url: https://www.cancer.gov/types/colorectal/hp/colon-treatment-pdq
+    accessed_on: "2026-07-27"
+    scope: evidence background and treatment-option context
+    use: Context and cross-check only.
+    limitations: NCI explicitly states PDQ is not a formal practice guideline.

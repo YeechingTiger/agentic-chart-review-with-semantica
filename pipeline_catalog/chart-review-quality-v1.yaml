@@ -1,0 +1,22 @@
+schema: acr.pipeline_profile/1
+profile_id: chart-review-quality-v1
+version: 1.0.0
+description: Deterministic quality screening before selected agent attribution.
+nodes:
+  - id: evidence-check
+    module: evidence-validity@1.0.0
+    when: always
+    authority: BLOCK_RELEASE
+    budget:
+      max_calls: 0
+      max_chart_reads: 0
+      max_usd: 0
+  - id: gate-check
+    module: gate-effectiveness@1.0.0
+    after: [evidence-check]
+    when: always
+    authority: BLOCK_RELEASE
+    budget:
+      max_calls: 0
+      max_chart_reads: 0
+      max_usd: 0

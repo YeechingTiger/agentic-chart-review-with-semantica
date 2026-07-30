@@ -1,0 +1,203 @@
+contract_schema_version: '2.0'
+contract_id: CRC.FULL.VAR.irinotecan_toxicity_risk_at_decision
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.irinotecan_toxicity_risk_at_decision
+label: irinotecan toxicity risk at decision
+roles:
+- exceptions
+datatype: structured_categorical
+value_domain: &id001
+  kind: explicit_contract_required
+  required_missing_states:
+  - not_assessed
+  - indeterminate
+  - not_documented
+temporal_meaning: Must be known on or before the indexed decision. Later evidence must not be back-projected. Variables describing
+  delivery additionally retain the actual event date.
+mapping_level: chart_extension
+registry_mapping:
+  standard: none
+  status: no_verified_mapping
+question: What is the irinotecan toxicity risk at decision for the indexed CRC tumor, test, treatment, or decision at Must
+  be known on or before the indexed decision. Later evidence must not be back-projected. Variables describing delivery additionally
+  retain the actual event date.?
+applicability_guard:
+  disease: colorectal_cancer
+  rule_uses:
+  - E26-SYS-1L-04
+field_contract:
+  name: irinotecan_toxicity_risk_at_decision
+  type: structured_categorical
+  nullable: true
+  value_domain: *id001
+  description: irinotecan toxicity risk at decision
+evidence_contract:
+  establishing_source_documents: &id002
+  - source-specific establishing document class pending review
+  excluded_sources: &id003
+  - problem-list carry-forward without indexed-event support
+  positive_witness: A tumor- and time-linked source owned by the relevant clinical discipline explicitly establishes crc.irinotecan_toxicity_risk_at_decision.
+  negative_or_unknown_proof:
+    mode: candidate_review_required
+    required_coverage:
+    - Review every available establishing document class in the indexed rule window.
+    statement: &id004
+      not_assessed: The relevant assessment/test was not performed by the indexed decision.
+      indeterminate: The assessment was performed but did not yield a determinate result.
+      not_documented: Current chart evidence cannot establish whether assessment occurred.
+      not_applicable: The variable is outside the candidate's conditional branch.
+  conflict_policy: Retain conflicting citations; prefer the indexed primary source and timepoint. Abstain when source precedence
+    does not resolve the conflict.
+proof_obligation:
+  for_positive: At least one tumor- and time-linked establishing source explicitly supports crc.irinotecan_toxicity_risk_at_decision;
+    copied or unanchored mentions are insufficient.
+  for_negative_or_unknown:
+    mode: candidate_review_required
+    required_document_classes: *id002
+    excluded_document_classes: *id003
+    runtime_enforcement: not_materialized
+missingness_semantics: *id004
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish the variable.
+  SPEC_INSUFFICIENT: The candidate contract does not cover this evidence pattern or timepoint.
+boundary_cases:
+- case_id: wrong_tumor_or_timepoint
+  input: irinotecan toxicity risk at decision is documented only for another tumor, specimen, line, or later decision.
+  expected: Do not back-project; return EVIDENCE_INSUFFICIENT for the indexed use.
+- case_id: conflicting_establishing_sources
+  input: Two admissible indexed sources disagree and precedence does not resolve them.
+  expected: Retain both citations and abstain EVIDENCE_INSUFFICIENT.
+- case_id: mention_without_establishing_source
+  input: Only a copied problem-list or unanchored summary mention is available.
+  expected: Do not emit a positive value.
+- case_id: registry_projection_is_coarser
+  input: A registry value exists but omits a distinction required by this variable.
+  expected: Keep the registry value as a validation projection only; do not infer the detailed canonical value.
+execution_binding:
+  execution_group_id: CRC.FULL.chart_misc
+  output_field: irinotecan_toxicity_risk_at_decision
+  runtime_status: planned_not_materialized
+source_concepts:
+- irinotecan_risk
+conformance:
+  verdict: needs_revision
+  issues:
+  - full-universe generated contract requires clinical and evidence-owner review
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+provenance:
+- element: roles
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: datatype
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: value_domain
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: temporal_meaning
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: mapping_level
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: registry_mapping
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: question
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: applicability_guard
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: field_contract.name
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: field_contract.type
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: field_contract.nullable
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: field_contract.value_domain
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: evidence_contract.establishing_source_documents
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: evidence_contract.excluded_sources
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: evidence_contract.positive_witness
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: evidence_contract.negative_or_unknown_proof
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: evidence_contract.conflict_policy
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: proof_obligation
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: missingness_semantics
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: abstention
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: boundary_cases
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: execution_binding
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+contract_hash: af7da550923064b872e134c545a469d9d7119ac3c0a472bb30085820249003b7

@@ -1,0 +1,753 @@
+schema_version: '2.0'
+category: rectal_organ_preservation
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 10
+rules:
+- candidate_id: ER25-TX-03
+  parent_recommendation_id: ER25-TX-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Treatment recommendation 3
+  category: rectal_organ_preservation
+  title: RT or CRT for early organ preservation
+  core_or_supplemental: core
+  source_context:
+    eligibility: Lower or mid cT1-2N0 with organ-preservation goal
+    action: Use short-course RT or chemoradiation
+    timing: Neoadjuvant
+    exceptions: Patient selection and surveillance
+    predicate_logic: lower_mid AND cT1_2N0 AND organ_preservation => SCRT OR CRT
+  requirements:
+    eligibility:
+      expression: Lower or mid cT1-2N0 with organ-preservation goal
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_anatomy.third.pretreatment
+      - crc.rectal_stage.clinical_n.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.rectal_anatomy.third.pretreatment
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_stage.clinical_n.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use short-course RT or chemoradiation
+      variables:
+      - crc.rectal_nom.management_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.management_plan_at_decision
+    timing:
+      expression: Neoadjuvant
+      variables:
+      - crc.rectal_nom.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.decision_date
+    exceptions:
+      expression: Patient selection and surveillance
+      variables:
+      - crc.rectal_treatment.organ_preservation_goal
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.organ_preservation_goal
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_anatomy.third.pretreatment
+  - crc.rectal_nom.decision_date
+  - crc.rectal_nom.management_plan_at_decision
+  - crc.rectal_stage.clinical_n.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_treatment.organ_preservation_goal
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-TX-04
+  parent_recommendation_id: ER25-TX-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Treatment recommendation 4
+  category: rectal_organ_preservation
+  title: CRT plus brachytherapy boost for selected organ preservation
+  core_or_supplemental: core
+  source_context:
+    eligibility: Lower or mid cT1-2N-positive or cT3N0-1 under 5 cm with preservation goal
+    action: Use external-beam CRT plus endorectal brachytherapy boost
+    timing: Neoadjuvant
+    exceptions: Center and anatomy suitability
+    predicate_logic: selected_stage AND size_lt_5 AND organ_preservation => CRT_brachy
+  requirements:
+    eligibility:
+      expression: Lower or mid cT1-2N-positive or cT3N0-1 under 5 cm with preservation goal
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_anatomy.third.pretreatment
+      - crc.rectal_stage.clinical_n.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      - crc.rectal_tumor.maximum_diameter_cm.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_anatomy.third.pretreatment
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_stage.clinical_n.pretreatment
+        - variable: crc.rectal_tumor.maximum_diameter_cm.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use external-beam CRT plus endorectal brachytherapy boost
+      variables:
+      - crc.rectal_nom.management_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.management_plan_at_decision
+    timing:
+      expression: Neoadjuvant
+      variables:
+      - crc.rectal_nom.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.decision_date
+    exceptions:
+      expression: Center and anatomy suitability
+      variables:
+      - crc.rectal_brachytherapy.feasibility
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_brachytherapy.feasibility
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_anatomy.third.pretreatment
+  - crc.rectal_brachytherapy.feasibility
+  - crc.rectal_nom.decision_date
+  - crc.rectal_nom.management_plan_at_decision
+  - crc.rectal_stage.clinical_n.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_tumor.maximum_diameter_cm.pretreatment
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-TX-21
+  parent_recommendation_id: ER25-TX-R20
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: NACT cCR recommendation
+  category: rectal_organ_preservation
+  title: No watch-and-wait after chemotherapy alone
+  core_or_supplemental: core
+  source_context:
+    eligibility: Clinical complete response after NACT alone
+    action: Do not enter watch-and-wait based on that response
+    timing: Post-NACT assessment
+    exceptions: None stated
+    predicate_logic: cCR_after_NACT_alone => not_WW
+  requirements:
+    eligibility:
+      expression: Clinical complete response after NACT alone
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_response.overall_category.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.overall_category.post_neoadjuvant
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Do not enter watch-and-wait based on that response
+      variables:
+      - crc.rectal_nom.management_plan_at_decision
+      - crc.rectal_response.dre_category.post_neoadjuvant
+      - crc.rectal_response.endoscopy_category.post_neoadjuvant
+      - crc.rectal_response.mri_category.post_neoadjuvant
+      - crc.rectal_treatment.sequence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.sequence
+        - variable: crc.rectal_response.mri_category.post_neoadjuvant
+        - variable: crc.rectal_response.endoscopy_category.post_neoadjuvant
+        - variable: crc.rectal_response.dre_category.post_neoadjuvant
+        - variable: crc.rectal_nom.management_plan_at_decision
+    timing:
+      expression: Post-NACT assessment
+      variables:
+      - crc.rectal_nom.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.decision_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_nom.decision_date
+  - crc.rectal_nom.management_plan_at_decision
+  - crc.rectal_response.dre_category.post_neoadjuvant
+  - crc.rectal_response.endoscopy_category.post_neoadjuvant
+  - crc.rectal_response.mri_category.post_neoadjuvant
+  - crc.rectal_response.overall_category.post_neoadjuvant
+  - crc.rectal_treatment.sequence
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-TX-23
+  parent_recommendation_id: ER25-TX-R22
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Post-dostarlimab cCR recommendation
+  category: rectal_organ_preservation
+  title: Watch-and-wait follow-up after immunotherapy cCR
+  core_or_supplemental: core
+  source_context:
+    eligibility: cCR after dostarlimab
+    action: Use the same watch-and-wait follow-up as pMMR TNT cCR
+    timing: After cCR
+    exceptions: Requires strict surveillance
+    predicate_logic: dostarlimab_cCR => WW_followup
+  requirements:
+    eligibility:
+      expression: cCR after dostarlimab
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_response.overall_category.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.overall_category.post_neoadjuvant
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use the same watch-and-wait follow-up as pMMR TNT cCR
+      variables:
+      - crc.rectal_nom.management_plan_at_decision
+      - crc.rectal_nom.surveillance_plan
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.surveillance_plan
+        - variable: crc.rectal_nom.management_plan_at_decision
+    timing:
+      expression: After cCR
+      variables:
+      - crc.rectal_nom.decision_date
+      - crc.rectal_response.ccr_confirmation_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.ccr_confirmation_date
+        - variable: crc.rectal_nom.decision_date
+    exceptions:
+      expression: Requires strict surveillance
+      variables:
+      - crc.rectal_nom.surveillance_adherence_capacity
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.surveillance_adherence_capacity
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_nom.decision_date
+  - crc.rectal_nom.management_plan_at_decision
+  - crc.rectal_nom.surveillance_adherence_capacity
+  - crc.rectal_nom.surveillance_plan
+  - crc.rectal_response.ccr_confirmation_date
+  - crc.rectal_response.overall_category.post_neoadjuvant
+  computability:
+    status: partially_specified
+    blockers:
+    - B_OFF_LABEL
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-NOM-01
+  parent_recommendation_id: ER25-NOM-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: NOM recommendation 1
+  category: rectal_organ_preservation
+  title: Watch-and-wait after cCR in lower or mid rectum
+  core_or_supplemental: core
+  source_context:
+    eligibility: Lower or mid rectal tumor with cCR and organ-preservation intent
+    action: Offer watch-and-wait
+    timing: After response assessment
+    exceptions: Requires strict surveillance and informed preference
+    predicate_logic: lower_mid AND cCR AND organ_preservation => WW
+  requirements:
+    eligibility:
+      expression: Lower or mid rectal tumor with cCR and organ-preservation intent
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_anatomy.third.pretreatment
+      - crc.rectal_response.overall_category.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_anatomy.third.pretreatment
+        - variable: crc.rectal_response.overall_category.post_neoadjuvant
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Offer watch-and-wait
+      variables:
+      - crc.rectal_nom.management_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.management_plan_at_decision
+    timing:
+      expression: After response assessment
+      variables:
+      - crc.rectal_nom.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.decision_date
+    exceptions:
+      expression: Requires strict surveillance and informed preference
+      variables:
+      - crc.patient_preference
+      - crc.rectal_nom.surveillance_capacity
+      - crc.rectal_treatment.goal
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.goal
+        - variable: crc.patient_preference
+        - variable: crc.rectal_nom.surveillance_capacity
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.patient_preference
+  - crc.rectal_anatomy.third.pretreatment
+  - crc.rectal_nom.decision_date
+  - crc.rectal_nom.management_plan_at_decision
+  - crc.rectal_nom.surveillance_capacity
+  - crc.rectal_response.overall_category.post_neoadjuvant
+  - crc.rectal_treatment.goal
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-NOM-02
+  parent_recommendation_id: ER25-NOM-R02
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: NOM recommendation 2
+  category: rectal_organ_preservation
+  title: Watch-and-wait after PD-1 cCR
+  core_or_supplemental: core
+  source_context:
+    eligibility: dMMR or MSI-H with cCR after PD-1 therapy
+    action: Offer watch-and-wait
+    timing: After cCR confirmation
+    exceptions: Strict follow-up
+    predicate_logic: dMMR_MSIH AND cCR_after_PD1 => WW
+  requirements:
+    eligibility:
+      expression: dMMR or MSI-H with cCR after PD-1 therapy
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.rectal_response.overall_category.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.rectal_response.overall_category.post_neoadjuvant
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Offer watch-and-wait
+      variables:
+      - crc.rectal_nom.management_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.management_plan_at_decision
+    timing:
+      expression: After cCR confirmation
+      variables:
+      - crc.rectal_nom.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.decision_date
+    exceptions:
+      expression: Strict follow-up
+      variables:
+      - crc.rectal_nom.surveillance_capacity
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.surveillance_capacity
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.rectal_nom.decision_date
+  - crc.rectal_nom.management_plan_at_decision
+  - crc.rectal_nom.surveillance_capacity
+  - crc.rectal_response.overall_category.post_neoadjuvant
+  computability:
+    status: partially_specified
+    blockers:
+    - B_OFF_LABEL
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO24-LARC-5.1
+  parent_recommendation_id: ASCO24-LARC-R5.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_larc_2024
+  source_anchor: Recommendation 5.1
+  category: rectal_organ_preservation
+  title: Discuss NOM after cCR
+  core_or_supplemental: core
+  source_context:
+    eligibility: cCR after neoadjuvant therapy
+    action: Discuss NOM as an alternative to TME
+    timing: Post-treatment response assessment
+    exceptions: Requires patient preference and surveillance capacity
+    predicate_logic: cCR AND preference AND surveillance_capacity => discuss_NOM
+  requirements:
+    eligibility:
+      expression: cCR after neoadjuvant therapy
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_response.overall_category.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.overall_category.post_neoadjuvant
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Discuss NOM as an alternative to TME
+      variables:
+      - crc.rectal_nom.management_plan_at_decision
+      - crc.rectal_response.dre_category.post_neoadjuvant
+      - crc.rectal_response.endoscopy_category.post_neoadjuvant
+      - crc.rectal_response.mri_category.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.mri_category.post_neoadjuvant
+        - variable: crc.rectal_response.endoscopy_category.post_neoadjuvant
+        - variable: crc.rectal_response.dre_category.post_neoadjuvant
+        - variable: crc.rectal_nom.management_plan_at_decision
+    timing:
+      expression: Post-treatment response assessment
+      variables:
+      - crc.rectal_nom.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.decision_date
+    exceptions:
+      expression: Requires patient preference and surveillance capacity
+      variables:
+      - crc.patient_preference
+      - crc.rectal_nom.surveillance_capacity
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.patient_preference
+        - variable: crc.rectal_nom.surveillance_capacity
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.patient_preference
+  - crc.rectal_nom.decision_date
+  - crc.rectal_nom.management_plan_at_decision
+  - crc.rectal_nom.surveillance_capacity
+  - crc.rectal_response.dre_category.post_neoadjuvant
+  - crc.rectal_response.endoscopy_category.post_neoadjuvant
+  - crc.rectal_response.mri_category.post_neoadjuvant
+  - crc.rectal_response.overall_category.post_neoadjuvant
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ1-07
+  parent_recommendation_id: ASTRO25-KQ1-R7
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ1 recommendation 7
+  category: rectal_organ_preservation
+  title: RT for sphincter preservation in cT1-2N0
+  core_or_supplemental: core
+  source_context:
+    eligibility: cT1-2N0 otherwise requiring APR
+    action: May use neoadjuvant RT for sphincter preservation
+    timing: Preoperative
+    exceptions: Conditional and anatomy dependent
+    predicate_logic: cT1_2N0 AND otherwise_APR => may_RT
+  requirements:
+    eligibility:
+      expression: cT1-2N0 otherwise requiring APR
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_stage.clinical_n.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_stage.clinical_n.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: May use neoadjuvant RT for sphincter preservation
+      variables:
+      - crc.rectal_nom.management_plan_at_decision
+      - crc.rectal_surgery.planned_procedure
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_surgery.planned_procedure
+        - variable: crc.rectal_nom.management_plan_at_decision
+    timing:
+      expression: Preoperative
+      variables:
+      - crc.rectal_nom.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.decision_date
+    exceptions:
+      expression: Conditional and anatomy dependent
+      variables:
+      - crc.rectal_treatment.sphincter_preservation_goal
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.sphincter_preservation_goal
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_nom.decision_date
+  - crc.rectal_nom.management_plan_at_decision
+  - crc.rectal_stage.clinical_n.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_surgery.planned_procedure
+  - crc.rectal_treatment.sphincter_preservation_goal
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ3-01
+  parent_recommendation_id: ASTRO25-KQ3-R1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ3 recommendation 1
+  category: rectal_organ_preservation
+  title: NOM after TNT cCR
+  core_or_supplemental: core
+  source_context:
+    eligibility: cT3-4 or cN-positive, cCR after TNT, preservation preference, and close MDT follow-up
+    action: May use NOM
+    timing: After cCR
+    exceptions: All selection and follow-up conditions required
+    predicate_logic: advanced_stage AND TNT_cCR AND preference AND close_followup => NOM
+  requirements:
+    eligibility:
+      expression: cT3-4 or cN-positive, cCR after TNT, preservation preference, and close MDT follow-up
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_response.overall_category.post_neoadjuvant
+      - crc.rectal_stage.clinical_n.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_stage.clinical_n.pretreatment
+        - variable: crc.rectal_response.overall_category.post_neoadjuvant
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: May use NOM
+      variables:
+      - crc.rectal_nom.management_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.management_plan_at_decision
+    timing:
+      expression: After cCR
+      variables:
+      - crc.rectal_nom.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.decision_date
+    exceptions:
+      expression: All selection and follow-up conditions required
+      variables:
+      - crc.patient_preference
+      - crc.rectal_nom.surveillance_capacity
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.patient_preference
+        - variable: crc.rectal_nom.surveillance_capacity
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.patient_preference
+  - crc.rectal_nom.decision_date
+  - crc.rectal_nom.management_plan_at_decision
+  - crc.rectal_nom.surveillance_capacity
+  - crc.rectal_response.overall_category.post_neoadjuvant
+  - crc.rectal_stage.clinical_n.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ3-02
+  parent_recommendation_id: ASTRO25-KQ3-R2
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ3 recommendation 2
+  category: rectal_organ_preservation
+  title: CRT plus local excision after near-cCR
+  core_or_supplemental: core
+  source_context:
+    eligibility: cT2-3N0, near-cCR, lower or mid, at most 4 cm, and preservation preference
+    action: May use CRT plus local excision
+    timing: After response assessment
+    exceptions: Strict selection
+    predicate_logic: all_selected_early_features AND near_cCR => may_CRT_LE
+  requirements:
+    eligibility:
+      expression: cT2-3N0, near-cCR, lower or mid, at most 4 cm, and preservation preference
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_anatomy.third.pretreatment
+      - crc.rectal_response.overall_category.post_neoadjuvant
+      - crc.rectal_stage.clinical_n.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      - crc.rectal_tumor.maximum_diameter_cm.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_stage.clinical_n.pretreatment
+        - variable: crc.rectal_response.overall_category.post_neoadjuvant
+        - variable: crc.rectal_anatomy.third.pretreatment
+        - variable: crc.rectal_tumor.maximum_diameter_cm.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: May use CRT plus local excision
+      variables:
+      - crc.rectal_nom.management_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.management_plan_at_decision
+    timing:
+      expression: After response assessment
+      variables:
+      - crc.rectal_nom.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.decision_date
+    exceptions:
+      expression: Strict selection
+      variables:
+      - crc.patient_preference
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.patient_preference
+  - crc.rectal_anatomy.third.pretreatment
+  - crc.rectal_nom.decision_date
+  - crc.rectal_nom.management_plan_at_decision
+  - crc.rectal_response.overall_category.post_neoadjuvant
+  - crc.rectal_stage.clinical_n.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_tumor.maximum_diameter_cm.pretreatment
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

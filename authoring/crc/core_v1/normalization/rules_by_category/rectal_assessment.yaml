@@ -1,0 +1,1160 @@
+schema_version: '2.0'
+category: rectal_assessment
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 15
+rules:
+- candidate_id: ER25-MOL-01
+  parent_recommendation_id: ER25-MOL-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Molecular recommendation 1
+  category: rectal_assessment
+  title: MMR or MSI on diagnostic biopsy
+  core_or_supplemental: core
+  source_context:
+    eligibility: Localized rectal cancer
+    action: Test MMR or MSI on biopsy
+    timing: At diagnosis before treatment
+    exceptions: None
+    predicate_logic: localized_rectal => biopsy_MMR_MSI
+  requirements:
+    eligibility:
+      expression: Localized rectal cancer
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Test MMR or MSI on biopsy
+      variables:
+      - crc.mmr_ihc_integrated_status
+      - crc.molecular_assay_method
+      - crc.msi_status
+      - crc.rectal_assessment.completed_components.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.molecular_assay_method
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+    timing:
+      expression: At diagnosis before treatment
+      variables:
+      - crc.rectal_diagnostic_biopsy.date
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_diagnostic_biopsy.date
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.molecular_assay_method
+  - crc.msi_status
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_diagnostic_biopsy.date
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-MOL-02
+  parent_recommendation_id: ER25-MOL-R02
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Molecular recommendation 2
+  category: rectal_assessment
+  title: Do not routinely test metastatic markers for localized treatment
+  core_or_supplemental: core
+  source_context:
+    eligibility: Localized rectal treatment planning
+    action: Do not routinely test RAS, BRAF, NTRK, or HER2
+    timing: Initial localized workup
+    exceptions: Other indications such as hereditary or metastatic workup
+    predicate_logic: localized_treatment_only => not_routine_RAS_BRAF_NTRK_HER2
+  requirements:
+    eligibility:
+      expression: Localized rectal treatment planning
+      variables:
+      - crc.disease_extent.at_localized_treatment_decision
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.disease_extent.at_localized_treatment_decision
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Do not routinely test RAS, BRAF, NTRK, or HER2
+      variables:
+      - crc.localized_rectal.metastatic_marker_orders
+      - crc.rectal_assessment.completed_components.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.metastatic_marker_orders
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+    timing:
+      expression: Initial localized workup
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Other indications such as hereditary or metastatic workup
+      variables:
+      - crc.molecular.test_indication
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular.test_indication
+  required_variables:
+  - crc.disease_extent.at_localized_treatment_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.localized_rectal.metastatic_marker_orders
+  - crc.molecular.test_indication
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-ASSESS-01
+  parent_recommendation_id: ER25-ASSESS-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Assessment recommendation 1
+  category: rectal_assessment
+  title: MDT from diagnosis
+  core_or_supplemental: core
+  source_context:
+    eligibility: New localized rectal cancer
+    action: Review in multidisciplinary team
+    timing: From diagnosis
+    exceptions: None
+    predicate_logic: rectal_diagnosis => MDT
+  requirements:
+    eligibility:
+      expression: New localized rectal cancer
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Review in multidisciplinary team
+      variables:
+      - crc.multidisciplinary_team.decision
+      - crc.multidisciplinary_team.specialties_present
+      - crc.rectal_assessment.completed_components.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.multidisciplinary_team.specialties_present
+        - variable: crc.multidisciplinary_team.decision
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+    timing:
+      expression: From diagnosis
+      variables:
+      - crc.multidisciplinary_team.review_date
+      - crc.rectal_cancer.diagnosis_date
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_cancer.diagnosis_date
+        - variable: crc.multidisciplinary_team.review_date
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.multidisciplinary_team.decision
+  - crc.multidisciplinary_team.review_date
+  - crc.multidisciplinary_team.specialties_present
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_cancer.diagnosis_date
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-ASSESS-02
+  parent_recommendation_id: ER25-ASSESS-R02
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Assessment recommendation 2
+  category: rectal_assessment
+  title: Baseline clinical and laboratory assessment
+  core_or_supplemental: core
+  source_context:
+    eligibility: Localized rectal cancer
+    action: History, examination including DRE, CBC, liver and renal tests, and CEA
+    timing: Initial staging
+    exceptions: None
+    predicate_logic: diagnosis => baseline_clinical_labs
+  requirements:
+    eligibility:
+      expression: Localized rectal cancer
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: History, examination including DRE, CBC, liver and renal tests, and CEA
+      variables:
+      - crc.baseline_laboratory.cbc_completed
+      - crc.baseline_laboratory.liver_tests_completed
+      - crc.baseline_laboratory.renal_tests_completed
+      - crc.cea.value_at_adjuvant_decision
+      - crc.ecog_performance_status
+      - crc.rectal_assessment.completed_components.pretreatment
+      - crc.rectal_response.dre_performed.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.dre_performed.post_neoadjuvant
+        - variable: crc.baseline_laboratory.cbc_completed
+        - variable: crc.baseline_laboratory.liver_tests_completed
+        - variable: crc.baseline_laboratory.renal_tests_completed
+        - variable: crc.cea.value_at_adjuvant_decision
+        - variable: crc.ecog_performance_status
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+    timing:
+      expression: Initial staging
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.baseline_laboratory.cbc_completed
+  - crc.baseline_laboratory.liver_tests_completed
+  - crc.baseline_laboratory.renal_tests_completed
+  - crc.cea.value_at_adjuvant_decision
+  - crc.ecog_performance_status
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_response.dre_performed.post_neoadjuvant
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-ASSESS-03
+  parent_recommendation_id: ER25-ASSESS-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Assessment recommendation 3
+  category: rectal_assessment
+  title: Complete colonoscopy and MRI tumor level
+  core_or_supplemental: core
+  source_context:
+    eligibility: Localized rectal cancer before treatment
+    action: Colonoscopy to caecum and MRI definition of tumor level
+    timing: Preoperative staging
+    exceptions: Document infeasibility
+    predicate_logic: preop => complete_colonoscopy AND MRI_level
+  requirements:
+    eligibility:
+      expression: Localized rectal cancer before treatment
+      variables:
+      - crc.colon_presentation.obstruction
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_presentation.obstruction
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Colonoscopy to caecum and MRI definition of tumor level
+      variables:
+      - crc.colonoscopy.extent_at_initial_workup
+      - crc.rectal_anatomy.anal_verge_distance_cm.pretreatment
+      - crc.rectal_anatomy.third.pretreatment
+      - crc.rectal_assessment.completed_components.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colonoscopy.extent_at_initial_workup
+        - variable: crc.rectal_anatomy.anal_verge_distance_cm.pretreatment
+        - variable: crc.rectal_anatomy.third.pretreatment
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+    timing:
+      expression: Preoperative staging
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Document infeasibility
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.colon_presentation.obstruction
+  - crc.colonoscopy.extent_at_initial_workup
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_anatomy.anal_verge_distance_cm.pretreatment
+  - crc.rectal_anatomy.third.pretreatment
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-ASSESS-04
+  parent_recommendation_id: ER25-ASSESS-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Assessment recommendation 4
+  category: rectal_assessment
+  title: ERUS to distinguish cT1 from cT2
+  core_or_supplemental: core
+  source_context:
+    eligibility: Early rectal lesion requiring cT1 versus cT2 discrimination
+    action: Use endorectal ultrasound
+    timing: Initial local staging
+    exceptions: Not a restaging modality
+    predicate_logic: suspected_cT1_or_cT2 => ERUS
+  requirements:
+    eligibility:
+      expression: Early rectal lesion requiring cT1 versus cT2 discrimination
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_stage.clinical_t.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use endorectal ultrasound
+      variables:
+      - crc.rectal_assessment.completed_components.pretreatment
+      - crc.rectal_erus.t_category_result.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_erus.t_category_result.pretreatment
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+    timing:
+      expression: Initial local staging
+      variables:
+      - crc.rectal_erus.date.pretreatment
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_erus.date.pretreatment
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Not a restaging modality
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_erus.date.pretreatment
+  - crc.rectal_erus.t_category_result.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-ASSESS-05
+  parent_recommendation_id: ER25-ASSESS-R05
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Assessment recommendation 5
+  category: rectal_assessment
+  title: Mandatory pelvic MRI for risk-adapted staging
+  core_or_supplemental: core
+  source_context:
+    eligibility: Localized rectal cancer
+    action: Perform high-quality pelvic MRI
+    timing: Before treatment selection
+    exceptions: None stated
+    predicate_logic: localized_rectal => pelvic_MRI
+  requirements:
+    eligibility:
+      expression: Localized rectal cancer
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Perform high-quality pelvic MRI
+      variables:
+      - crc.rectal_assessment.completed_components.pretreatment
+      - crc.rectal_mri.image_quality.pretreatment
+      - crc.rectal_mri.report_available.pretreatment
+      - crc.rectal_neoadjuvant.protocol_name
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.protocol_name
+        - variable: crc.rectal_mri.image_quality.pretreatment
+        - variable: crc.rectal_mri.report_available.pretreatment
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+    timing:
+      expression: Before treatment selection
+      variables:
+      - crc.rectal_mri.date.pretreatment
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_mri.date.pretreatment
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_mri.date.pretreatment
+  - crc.rectal_mri.image_quality.pretreatment
+  - crc.rectal_mri.report_available.pretreatment
+  - crc.rectal_neoadjuvant.protocol_name
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-ASSESS-06
+  parent_recommendation_id: ER25-ASSESS-R06
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Assessment recommendation 6
+  category: rectal_assessment
+  title: Required MRI risk fields
+  core_or_supplemental: core
+  source_context:
+    eligibility: Rectal MRI performed
+    action: Report depth, nodes, lateral nodes, EMVI, and MRF relationship
+    timing: Initial MRI report
+    exceptions: None
+    predicate_logic: MRI_report => all_required_fields
+  requirements:
+    eligibility:
+      expression: Rectal MRI performed
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Report depth, nodes, lateral nodes, EMVI, and MRF relationship
+      variables:
+      - crc.rectal_assessment.completed_components.pretreatment
+      - crc.rectal_mri.emvi_status.pretreatment
+      - crc.rectal_mri.extramural_depth_mm.pretreatment
+      - crc.rectal_mri.lateral_node_status.pretreatment
+      - crc.rectal_mri.mrf_distance_mm.pretreatment
+      - crc.rectal_stage.clinical_n.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_mri.extramural_depth_mm.pretreatment
+        - variable: crc.rectal_stage.clinical_n.pretreatment
+        - variable: crc.rectal_mri.lateral_node_status.pretreatment
+        - variable: crc.rectal_mri.emvi_status.pretreatment
+        - variable: crc.rectal_mri.mrf_distance_mm.pretreatment
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+    timing:
+      expression: Initial MRI report
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_mri.emvi_status.pretreatment
+  - crc.rectal_mri.extramural_depth_mm.pretreatment
+  - crc.rectal_mri.lateral_node_status.pretreatment
+  - crc.rectal_mri.mrf_distance_mm.pretreatment
+  - crc.rectal_stage.clinical_n.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-ASSESS-07
+  parent_recommendation_id: ER25-ASSESS-R07
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Assessment high-risk definition
+  category: rectal_assessment
+  title: MRI high-risk definition
+  core_or_supplemental: core
+  source_context:
+    eligibility: Pretreatment rectal MRI
+    action: Classify high risk from cT4, MRF-positive, cN2, EMVI-positive, or lateral node at least 7 mm
+    timing: Before neoadjuvant selection
+    exceptions: Preserve each raw feature
+    predicate_logic: cT4 OR MRF_pos OR cN2_4plus_nodes OR EMVI_pos OR lateral_node_ge_7 => highrisk
+  requirements:
+    eligibility:
+      expression: Pretreatment rectal MRI
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Classify high risk from cT4, MRF-positive, cN2, EMVI-positive, or lateral node at least 7 mm
+      variables:
+      - crc.rectal_assessment.completed_components.pretreatment
+      - crc.rectal_mri.emvi_status.pretreatment
+      - crc.rectal_mri.largest_lateral_node_short_axis_mm.pretreatment
+      - crc.rectal_mri.mrf_status.pretreatment
+      - crc.rectal_mri.suspicious_regional_node_count.pretreatment
+      - crc.rectal_risk.high_risk_status.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_mri.mrf_status.pretreatment
+        - variable: crc.rectal_mri.suspicious_regional_node_count.pretreatment
+        - variable: crc.rectal_mri.emvi_status.pretreatment
+        - variable: crc.rectal_mri.largest_lateral_node_short_axis_mm.pretreatment
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+        - variable: crc.rectal_risk.high_risk_status.pretreatment
+    timing:
+      expression: Before neoadjuvant selection
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Preserve each raw feature
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_mri.emvi_status.pretreatment
+  - crc.rectal_mri.largest_lateral_node_short_axis_mm.pretreatment
+  - crc.rectal_mri.mrf_status.pretreatment
+  - crc.rectal_mri.suspicious_regional_node_count.pretreatment
+  - crc.rectal_risk.high_risk_status.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-ASSESS-08
+  parent_recommendation_id: ER25-ASSESS-R08
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Assessment recommendation 8
+  category: rectal_assessment
+  title: CT chest and abdomen staging
+  core_or_supplemental: core
+  source_context:
+    eligibility: Localized rectal cancer
+    action: Perform CT chest and abdomen
+    timing: Initial staging
+    exceptions: None stated
+    predicate_logic: diagnosis => CT_chest_abdomen
+  requirements:
+    eligibility:
+      expression: Localized rectal cancer
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Perform CT chest and abdomen
+      variables:
+      - crc.metastatic_status.at_initial_staging
+      - crc.rectal_assessment.completed_components.pretreatment
+      - crc.staging.ct_abdomen_findings.pretreatment
+      - crc.staging.ct_chest_findings.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.staging.ct_chest_findings.pretreatment
+        - variable: crc.staging.ct_abdomen_findings.pretreatment
+        - variable: crc.metastatic_status.at_initial_staging
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+    timing:
+      expression: Initial staging
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      - crc.staging.ct_chest_abdomen_date.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.staging.ct_chest_abdomen_date.pretreatment
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.metastatic_status.at_initial_staging
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  - crc.staging.ct_abdomen_findings.pretreatment
+  - crc.staging.ct_chest_abdomen_date.pretreatment
+  - crc.staging.ct_chest_findings.pretreatment
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO24-LARC-1.1
+  parent_recommendation_id: ASCO24-LARC-R1.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_larc_2024
+  source_anchor: Recommendation 1.1
+  category: rectal_assessment
+  title: MMR or MSI before LARC treatment
+  core_or_supplemental: core
+  source_context:
+    eligibility: Locally advanced rectal cancer
+    action: Determine MMR or MSI
+    timing: Before treatment
+    exceptions: None
+    predicate_logic: LARC => MMR_MSI
+  requirements:
+    eligibility:
+      expression: Locally advanced rectal cancer
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Determine MMR or MSI
+      variables:
+      - crc.mmr_ihc_integrated_status
+      - crc.molecular_assay_method
+      - crc.msi_status
+      - crc.rectal_assessment.completed_components.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.molecular_assay_method
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+    timing:
+      expression: Before treatment
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.molecular_assay_method
+  - crc.msi_status
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO24-LARC-1.2
+  parent_recommendation_id: ASCO24-LARC-R1.2
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_larc_2024
+  source_anchor: Recommendation 1.2
+  category: rectal_assessment
+  title: Dedicated high-resolution pelvic MRI
+  core_or_supplemental: core
+  source_context:
+    eligibility: LARC before treatment
+    action: Perform dedicated high-resolution pelvic MRI
+    timing: Pretreatment
+    exceptions: None
+    predicate_logic: LARC => high_resolution_MRI
+  requirements:
+    eligibility:
+      expression: LARC before treatment
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Perform dedicated high-resolution pelvic MRI
+      variables:
+      - crc.rectal_assessment.completed_components.pretreatment
+      - crc.rectal_mri.image_quality.pretreatment
+      - crc.rectal_neoadjuvant.protocol_name
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.protocol_name
+        - variable: crc.rectal_mri.image_quality.pretreatment
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+    timing:
+      expression: Pretreatment
+      variables:
+      - crc.rectal_mri.date.pretreatment
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_mri.date.pretreatment
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_mri.date.pretreatment
+  - crc.rectal_mri.image_quality.pretreatment
+  - crc.rectal_neoadjuvant.protocol_name
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO24-LARC-1.3
+  parent_recommendation_id: ASCO24-LARC-R1.3
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_larc_2024
+  source_anchor: Recommendation 1.3
+  category: rectal_assessment
+  title: Synoptic MRI report
+  core_or_supplemental: core
+  source_context:
+    eligibility: Pretreatment LARC MRI
+    action: Report anal-verge and sphincter relation, nodes, MRF, EMVI, and tumor deposits
+    timing: Pretreatment report
+    exceptions: None
+    predicate_logic: MRI_report => required_synoptic_fields
+  requirements:
+    eligibility:
+      expression: Pretreatment LARC MRI
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Report anal-verge and sphincter relation, nodes, MRF, EMVI, and tumor deposits
+      variables:
+      - crc.rectal_anatomy.anal_verge_distance_cm.pretreatment
+      - crc.rectal_assessment.completed_components.pretreatment
+      - crc.rectal_mri.emvi_status.pretreatment
+      - crc.rectal_mri.mrf_distance_mm.pretreatment
+      - crc.rectal_mri.sphincter_relation.pretreatment
+      - crc.rectal_mri.tumor_deposit_status.pretreatment
+      - crc.rectal_stage.clinical_n.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_anatomy.anal_verge_distance_cm.pretreatment
+        - variable: crc.rectal_mri.sphincter_relation.pretreatment
+        - variable: crc.rectal_stage.clinical_n.pretreatment
+        - variable: crc.rectal_mri.mrf_distance_mm.pretreatment
+        - variable: crc.rectal_mri.emvi_status.pretreatment
+        - variable: crc.rectal_mri.tumor_deposit_status.pretreatment
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+    timing:
+      expression: Pretreatment report
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_anatomy.anal_verge_distance_cm.pretreatment
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_mri.emvi_status.pretreatment
+  - crc.rectal_mri.mrf_distance_mm.pretreatment
+  - crc.rectal_mri.sphincter_relation.pretreatment
+  - crc.rectal_mri.tumor_deposit_status.pretreatment
+  - crc.rectal_stage.clinical_n.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ1-01
+  parent_recommendation_id: ASTRO25-KQ1-R1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ1 recommendation 1
+  category: rectal_assessment
+  title: Rectal-protocol MRI
+  core_or_supplemental: core
+  source_context:
+    eligibility: Rectal cancer before treatment
+    action: Perform pelvic MRI for cT and cN
+    timing: Preoperative
+    exceptions: None
+    predicate_logic: preop_rectal => protocol_MRI
+  requirements:
+    eligibility:
+      expression: Rectal cancer before treatment
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Perform pelvic MRI for cT and cN
+      variables:
+      - crc.rectal_assessment.completed_components.pretreatment
+      - crc.rectal_mri.protocol.pretreatment
+      - crc.rectal_stage.clinical_n.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_mri.protocol.pretreatment
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_stage.clinical_n.pretreatment
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+    timing:
+      expression: Preoperative
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_mri.protocol.pretreatment
+  - crc.rectal_stage.clinical_n.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ1-02
+  parent_recommendation_id: ASTRO25-KQ1-R2
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ1 recommendation 2
+  category: rectal_assessment
+  title: MMR or MSI on biopsy
+  core_or_supplemental: core
+  source_context:
+    eligibility: Rectal cancer biopsy
+    action: Determine MMR or MSI
+    timing: Before treatment
+    exceptions: None
+    predicate_logic: rectal_biopsy => MMR_MSI
+  requirements:
+    eligibility:
+      expression: Rectal cancer biopsy
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Determine MMR or MSI
+      variables:
+      - crc.mmr_ihc_integrated_status
+      - crc.molecular_assay_method
+      - crc.msi_status
+      - crc.rectal_assessment.completed_components.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.molecular_assay_method
+        - variable: crc.rectal_assessment.completed_components.pretreatment
+    timing:
+      expression: Before treatment
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.molecular_assay_method
+  - crc.msi_status
+  - crc.rectal_assessment.completed_components.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

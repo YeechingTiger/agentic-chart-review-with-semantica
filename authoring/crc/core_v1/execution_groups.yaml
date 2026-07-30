@@ -1,0 +1,215 @@
+schema_version: '1.0'
+bundle_id: CRC.CORE.MOLECULAR_TREATMENT.v1
+clinical_use: NOT_FOR_CLINICAL_USE
+groups:
+- execution_group_id: CRC.CANDIDATE.disease_context
+  source_template: candidate_specs/CRC.CANDIDATE.disease_context.yaml
+  materialized_spec: materialized_specs/CRC.CANDIDATE.disease_context.yaml
+  runtime_status: candidate_loadable
+  rationale: Members share the parent template's evidence universe, timing family, or owner; variable contracts remain independently
+    hashed and reviewed.
+  member_contracts:
+  - contract_id: CRC.VAR.primary_site
+    output_field: primary_site_icdo3
+  - contract_id: CRC.VAR.histology
+    output_field: histology_icdo3
+  - contract_id: CRC.VAR.disease_setting
+    output_field: disease_setting
+  - contract_id: CRC.VAR.larc_status
+    output_field: larc_status
+  - contract_id: CRC.VAR.metastatic_status
+    output_field: metastatic_status
+  - contract_id: CRC.VAR.resectability_status
+    output_field: resectability_status
+  - contract_id: CRC.VAR.line_of_therapy
+    output_field: line_of_therapy
+  - contract_id: CRC.VAR.primary_tumor_sidedness
+    output_field: primary_tumor_sidedness
+  - contract_id: CRC.VAR.clinical_t
+    output_field: clinical_t
+  - contract_id: CRC.VAR.clinical_n
+    output_field: clinical_n
+  - contract_id: CRC.VAR.multidisciplinary_review
+    output_field: multidisciplinary_review
+  unbound_runtime_fields: []
+  materialized_spec_content_hash: 9d71234fa5006b0be4eb055f0ec398604186249d98225ff71a89b5ddd732e9f3
+- execution_group_id: CRC.STORE.molecular_summary
+  source_template: candidate_specs/CRC.STORE.molecular_summary.yaml
+  materialized_spec: materialized_specs/CRC.STORE.molecular_summary.yaml
+  runtime_status: candidate_loadable
+  rationale: Members share the parent template's evidence universe, timing family, or owner; variable contracts remain independently
+    hashed and reviewed.
+  member_contracts:
+  - contract_id: CRC.VAR.kras_status
+    output_field: kras_registry_code
+  - contract_id: CRC.VAR.nras_status
+    output_field: nras_registry_code
+  - contract_id: CRC.VAR.braf_v600e_status
+    output_field: braf_registry_code
+  unbound_runtime_fields:
+  - field: msi_mmr_registry_code
+    classification: supporting_or_projection_only_review_required
+    rationale: The grouped runtime template produces this field, but no canonical variable contract currently owns it.
+  materialized_spec_content_hash: 83301669ec34c0bd57b0e44ab7087999b00200cbbfcc3d16461be3836da2f288
+- execution_group_id: CRC.CHART.molecular_detail
+  source_template: candidate_specs/CRC.CHART.molecular_detail.yaml
+  materialized_spec: materialized_specs/CRC.CHART.molecular_detail.yaml
+  runtime_status: candidate_loadable
+  rationale: Members share the parent template's evidence universe, timing family, or owner; variable contracts remain independently
+    hashed and reviewed.
+  member_contracts:
+  - contract_id: CRC.VAR.msi_status
+    output_field: msi_status
+  - contract_id: CRC.VAR.mmr_ihc_integrated_status
+    output_field: mmr_ihc_integrated_status
+  - contract_id: CRC.VAR.mmr_mlh1
+    output_field: mmr_mlh1
+  - contract_id: CRC.VAR.mmr_pms2
+    output_field: mmr_pms2
+  - contract_id: CRC.VAR.mmr_msh2
+    output_field: mmr_msh2
+  - contract_id: CRC.VAR.mmr_msh6
+    output_field: mmr_msh6
+  - contract_id: CRC.VAR.molecular_assay_method
+    output_field: molecular_assay_method
+  - contract_id: CRC.VAR.molecular_assay_validation_status
+    output_field: molecular_assay_validation_status
+  - contract_id: CRC.VAR.molecular_qc_status
+    output_field: molecular_qc_status
+  - contract_id: CRC.VAR.molecular_specimen_id
+    output_field: molecular_specimen_id
+  - contract_id: CRC.VAR.molecular_specimen_date
+    output_field: molecular_specimen_date
+  - contract_id: CRC.VAR.molecular_result_date
+    output_field: molecular_result_date
+  - contract_id: CRC.VAR.mmr_msi_discordance_status
+    output_field: mmr_msi_discordance_status
+  - contract_id: CRC.VAR.mmr_subclonal_loss
+    output_field: mmr_subclonal_loss
+  - contract_id: CRC.VAR.molecular_peer_review_status
+    output_field: molecular_peer_review_status
+  - contract_id: CRC.VAR.molecular_repeat_test_result
+    output_field: molecular_repeat_test_result
+  - contract_id: CRC.VAR.molecular_final_interpretation
+    output_field: molecular_final_interpretation
+  - contract_id: CRC.VAR.trial_context
+    output_field: trial_context
+  - contract_id: CRC.VAR.expanded_ras_coverage
+    output_field: expanded_ras_coverage
+  - contract_id: CRC.VAR.mlh1_promoter_methylation_status
+    output_field: mlh1_promoter_methylation_status
+  - contract_id: CRC.VAR.lynch_risk_communication
+    output_field: lynch_risk_communication
+  - contract_id: CRC.VAR.genetics_referral_status
+    output_field: genetics_referral_status
+  - contract_id: CRC.VAR.germline_result
+    output_field: germline_result
+  unbound_runtime_fields: []
+  materialized_spec_content_hash: 4e4223c3123c33c75e62f3ee4f25c5bc8911e8d76de22442b70d103e97500123
+- execution_group_id: CRC.CHART.rectal_mri_risk
+  source_template: candidate_specs/CRC.CHART.rectal_mri_risk.yaml
+  materialized_spec: materialized_specs/CRC.CHART.rectal_mri_risk.yaml
+  runtime_status: candidate_loadable
+  rationale: Members share the parent template's evidence universe, timing family, or owner; variable contracts remain independently
+    hashed and reviewed.
+  member_contracts:
+  - contract_id: CRC.VAR.rectal_mri_protocol
+    output_field: rectal_mri_protocol
+  - contract_id: CRC.VAR.rectal_mri_quality
+    output_field: rectal_mri_quality
+  - contract_id: CRC.VAR.pelvic_mri_date
+    output_field: pelvic_mri_date
+  - contract_id: CRC.VAR.rectal_tumor_height
+    output_field: rectal_tumor_height_cm
+  - contract_id: CRC.VAR.sphincter_relation
+    output_field: sphincter_relation
+  - contract_id: CRC.VAR.extramural_depth_mm
+    output_field: extramural_depth_mm
+  - contract_id: CRC.VAR.mrf_status
+    output_field: mrf_status
+  - contract_id: CRC.VAR.emvi_status
+    output_field: emvi_status
+  - contract_id: CRC.VAR.mri_tumor_deposits
+    output_field: mri_tumor_deposits
+  - contract_id: CRC.VAR.intersphincteric_plane_status
+    output_field: intersphincteric_plane_status
+  unbound_runtime_fields: []
+  materialized_spec_content_hash: 6454c2fd4ae578aa8242a8fecdfeba372d2422f6d62f004e6767a8c535190520
+- execution_group_id: CRC.STORE_CHART.systemic_treatment
+  source_template: candidate_specs/CRC.STORE_CHART.systemic_treatment.yaml
+  materialized_spec: materialized_specs/CRC.STORE_CHART.systemic_treatment.yaml
+  runtime_status: candidate_loadable
+  rationale: Members share the parent template's evidence universe, timing family, or owner; variable contracts remain independently
+    hashed and reviewed.
+  member_contracts:
+  - contract_id: CRC.VAR.ici_plan
+    output_field: ici_plan
+  - contract_id: CRC.VAR.anti_egfr_plan
+    output_field: anti_egfr_plan
+  - contract_id: CRC.VAR.anti_egfr_start_date
+    output_field: anti_egfr_start_date
+  - contract_id: CRC.VAR.ici_start_date
+    output_field: immunotherapy_start_date
+  - contract_id: CRC.VAR.systemic_therapy_start_date
+    output_field: systemic_therapy_start_date
+  - contract_id: CRC.VAR.treatment_start_date
+    output_field: treatment_start_date
+  - contract_id: CRC.VAR.systemic_regimen
+    output_field: systemic_regimen
+  - contract_id: CRC.VAR.systemic_regimen_intensity
+    output_field: systemic_regimen_intensity
+  - contract_id: CRC.VAR.radiation_type
+    output_field: radiation_type
+  - contract_id: CRC.VAR.treatment_sequence
+    output_field: treatment_sequence
+  - contract_id: CRC.VAR.ici_agent
+    output_field: ici_agent
+  - contract_id: CRC.VAR.biologic_agent
+    output_field: biologic_agent
+  - contract_id: CRC.VAR.prior_systemic_therapy
+    output_field: prior_systemic_therapy
+  - contract_id: CRC.VAR.prior_braf_egfr_targeted_therapy
+    output_field: prior_braf_egfr_targeted_therapy
+  - contract_id: CRC.VAR.progression_date
+    output_field: progression_date
+  unbound_runtime_fields:
+  - field: chemotherapy_registry_code
+    classification: supporting_or_projection_only_review_required
+    rationale: The grouped runtime template produces this field, but no canonical variable contract currently owns it.
+  - field: chemotherapy_start_date
+    classification: supporting_or_projection_only_review_required
+    rationale: The grouped runtime template produces this field, but no canonical variable contract currently owns it.
+  - field: immunotherapy_registry_code
+    classification: supporting_or_projection_only_review_required
+    rationale: The grouped runtime template produces this field, but no canonical variable contract currently owns it.
+  - field: radiation_end_date
+    classification: supporting_or_projection_only_review_required
+    rationale: The grouped runtime template produces this field, but no canonical variable contract currently owns it.
+  - field: radiation_start_date
+    classification: supporting_or_projection_only_review_required
+    rationale: The grouped runtime template produces this field, but no canonical variable contract currently owns it.
+  - field: treatment_status_registry_code
+    classification: supporting_or_projection_only_review_required
+    rationale: The grouped runtime template produces this field, but no canonical variable contract currently owns it.
+  materialized_spec_content_hash: 9bc6ba34cb3c8778593f5990dfcdbf9e9207b829871c4e54508c185ca3c8fb18
+- execution_group_id: CRC.CHART.decision_exceptions
+  source_template: candidate_specs/CRC.CHART.decision_exceptions.yaml
+  materialized_spec: materialized_specs/CRC.CHART.decision_exceptions.yaml
+  runtime_status: candidate_loadable
+  rationale: Members share the parent template's evidence universe, timing family, or owner; variable contracts remain independently
+    hashed and reviewed.
+  member_contracts:
+  - contract_id: CRC.VAR.ecog_performance_status
+    output_field: ecog_performance_status
+  - contract_id: CRC.VAR.organ_function_constraints
+    output_field: organ_function_constraints
+  - contract_id: CRC.VAR.comorbidity_constraints
+    output_field: comorbidity_constraints
+  - contract_id: CRC.VAR.treatment_contraindication
+    output_field: treatment_contraindication
+  - contract_id: CRC.VAR.ici_contraindication
+    output_field: ici_contraindication
+  - contract_id: CRC.VAR.patient_preference
+    output_field: patient_preference
+  unbound_runtime_fields: []
+  materialized_spec_content_hash: 8e6938c8c513f85d73ec1991c7509cc28fedc19dac6fb97b22c98168f772f415

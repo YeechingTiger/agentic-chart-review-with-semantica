@@ -27,9 +27,24 @@ from __future__ import annotations
 from .answer_checks import check_answer_detail, check_field_formats_detail
 from .answer_contract import SPEC_SECTIONS
 from .corpus import PatientChart
-from .coverage import (CoverageLedger, GateResult, admissibility_for_citations, evaluate_gate,
-                       keyword_was_searched)
-from .coverage_planner import CoveragePlan, OpenThreadLedger
+from .coverage import (
+    CoverageLedger,
+    GateResult,
+    admissibility_for_citations,
+    evaluate_gate,
+)
+from .coverage_planner import CoveragePlan, OpenThreadLedger, marker_blocks_answer
+from .runtime_profiles import (
+    ALWAYS_COVERAGE_PROFILE,
+    CONDITIONAL_COVERAGE_PROFILE,
+    COVERAGE_ALWAYS,
+    COVERAGE_ON_NEGATIVE_OR_MISSING,
+    DEFAULT_RUNTIME_PROFILE,
+    STRATIFIED_COVERAGE_PROFILE,
+    coverage_requirement,
+    resolve_runtime_policy,
+    targeted_negative_basis,
+)
 from .spec import ExtractionSpec
 from .state import EvidenceLedger
 
@@ -82,16 +97,22 @@ def check_gate(spec: ExtractionSpec, coverage: CoverageLedger,
         # declare, rather than silently passing everything.
         gate_spec = {"required_keywords_all_searched": True}
     g = evaluate_gate(gate_spec, coverage.stratum_results())
-    for kw in getattr(spec.proof_obligation, "required_keywords", []) or []:
-        # One-directional containment; see coverage.keyword_was_searched. The `t in kw` half
-        # this used to carry let a search for "t" discharge every required keyword at once.
-        if not keyword_was_searched(kw, coverage.searched_terms):
-            g.missing.append(f"required search not performed: {kw!r}")
-    for kw in (plan.keywords if plan else []):
-        if not keyword_was_searched(kw, coverage.searched_terms):
-            g.missing.append(f"required search not performed: {kw!r} — this term is in the "
-                             "retrieval plan (the spec declared it, or you added it). A term "
-                             "you added and did not run widens nothing")
+    # THE REQUIRED-SEARCH REFUSALS ARE GONE. Two loops used to run here: one over the spec's
+    # `required_keywords` and one over the plan's expanded list, each refusing the answer for a
+    # term the agent had not searched.
+    #
+    # The baseline design gives the model no keyword list at all. It has a `search` tool, it
+    # works out what to look for, and it calls it -- so there is no declared list for a gate to
+    # discharge, and a term the model chose not to run is a retrieval decision, not a contract
+    # violation. Where a list exists at all it is a measured, development-set artifact offered
+    # as a prior, and a prior the model may decline is not a gate.
+    #
+    # The list that was being enforced here was also measured wrong. From this spec's own
+    # provenance: the five terms recall 87.4% of answer-bearing documents over 276,054
+    # documents, missing at least one for 31.7% of patients, because the list has `carcinoma`
+    # and not `cancer`. And `fit_terms_to_budget` was deleting the model's own proposals --
+    # `lobe` and `bronchus` among them -- which `nos_requires_search` then refused the answer
+    # for not having searched.
     if not coverage.listed_documents:
         g.missing.append("must list the patient's documents before asserting absence")
     g.verdict = "PASS" if not g.missing else "FAIL"
@@ -99,26 +120,42 @@ def check_gate(spec: ExtractionSpec, coverage: CoverageLedger,
 
 
 def check_threads(threads: OpenThreadLedger | None) -> list[str]:
-    """Unsettled threads, as gate refusals. Empty when there are none, or none are known.
+    """Unsettled threads that may REFUSE an answer. Only the computed ones.
 
-    THIS IS THE 8046 ERROR, wired as a control. A histology was coded off a line reading
-    "special stains pending" and the addendum that resolved it — in the same file, 353
-    characters past where the read stopped — was never chased. Every part of the machinery
-    to catch that already existed as advice: the thread-chasing skill, the marker catalogue,
-    the `truncated` flag on every read. Advice a model may decline to act on is not a
-    control. So an open thread now refuses the answer, and the only ways past are a
-    resolution or a dismissal that states a reason — both recorded, so that "the reviewer
-    did not notice" and "the reviewer decided it did not matter" stay distinguishable in the
-    manifest.
+    THIS WAS THE 8046 ERROR, wired as a control: a histology coded off a line reading "special
+    stains pending" while the addendum that resolved it sat 353 characters past where the read
+    stopped. Every open thread refused the answer, and the only ways past were a resolution or
+    a dismissal with a stated reason.
+
+    Measured over every recorded trace on 2026-07-30, that control refused 39 times and 11 of
+    those refusals (28%) rejected a tuple that was exactly the registry's answer. The markers
+    behind them:
+
+        truncated 111    addendum 40    in consultation 10    additional sections 9
+        pending 8        outside facility 5    clinical correlation 4    others 7
+
+    All but `truncated` are substrings scanned across document text, parsed out of a Markdown
+    table in a skill file. `addendum` refused 40 times while `read_section("ADDENDUM")` could
+    address that heading in 0 of the 2,401 documents containing the word: an obligation whose
+    tool could never reach its target.
+
+    So the text-matched markers no longer block. They are still detected, still opened as
+    threads, still rendered into the prompt by `OpenThreadLedger.render()` with the settling
+    call and thread_id already filled in, and still recorded in the manifest -- which is the
+    advisory channel, and it was always there. What went away is the refusal.
+
+    `truncated` still blocks, and the difference is not a matter of degree. It is COMPUTED from
+    the character counts of the run's own read against the length that read reported: a fact
+    about what this run did rather than a guess about what a word means. It cannot be wrong
+    about the corpus, and the agent discharges it by reading to the end -- which
+    `OpenThreadLedger` does for it automatically once the document is fully read.
     """
     if threads is None:
         return []
-    out = []
-    for t in threads.unresolved():
-        out.append(f"unsettled thread {t.thread_id}: {t.marker!r} in {t.note_id} "
-                   f"({t.doc_type or 'unknown type'}) — {t.obligation}. Resolve it (say where "
-                   f"it was settled) or dismiss it with a reason; both are recorded.")
-    return out
+    return [f"unsettled thread {t.thread_id}: {t.marker!r} in {t.note_id} "
+            f"({t.doc_type or 'unknown type'}) — {t.obligation}. Resolve it (say where "
+            f"it was settled) or dismiss it with a reason; both are recorded."
+            for t in threads.unresolved() if marker_blocks_answer(t.marker)]
 
 
 def _gate_spec_insufficient(spec: ExtractionSpec, submitted: dict, *, tracer=None) -> dict:
@@ -191,10 +228,143 @@ def _norm_ws(s: str) -> str:
     return " ".join(str(s or "").split()).lower()
 
 
+def negative_claim_reasons(
+    spec: ExtractionSpec, status: str, value: dict
+) -> list[str]:
+    """Return the field-level reasons a submission makes a negative-shaped claim.
+
+    ``FOUND`` is not necessarily wholly positive.  A null field and a NOS value both assert
+    that something more specific was not established.  The conditional arm must notice
+    those claims instead of branching only on the case-level status.
+    """
+    reasons: list[str] = []
+    if status == "EVIDENCE_INSUFFICIENT":
+        reasons.append("case_status:EVIDENCE_INSUFFICIENT")
+    if status == "FOUND":
+        for field in spec.fields:
+            raw = value.get(field.name)
+            if raw is None or (isinstance(raw, str) and not raw.strip()):
+                reasons.append(f"missing_field:{field.name}")
+    # THE `nos_or_unknown` BRANCH IS GONE, and its absence is the point.
+    #
+    # It inferred "this answer claims something was not established" from the SHAPE of the
+    # value: if the coded value appeared in some answer_check's `nos_values`, the submission
+    # was treated as a negative claim and the coverage machinery activated against it.
+    #
+    # A NOS code is a conclusion, not a confession. On this corpus 8000/8010/8046 together are
+    # the registry's own answer for 10.8% of patients and C349 for 9.6% -- an abstraction rule
+    # frequently resolves to exactly these codes, and `conflict_requires_nos` used to ORDER the
+    # agent toward one of them. So the same value could be demanded by one rule and then treated
+    # as evidence of an unproven absence by this one. Measured consequence, recorded in
+    # COVERAGE_THREE_ARM_PILOT.md: one run submitted the conflict-resolving gold answer exactly
+    # ten times and was rejected into a model-call-limit failure.
+    #
+    # A missing field is still a negative claim -- there is no value there at all, which is a
+    # fact about the submission and not an inference from a code table. That half stays.
+    return list(dict.fromkeys(reasons))
+
+
+def _coverage_verdict(
+    spec: ExtractionSpec,
+    *,
+    evidence: EvidenceLedger,
+    coverage: CoverageLedger,
+    chart: PatientChart,
+    plan: CoveragePlan | None,
+    tracer=None,
+    activation_reasons: list[str],
+) -> dict:
+    """Evaluate the one coverage proof for either a negative or experimental positive."""
+    kw_hits = keyword_hits_among_drawn(spec, coverage, chart)
+    coverage.resolve_sample_verdicts(evidence.cited_notes(), kw_hits)
+    pending = coverage.pending_samples()
+    if pending:
+        lines = []
+        for stratum, docs in pending.items():
+            for d in docs:
+                lines.append(f"  {stratum}: {d.note_id} ({d.doc_type}, {d.date})")
+        if tracer:
+            tracer.emit(
+                "forced_sampling",
+                seed=coverage.sampler.seed,
+                counts={k: len(v) for k, v in pending.items()},
+                activation_reasons=activation_reasons,
+            )
+        ids = [d.note_id for docs in pending.values() for d in docs]
+        return {
+            "accepted": False,
+            "why": "validation sampling not yet done — the runtime has drawn these",
+            "how_to_satisfy": (
+                "call read_documents_batch with note_ids set to the list below, in one "
+                "step; then record_evidence for any that turn out to be relevant, then "
+                "resubmit"
+            ),
+            "note_ids": ids,
+            "missing": ["these were drawn by the runtime, not chosen by you:"] + lines,
+            "coverage_activated": True,
+            "coverage_activation_reasons": activation_reasons,
+        }
+    gate = check_gate(spec, coverage, plan)
+    if gate.verdict != "PASS":
+        remaining = [m for m in gate.missing if m not in set(gate.terminal)]
+        if gate.terminal and not remaining:
+            if tracer:
+                tracer.emit(
+                    "coverage_unreachable",
+                    terminal=list(gate.terminal),
+                    n_missing=len(gate.missing),
+                    activation_reasons=activation_reasons,
+                )
+            return {
+                "accepted": True,
+                "why": "",
+                "missing": [],
+                "coverage_unreachable": list(gate.terminal),
+                "coverage_claim_earned": False,
+                "coverage_activated": True,
+                "coverage_activation_reasons": activation_reasons,
+            }
+        return {
+            "accepted": False,
+            "why": "the configured coverage proof is not yet met",
+            "how_to_satisfy": (
+                "do the items under `missing`. Any listed under "
+                "`cannot_be_satisfied_in_this_run` are dead ends — do not retry them; "
+                "they mean this chart's stratification was wrong and a different run is "
+                "needed. If they are the ONLY thing left, submit the same answer again and "
+                "it will be accepted and routed to a human."
+            ),
+            "missing": remaining or list(gate.missing),
+            "cannot_be_satisfied_in_this_run": list(gate.terminal),
+            "coverage_activated": True,
+            "coverage_activation_reasons": activation_reasons,
+        }
+    return {
+        "accepted": True,
+        "why": "",
+        "missing": [],
+        # WHAT THE LEDGER OBSERVED BUT DID NOT REFUSE. `evaluate_gate` is advisory by default as
+        # of 2026-07-30, so these are the sentences that used to be `missing`: how much of each
+        # stratum was reviewed, which required searches never ran, what residual bound the draws
+        # earn. They must travel with the acceptance, because an advisory nobody is shown is
+        # indistinguishable from an advisory nobody generated -- and the whole point of moving
+        # this judgement to the model is that the model can see what the runtime counted.
+        # Recorded in the manifest too, so "decided the chart was adequately searched" and "never
+        # looked" stay distinguishable after the run.
+        "advisories": list(gate.advisories),
+        "coverage_claim_earned": True,
+        "coverage_activated": True,
+        "coverage_activation_reasons": activation_reasons,
+    }
+
+
 def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedger,
                 coverage: CoverageLedger, chart: PatientChart, tracer=None,
                 threads: OpenThreadLedger | None = None,
-                plan: CoveragePlan | None = None) -> dict:
+                plan: CoveragePlan | None = None,
+                coverage_plan: CoveragePlan | None = None,
+                coverage_state: dict | None = None,
+                runtime_profile: str = DEFAULT_RUNTIME_PROFILE) -> dict:
     """The single decision on whether an answer may stand. Returns an acceptance dict.
 
     Also the one place where WHICH SPEC RULE WAS IN PLAY is knowable for certain, so it is
@@ -204,9 +374,16 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
     is tracer-guarded and side-effect-free — `mcp_server` calls this function with no tracer
     at all, and attribution must never be able to change a verdict.
     """
+    profile_asset, _ = resolve_runtime_policy(runtime_profile)
     status = submitted.get("status", "")
     value = submitted.get("value") or {}
     if tracer:
+        # ONE EVALUATION, counted once, before any branch can return early. It used to be
+        # counted inside `answer_check_outcome`, which was called unconditionally so a rejection
+        # streak could observe its gaps; that method now runs only when something fired, so the
+        # count had silently become a count of rejections. Every `return` below is an evaluation
+        # that happened.
+        tracer.note_gate_evaluation()
         # SELF-REPORTED, and taken from the submission whatever the verdict turns out to be:
         # the rules an agent invoked for an answer that was then rejected are the rules that
         # produced the rejected answer, and dropping them would leave exactly the failures
@@ -244,6 +421,51 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
                                        "addendum types. Then resolve_threads in your next "
                                        "reflection, or dismiss_threads with a reason."),
                     "missing": open_threads}
+    # THE FIELD-FORMAT REFUSAL IS GONE TOO, and it was the last enforcement in this function
+    # that judged the CONTENT of an answer rather than its provenance.
+    #
+    # It had the best measured record of any check here: 7 firings over every recorded trace, 0
+    # that refused a registry value, 6 that preceded the registry answer. But look at what it
+    # caught. Four of those six were `C34.9`, `C34.11` and `C34.2` -- the punctuated form ICD-O-3
+    # itself writes -- so the check was largely creating the round trips it then resolved. And
+    # the constraint it enforced is ALREADY IN THE PROMPT: `as_prompt_block` renders every
+    # field's `format` and `allowable_values`, and STORE.400's own field description reads "no
+    # decimal point". A model that writes `C34.9` against that instruction has not been
+    # under-informed; it has failed to follow an instruction, and that is a fact to measure
+    # rather than a hole to plug with a regex.
+    #
+    # `check_field_formats_detail` is NOT deleted. It moves to where a measurement belongs:
+    # `concordance` and `evals` score submitted answers against the declared shape after the
+    # run, which is how "the model does not follow the format instruction" becomes a number
+    # somebody can act on instead of a rejection nobody counts.
+    #
+    # What is left in this function is provenance, not content: is there evidence, was every
+    # quote re-read from disk at its offsets, is the patient in scope, is the budget spent, is a
+    # read still unfinished. None of those is a clinical judgement.
+    if status in {"FOUND", "EVIDENCE_INSUFFICIENT"} and tracer:
+        # Recorded, never refused: the trace still carries which declared shapes the answer
+        # missed, so the eval plane can count them without re-deriving the spec.
+        #
+        # NOT through `tracer.answer_check_outcome`. That method emits a `rule_rejection` event
+        # and drives the consecutive-rejection streak counter -- machinery about refusals, and
+        # nothing here is refused. Logging a rejection for an answer that was accepted is how a
+        # manifest starts lying about its own run. Its own event kind, so the eval plane can
+        # count instruction-following misses and the rejection accounting stays about rejections.
+        shape_detail = check_field_formats_detail(getattr(spec, "fields", []) or [], value)
+        if shape_detail:
+            tracer.emit(
+                "answer_shape_miss",
+                severity="warning",
+                provenance="DETERMINISTIC",
+                source="acr.answer_checks.check_field_formats_detail",
+                status=status,
+                refused=False,
+                violations=[row.to_dict() for row in shape_detail],
+                rules=sorted({row.rule_id for row in shape_detail}),
+                note=("the declared format/allowable_values are rendered into the prompt; a "
+                      "populated field that misses them is an instruction-following failure, "
+                      "measured here rather than refused"),
+            )
     if status == "FOUND":
         # Positives were previously accepted unchecked, so `gate_validated: True`
         # on a FOUND answer asserted nothing. These are the spec's own decision
@@ -253,21 +475,27 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
         # on which value, over which quote, and that was being discarded one line later.
         # Attribution reconstructed afterwards from a rejection message is a guess, and a
         # guess is what makes an optimizer rewrite the wrong sentence.
-        detail = check_field_formats_detail(spec.fields, value)
-        detail += check_answer_detail(getattr(spec, "answer_checks", []) or [],
-                                      value, evidence.to_list(), coverage.searched_terms)
-        violations = [v.message for v in detail]
-        if tracer:
-            # Called on clean evaluations too. A rejection streak is only measurable if the
-            # evaluations where the rule did NOT fire are observed as well.
-            tracer.answer_check_outcome(detail, status=status)
-        if violations:
+        # `check_answer_detail` returns [] unconditionally -- `ANSWER_CHECK_KINDS` is empty and a
+        # spec that declares one of the removed kinds fails to load. So this block used to call
+        # `tracer.answer_check_outcome([])` on every evaluation, which EMITTED A `rule_rejection`
+        # EVENT WITH ZERO VIOLATIONS and bumped the consecutive-rejection accounting, for a
+        # channel with no rules left in it. That is a manifest reporting gate activity that did
+        # not happen.
+        #
+        # The call is still made, because a spec loaded from a future kind would need it, and
+        # because deleting the call and the function together is how the two get out of step.
+        # What is gone is the unconditional trace write.
+        detail = check_answer_detail(getattr(spec, "answer_checks", []) or [],
+                                     value, evidence.to_list(), coverage.searched_terms)
+        if detail:
             if tracer:
-                tracer.emit("answer_check_failed", severity="warning", violations=violations,
+                tracer.answer_check_outcome(detail, status=status)
+                tracer.emit("answer_check_failed", severity="warning",
+                            violations=[v.message for v in detail],
                             rejected_by=sorted({v.rule_id for v in detail}))
             return {"accepted": False,
                     "why": "the answer contradicts the specification's decision rules",
-                    "missing": violations}
+                    "missing": [v.message for v in detail]}
     if status == "SPEC_INSUFFICIENT":
         # NOT sent to the coverage gate. SPEC_INSUFFICIENT is a statement about the
         # SPECIFICATION, not about this chart, and no amount of reading the chart can
@@ -275,68 +503,76 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
         # instead is a report the improvement loop can route on, checked here so the
         # agent gets a recoverable rejection through the loop it already understands
         # rather than a crash after the run is over.
-        return _gate_spec_insufficient(spec, submitted, tracer=tracer)
-    if status == "EVIDENCE_INSUFFICIENT":
-        # Runtime-forced validation sampling. Drawn by the sampler, never by the agent:
-        # a model choosing which unread documents to check is validating its own
-        # judgement with its own judgement.
-        # Credit whatever the agent has already read against the outstanding draw before
-        # deciding it still owes anything.
-        kw_hits = keyword_hits_among_drawn(spec, coverage, chart)
-        coverage.resolve_sample_verdicts(evidence.cited_notes(), kw_hits)
-        pending = coverage.pending_samples()
-        if pending:
-            lines = []
-            for stratum, docs in pending.items():
-                for d in docs:
-                    lines.append(f"  {stratum}: {d.note_id} ({d.doc_type}, {d.date})")
+        verdict = _gate_spec_insufficient(spec, submitted, tracer=tracer)
+        verdict["coverage_claim_earned"] = False
+        return verdict
+    requirement = coverage_requirement(profile_asset.ref)
+    reasons: list[str] = []
+    if requirement == COVERAGE_ALWAYS and status in {"FOUND", "EVIDENCE_INSUFFICIENT"}:
+        reasons = [f"profile:{ALWAYS_COVERAGE_PROFILE}"]
+    elif requirement == COVERAGE_ON_NEGATIVE_OR_MISSING:
+        # Preserve the historical profile's old branch exactly; the new conditional profile
+        # additionally recognises partial and NOS-shaped FOUND answers.
+        reasons = (
+            negative_claim_reasons(spec, status, value)
+            if profile_asset.module_id == CONDITIONAL_COVERAGE_PROFILE
+            else (
+                ["case_status:EVIDENCE_INSUFFICIENT"]
+                if profile_asset.module_id == STRATIFIED_COVERAGE_PROFILE
+                and status == "EVIDENCE_INSUFFICIENT"
+                else []
+            )
+        )
+    if reasons:
+        state = coverage_state if coverage_state is not None else {}
+        if not state.get("active"):
+            state.update(
+                {
+                    "active": True,
+                    "reason": reasons,
+                    "trigger_status": status,
+                }
+            )
             if tracer:
-                tracer.emit("forced_sampling", seed=coverage.sampler.seed,
-                            counts={k: len(v) for k, v in pending.items()})
-            ids = [d.note_id for docs in pending.values() for d in docs]
-            return {"accepted": False,
-                    "why": "validation sampling not yet done — the runtime has drawn these",
-                    "how_to_satisfy": ("call read_documents_batch with note_ids set to the "
-                                       "list below, in one step; then record_evidence for "
-                                       "any that turn out to be relevant, then resubmit"),
-                    "note_ids": ids,
-                    "missing": ["these were drawn by the runtime, not chosen by you:"] + lines}
-        gate = check_gate(spec, coverage, plan)
-        if gate.verdict != "PASS":
-            # IS ANYTHING LEFT THAT MORE WORK COULD FIX? If every remaining failure is terminal,
-            # refusing again asks the agent for something that does not exist. On the ten-patient
-            # real batch of 2026-07-28 that produced this run: rejections 1-2 were sampling
-            # draws (satisfied), 5 was a thread (settled), and 3,4,6,7,8 were this line, with the
-            # unread-hit count going 13 -> 13 -> 8 -> 3 -> 0 as the agent did the work. The last
-            # two failures were an exclusion hit and an elusion bound over cap, neither of which
-            # any further reading can change. The ledgers froze at [4, 3, 3], the loop brake
-            # fired, and the agent submitted SPEC_INSUFFICIENT -- a claim that the SPECIFICATION
-            # is inadequate -- because that was the only exit it had. It was the wrong claim: the
-            # spec was fine, this chart's stratification was not.
-            #
-            # So the abstention is ACCEPTED and labelled. `attach_coverage_claim` will see
-            # gate_validated=False, attach no coverage ledger, set route_to_human, and record
-            # `negative_basis: COVERAGE_UNREACHABLE`. The answer is "I could not establish the
-            # value AND I cannot prove I looked hard enough", which is the truth, and it is
-            # distinguishable downstream from both GATE_VALIDATED and SPEC_INSUFFICIENT.
-            remaining = [m for m in gate.missing if m not in set(gate.terminal)]
-            if gate.terminal and not remaining:
-                if tracer:
-                    tracer.emit("coverage_unreachable", terminal=list(gate.terminal),
-                                n_missing=len(gate.missing))
-                return {"accepted": True, "why": "", "missing": [],
-                        "coverage_unreachable": list(gate.terminal)}
-            return {"accepted": False,
-                    "why": "the proof obligation for asserting absence is not yet met",
-                    # WHAT WOULD ACTUALLY HELP, first. A terminal item mixed into the list reads
-                    # as another instruction and the agent retries it; saying which ones are
-                    # dead ends is the difference between eight rejections and three.
-                    "how_to_satisfy": (
-                        "do the items under `missing`. Any listed under `cannot_be_satisfied_in_"
-                        "this_run` are dead ends — do not retry them; they mean this chart's "
-                        "stratification was wrong and a different run is needed. If they are the "
-                        "ONLY thing left, submit the same answer again and it will be accepted "
-                        "and routed to a human."),
-                    "missing": remaining or list(gate.missing),
-                    "cannot_be_satisfied_in_this_run": list(gate.terminal)}
-    return {"accepted": True, "why": "", "missing": []}
+                tracer.emit(
+                    "coverage_activated",
+                    runtime_profile=profile_asset.ref,
+                    trigger_status=status,
+                    reasons=reasons,
+                )
+        return _coverage_verdict(
+            spec,
+            evidence=evidence,
+            coverage=coverage,
+            chart=chart,
+            plan=coverage_plan or plan,
+            tracer=tracer,
+            activation_reasons=reasons,
+        )
+    if status == "EVIDENCE_INSUFFICIENT":
+        # Targeted search is deliberately not a coverage claim.  It still has to establish
+        # the patient-level document universe so "nothing found" is not a run that never
+        # looked at the chart at all.
+        if not coverage.listed_documents:
+            return {
+                "accepted": False,
+                "why": "the targeted-search arm has not established its patient inventory",
+                "missing": [
+                    "list the patient's documents before concluding that targeted search "
+                    "found no admissible evidence"
+                ],
+                "coverage_claim_earned": False,
+            }
+        return {
+            "accepted": True,
+            "why": "",
+            "missing": [],
+            "coverage_claim_earned": False,
+            "negative_basis": targeted_negative_basis(profile_asset.ref),
+        }
+    return {
+        "accepted": True,
+        "why": "",
+        "missing": [],
+        "coverage_claim_earned": False,
+    }

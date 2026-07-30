@@ -12,11 +12,13 @@ import json
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 from rich.console import Console
 
-from .llm import LLMClient, LLMConfig
+if TYPE_CHECKING:
+    from .llm import LLMClient
 
 con = Console()
 
@@ -24,28 +26,16 @@ CORPUS = typer.Option("corpus/patients", "--corpus", help="root directory of pat
 MODEL = typer.Option(None, "--model", "-m", help="LiteLLM model string, e.g. ollama_chat/qwen3.6:35b")
 API_BASE = typer.Option(None, "--api-base", help="override provider base URL (vLLM, proxy, …)")
 
-# THE RUN BUDGET, ON THE COMMAND LINE. `Budget` has carried max_tokens and max_seconds since
-# it was written, and every construction site passed max_steps and nothing else — so the two
-# that actually bind on a real chart were unreachable defaults. On a 10-patient batch of real
-# charts, 7 of 10 runs returned EVIDENCE_INSUFFICIENT with `negative_basis: BUDGET_EXHAUSTED`
-# and `max_tokens (400000) reached`, at 8-16 steps against a 24-step cap: the abstention was
-# a property of a number nobody could set, and it read as a property of the charts.
+# The hooks runtime has two backstops: a model-call limit and a priced USD ceiling. Keep both
+# on the public CLI and pass them through every chart-review command; a limit hidden inside a
+# Python default is a number no operator chose.
 MAX_STEPS = typer.Option(24, "--max-steps",
                          help="MODEL CALLS before the run is cut off. Not plan/act/reflect "
                               "cycles — there is no reflect node; one call is one turn in which "
                               "the model may issue tool calls. The cost ceiling in spend.py is "
                               "the limit meant to bind; this is a backstop")
-MAX_TOKENS = typer.Option(400_000, "--max-tokens",
-                          help="prompt+completion tokens before the run is cut off. Prompt is "
-                               "~96% of the spend and grows with the chart, so a large chart "
-                               "needs a larger number here, not more steps")
-MAX_SECONDS = typer.Option(1200, "--max-seconds", help="wall-clock seconds before the run is cut off")
-
-
-def budget(max_steps: int, max_tokens: int, max_seconds: int) -> "Budget":
-    """One construction site for the run budget, so no command can quietly drop a limit."""
-    from .state import Budget
-    return Budget(max_steps=max_steps, max_tokens=max_tokens, max_seconds=max_seconds)
+MAX_USD = typer.Option(5.0, "--max-usd", min=0.01,
+                       help="priced per-run ceiling in USD; stops an unfinished run when reached")
 
 #: The artifact contract of the L0-L5 chain. Named here rather than in the command that writes
 #: each one, because the command that READS an artifact has to name the same string; two copies
@@ -78,7 +68,8 @@ def unique_run_dir(base: str) -> Path:
     """
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     d = Path(f"{base}__{stamp}__{code_sha()}")
-    d.mkdir(parents=True, exist_ok=False)
+    d.mkdir(parents=True, exist_ok=False, mode=0o700)
+    d.chmod(0o700)
     return d
 
 
@@ -89,6 +80,7 @@ def llm_client(model, api_base, temperature=0.0) -> LLMClient:
     silences the provider for every command. When each group held its own `_llm`, a test that
     muzzled one of them left the others free to dial out.
     """
+    from .llm import LLMClient, LLMConfig
     return LLMClient(LLMConfig.from_env(model=model, api_base=api_base, temperature=temperature))
 
 
@@ -111,8 +103,18 @@ def chat_model(model, api_base, temperature=1.0):
 
     from langchain_openai import ChatOpenAI
 
-    from .audit import _callbacks
-    return ChatOpenAI(model=(model or os.getenv("ACR_MODEL_NAME", "gpt-5.6-luna")),
+    from .usage_telemetry import _callbacks
+    model_name = model or os.getenv("ACR_MODEL_NAME") or os.getenv(
+        "ACR_MODEL", "gpt-5.6-luna"
+    )
+    # ``ACR_MODEL`` is shared with the LiteLLM runtime, where provider-qualified names such
+    # as ``openai/gpt-5.6-luna`` are required.  ``ChatOpenAI`` sends its model string to the
+    # OpenAI-compatible endpoint as the deployment name, so forwarding that prefix makes an
+    # otherwise healthy Azure deployment return DeploymentNotFound.  Keep one operator-facing
+    # environment variable while adapting its representation at the provider seam.
+    if model_name.startswith("openai/"):
+        model_name = model_name.split("/", 1)[1]
+    return ChatOpenAI(model=model_name,
                       base_url=api_base or os.getenv("ACR_API_BASE"),
                       api_key=os.getenv("ACR_API_KEY"),
                       temperature=temperature, timeout=600, max_retries=3,

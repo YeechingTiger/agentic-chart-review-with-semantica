@@ -1,0 +1,276 @@
+schema_version: '2.0'
+category: shared_decision_making
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 4
+rules:
+- candidate_id: ASCO22-MCRC-05
+  parent_recommendation_id: ASCO22-MCRC-R1.1
+  related_parent_recommendation_ids:
+  - ASCO22-MCRC-R1.1
+  - ASCO22-MCRC-R1.2
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_systemic
+  source_anchor: Recommendations 1.1 and 1.2 qualifying statement 2
+  category: shared_decision_making
+  title: Triplet benefit-harm discussion
+  core_or_supplemental: core
+  source_context:
+    eligibility: Triplet considered
+    action: Discuss benefit and increased grade 3 or higher adverse events
+    timing: Before regimen selection
+    exceptions: None
+    predicate_logic: triplet_considered => SDM_benefit_and_harm
+  requirements:
+    eligibility:
+      expression: Triplet considered
+      variables:
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.systemic_regimen
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.systemic_regimen
+    action:
+      expression: Discuss benefit and increased grade 3 or higher adverse events
+      variables:
+      - crc.shared_decision_discussion
+      evidence_logic:
+        variable: crc.shared_decision_discussion
+    timing:
+      expression: Before regimen selection
+      variables:
+      - crc.decision_date
+      evidence_logic:
+        variable: crc.decision_date
+    exceptions:
+      expression: None
+      variables:
+      - crc.patient_preference
+      - crc.treatment_toxicity_risk_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.treatment_toxicity_risk_at_decision
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.decision_date
+  - crc.metastatic_status
+  - crc.patient_preference
+  - crc.primary_site
+  - crc.shared_decision_discussion
+  - crc.systemic_regimen
+  - crc.treatment_toxicity_risk_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-MCRC-12
+  parent_recommendation_id: ASCO22-MCRC-R3.1
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_systemic
+  source_anchor: Recommendation 3.1 qualifier 5
+  category: shared_decision_making
+  title: Anti-EGFR benefit-harm discussion
+  core_or_supplemental: core
+  source_context:
+    eligibility: Anti-EGFR considered
+    action: Discuss benefits and harms including rash
+    timing: Before treatment selection
+    exceptions: None
+    predicate_logic: antiEGFR_considered => SDM_benefit_harm
+  requirements:
+    eligibility:
+      expression: Anti-EGFR considered
+      variables:
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.systemic_regimen
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.systemic_regimen
+    action:
+      expression: Discuss benefits and harms including rash
+      variables:
+      - crc.shared_decision_discussion
+      evidence_logic:
+        variable: crc.shared_decision_discussion
+    timing:
+      expression: Before treatment selection
+      variables:
+      - crc.decision_date
+      evidence_logic:
+        variable: crc.decision_date
+    exceptions:
+      expression: None
+      variables:
+      - crc.anti_egfr_rash_risk_at_decision
+      - crc.patient_preference
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.anti_egfr_rash_risk_at_decision
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.anti_egfr_rash_risk_at_decision
+  - crc.decision_date
+  - crc.metastatic_status
+  - crc.patient_preference
+  - crc.primary_site
+  - crc.shared_decision_discussion
+  - crc.systemic_regimen
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-NOM-03
+  parent_recommendation_id: ER25-NOM-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: NOM recommendation 3
+  category: shared_decision_making
+  title: Mandatory informed surveillance commitment for watch-and-wait
+  core_or_supplemental: core
+  source_context:
+    eligibility: Watch-and-wait considered
+    action: Complete shared decision making and confirm surveillance adherence
+    timing: Before NOM
+    exceptions: Do not select NOM without capacity
+    predicate_logic: WW_considered => SDM AND adherence_capacity
+  requirements:
+    eligibility:
+      expression: Watch-and-wait considered
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Complete shared decision making and confirm surveillance adherence
+      variables:
+      - crc.decision.counseling_documented
+      - crc.rectal_nom.shared_decision_making_documented
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision.counseling_documented
+        - variable: crc.rectal_nom.shared_decision_making_documented
+    timing:
+      expression: Before NOM
+      variables:
+      - crc.rectal_nom.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.decision_date
+    exceptions:
+      expression: Do not select NOM without capacity
+      variables:
+      - crc.patient_preference
+      - crc.rectal_nom.surveillance_access
+      - crc.rectal_nom.surveillance_adherence_capacity
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.patient_preference
+        - variable: crc.rectal_nom.surveillance_access
+        - variable: crc.rectal_nom.surveillance_adherence_capacity
+  required_variables:
+  - crc.decision.counseling_documented
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.patient_preference
+  - crc.rectal_nom.decision_date
+  - crc.rectal_nom.shared_decision_making_documented
+  - crc.rectal_nom.surveillance_access
+  - crc.rectal_nom.surveillance_adherence_capacity
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-LOCAL-04
+  parent_recommendation_id: ASCO22-LOCAL-R5.1
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_local
+  source_anchor: Recommendation 5.1 qualifying statement SDM
+  category: shared_decision_making
+  title: CRS quality-of-life and harm discussion
+  core_or_supplemental: core
+  source_context:
+    eligibility: CRS considered
+    action: Discuss quality-of-life impact and adverse events
+    timing: Before treatment decision
+    exceptions: None
+    predicate_logic: CRS_considered => SDM_QOL_harm
+  requirements:
+    eligibility:
+      expression: CRS considered
+      variables:
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.shared_decision_discussion
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.shared_decision_discussion
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Discuss quality-of-life impact and adverse events
+      variables:
+      - crc.shared_decision_discussion
+      evidence_logic:
+        variable: crc.shared_decision_discussion
+    timing:
+      expression: Before treatment decision
+      variables:
+      - crc.decision_date
+      evidence_logic:
+        variable: crc.decision_date
+    exceptions:
+      expression: None
+      variables:
+      - crc.patient_preference
+      evidence_logic:
+        variable: crc.patient_preference
+  required_variables:
+  - crc.decision_date
+  - crc.metastatic_status
+  - crc.patient_preference
+  - crc.primary_site
+  - crc.shared_decision_discussion
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

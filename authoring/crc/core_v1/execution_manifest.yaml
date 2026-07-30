@@ -1,0 +1,166 @@
+schema_version: '1.0'
+bundle_id: CRC.CORE.MOLECULAR_TREATMENT.v1
+materialization_status: candidate
+variable_contract_count: 68
+execution_group_count: 6
+groups:
+- execution_group_id: CRC.CANDIDATE.disease_context
+  materialized_spec: materialized_specs/CRC.CANDIDATE.disease_context.yaml
+  materialized_spec_content_hash: 9d71234fa5006b0be4eb055f0ec398604186249d98225ff71a89b5ddd732e9f3
+  member_contract_hashes:
+  - contract_id: CRC.VAR.primary_site
+    contract_hash: c5e50443270e743c9b8f68f22f7251f9f5af4785851ad1c0e5bf00a76f265d99
+  - contract_id: CRC.VAR.histology
+    contract_hash: 1348dc66afde91128f86c73d2be5c152bc436f04578decb0273a841a3e3c4784
+  - contract_id: CRC.VAR.disease_setting
+    contract_hash: e4a2eb5737618a08d7b294f067508a02b70ec1ae8cae745c3220fdbe973d883e
+  - contract_id: CRC.VAR.larc_status
+    contract_hash: 57c77e3f32bd6ae45f0e5902a73bfbbe1b15c8bd2226a54a7ea37d0c39cb5beb
+  - contract_id: CRC.VAR.metastatic_status
+    contract_hash: 8d3c2b39ecf7e29f3f12b5dd7519b3afaf869c108241fc329e50e0078c3aefcc
+  - contract_id: CRC.VAR.resectability_status
+    contract_hash: 3dbabfcb4f039f5fa5dd2fc2e350e6ec7550c946639e6b88a1e40d9719700519
+  - contract_id: CRC.VAR.line_of_therapy
+    contract_hash: ca180747a577b821e23f2246b3950dc0a399206247b733a899b5e1893bc36a1b
+  - contract_id: CRC.VAR.primary_tumor_sidedness
+    contract_hash: c65a7f5f209e35b7f0288b526e62123d102571a57fdf7a307da0109205ad6a33
+  - contract_id: CRC.VAR.clinical_t
+    contract_hash: 3f500bd3f57666e47e01262a167bb26f8bb9893fea8df242118c7548a766ec9f
+  - contract_id: CRC.VAR.clinical_n
+    contract_hash: 0a1c833586164ab0aabe9f6f85824906b3c2fe3cc74fe5686776bcdbcf8ca74c
+  - contract_id: CRC.VAR.multidisciplinary_review
+    contract_hash: 45e8bdece4b97974b0a167efa6dd666b4bc1242e2f59c1db0f7b591d45321ec2
+- execution_group_id: CRC.STORE.molecular_summary
+  materialized_spec: materialized_specs/CRC.STORE.molecular_summary.yaml
+  materialized_spec_content_hash: 83301669ec34c0bd57b0e44ab7087999b00200cbbfcc3d16461be3836da2f288
+  member_contract_hashes:
+  - contract_id: CRC.VAR.kras_status
+    contract_hash: c924a7da098f372d174c8fc2aa4f65e9555d7f92abc8c24a2857cce53c97d715
+  - contract_id: CRC.VAR.nras_status
+    contract_hash: 107e67be06a12d7c5f3646a34b53347b280882b6d47e9f32f83b46551bad7a12
+  - contract_id: CRC.VAR.braf_v600e_status
+    contract_hash: 6411688509025d1e8415d3373c029e846b38d6ae7b8f96b35df270561239c55b
+- execution_group_id: CRC.CHART.molecular_detail
+  materialized_spec: materialized_specs/CRC.CHART.molecular_detail.yaml
+  materialized_spec_content_hash: 4e4223c3123c33c75e62f3ee4f25c5bc8911e8d76de22442b70d103e97500123
+  member_contract_hashes:
+  - contract_id: CRC.VAR.msi_status
+    contract_hash: 0b647357f8ca24c9546eb6679715903389a79ad12478a97e77f8d7ddea86e7f1
+  - contract_id: CRC.VAR.mmr_ihc_integrated_status
+    contract_hash: e1b01f7f4c17c5e807230496f673965ad40d258bf281a751aa579bf4107f0798
+  - contract_id: CRC.VAR.mmr_mlh1
+    contract_hash: c100f65b555c62ccd9fa4843d0e7cc43a8fcc1bbf576274074374542ee6f33c5
+  - contract_id: CRC.VAR.mmr_pms2
+    contract_hash: 553aead31011a43815a0ac1830db4f1a8ab1492d1f7e82111bea3e6ae9cb9514
+  - contract_id: CRC.VAR.mmr_msh2
+    contract_hash: aae62f6c43bbdceb35c7723898864af7b200abc42f9bf9b6dbc759319b4f2dba
+  - contract_id: CRC.VAR.mmr_msh6
+    contract_hash: d9fabec6419efb2dfb6f31298734563d4100264e7295861c281f348f05010411
+  - contract_id: CRC.VAR.molecular_assay_method
+    contract_hash: 891090596fa62e7493126d609f6d79ce7361f6b77ec76bb1a8382810aee72def
+  - contract_id: CRC.VAR.molecular_assay_validation_status
+    contract_hash: 61680220fadc65180908390768d116f35e7dfb19b4a0827cc318da324f94ca4d
+  - contract_id: CRC.VAR.molecular_qc_status
+    contract_hash: bb09361e5c5b1705f0fd62d6b30856e702e2471d11a0408292b441ce4c7d51c4
+  - contract_id: CRC.VAR.molecular_specimen_id
+    contract_hash: 6f4eb372b8cacb163c71129fe2d27a42d8b86ae138345d912ab5ed823ef29abd
+  - contract_id: CRC.VAR.molecular_specimen_date
+    contract_hash: 95bc8252223a3bf550a263ae7af4237ffe3210b9cb0bb585b5d86cdd702abc66
+  - contract_id: CRC.VAR.molecular_result_date
+    contract_hash: 193170bdae47d3104466654889195779f0593981ff39ccba980efe475344c59c
+  - contract_id: CRC.VAR.mmr_msi_discordance_status
+    contract_hash: 31b9f7596b77fbde1e3bbb09ae2405d51309030d935cde0e0f174371ee55c846
+  - contract_id: CRC.VAR.mmr_subclonal_loss
+    contract_hash: 1c634ed46dbfbb5800d782764d9ab9d6bca3b72f765540f57fe44025f39f8a84
+  - contract_id: CRC.VAR.molecular_peer_review_status
+    contract_hash: c5d85c68d21a83f990e1cf3eb3795acec4b5610bca6243d53e92ba515adb6b36
+  - contract_id: CRC.VAR.molecular_repeat_test_result
+    contract_hash: 0ce3c1ad6a1ef006d028ec3651183fdff63079c54a08c711eb7c5c604ec7e496
+  - contract_id: CRC.VAR.molecular_final_interpretation
+    contract_hash: 9195480e6731b4f004ca488bd192d4a7fea31170df520c260cd3587a9cad4d5e
+  - contract_id: CRC.VAR.trial_context
+    contract_hash: 906a57742f4164755099426fd6e722110a406c9f511d5ba32e919991634178dc
+  - contract_id: CRC.VAR.expanded_ras_coverage
+    contract_hash: e23f058c8b5fd5a0612d229971651bd2a65df5ebeb53fabf3799bf7dfd230130
+  - contract_id: CRC.VAR.mlh1_promoter_methylation_status
+    contract_hash: 037f1121ac53cdbf7404e2290adedae8cc1433980493a299184e70dd8c7464b1
+  - contract_id: CRC.VAR.lynch_risk_communication
+    contract_hash: 1b338a4cb765e05a9a645e6206c5173351d864e9b838e382965a4df1ce125c53
+  - contract_id: CRC.VAR.genetics_referral_status
+    contract_hash: e79a06ff524ed66739fda99502b7ddd1d63b92166d783d435546c03ba1cda541
+  - contract_id: CRC.VAR.germline_result
+    contract_hash: 2bf8559f13d3a35062b5bfb733e331386f56de35d0e308bb127ccc152dcb1992
+- execution_group_id: CRC.CHART.rectal_mri_risk
+  materialized_spec: materialized_specs/CRC.CHART.rectal_mri_risk.yaml
+  materialized_spec_content_hash: 6454c2fd4ae578aa8242a8fecdfeba372d2422f6d62f004e6767a8c535190520
+  member_contract_hashes:
+  - contract_id: CRC.VAR.rectal_mri_protocol
+    contract_hash: 791199f48c10530c55743a5c1f5f85292814cf3044cd08cf49438c72f2cd0a0e
+  - contract_id: CRC.VAR.rectal_mri_quality
+    contract_hash: 7a95f4164ab4e50e913d2bc4695f0e1e13dd2b2ffc9631a996f61e1388fc5928
+  - contract_id: CRC.VAR.pelvic_mri_date
+    contract_hash: a75aae9a83aa5d456c786eed9afa434658e894730a7547102e170882456cd5d0
+  - contract_id: CRC.VAR.rectal_tumor_height
+    contract_hash: 0d1fc18b6c3694eb2100253f710f79a19ce26e966e1471f8163cc28f58718a5c
+  - contract_id: CRC.VAR.sphincter_relation
+    contract_hash: 078f5e16c8237b55b87bf70c1c584761a5091166c1fd52c381155fbb489b5e56
+  - contract_id: CRC.VAR.extramural_depth_mm
+    contract_hash: 554c940fd9bebae4b59d547052df19d027ae36fa0fbc866c8415b592c33a4498
+  - contract_id: CRC.VAR.mrf_status
+    contract_hash: ffdb8300862525622be6b44bfc069bafba4ad75082e9cfe424c38bc55114030b
+  - contract_id: CRC.VAR.emvi_status
+    contract_hash: 61743313dfb20620e4a5034d2d4f279770cbe8c354744a86ed6c7551c0eb8c0a
+  - contract_id: CRC.VAR.mri_tumor_deposits
+    contract_hash: e3df884702920b09b47e50bd62cd2df9b64b01a18c368d5da68874490c9a7b7f
+  - contract_id: CRC.VAR.intersphincteric_plane_status
+    contract_hash: 3ec138e3da48b29f62ce43bb816c857060c3720eff613a6b07e013e6084ad80e
+- execution_group_id: CRC.STORE_CHART.systemic_treatment
+  materialized_spec: materialized_specs/CRC.STORE_CHART.systemic_treatment.yaml
+  materialized_spec_content_hash: 9bc6ba34cb3c8778593f5990dfcdbf9e9207b829871c4e54508c185ca3c8fb18
+  member_contract_hashes:
+  - contract_id: CRC.VAR.ici_plan
+    contract_hash: 4511c29104dc3b6936b25952888c9897c198b2bd321081be03949cbbc6fbf249
+  - contract_id: CRC.VAR.anti_egfr_plan
+    contract_hash: 23b78a19362c4398c76628273a36880e9c078c478e52ece1253cf2e4c1358696
+  - contract_id: CRC.VAR.anti_egfr_start_date
+    contract_hash: 727dcbe369b7510b553b9f733f7374b01f0b74b64ab82eb4542039d6634e0cd7
+  - contract_id: CRC.VAR.ici_start_date
+    contract_hash: bf3a35c380984b9cb83ab848cb5e5cfab53bd7427611648d056e39a92c88d7a0
+  - contract_id: CRC.VAR.systemic_therapy_start_date
+    contract_hash: e6c3833e59f6fc3746bcf004757f46306c79c9964d5db6cb00db5e58740c1b97
+  - contract_id: CRC.VAR.treatment_start_date
+    contract_hash: 6e94079dc5d2ca668f18a2dc960de226db31cda672ea48c1c03d1f632666ab9a
+  - contract_id: CRC.VAR.systemic_regimen
+    contract_hash: ebeb159eb68081c8741f95695999f4f69f520cc851c88edc2401a042e1a55670
+  - contract_id: CRC.VAR.systemic_regimen_intensity
+    contract_hash: 37b23225a00a14595cd2990904ccda8ed842ae543b79334b2831292564feb4cb
+  - contract_id: CRC.VAR.radiation_type
+    contract_hash: 3c2ae6100adcce72cba8b0b31717620adc584a9612d9ca894412e2fba6eb4b75
+  - contract_id: CRC.VAR.treatment_sequence
+    contract_hash: 1207aa5198722297ed23a58db60ae3fc967ed7eabfd8dc5159032c72da31214f
+  - contract_id: CRC.VAR.ici_agent
+    contract_hash: fa303cac52cfb5d283cbf3b4ee85cfd0dd830cce29d0b6e1b664e885432503eb
+  - contract_id: CRC.VAR.biologic_agent
+    contract_hash: da9ec17e9e104729386e12d1650888e92f1c603980728d30e19bbbc9486040f9
+  - contract_id: CRC.VAR.prior_systemic_therapy
+    contract_hash: bf122d5d1b390f28cc65d469771b3ad785dfd3105712a6a9f780f827720e0b74
+  - contract_id: CRC.VAR.prior_braf_egfr_targeted_therapy
+    contract_hash: 7445818ec0f0823de18a130e91683d310bf0f9e3b8c747e4ac167fa2bb01ae43
+  - contract_id: CRC.VAR.progression_date
+    contract_hash: 86096f60d2622bd442c9020850b81d6ad30ad3e38e75fbf2649a44c2023f51df
+- execution_group_id: CRC.CHART.decision_exceptions
+  materialized_spec: materialized_specs/CRC.CHART.decision_exceptions.yaml
+  materialized_spec_content_hash: 8e6938c8c513f85d73ec1991c7509cc28fedc19dac6fb97b22c98168f772f415
+  member_contract_hashes:
+  - contract_id: CRC.VAR.ecog_performance_status
+    contract_hash: 4c29a2d1a090e6001f7caa712a75194ec03b9df8dfd9463e6b0e83c467c60d37
+  - contract_id: CRC.VAR.organ_function_constraints
+    contract_hash: 5b03ae4f8e162e3afc922c490367824efdf7eab600c30627eec8588e4b2114b9
+  - contract_id: CRC.VAR.comorbidity_constraints
+    contract_hash: 219892ea3000ea5206d006e5d361f044852c38ae0dfd5c44d50cbb7566534393
+  - contract_id: CRC.VAR.treatment_contraindication
+    contract_hash: 98807e1743fac4205f2c5ce6387467464ad579ea6927c43bfc4fa1736dcb692e
+  - contract_id: CRC.VAR.ici_contraindication
+    contract_hash: 1dbaa40d702312d749aed9719b3ae6f4dd00940575f5e05fd82c596309442a8f
+  - contract_id: CRC.VAR.patient_preference
+    contract_hash: 40c3fbd0d6454e57e2b4844726b255dab2b63f947181458cce5f5dff10892035

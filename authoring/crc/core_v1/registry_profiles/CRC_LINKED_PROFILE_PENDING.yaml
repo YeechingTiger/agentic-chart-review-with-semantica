@@ -1,0 +1,21 @@
+profile_schema_version: "1.0"
+profile_id: CRC_LINKED_PROFILE_PENDING
+profile_status: NOT_ASSESSED
+clinical_use: NOT_FOR_CLINICAL_USE
+dataset:
+  disease: colorectal_carcinoma
+  snapshot_date:
+  case_unit: tumor_record
+  diagnosis_years:
+  included_primary_sites: ["C180", "C182-C189", "C199", "C209"]
+  excluded_schemas: [appendix, neuroendocrine, GIST, sarcoma]
+required_before_measurement:
+  - immutable dataset snapshot or extract date
+  - tumor-record key and multiple-primary handling
+  - registry data dictionary with released fields
+  - field presence and informative-value distributions by diagnosis year
+  - chart document counts by tumor/patient and source class
+crc_observed_availability:
+  status: NOT_ASSESSED
+  reason: compatible_linked_crc_extract_not_bound
+

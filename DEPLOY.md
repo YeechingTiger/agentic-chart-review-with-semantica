@@ -37,7 +37,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh     # if uv is absent
 uv venv --python 3.12
 uv pip install -e ".[dev]"
 
-./.venv/bin/python -m pytest -q                     # expect: 53 passed
+./.venv/bin/python -m pytest -q                     # expect no failures
 ```
 
 **Always call `./.venv/bin/python` directly.** A bare `python3` is often 3.9 and cannot
@@ -113,12 +113,23 @@ export ACR_MODEL="anthropic/claude-sonnet-4-5" ; export ACR_API_KEY=sk-ant-...
 # one run, verbose — should finish in a couple of minutes on a GPU box
 ./.venv/bin/acr run SYN0002 \
   --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
-  --max-steps 30 --reflect-every 3 --seed 1234 --out runs/smoke
+  --max-steps 30 --max-usd 5 --seed 1234 --out runs/smoke
 ```
 
 Read `degradation` in the manifest first. Any non-zero entry means a node silently fell back
 and the corresponding behaviour was not exercised — conclusions drawn from that run about
 planning, reflection or finalisation do not hold.
+
+The smoke command above is the unchanged deepagents path. Ground-truth-guided spec repair and
+conflict refinement are optional:
+
+- DEVELOP-only `acr gold …` / `acr repair …` may read adjudicated gold but must run in a
+  separate job and write outside the repository.
+- RUN-only `acr run --conflict-refine` reads no gold and calls the same `run_patient` repeatedly.
+  Leave the flag off until a paired validation plus the four-arm pilot in README passes.
+- `acr eval compare-refinement` reports extra runs, rounds, cost and review routing. It is
+  intentionally not an accuracy scorer; use `acr repair validate` for paired
+  chart-observable correctness.
 
 ```bash
 ./.venv/bin/python -c "
@@ -141,8 +152,8 @@ arms are not comparable.
 S=specs/STORE.400_522_523.site_histology_behavior.yaml
 U=specs/ablation/STORE.400_522_523.unstratified.yaml
 for pt in SYN0002 SYN0001; do
-  ./.venv/bin/acr run $pt --spec $U --max-steps 30 --reflect-every 3 --seed 1234 --out runs/aprime_$pt
-  ./.venv/bin/acr run $pt --spec $S --max-steps 30 --reflect-every 3 --seed 1234 --out runs/b_$pt
+  ./.venv/bin/acr run $pt --spec $U --max-steps 30 --max-usd 5 --seed 1234 --out runs/aprime_$pt
+  ./.venv/bin/acr run $pt --spec $S --max-steps 30 --max-usd 5 --seed 1234 --out runs/b_$pt
 done
 ```
 
@@ -203,7 +214,7 @@ SETUP
 1. Read DEPLOY.md and RESULTS.md first. RESULTS.md says what has and has not been
    established; do not re-derive it.
 2. Install: uv venv --python 3.12 && uv pip install -e ".[dev]"
-   Verify with ./.venv/bin/python -m pytest -q — expect 53 passed.
+   Verify with ./.venv/bin/python -m pytest -q — expect no failures.
    Always invoke ./.venv/bin/python directly; a bare python3 is usually 3.9 and cannot
    import acr, which looks like a broken checkout.
 3. The corpus is committed (12 synthetic patients, 3736 documents). Do not generate data.
@@ -221,7 +232,7 @@ FIRST TASK — this is the point of the exercise
 6. Run exactly this one and stop:
      ./.venv/bin/acr run SYN0002 \
        --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
-       --max-steps 30 --reflect-every 3 --seed 1234 --out runs/b_SYN0002
+       --max-steps 30 --max-usd 5 --seed 1234 --out runs/b_SYN0002
 
    It exercises the stratified proof obligation with forced validation sampling — the only
    core mechanism never yet shown to be satisfiable. The unstratified obligation already

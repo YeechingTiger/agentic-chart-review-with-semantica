@@ -1,0 +1,405 @@
+schema_version: 1
+artifact_id: crc_core_v1_source_denominator
+repository_scope: agentic-chart-review
+as_of_date: '2026-07-27'
+scope:
+  disease: colorectal_cancer
+  focus:
+    - molecular_testing_and_operations
+    - localized_colon_adjuvant
+    - locally_advanced_rectal_assessment_and_neoadjuvant_treatment
+    - metastatic_molecular_systemic_treatment
+    - resectable_and_oligometastatic_local_treatment
+    - treatment_linked_lynch_reflex
+  denominator_policy: >
+    Formal recommendation counts describe source-authored recommendation units.
+    Executable candidate counts additionally split source recommendations into
+    branches and retain operational qualifiers. They must not be presented as
+    independent guideline statements.
+summary:
+  core_formal_recommendations: 218
+  core_nonformal_source_units: 37
+  core_scoped_source_units: 255
+  core_executable_candidates: 275
+  all_sources_formal_recommendations_including_supplemental_and_adjacent: 223
+  supplemental_or_adjacent_candidates: 5
+  total_executable_candidates: 280
+  nccn_candidates_reconstructed: 0
+  completeness_claim: accessible_source_scoped_complete
+denominator_semantics:
+  formal_recommendations: >
+    Count only source-authored formal recommendation parents. This is the
+    clinical-guideline denominator. It excludes good-practice statements,
+    operational qualifiers, explicit prose branches, and executable splits.
+  nonformal_source_units: >
+    Source-authored good-practice statements, operational qualifiers, or
+    explicitly extracted source branches that are in scope but are not formal
+    recommendations.
+  scoped_source_units: >
+    Formal recommendations plus nonformal source units reviewed in the declared
+    scope. This is a source-review denominator, not a formal-recommendation count.
+  executable_candidates: >
+    Rule candidates after splitting conditions, alternatives, exceptions, and
+    operational obligations. Multiple candidates may share one formal parent.
+  candidate_projection_for_core_formal_coverage: >
+    In rule_universe.yaml, take distinct parent_recommendation_id among entries
+    with core_or_supplemental equal to core, excluding candidate_kind
+    good_practice and adjacent. Shared multi-recommendation qualifiers use a
+    primary parent plus related_parent_recommendation_ids and therefore do not
+    create synthetic parent IDs.
+sources:
+  - source_id: esmo_mcrc_2026_molecular_ops
+    register_source_id: ESMO.MCRC.2026
+    organization: ESMO
+    title: Metastatic colorectal cancer Clinical Practice Guideline
+    version: '2026-03'
+    doi: 10.1016/j.annonc.2026.03.005
+    scope_anchor: Diagnosis, pathology and molecular biology recommendations
+    scoped_source_units_expected: 13
+    scoped_source_units_extracted: 13
+    formal_recommendations_in_scope: 13
+    executable_candidates_expected: 19
+    executable_candidates_extracted: 19
+    deferred_candidates: 0
+    completeness: complete_within_declared_scope
+    core_or_supplemental: core
+    license_blocker: false
+    blockers:
+      - Store paraphrase and locator rather than source text because the article reserves text-and-data-mining and AI-training rights.
+      - Drug-linked interpretation remains jurisdiction and effective-date dependent.
+  - source_id: esmo_mcrc_2026_systemic
+    register_source_id: ESMO.MCRC.2026
+    organization: ESMO
+    title: Metastatic colorectal cancer Clinical Practice Guideline
+    version: '2026-03'
+    doi: 10.1016/j.annonc.2026.03.005
+    scope_anchor: First-line, second-line, and third-line systemic treatment recommendations
+    scoped_source_units_expected: 30
+    scoped_source_units_extracted: 30
+    formal_recommendations_in_scope: 19
+    nonformal_source_units_in_scope: 11
+    executable_candidates_expected: 38
+    executable_candidates_extracted: 38
+    deferred_candidates: 0
+    completeness: complete_within_declared_molecular_branch_scope
+    core_or_supplemental: core
+    license_blocker: false
+    blockers:
+      - Several drug combinations require jurisdiction-specific approval and availability checks.
+      - Conflicts with ASCO 2022 must remain source-specific until adjudicated.
+  - source_id: esmo_mcrc_2026_staging_local
+    register_source_id: ESMO.MCRC.2026
+    organization: ESMO
+    title: Metastatic colorectal cancer Clinical Practice Guideline
+    version: '2026-03'
+    doi: 10.1016/j.annonc.2026.03.005
+    scope_anchor: Staging, resectability, oligometastatic disease, and local treatment recommendations
+    scoped_source_units_expected: 28
+    scoped_source_units_extracted: 28
+    formal_recommendations_in_scope: 28
+    executable_candidates_expected: 28
+    executable_candidates_extracted: 28
+    deferred_candidates: 0
+    completeness: complete_within_declared_local_treatment_scope
+    core_or_supplemental: core
+    license_blocker: false
+    blockers:
+      - Transplant and locoregional techniques require center, policy, and jurisdiction review.
+  - source_id: esmo_rectal_2025
+    register_source_id: ESMO.RECTAL_LOCALIZED.2025
+    organization: ESMO
+    title: Localised rectal cancer Clinical Practice Guideline
+    version: '2025-05'
+    doi: 10.1016/j.annonc.2025.05.528
+    scope_anchor: Molecular assessment, staging, neoadjuvant treatment, restaging, and non-operative management recommendations
+    scoped_source_units_expected: 51
+    scoped_source_units_extracted: 51
+    formal_recommendations_in_scope: 51
+    nonformal_source_units_in_scope: 0
+    executable_candidates_expected: 52
+    executable_candidates_extracted: 52
+    deferred_candidates: 0
+    completeness: complete_within_declared_scope
+    core_or_supplemental: core
+    license_blocker: false
+    blockers:
+      - Dostarlimab recommendation was off-label in the publication context and requires current jurisdiction review.
+  - source_id: esmo_colon_2020
+    register_source_id: ESMO.COLON_LOCALIZED.2020_2026
+    organization: ESMO
+    title: Localised colon cancer Clinical Practice Guideline
+    version: '2020-06'
+    doi: 10.1016/j.annonc.2020.06.022
+    scope_anchor: Risk assessment, molecular assessment, and adjuvant treatment recommendations plus explicit DPD and Lynch branches
+    scoped_source_units_expected: 25
+    scoped_source_units_extracted: 25
+    formal_recommendations_in_scope: 17
+    nonformal_source_units_in_scope: 8
+    executable_candidates_expected: 25
+    executable_candidates_extracted: 25
+    deferred_candidates: 0
+    completeness: complete_within_declared_adjuvant_and_reflex_scope
+    core_or_supplemental: core
+    license_blocker: false
+    blockers:
+      - Numeric DPD dose and uracil thresholds require current pharmacogenomic and jurisdiction review.
+      - Treatment-linked Lynch reflex is not a complete hereditary-cancer guideline.
+  - source_id: asco_stage2_colon_2022
+    register_source_id: ASCO.COLON_STAGE_II.2022
+    organization: ASCO
+    title: Adjuvant Therapy for Stage II Colon Cancer Guideline Update
+    version: '2022'
+    doi: 10.1200/JCO.21.02538
+    scope_anchor: Recommendations 1.1 through 4.1
+    scoped_source_units_expected: 7
+    scoped_source_units_extracted: 7
+    formal_recommendations_in_scope: 7
+    executable_candidates_expected: 9
+    executable_candidates_extracted: 9
+    deferred_candidates: 0
+    completeness: complete
+    core_or_supplemental: core
+    license_blocker: false
+    blockers: []
+  - source_id: asco_stage3_duration_2019
+    register_source_id: ASCO.COLON_STAGE_III_DURATION.2019
+    organization: ASCO
+    title: Duration of Oxaliplatin-Containing Adjuvant Therapy for Stage III Colon Cancer
+    version: '2019'
+    doi: 10.1200/JCO.19.00281
+    scope_anchor: High-risk and low-risk duration recommendations
+    scoped_source_units_expected: 2
+    scoped_source_units_extracted: 2
+    formal_recommendations_in_scope: 2
+    executable_candidates_expected: 2
+    executable_candidates_extracted: 2
+    deferred_candidates: 0
+    completeness: complete
+    core_or_supplemental: core
+    license_blocker: false
+    blockers: []
+  - source_id: asco_larc_2024
+    register_source_id: ASCO.LARC.2024
+    organization: ASCO
+    title: Management of Locally Advanced Rectal Cancer
+    version: '2024'
+    doi: 10.1200/JCO.24.01160
+    scope_anchor: Recommendations 1.1 through 6.1
+    scoped_source_units_expected: 9
+    scoped_source_units_extracted: 9
+    formal_recommendations_in_scope: 9
+    executable_candidates_expected: 9
+    executable_candidates_extracted: 9
+    deferred_candidates: 0
+    completeness: complete
+    core_or_supplemental: core
+    license_blocker: false
+    blockers:
+      - Conflicting source-specific treatment preferences must not be silently merged with ESMO or ASTRO.
+  - source_id: astro_rectal_2025
+    register_source_id: ASTRO.RECTAL_RT.2025
+    organization: ASTRO
+    title: Radiation Therapy for Rectal Cancer Focused Update
+    version: '2025'
+    doi: 10.1016/j.prro.2024.11.003
+    scope_anchor: Focused-update tables KQ1 through KQ3
+    scoped_source_units_expected: 24
+    scoped_source_units_extracted: 24
+    formal_recommendations_in_scope: 24
+    executable_candidates_expected: 25
+    executable_candidates_extracted: 25
+    deferred_candidates: 0
+    completeness: recommendation_complete_context_version_pending
+    core_or_supplemental: core
+    license_blocker: false
+    blockers:
+      - Extraction used the publicly accessible accepted manuscript; compare against the final version of record before activation.
+      - Unchanged KQ4 planning and technique recommendations are outside the declared scope.
+  - source_id: asco_mcrc_2022_systemic
+    register_source_id: ASCO.MCRC.2022
+    organization: ASCO
+    title: Treatment of Metastatic Colorectal Cancer
+    version: '2022-10'
+    doi: 10.1200/JCO.22.01690
+    scope_anchor: Recommendations 1.1 through 4.1 and their qualifying statements
+    scoped_source_units_expected: 13
+    scoped_source_units_extracted: 13
+    formal_recommendations_in_scope: 5
+    operational_qualifiers_in_scope: 8
+    nonformal_source_units_in_scope: 8
+    executable_candidates_expected: 13
+    executable_candidates_extracted: 13
+    deferred_candidates: 0
+    completeness: complete_within_declared_systemic_scope
+    core_or_supplemental: core
+    license_blocker: false
+    blockers:
+      - ESMO 2026 is more current and creates explicit source conflicts for several branches.
+  - source_id: asco_mcrc_2022_local
+    register_source_id: ASCO.MCRC.2022
+    organization: ASCO
+    title: Treatment of Metastatic Colorectal Cancer
+    version: '2022-10'
+    doi: 10.1200/JCO.22.01690
+    scope_anchor: Recommendations 5.1 through 7.1 and their qualifying statements
+    scoped_source_units_expected: 12
+    scoped_source_units_extracted: 12
+    formal_recommendations_in_scope: 5
+    operational_qualifiers_in_scope: 7
+    nonformal_source_units_in_scope: 7
+    executable_candidates_expected: 12
+    executable_candidates_extracted: 12
+    deferred_candidates: 0
+    completeness: complete_within_declared_local_treatment_scope
+    core_or_supplemental: core
+    license_blocker: false
+    blockers: []
+  - source_id: cap_mmr_msi_2022
+    register_source_id: CAP.MMR_MSI_ICI.2022
+    organization: CAP
+    title: Mismatch Repair and Microsatellite Instability Testing for Immune Checkpoint Inhibitor Therapy
+    version: '2022'
+    source_url: https://www.cap.org/wp-content/uploads/documents/mmr-msi-summary-recommendations.pdf
+    scope_anchor: Recommendations 1, 5, and 6 plus Good Practice Statements 1 through 3
+    scoped_source_units_expected: 6
+    scoped_source_units_extracted: 6
+    formal_recommendations_in_scope: 3
+    good_practice_statements_in_scope: 3
+    nonformal_source_units_in_scope: 3
+    executable_candidates_expected: 7
+    executable_candidates_extracted: 7
+    deferred_candidates: 0
+    completeness: recommendation_complete_context_summary_only
+    core_or_supplemental: core
+    license_blocker: false
+    blockers:
+      - Official summary is recommendation-complete but does not carry all full-text evidence context.
+  - source_id: cap_crc_biomarkers_2017
+    register_source_id: CAP.CRC_BIOMARKERS.2017
+    organization: CAP_AMP_ASCO
+    title: Molecular Biomarkers for the Evaluation of Colorectal Cancer
+    version: '2017'
+    source_url: https://www.cap.org/wp-content/uploads/documents/colorectal-cancer-recommendations.pdf
+    scope_anchor: Numbered statements 1 through 21, including 2a and 2b
+    scoped_source_units_expected: 21
+    scoped_source_units_extracted: 21
+    formal_recommendations_in_scope: 21
+    executable_candidates_expected: 22
+    executable_candidates_extracted: 22
+    deferred_candidates: 0
+    completeness: recommendation_complete_update_pending
+    core_or_supplemental: core
+    license_blocker: false
+    blockers:
+      - CAP lists an update as being in scope and panel development.
+      - Treatment-era no-recommendation statements are historical only.
+  - source_id: asco_somatic_genomic_2022
+    register_source_id: ASCO.SOMATIC_GENOMIC.2022
+    organization: ASCO
+    title: Somatic Genomic Testing in Patients With Metastatic or Advanced Cancer
+    version: '2022'
+    doi: 10.1200/JCO.21.02767
+    scope_anchor: PCOs applicable to CRC and pan-solid-tumor care
+    scoped_source_units_expected: 14
+    scoped_source_units_extracted: 14
+    formal_recommendations_in_scope: 14
+    executable_candidates_expected: 14
+    executable_candidates_extracted: 14
+    deferred_candidates: 0
+    completeness: complete_within_crc_and_pan_tumor_scope
+    core_or_supplemental: core
+    license_blocker: false
+    blockers:
+      - Approval-linked predicates require a current jurisdiction and effective-date service.
+      - NSCLC-only PCO 3.3 is explicitly outside scope, not missing.
+  - source_id: esmo_colon_exercise_2026
+    register_source_id: ESMO.COLON_LOCALIZED.2020_2026
+    organization: ESMO
+    title: Express Update on Exercise After Adjuvant Treatment for Localised Colon Cancer
+    version: '2026'
+    doi: 10.1016/j.esmoop.2025.106019
+    scope_anchor: Structured exercise recommendation
+    scoped_source_units_expected: 1
+    scoped_source_units_extracted: 1
+    formal_recommendations_in_scope: 1
+    executable_candidates_expected: 1
+    executable_candidates_extracted: 1
+    deferred_candidates: 0
+    completeness: complete
+    core_or_supplemental: adjacent
+    license_blocker: false
+    blockers:
+      - Scope-adjacent survivorship intervention; do not mix into the core treatment denominator.
+  - source_id: sitc_gi_2023_crc_guards
+    register_source_id: SITC.GI_IMMUNOTHERAPY.2023
+    organization: SITC
+    title: Clinical Practice Guideline on Immunotherapy for Gastrointestinal Cancer
+    version: '2023'
+    doi: 10.1136/jitc-2022-006658
+    scope_anchor: Selected CRC biomarker and immunotherapy interpretation guards
+    scoped_source_units_expected: 4
+    scoped_source_units_extracted: 4
+    formal_recommendations_in_scope: 4
+    executable_candidates_expected: 4
+    executable_candidates_extracted: 4
+    deferred_candidates: 0
+    completeness: targeted_supplement_only
+    core_or_supplemental: supplemental
+    license_blocker: false
+    blockers:
+      - This is not an exhaustive extraction of the full GI guideline.
+      - A 2025 living update must be reconciled before activation.
+  - source_id: nccn_colon_current
+    register_source_id: NCCN.COLON.CURRENT
+    organization: NCCN
+    title: Colon Cancer
+    version: licensed_current_snapshot_required
+    scope_anchor: not_extracted
+    scoped_source_units_expected: null
+    scoped_source_units_extracted: 0
+    formal_recommendations_in_scope: null
+    executable_candidates_expected: null
+    executable_candidates_extracted: 0
+    deferred_candidates: null
+    completeness: licensed_pending
+    core_or_supplemental: core
+    license_blocker: true
+    blockers:
+      - Do not reconstruct from public secondary sources.
+      - Require authorized document version, effective date, anchor, and content hash.
+  - source_id: nccn_rectal_current
+    register_source_id: NCCN.RECTAL.CURRENT
+    organization: NCCN
+    title: Rectal Cancer
+    version: licensed_current_snapshot_required
+    scope_anchor: not_extracted
+    scoped_source_units_expected: null
+    scoped_source_units_extracted: 0
+    formal_recommendations_in_scope: null
+    executable_candidates_expected: null
+    executable_candidates_extracted: 0
+    deferred_candidates: null
+    completeness: licensed_pending
+    core_or_supplemental: core
+    license_blocker: true
+    blockers:
+      - Do not reconstruct from public secondary sources.
+      - Require authorized document version, effective date, anchor, and content hash.
+  - source_id: nccn_genetic_familial_crc_current
+    register_source_id: NCCN.HEREDITARY_CRC.CURRENT
+    organization: NCCN
+    title: Genetic/Familial High-Risk Assessment for Colorectal Cancer
+    version: licensed_current_snapshot_required
+    scope_anchor: not_extracted
+    scoped_source_units_expected: null
+    scoped_source_units_extracted: 0
+    formal_recommendations_in_scope: null
+    executable_candidates_expected: null
+    executable_candidates_extracted: 0
+    deferred_candidates: null
+    completeness: licensed_pending
+    core_or_supplemental: core
+    license_blocker: true
+    blockers:
+      - Direct Lynch reflex coverage remains partial until an authorized hereditary guideline snapshot is ingested.
+      - Do not reconstruct from public secondary sources.

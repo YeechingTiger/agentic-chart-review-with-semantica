@@ -1,0 +1,337 @@
+schema_version: '2.0'
+category: pharmacogenomics
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 5
+rules:
+- candidate_id: EC20-DPD-HET-01
+  parent_recommendation_id: EC20-DPD-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_colon_2020
+  source_anchor: DPD implementation prose heterozygous branch
+  category: pharmacogenomics
+  title: DPYD heterozygous initial dose reduction
+  core_or_supplemental: core
+  source_context:
+    eligibility: Heterozygous pathogenic DPYD
+    action: Reduce initial fluoropyrimidine dose by 50 percent
+    timing: First dose
+    exceptions: Requires current implementation review
+    predicate_logic: pathogenic_DPYP_heterozygous => initial_dose_50_percent
+  requirements:
+    eligibility:
+      expression: Heterozygous pathogenic DPYD
+      variables:
+      - crc.dpyd_variant
+      - crc.dpyd_zygosity
+      - crc.molecular_variant_pathogenicity
+      - crc.planned_drug
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.dpyd_variant
+        - variable: crc.dpyd_zygosity
+        - variable: crc.molecular_variant_pathogenicity
+        - variable: crc.planned_drug
+    action:
+      expression: Reduce initial fluoropyrimidine dose by 50 percent
+      variables:
+      - crc.fluoropyrimidine_initial_dose
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.fluoropyrimidine_initial_dose
+    timing:
+      expression: First dose
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: First dose
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Requires current implementation review
+      variables:
+      - crc.molecular_variant_pathogenicity
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_variant_pathogenicity
+  required_variables:
+  - crc.dpyd_variant
+  - crc.dpyd_zygosity
+  - crc.fluoropyrimidine_initial_dose
+  - crc.molecular_variant_pathogenicity
+  - crc.planned_drug
+  computability:
+    status: partially_specified
+    blockers:
+    - B_DPD_IMPLEMENTATION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-DPD-HOM-01
+  parent_recommendation_id: EC20-DPD-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_colon_2020
+  source_anchor: DPD implementation prose homozygous branch
+  category: pharmacogenomics
+  title: Avoid fluoropyrimidine in pathogenic DPYD homozygosity
+  core_or_supplemental: core
+  source_context:
+    eligibility: Homozygous pathogenic DPYD
+    action: Avoid fluoropyrimidine
+    timing: Before therapy
+    exceptions: Requires current implementation review
+    predicate_logic: pathogenic_DPYD_homozygous => avoid_fluoropyrimidine
+  requirements:
+    eligibility:
+      expression: Homozygous pathogenic DPYD
+      variables:
+      - crc.dpyd_variant
+      - crc.dpyd_zygosity
+      - crc.molecular_variant_pathogenicity
+      - crc.planned_drug
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.dpyd_variant
+        - variable: crc.dpyd_zygosity
+        - variable: crc.molecular_variant_pathogenicity
+        - variable: crc.planned_drug
+    action:
+      expression: Avoid fluoropyrimidine
+      variables:
+      - crc.fluoropyrimidine_treatment_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.fluoropyrimidine_treatment_decision
+    timing:
+      expression: Before therapy
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before therapy
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Requires current implementation review
+      variables:
+      - crc.molecular_variant_pathogenicity
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_variant_pathogenicity
+  required_variables:
+  - crc.dpyd_variant
+  - crc.dpyd_zygosity
+  - crc.fluoropyrimidine_treatment_decision
+  - crc.molecular_variant_pathogenicity
+  - crc.planned_drug
+  computability:
+    status: partially_specified
+    blockers:
+    - B_DPD_IMPLEMENTATION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-DPD-U16-01
+  parent_recommendation_id: EC20-DPD-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_colon_2020
+  source_anchor: DPD implementation prose uracil branch
+  category: pharmacogenomics
+  title: Dose reduction for elevated uracil
+  core_or_supplemental: core
+  source_context:
+    eligibility: Pretreatment uracil above 16 ng per mL and not above contraindication threshold
+    action: Reduce initial dose by 50 percent
+    timing: First dose
+    exceptions: Threshold is jurisdiction-specific
+    predicate_logic: uracil_gt_16 AND uracil_le_150 => initial_dose_50_percent
+  requirements:
+    eligibility:
+      expression: Pretreatment uracil above 16 ng per mL and not above contraindication threshold
+      variables:
+      - crc.planned_drug
+      - crc.pretreatment_uracil_unit
+      - crc.pretreatment_uracil_value
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.planned_drug
+        - variable: crc.pretreatment_uracil_unit
+        - variable: crc.pretreatment_uracil_value
+    action:
+      expression: Reduce initial dose by 50 percent
+      variables:
+      - crc.fluoropyrimidine_initial_dose
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.fluoropyrimidine_initial_dose
+    timing:
+      expression: First dose
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: First dose
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Threshold is jurisdiction-specific
+      variables:
+      - crc.pretreatment_uracil_unit
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.pretreatment_uracil_unit
+  required_variables:
+  - crc.fluoropyrimidine_initial_dose
+  - crc.planned_drug
+  - crc.pretreatment_uracil_unit
+  - crc.pretreatment_uracil_value
+  computability:
+    status: partially_specified
+    blockers:
+    - B_DPD_IMPLEMENTATION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-DPD-U150-01
+  parent_recommendation_id: EC20-DPD-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_colon_2020
+  source_anchor: DPD implementation prose high-uracil branch
+  category: pharmacogenomics
+  title: Fluoropyrimidine contraindication for very high uracil
+  core_or_supplemental: core
+  source_context:
+    eligibility: Pretreatment uracil above 150 ng per mL
+    action: Do not use fluoropyrimidine
+    timing: Before therapy
+    exceptions: Threshold is jurisdiction-specific
+    predicate_logic: uracil_gt_150 => contraindicated_fluoropyrimidine
+  requirements:
+    eligibility:
+      expression: Pretreatment uracil above 150 ng per mL
+      variables:
+      - crc.planned_drug
+      - crc.pretreatment_uracil_unit
+      - crc.pretreatment_uracil_value
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.planned_drug
+        - variable: crc.pretreatment_uracil_unit
+        - variable: crc.pretreatment_uracil_value
+    action:
+      expression: Do not use fluoropyrimidine
+      variables:
+      - crc.fluoropyrimidine_treatment_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.fluoropyrimidine_treatment_decision
+    timing:
+      expression: Before therapy
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before therapy
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Threshold is jurisdiction-specific
+      variables:
+      - crc.pretreatment_uracil_unit
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.pretreatment_uracil_unit
+  required_variables:
+  - crc.fluoropyrimidine_treatment_decision
+  - crc.planned_drug
+  - crc.pretreatment_uracil_unit
+  - crc.pretreatment_uracil_value
+  computability:
+    status: partially_specified
+    blockers:
+    - B_DPD_IMPLEMENTATION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-DPD-ALT-01
+  parent_recommendation_id: EC20-DPD-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_colon_2020
+  source_anchor: DPD implementation prose alternative branch
+  category: pharmacogenomics
+  title: Raltitrexed when fluoropyrimidine is contraindicated
+  core_or_supplemental: core
+  source_context:
+    eligibility: High recurrence risk with fluoropyrimidine contraindication
+    action: May consider raltitrexed
+    timing: Adjuvant selection
+    exceptions: Low-level evidence and current-label review
+    predicate_logic: high_recurrence_risk AND FP_contraindicated => may_raltitrexed
+  requirements:
+    eligibility:
+      expression: High recurrence risk with fluoropyrimidine contraindication
+      variables:
+      - crc.fluoropyrimidine_contraindication
+      - crc.recurrence_risk_group
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.fluoropyrimidine_contraindication
+        - variable: crc.recurrence_risk_group
+    action:
+      expression: May consider raltitrexed
+      variables:
+      - crc.alternative_adjuvant_regimen
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.alternative_adjuvant_regimen
+    timing:
+      expression: Adjuvant selection
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Adjuvant selection
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Low-level evidence and current-label review
+      variables:
+      - crc.alternative_adjuvant_regimen
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.alternative_adjuvant_regimen
+  required_variables:
+  - crc.alternative_adjuvant_regimen
+  - crc.fluoropyrimidine_contraindication
+  - crc.recurrence_risk_group
+  computability:
+    status: partially_specified
+    blockers:
+    - B_DPD_IMPLEMENTATION
+    - B_DYNAMIC_LABEL
+    - B_HUMAN_REVIEW
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

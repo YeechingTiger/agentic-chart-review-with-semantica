@@ -12,6 +12,17 @@ The two remedies have different owners and different scopes, so collapsing them 
 work. This is the same inversion as returning an empty list both for a document type that
 does not exist and for one this patient lacks: a level confusion, not a typo.
 """
+
+# The calls below pass `enforce=True`. `evaluate_gate` is ADVISORY by default as of 2026-07-30:
+# it still counts strata, samples and residual bounds identically, but routes its sentences to
+# `advisories` instead of `missing` so they inform the model rather than refuse its answer.
+# "Have I looked at enough of this chart?" is a clinical judgement and now lives in
+# `skills/coverage-judgement/SKILL.md`; measured over every recorded trace, coverage obligations
+# produced ~150 answer rejections and 27 of them refused a tuple that was exactly the registry's.
+#
+# These tests are about the ARITHMETIC, which is unchanged and still worth pinning: a bound that
+# clears its cap only by inheriting a stale sampling frame is anti-conservative whether or not
+# anybody is refused over it. `enforce=True` is how a test reaches the refusal wording.
 from __future__ import annotations
 
 from pathlib import Path
@@ -45,7 +56,7 @@ def test_empty_can_establish_is_a_finding_not_a_spec_fault(spec):
     led = _ledger("SYN0002", spec)
     assert led.by_stratum["can_establish"] == [], "precondition: this patient has no pathology"
 
-    gate = evaluate_gate({"require_can_establish_nonempty": True}, led.stratum_results())
+    gate = evaluate_gate({"require_can_establish_nonempty": True}, led.stratum_results(), enforce=True)
     assert gate.checks["can_establish_declared"] is True
     assert not any("not a legal mode" in m for m in gate.missing)
 
@@ -55,7 +66,7 @@ def test_missing_can_establish_declaration_is_a_spec_fault(spec):
     led = _ledger("SYN0002", spec)
     without = [r for r in led.stratum_results() if r.name != "can_establish"]
 
-    gate = evaluate_gate({"require_can_establish_nonempty": True}, without)
+    gate = evaluate_gate({"require_can_establish_nonempty": True}, without, enforce=True)
     assert gate.checks["can_establish_declared"] is False
     assert any("SPEC_INSUFFICIENT" in m for m in gate.missing)
 

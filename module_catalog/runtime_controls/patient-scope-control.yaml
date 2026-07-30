@@ -1,0 +1,14 @@
+schema: acr.module_asset/1
+module_id: patient-scope-control
+version: 1.0.0
+kind: RUNTIME_CONTROL
+runner: CODE
+inputs: [proposed_action, run_state]
+output_schema: acr.control_decision/1
+implementation: control.patient_scope.v1
+truth_modes: [BLIND]
+capabilities: []
+maximum_authority: BLOCK_CURRENT_ANSWER
+description: Deny actions outside the current patient scope.
+owner: runtime-owner
+tags: [runtime, patient-scope]

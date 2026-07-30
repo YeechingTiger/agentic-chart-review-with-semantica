@@ -1,21 +1,32 @@
-"""The answer checks, tested directly — which until 2026-07-28 nothing did.
+"""What answer_checks still does, and what it must never do again.
 
-`answer_checks.py` decides whether a submitted answer is accepted. It had no test file of its
-own; it was exercised sideways by `test_rule_attribution` (which cares about rule IDS, not
-verdicts), `test_stage_spec`, `test_refine` and `test_speclint`. So the module that can turn a
-right answer into a wrong one had its verdicts asserted nowhere, and that is exactly what
-happened on the ten-patient real batch of 2026-07-28.
+This file used to specify five clinical checks that matched word lists against the model's own
+cited quotes. They were removed on 2026-07-30 after being measured over every trace this
+project has recorded. The tests that specified them are gone with them -- a test that pins a
+rule in place is part of the rule -- and what is left here does two jobs:
 
-THE MEASURED FAILURE, wired here as a control. A run coded histology 8046 — the registry's
-answer — citing "poorly differentiated non-small cell carcinoma". The check's
-`contradicted_by` list contains "small cell". `_norm` does not strip hyphens, so
-`"small cell" in "non-small cell carcinoma"` is True: the check read a negation as its
-opposite, refused the correct answer, and its message then told the agent that
-'"favor squamous cell carcinoma" supports 8070 over 8046' — a worked example hardcoded from a
-different chart. The agent submitted 8070 and that was accepted.
+  1. the surviving format/value-domain check still works, with the cases that justified it;
+  2. the clinical kinds cannot come back by accident. A spec that declares one fails to load,
+     and `check_answer_detail` returns nothing whatever it is handed.
 
-Both halves are asserted below: the negation must not count, and the message must not name a
-code.
+THE MEASUREMENT, so that re-adding a word list has to argue with a number. Over 266 traces,
+202 joinable to registry gold, 122 recorded firings:
+
+    rule                       fires   rejected the registry's own value   ever helped
+    not_less_specific             22                    22  (100%)                   0
+    nos_requires_search           24                    21  ( 88%)                   0
+    conflict_requires_nos         67                    18  ( 27%)                  15
+    origin_not_specimen            2                     0                           0
+    code_matches_cited_text        0                     -                           -
+
+All 15 `conflict_requires_nos` "helps" were the same event -- a push to the NOS code, the only
+remedy its message offered -- and the NOS code is the registry's answer for 9.6% of this corpus
+against C341's 52.7%. Per submission: 60 of 254 recorded rejections refused a tuple that was
+exactly the registry's, and 12 runs held the exact registry answer and shipped something else.
+
+The negation bug this file was originally written to pin (`"small cell"` matching inside
+`"non-small cell carcinoma"`, refusing the registry's 8046) is now impossible for the reason
+that makes the whole class impossible: nothing matches phrases against quotes any more.
 """
 from __future__ import annotations
 
@@ -23,201 +34,146 @@ from pathlib import Path
 
 import pytest
 
-from acr.answer_checks import _norm, _occurs_unnegated, check_answer_detail
-from acr.spec import load_spec
+from acr.answer_checks import (
+    ANSWER_CHECK_KINDS,
+    answer_check_rule_id,
+    check_answer,
+    check_answer_detail,
+    check_field_formats,
+    check_field_formats_detail,
+    field_rule_id,
+)
+from acr.spec import ProvenanceError, load_spec
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
 
-HISTOLOGY_NOS = {"field": "histology", "kind": "not_less_specific",
-                 "nos_values": ["8000", "8010", "8046"],
-                 "contradicted_by": ["squamous", "adenocarcinoma", "small cell", "large cell"]}
+
+class F:
+    """The duck type `check_field_formats` reads: name, format, allowable_values."""
+
+    def __init__(self, name, format=None, allowable_values=None):
+        self.name, self.format, self.allowable_values = name, format, allowable_values
 
 
-def ev(quote: str, field: str = "histology") -> list[dict]:
-    return [{"field": field, "note_id": "Path-Report_2020-01-01", "quote": quote}]
+FIELDS = [F("primary_site", format=r"C\d{3}"),
+          F("histology", format=r"\d{4}"),
+          F("behavior", allowable_values=["0", "1", "2", "3"])]
 
 
-# ------------------------------------------------------------------ the negation, in isolation
-@pytest.mark.parametrize("phrase,text,unnegated", [
-    # The measured case. "non-" makes the phrase the tail of its own negation.
-    ("small cell", "poorly differentiated non-small cell carcinoma", False),
-    ("small cell", "non small cell carcinoma of the lung", False),
-    # ...and the same words, actually asserted.
-    ("small cell", "small cell carcinoma of the lung", True),
-    ("small cell", "negative for small cell carcinoma", False),
-    ("adenocarcinoma", "no evidence of adenocarcinoma", False),
-    # Bare "no" is NOT a negator, on purpose: this sentence asserts adenocarcinoma.
-    ("adenocarcinoma", "there is no doubt this is adenocarcinoma", True),
-    # Per occurrence, not per blob: the second mention is not negated by the first.
-    ("adenocarcinoma", "no evidence of adenocarcinoma left; adenocarcinoma present right", True),
-    # A sentence boundary ends a negation's reach.
-    ("adenocarcinoma", "negative for small cell. adenocarcinoma is present", True),
-    # "non-" applies only immediately before the phrase, not to the whole sentence.
-    ("lower lobe", "non small cell carcinoma of the lower lobe", True),
+# ------------------------------------------------------- the clinical checks are gone
+def test_no_clinical_check_kind_is_implemented():
+    assert ANSWER_CHECK_KINDS == frozenset()
+
+
+@pytest.mark.parametrize("kind", [
+    "not_less_specific", "nos_requires_search", "conflict_requires_nos",
+    "origin_not_specimen", "code_matches_cited_text",
 ])
-def test_negation_is_read_per_occurrence(phrase, text, unnegated):
-    assert _occurs_unnegated(phrase, _norm(text)) is unnegated
+def test_a_spec_declaring_a_removed_kind_fails_to_load(tmp_path, kind):
+    """Fail closed, not fail quiet.
 
-
-# ---------------------------------------------------- the failure that reached a real answer
-def test_a_negated_mention_does_not_refuse_the_nos_code():
-    """8046 IS the answer for "non-small cell carcinoma". The check must not refuse it.
-
-    This is the regression. Before the fix this returned one violation whose message named
-    8070, and the run that received it complied.
+    A check named in YAML, visible in the manifest's `rule_catalog`, and never firing is
+    indistinguishable from a check that looked and found nothing. That is the exact confusion
+    `ANSWER_CHECK_KINDS` was introduced to prevent, so emptying the set keeps the property
+    rather than dropping it.
     """
-    quote = ("Final Diagnosis: Positive for malignant cells. Poorly differentiated "
-             "non-small cell carcinoma. See note.")
-    assert check_answer_detail([HISTOLOGY_NOS], {"histology": "8046"}, ev(quote)) == []
+    p = tmp_path / "S.1.yaml"
+    p.write_text(
+        "spec_id: S.1\nspec_version: 0.1.0\ndata_source: notes\n"
+        "question: q\n"
+        "fields:\n  - name: primary_site\n    type: string\n    format: 'C\\d{3}'\n"
+        "decision_rule: [r]\n"
+        "evidence_rules:\n  counts_as_evidence: [anything]\n"
+        f"answer_checks:\n  - field: primary_site\n    kind: {kind}\n"
+        "    nos_values: ['C349']\n", encoding="utf-8")
+    with pytest.raises(ProvenanceError) as e:
+        load_spec(p)
+    assert kind in str(e.value)
 
 
-def test_an_unnegated_mention_still_refuses_the_nos_code():
-    """The fix must not disarm the check. Same code, same list, a real specific mention."""
-    v = check_answer_detail([HISTOLOGY_NOS], {"histology": "8046"},
-                            ev("Final Diagnosis: small cell carcinoma, extensive stage."))
-    assert len(v) == 1 and v[0].trigger == "small cell", (
-        "a genuine more-specific mention must still be caught")
+def test_check_answer_returns_nothing_whatever_it_is_handed():
+    checks = [{"field": "primary_site", "kind": "not_less_specific",
+               "nos_values": ["C349"], "contradicted_by": ["upper lobe"]}]
+    ev = [{"quote": "tumour in the right upper lobe", "supports": "primary_site"}]
+    assert check_answer(checks, {"primary_site": "C349"}, ev, searched=[]) == []
+    assert check_answer_detail(checks, {"primary_site": "C349"}, ev, searched=[]) == []
 
 
-def test_the_live_spec_refuses_no_answer_on_the_chart_that_was_misjudged():
-    """Through the spec as shipped, not a hand-built check — the shipped list is the risk."""
-    spec = load_spec(str(SPEC))
-    checks = [c if isinstance(c, dict) else c.model_dump() for c in spec.answer_checks]
-    quote = "Poorly differentiated non-small cell carcinoma. See note."
-    hits = [v for v in check_answer_detail(checks, {"histology": "8046"}, ev(quote))
-            if v.field == "histology"]
-    assert hits == [], f"the shipped spec still refuses 8046: {[h.message for h in hits]}"
+def test_the_registry_answers_the_removed_checks_destroyed_now_pass():
+    """The three values that were refused in real runs, as a regression pin.
 
-
-# -------------------------------------------------------------- the message must not answer
-# ------------------------------------------- the code and the words must be the same claim
-LOBE_EVIDENCE = [
-    {"field": "primary_site", "note_id": "Operative-Note-Report_2022-08-25",
-     "quote": "PREOPERATIVE DIAGNOSIS: 1. Left lower lobe lung mass 2. COPD"},
-    {"field": "primary_site", "note_id": "Rad-Onc-Consult_2022-09-19",
-     "quote": "Stage IIIB NSCLC of Left Lower Lobe Lung (LLL)"},
-]
-
-
-def _site_violations(coded: str, evidence=None):
-    spec = load_spec(str(SPEC))
-    checks = [c if isinstance(c, dict) else c.model_dump() for c in spec.answer_checks]
-    return [v for v in check_answer_detail(checks, {"primary_site": coded},
-                                           evidence if evidence is not None else LOBE_EVIDENCE)
-            if v.field == "primary_site"]
-
-
-def test_a_site_code_that_names_a_different_lobe_than_the_evidence_is_refused():
-    """The measured miss. Nine "left lower lobe", one "LLL", coded C342 — middle lobe.
-
-    `answer_check_rejections` was EMPTY on the real run: `not_less_specific` only asks whether
-    the code is too vague, `conflict_requires_nos` only fires when two groups appear, and
-    `origin_not_specimen` only reads document headers. Nothing compared the code to the words.
+    C349 with a lobe in the evidence (`not_less_specific`, 16 firings), C341 with two lobes in
+    the evidence (`conflict_requires_nos`, 13 firings), and 8046 cited off "non-small cell"
+    (`not_less_specific` reading a negation as its opposite). Each was the registry's own
+    answer; each was refused.
     """
-    v = _site_violations("C342")
-    kinds = [x.rule_kind for x in v]
-    assert "code_matches_cited_text" in kinds, f"C342 must be refused; fired: {kinds}"
-    msg = next(x.message for x in v if x.rule_kind == "code_matches_cited_text")
-    assert "C343" in msg, "the refusal must say which code the evidence actually names"
+    ev = [{"quote": "right upper lobe mass; also a left lower lobe nodule"},
+          {"quote": "poorly differentiated non-small cell carcinoma"}]
+    for value in ({"primary_site": "C349"}, {"primary_site": "C341"}, {"histology": "8046"}):
+        assert check_answer([], value, ev, searched=[]) == []
+        assert check_field_formats(FIELDS, value) == []
 
 
-def test_the_code_the_evidence_names_passes():
-    """C343 is the registry's answer here. A check that refuses it too is not a check."""
-    assert [x.rule_kind for x in _site_violations("C343")] == []
+# ------------------------------------------------------- the format check still works
+def test_a_four_digit_topography_code_is_refused():
+    """C3412 shipped once, gate-validated, zero rejections. `C\\d{3}` is a contract."""
+    v = check_field_formats_detail(FIELDS, {"primary_site": "C3412"})
+    assert len(v) == 1
+    assert v[0].rule_kind == "field_format"
+    assert v[0].rule_id == "field_format.primary_site"
+    assert v[0].coded_value == "C3412"
 
 
-def test_the_nos_value_is_not_refused_twice_for_two_different_reasons():
-    """C349 is this check's `nos_value`, so it is out of scope here.
+def test_the_punctuated_icdo3_form_is_still_refused_and_that_is_a_known_defect():
+    """4 of this check's 7 useful firings rejected the form ICD-O-3 itself writes.
 
-    C349 IS refused on this evidence — by `not_less_specific` and `nos_requires_search`, which
-    is right, since the record names one lobe unambiguously. But `code_matches_cited_text` must
-    not pile on: an answer refused twice with two different remedies is the C349/C348 trap this
-    file's `conflict_requires_nos` comment describes, where no value satisfies everything.
+    Pinned as a FINDING, not as desired behaviour: the fix is deterministic normalisation
+    (`C34.1` -> `C341`), an addition that was not made in the deletion pass. Whoever adds it
+    should flip this test to assert the normalised value passes.
     """
-    kinds = [x.rule_kind for x in _site_violations("C349")]
-    assert "code_matches_cited_text" not in kinds, f"the NOS value is exempt; fired: {kinds}"
-    assert kinds, "C349 should still be refused, by the vagueness checks"
+    assert check_field_formats(FIELDS, {"primary_site": "C34.9"}) != []
 
 
-def test_the_check_stays_silent_when_the_evidence_names_no_lobe_at_all():
-    """That is `not_less_specific`'s question. Firing here would state the wrong reason."""
-    ev_no_lobe = [{"field": "primary_site", "note_id": "Path_2020-01-01",
-                   "quote": "Specimen: Lung, right. Invasive adenocarcinoma."}]
-    kinds = [x.rule_kind for x in _site_violations("C342", ev_no_lobe)]
-    assert "code_matches_cited_text" not in kinds, (
-        f"no enumerated lobe is named, so this check has nothing to say; fired: {kinds}")
+def test_a_value_outside_the_declared_domain_is_refused():
+    v = check_field_formats_detail(FIELDS, {"behavior": "9"})
+    assert len(v) == 1
+    assert v[0].rule_kind == "field_allowable_values"
+    assert v[0].rule_id == "field_allowable_values.behavior"
 
 
-def test_a_negated_lobe_does_not_satisfy_the_code():
-    """Same negation rule as the histology check: "no lower lobe involvement" is not evidence
-    of a lower-lobe primary, and must not license C343."""
-    ev_neg = [{"field": "primary_site", "note_id": "Rad_2020-01-01",
-               "quote": "Right upper lobe mass. No evidence of lower lobe involvement."}]
-    kinds = [x.rule_kind for x in _site_violations("C343", ev_neg)]
-    assert "code_matches_cited_text" in kinds, (
-        f"a negated lobe mention must not support the code; fired: {kinds}")
+def test_a_well_formed_answer_passes():
+    assert check_field_formats(FIELDS, {"primary_site": "C341", "histology": "8140",
+                                        "behavior": "3"}) == []
 
 
-def test_the_two_lobe_vocabularies_have_not_drifted_apart():
-    """`conflict_requires_nos.mutually_exclusive` and `code_matches_cited_text.code_wordings`
-    are the same lobe vocabulary written twice — once to detect a conflict between groups, once
-    to check the code against the group. Two copies agree until they do not, nothing raises, and
-    one check starts recognising a wording the other cannot see."""
-    spec = load_spec(str(SPEC))
-    checks = [c if isinstance(c, dict) else c.model_dump() for c in spec.answer_checks]
-    groups = next(c["mutually_exclusive"] for c in checks
-                  if c.get("kind") == "conflict_requires_nos" and c.get("field") == "primary_site")
-    wordings = next(c["code_wordings"] for c in checks
-                    if c.get("kind") == "code_matches_cited_text"
-                    and c.get("field") == "primary_site")
-    assert {frozenset(g) for g in groups} == {frozenset(v) for v in wordings.values()}, (
-        "the two declarations no longer describe the same lobes:\n"
-        f"  conflict_requires_nos: {[sorted(g) for g in groups]}\n"
-        f"  code_wordings        : { {k: sorted(v) for k, v in wordings.items()} }")
+def test_an_absent_field_is_abstentions_business_not_the_format_checkers():
+    assert check_field_formats(FIELDS, {"primary_site": None, "histology": "  "}) == []
 
 
-# -------------------------------------------------------- a declared check must be a real one
-def test_a_spec_declaring_an_unimplemented_check_kind_is_refused():
-    """`check_answer_detail` is an if/elif chain with no final else, so a misspelled kind matched
-    nothing and raised nothing. The rule showed up in the YAML and in the manifest's
-    `rule_catalog`, and produced zero rejections forever — which reads exactly like a check that
-    looked and found nothing."""
-    from acr.spec import ProvenanceError, bind_provenance
+def test_a_well_formed_but_invented_morphology_still_passes_and_that_is_the_open_gap():
+    """`\\d{4}` cannot tell a real morphology from a well-formed invented one.
 
-    spec = load_spec(str(SPEC))
-    spec.answer_checks = list(spec.answer_checks) + [
-        {"field": "histology", "kind": "code_matches_cited_txt", "nos_values": ["8046"]}]
-    with pytest.raises(ProvenanceError, match="nothing implements"):
-        bind_provenance(spec)
-
-
-def test_a_check_message_names_no_code_it_does_not_itself_declare():
-    """A check that supplies the answer is not checking it.
-
-    The histology message ended '"favor squamous cell carcinoma" supports 8070 over 8046' — a
-    worked example from one chart, delivered as instruction on every firing. It fired on a chart
-    whose own searches for "squamous" and "squamous cell carcinoma" both returned zero hits, and
-    the agent wrote the code the message named.
-
-    THE LINE IS NOT "no codes in messages". The three `primary_site` messages name C349, and
-    should: C349 is that check's own `nos_values`/`nos_value`, and saying what the code the agent
-    already chose ASSERTS ("C349 asserts the subsite is unknown") is the rule speaking about
-    itself. 8070 was declared nowhere in the histology check — it came from a different chart.
-    So the invariant is: a message may name the codes the check declares, and no others.
+    Pinned so the limitation lives in a test and not only in a docstring. Closing it needs a
+    real ICD-O-3 code table; a shape regex is not one.
     """
-    import re
-    spec = load_spec(str(SPEC))
-    checks = [c if isinstance(c, dict) else c.model_dump() for c in spec.answer_checks]
-    code = re.compile(r"\b(?:C\d{3}|\d{4})\b")
-    offenders = []
-    for c in checks:
-        declared = {str(v) for v in (c.get("nos_values") or [])}
-        if c.get("nos_value"):
-            declared.add(str(c["nos_value"]))
-        foreign = sorted(set(code.findall(str(c.get("message") or ""))) - declared)
-        if foreign:
-            offenders.append((c.get("field"), c.get("kind"), foreign))
-    assert not offenders, (
-        "an answer_check message names a code the check does not declare, so it is dictating "
-        f"an answer rather than describing the obligation: {offenders}")
+    assert check_field_formats(FIELDS, {"histology": "9999"}) == []
+
+
+def test_a_broken_pattern_in_a_spec_cannot_block_a_run():
+    assert check_field_formats([F("x", format="([unclosed")], {"x": "anything"}) == []
+
+
+# ------------------------------------------------------- rule identity still resolves
+def test_rule_ids_still_mint_for_traces_recorded_before_the_removal():
+    """`acr.attribution` has to resolve ids in traces written while the checks existed."""
+    rid = answer_check_rule_id({"field": "primary_site", "kind": "conflict_requires_nos",
+                                "nos_value": "C349"})
+    assert rid.startswith("answer_check.primary_site.conflict_requires_nos")
+    assert answer_check_rule_id("not a dict", 3) == "answer_check.unparsed#3"
+    assert field_rule_id("field_format", "histology") == "field_format.histology"
+
+
+def test_the_shipped_spec_declares_no_answer_checks():
+    spec = load_spec(SPEC)
+    assert (getattr(spec, "answer_checks", []) or []) == []

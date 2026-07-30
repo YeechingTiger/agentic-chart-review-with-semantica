@@ -1,0 +1,624 @@
+schema_version: '2.0'
+category: rectal_timing
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 9
+rules:
+- candidate_id: ER25-RESTAGE-04
+  parent_recommendation_id: ER25-RESTAGE-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Timing after CRT and consolidation
+  category: rectal_timing
+  title: Surgery timing after CRT plus consolidation
+  core_or_supplemental: core
+  source_context:
+    eligibility: CRT followed by consolidation chemotherapy with surgery planned
+    action: Schedule surgery
+    timing: Two to four weeks after consolidation completion
+    exceptions: Clinical recovery
+    predicate_logic: CRT_then_consolidation => surgery_2_to_4_weeks
+  requirements:
+    eligibility:
+      expression: CRT followed by consolidation chemotherapy with surgery planned
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Schedule surgery
+      variables:
+      - crc.rectal_neoadjuvant.completion_date
+      - crc.rectal_surgery.definitive_surgery_date
+      - crc.rectal_treatment.sequence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.sequence
+        - variable: crc.rectal_neoadjuvant.completion_date
+        - variable: crc.rectal_surgery.definitive_surgery_date
+    timing:
+      expression: Two to four weeks after consolidation completion
+      variables:
+      - crc.rectal_neoadjuvant.completion_date
+      - crc.rectal_surgery.definitive_surgery_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.completion_date
+        - variable: crc.rectal_surgery.definitive_surgery_date
+    exceptions:
+      expression: Clinical recovery
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_neoadjuvant.completion_date
+  - crc.rectal_surgery.definitive_surgery_date
+  - crc.rectal_treatment.sequence
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-RESTAGE-05
+  parent_recommendation_id: ER25-RESTAGE-R05
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Timing after induction and CRT
+  category: rectal_timing
+  title: Surgery timing after induction chemotherapy plus CRT
+  core_or_supplemental: core
+  source_context:
+    eligibility: Induction chemotherapy then CRT with surgery planned
+    action: Schedule surgery
+    timing: Six to seven weeks after CRT
+    exceptions: Clinical recovery
+    predicate_logic: induction_then_CRT => surgery_6_to_7_weeks
+  requirements:
+    eligibility:
+      expression: Induction chemotherapy then CRT with surgery planned
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Schedule surgery
+      variables:
+      - crc.rectal_radiation.chemoradiation_completion_date
+      - crc.rectal_surgery.definitive_surgery_date
+      - crc.rectal_treatment.sequence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.sequence
+        - variable: crc.rectal_radiation.chemoradiation_completion_date
+        - variable: crc.rectal_surgery.definitive_surgery_date
+    timing:
+      expression: Six to seven weeks after CRT
+      variables:
+      - crc.rectal_radiation.chemoradiation_completion_date
+      - crc.rectal_surgery.definitive_surgery_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.chemoradiation_completion_date
+        - variable: crc.rectal_surgery.definitive_surgery_date
+    exceptions:
+      expression: Clinical recovery
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.chemoradiation_completion_date
+  - crc.rectal_surgery.definitive_surgery_date
+  - crc.rectal_treatment.sequence
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-RESTAGE-06
+  parent_recommendation_id: ER25-RESTAGE-R06
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Timing after SCRT
+  category: rectal_timing
+  title: Delayed surgery after short-course RT
+  core_or_supplemental: core
+  source_context:
+    eligibility: Short-course RT with delayed surgery
+    action: Schedule surgery
+    timing: Four to eight weeks from SCRT start
+    exceptions: None stated
+    predicate_logic: SCRT_delayed_surgery => 4_to_8_weeks_from_start
+  requirements:
+    eligibility:
+      expression: Short-course RT with delayed surgery
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Schedule surgery
+      variables:
+      - crc.rectal_radiation.short_course_start_date
+      - crc.rectal_surgery.definitive_surgery_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.short_course_start_date
+        - variable: crc.rectal_surgery.definitive_surgery_date
+    timing:
+      expression: Four to eight weeks from SCRT start
+      variables:
+      - crc.rectal_radiation.short_course_start_date
+      - crc.rectal_surgery.definitive_surgery_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.short_course_start_date
+        - variable: crc.rectal_surgery.definitive_surgery_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.short_course_start_date
+  - crc.rectal_surgery.definitive_surgery_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-RESTAGE-07
+  parent_recommendation_id: ER25-RESTAGE-R07
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Timing after neoadjuvant CRT
+  category: rectal_timing
+  title: Surgery after neoadjuvant CRT
+  core_or_supplemental: core
+  source_context:
+    eligibility: Neoadjuvant CRT with surgery planned
+    action: Schedule surgery
+    timing: Four to seven weeks after CRT
+    exceptions: None stated
+    predicate_logic: neoadjuvant_CRT => surgery_4_to_7_weeks
+  requirements:
+    eligibility:
+      expression: Neoadjuvant CRT with surgery planned
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Schedule surgery
+      variables:
+      - crc.rectal_radiation.chemoradiation_completion_date
+      - crc.rectal_surgery.definitive_surgery_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.chemoradiation_completion_date
+        - variable: crc.rectal_surgery.definitive_surgery_date
+    timing:
+      expression: Four to seven weeks after CRT
+      variables:
+      - crc.rectal_radiation.chemoradiation_completion_date
+      - crc.rectal_surgery.definitive_surgery_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.chemoradiation_completion_date
+        - variable: crc.rectal_surgery.definitive_surgery_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.chemoradiation_completion_date
+  - crc.rectal_surgery.definitive_surgery_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-RESTAGE-08
+  parent_recommendation_id: ER25-RESTAGE-R08
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Timing after neoadjuvant chemotherapy
+  category: rectal_timing
+  title: Surgery after neoadjuvant chemotherapy
+  core_or_supplemental: core
+  source_context:
+    eligibility: Neoadjuvant chemotherapy with surgery planned
+    action: Schedule surgery
+    timing: Three to four weeks after chemotherapy
+    exceptions: Clinical recovery
+    predicate_logic: neoadjuvant_chemo => surgery_3_to_4_weeks
+  requirements:
+    eligibility:
+      expression: Neoadjuvant chemotherapy with surgery planned
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Schedule surgery
+      variables:
+      - crc.rectal_neoadjuvant.chemotherapy_completion_date
+      - crc.rectal_surgery.definitive_surgery_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.chemotherapy_completion_date
+        - variable: crc.rectal_surgery.definitive_surgery_date
+    timing:
+      expression: Three to four weeks after chemotherapy
+      variables:
+      - crc.rectal_neoadjuvant.chemotherapy_completion_date
+      - crc.rectal_surgery.definitive_surgery_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.chemotherapy_completion_date
+        - variable: crc.rectal_surgery.definitive_surgery_date
+    exceptions:
+      expression: Clinical recovery
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_neoadjuvant.chemotherapy_completion_date
+  - crc.rectal_surgery.definitive_surgery_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-RESTAGE-09
+  parent_recommendation_id: ER25-RESTAGE-R09
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: W&W assessment after consolidation TNT
+  category: rectal_timing
+  title: Watch-and-wait assessment after consolidation TNT
+  core_or_supplemental: core
+  source_context:
+    eligibility: Consolidation TNT with NOM consideration
+    action: Assess response
+    timing: Four to eight weeks after completion
+    exceptions: Near-cCR may need further reassessment
+    predicate_logic: consolidation_TNT => assess_4_to_8_weeks
+  requirements:
+    eligibility:
+      expression: Consolidation TNT with NOM consideration
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_response.overall_category.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.overall_category.post_neoadjuvant
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Assess response
+      variables:
+      - crc.rectal_neoadjuvant.completion_date
+      - crc.rectal_response.assessment_date.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.completion_date
+        - variable: crc.rectal_response.assessment_date.post_neoadjuvant
+    timing:
+      expression: Four to eight weeks after completion
+      variables:
+      - crc.rectal_neoadjuvant.completion_date
+      - crc.rectal_response.assessment_date.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.completion_date
+        - variable: crc.rectal_response.assessment_date.post_neoadjuvant
+    exceptions:
+      expression: Near-cCR may need further reassessment
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_neoadjuvant.completion_date
+  - crc.rectal_response.assessment_date.post_neoadjuvant
+  - crc.rectal_response.overall_category.post_neoadjuvant
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-RESTAGE-10
+  parent_recommendation_id: ER25-RESTAGE-R10
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: W&W assessment after SCRT or CRT
+  category: rectal_timing
+  title: Response timing after SCRT or CRT
+  core_or_supplemental: core
+  source_context:
+    eligibility: SCRT or CRT with NOM consideration
+    action: Assess at about 12 weeks; repeat near-cCR after another four to eight weeks
+    timing: From RT start
+    exceptions: Near-cCR branch
+    predicate_logic: RT => assess_week12; near_cCR => repeat_4_to_8_weeks
+  requirements:
+    eligibility:
+      expression: SCRT or CRT with NOM consideration
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_response.overall_category.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.overall_category.post_neoadjuvant
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Assess at about 12 weeks; repeat near-cCR after another four to eight weeks
+      variables:
+      - crc.rectal_radiation.start_date
+      - crc.rectal_response.assessment_date.post_neoadjuvant
+      - crc.rectal_response.repeat_assessment_date.after_near_ccr
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.start_date
+        - variable: crc.rectal_response.assessment_date.post_neoadjuvant
+        - variable: crc.rectal_response.repeat_assessment_date.after_near_ccr
+    timing:
+      expression: From RT start
+      variables:
+      - crc.rectal_radiation.start_date
+      - crc.rectal_response.assessment_date.post_neoadjuvant
+      - crc.rectal_response.repeat_assessment_date.after_near_ccr
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.start_date
+        - variable: crc.rectal_response.assessment_date.post_neoadjuvant
+        - variable: crc.rectal_response.repeat_assessment_date.after_near_ccr
+    exceptions:
+      expression: Near-cCR branch
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.start_date
+  - crc.rectal_response.assessment_date.post_neoadjuvant
+  - crc.rectal_response.overall_category.post_neoadjuvant
+  - crc.rectal_response.repeat_assessment_date.after_near_ccr
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-RESTAGE-11
+  parent_recommendation_id: ER25-RESTAGE-R11
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: W&W assessment after CRT and brachytherapy
+  category: rectal_timing
+  title: Response timing after CRT plus brachytherapy
+  core_or_supplemental: core
+  source_context:
+    eligibility: CRT plus brachytherapy with NOM consideration
+    action: Assess at about 14 weeks; repeat near-cCR after six to ten weeks
+    timing: From RT start
+    exceptions: Near-cCR branch
+    predicate_logic: CRT_brachy => assess_week14; near_cCR => repeat_6_to_10_weeks
+  requirements:
+    eligibility:
+      expression: CRT plus brachytherapy with NOM consideration
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_response.overall_category.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.overall_category.post_neoadjuvant
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Assess at about 14 weeks; repeat near-cCR after six to ten weeks
+      variables:
+      - crc.rectal_radiation.start_date
+      - crc.rectal_response.assessment_date.post_neoadjuvant
+      - crc.rectal_response.repeat_assessment_date.after_near_ccr
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.start_date
+        - variable: crc.rectal_response.assessment_date.post_neoadjuvant
+        - variable: crc.rectal_response.repeat_assessment_date.after_near_ccr
+    timing:
+      expression: From RT start
+      variables:
+      - crc.rectal_radiation.start_date
+      - crc.rectal_response.assessment_date.post_neoadjuvant
+      - crc.rectal_response.repeat_assessment_date.after_near_ccr
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.start_date
+        - variable: crc.rectal_response.assessment_date.post_neoadjuvant
+        - variable: crc.rectal_response.repeat_assessment_date.after_near_ccr
+    exceptions:
+      expression: Near-cCR branch
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.start_date
+  - crc.rectal_response.assessment_date.post_neoadjuvant
+  - crc.rectal_response.overall_category.post_neoadjuvant
+  - crc.rectal_response.repeat_assessment_date.after_near_ccr
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-RESTAGE-12
+  parent_recommendation_id: ER25-RESTAGE-R12
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Dostarlimab restaging timing
+  category: rectal_timing
+  title: Restaging during dostarlimab
+  core_or_supplemental: core
+  source_context:
+    eligibility: Localized rectal cancer receiving dostarlimab
+    action: Restage at weeks 12 and 24
+    timing: From treatment start
+    exceptions: Earlier assessment if clinically indicated
+    predicate_logic: dostarlimab => restage_week12 AND week24
+  requirements:
+    eligibility:
+      expression: Localized rectal cancer receiving dostarlimab
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Restage at weeks 12 and 24
+      variables:
+      - crc.rectal_response.assessment_completed.week12_dostarlimab
+      - crc.rectal_response.assessment_completed.week24_dostarlimab
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.assessment_completed.week12_dostarlimab
+        - variable: crc.rectal_response.assessment_completed.week24_dostarlimab
+        - variable: crc.rectal_treatment.start_date
+    timing:
+      expression: From treatment start
+      variables:
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Earlier assessment if clinically indicated
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_response.assessment_completed.week12_dostarlimab
+  - crc.rectal_response.assessment_completed.week24_dostarlimab
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_OFF_LABEL
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

@@ -54,25 +54,29 @@ an open door is not a boundary. `create_agent` takes exactly the tools it is giv
 """
 from __future__ import annotations
 
-import json
 import collections
+import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 from langchain.agents import create_agent
-from langchain.agents.middleware import (ModelCallLimitMiddleware, TodoListMiddleware,
-                                         hook_config)
-from langchain.agents.middleware.types import (AgentMiddleware, ModelRequest, ToolCallRequest)
+from langchain.agents.middleware import ModelCallLimitMiddleware, TodoListMiddleware, hook_config
+from langchain.agents.middleware.types import AgentMiddleware, ModelRequest, ToolCallRequest
 from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_core.tools import StructuredTool
 
 from .coverage_planner import OPEN_REQUEST_OPENED, triggers_from_tool_result
+from .document_concepts import anchor_block, baseline_block
+from .run_manifest import prompt_asset_manifest
+from .icdo3 import code_domain_block
+from .skills import skills_block
 from .tool_surface import LIBRARY_TOOLS, ToolSurfaceError, assert_tool_surface  # noqa: F401
 
 #: Tools whose results the coverage ledger must see. Named here rather than inferred from the
 #: toolbox, because this list answers "what counts as having looked" — a claim about the audit
 #: rule, not about which functions happen to exist.
-READ_TOOLS = ("read_document", "read_section", "read_documents_batch")
+READ_TOOLS = ("read_document", "read_documents_batch")
 
 #: The standing instruction. Beside the runtime it drives, now that the runner it used to live
 #: in is gone. The gate's contract — a rejection is the instruction for what to do next — is
@@ -102,8 +106,19 @@ class RunContext:
     tracer: Any
     gate: Callable[[dict], dict]
     toolbox: Any = None
+    runtime_profile_asset: Any = None
+    runtime_policy_plan: Any = None
+    #: The separately versioned retrieval/coverage asset.  For guideline-only search this is
+    #: deliberately not the same object as ``plan`` and is hidden until the profile activates
+    #: it.
+    coverage_plan: Any = None
+    #: Shared with the gate closure so activation is observable without rebuilding the agent.
+    coverage_state: dict = field(default_factory=dict)
     submitted: dict = field(default_factory=dict)
     accepted: bool = False
+    #: True only when an accepted negative completed the stratified proof obligation.
+    #: An answer gate can accept the witness-first ablation without making that stronger claim.
+    coverage_claim_earned: bool = False
     answer: dict = field(default_factory=dict)
     rejections: list = field(default_factory=list)
     #: Set when the gate STOPPED ASKING because nothing further could satisfy it — an exclusion
@@ -149,6 +164,14 @@ class RunContext:
     expansion_stopped: str | None = None
     stalled: dict | None = None
 
+    @property
+    def coverage_active(self) -> bool:
+        return bool(self.coverage_state.get("active"))
+
+    @property
+    def proof_plan(self):
+        return self.coverage_plan if self.coverage_active and self.coverage_plan is not None else self.plan
+
 
     def outstanding_obligations(self) -> list[str]:
         """What this run still owes, asked of the context rather than of a runtime object.
@@ -157,7 +180,20 @@ class RunContext:
         caller must get the same answer from the same two ledgers. When the old runtime had two
         ways to compute it they disagreed about whether a run had finished.
         """
-        return outstanding_obligations(self.spec, self.coverage, self.plan, self.threads)
+        runtime_profile = (
+            self.runtime_profile_asset.module_id
+            if self.runtime_profile_asset is not None
+            else None
+        )
+        return outstanding_obligations(
+            self.spec,
+            self.coverage,
+            self.plan,
+            self.threads,
+            runtime_profile=runtime_profile,
+            coverage_plan=self.coverage_plan,
+            coverage_state=self.coverage_state,
+        )
 
 
 class AuditMiddleware(AgentMiddleware):
@@ -187,6 +223,21 @@ class AuditMiddleware(AgentMiddleware):
                              revisable_why=("the agent revises through the declared "
                                             "`revise_plan` tool; apply_revision refuses "
                                             "demotions, so the plan can only widen"))
+        self.ctx.tracer.emit(
+            "coverage_profile_state",
+            runtime_profile=(
+                self.ctx.runtime_profile_asset.ref
+                if self.ctx.runtime_profile_asset is not None
+                else ""
+            ),
+            active=self.ctx.coverage_active,
+            coverage_asset_present=self.ctx.coverage_plan is not None,
+            coverage_asset_hidden=bool(
+                self.ctx.coverage_plan is not None
+                and self.ctx.coverage_plan is not self.ctx.plan
+                and not self.ctx.coverage_active
+            ),
+        )
         return None
 
     # ---------------------------------------------------------------- wrap_model_call
@@ -199,6 +250,16 @@ class AuditMiddleware(AgentMiddleware):
         """
         self.ctx.n_model_calls += 1
         parts = ["PLAN (current):\n" + self.ctx.plan.render(self._docs_by_type())]
+        if (
+            self.ctx.coverage_active
+            and self.ctx.coverage_plan is not None
+            and self.ctx.coverage_plan is not self.ctx.plan
+        ):
+            parts.append(
+                "COVERAGE PROOF ASSET (activated by the runtime; these are obligations, "
+                "not clinical semantics):\n"
+                + self.ctx.coverage_plan.render(self._docs_by_type())
+            )
         if (obligations := self._threads_block()):
             parts.append(obligations)
         if (observed := self._triggers_block()):
@@ -363,39 +424,26 @@ class AuditMiddleware(AgentMiddleware):
                 "message": ("This tool is not part of the declared surface for this task and "
                             "its result cannot be admitted as evidence.")}
 
-    def _out_of_plan(self, name: str, args: dict) -> dict | None:
-        """The retrieval plan, enforced at dispatch rather than suggested in a prompt."""
-        if name not in READ_TOOLS:
-            return None
-        ids = ([args.get("note_id")] if name != "read_documents_batch"
-               else list(args.get("note_ids") or []))
-        drawn = {n for v in self.ctx.coverage.drawn.values() for n in v}
-        blocked = []
-        for nid in ids:
-            meta = self.ctx.chart._docs.get(str(nid))
-            if meta is None or str(nid) in drawn:
-                continue
-            if not self.ctx.plan.may_open(meta.doc_type):
-                blocked.append({"note_id": str(nid), "doc_type": meta.doc_type})
-        if not blocked:
-            return None
-        self.ctx.tracer.emit("plan_refused_open", severity="warning", tool=name, blocked=blocked)
-        types = sorted({b["doc_type"] for b in blocked})
-        return {
-            "error": "OUT_OF_PLAN", "blocked": blocked, "types": types,
-            "message": ("The retrieval plan assigns these document types to `sample`: the "
-                        "runtime's sampler draws from them and you may not open them directly. "
-                        "This is NOT evidence that they hold nothing."),
-            # THE WAY OUT, in the same message as the refusal. Dropping this key is how a
-            # refusal becomes a deadlock: the agent is told it may not open the type and not
-            # told that it can ask for the type to be promoted. The old runtime carried it and
-            # this one had lost it — the same defect as the gate rejection that withheld
-            # `how_to_satisfy`, which cost a run nine repeats of the wrong request.
-            "how_to_proceed": (
-                "if you have a reason to think this type bears on the answer, promote it with "
-                f"revise_plan(promote_types=[{types[0]!r}]). The plan may only ever widen, so "
-                "the promotion is recorded and permanent."),
-        }
+    # ------------------------------------------------- _out_of_plan: REMOVED 2026-07-30
+    # `_out_of_plan` REFUSED A READ. If the retrieval plan had filed a document's type in the
+    # `sample` bucket, the agent could not open that document: the call came back
+    # `error: OUT_OF_PLAN` and the model was told to ask for the type to be promoted first.
+    #
+    # It fired 138 times across the recorded traces, and the bucket it enforced came from
+    # `doc_type_matches` -- a case-insensitive substring over local type names, measured wrong in
+    # both directions on this corpus: it matched `Speech-Language-Pathology-Note` and missed
+    # `Non-Gyn-Cyto-FNA` (1,285 documents), `FN-Aspirate-Report` (881) and `SURG-PATH-RESULT`
+    # (231). 107 of the 219 patients whose `can_establish` count is zero in fact hold one of
+    # those reports. So this hook could, and did, stand between the agent and the one document
+    # in the chart that carried the answer.
+    #
+    # Which documents to open is the model's decision. It is given the type inventory, `search`
+    # returns hits with dates and a context window, and it chooses the reading order from that.
+    # The runtime records what was read; it no longer rules on what may be.
+    #
+    # `_undeclared` stays. It refuses a tool nobody declared, which is a statement about the
+    # tool surface rather than about a clinical document, and a read that does not go through
+    # `Toolbox.dispatch` is invisible to the ledger.
 
     def wrap_tool_call(self, request: ToolCallRequest, handler):
         """Every tool call, including one a library adds tomorrow.
@@ -407,9 +455,9 @@ class AuditMiddleware(AgentMiddleware):
         """
         name = request.tool_call["name"]
         args = request.tool_call.get("args") or {}
-        for check in (self._undeclared(name), self._out_of_plan(name, args)):
-            if check is not None:
-                return self._refuse(request, check)
+        undeclared = self._undeclared(name)
+        if undeclared is not None:
+            return self._refuse(request, undeclared)
         result = handler(request)
         # BEFORE detection, always. A read that completes a document must settle its thread
         # before the same result is scanned for markers, or a window read of an
@@ -431,6 +479,13 @@ class AuditMiddleware(AgentMiddleware):
         """One gate, shared with `graph.py`. A rejection carries the way out, not just a no."""
         submitted = dict(self.ctx.toolbox.submitted or {})
         verdict = self.ctx.gate(submitted)
+        if verdict.get("coverage_activated"):
+            self.ctx.coverage_state["active"] = True
+            self.ctx.coverage_state.setdefault(
+                "reason", list(verdict.get("coverage_activation_reasons") or [])
+            )
+            self.ctx.coverage_state.setdefault("activated_at_model_call", self.ctx.n_model_calls)
+            self.ctx.coverage_state.setdefault("trigger_status", submitted.get("status"))
         if not verdict.get("accepted"):
             stall = self._stalled(submitted, verdict)
             if stall is not None:
@@ -441,7 +496,12 @@ class AuditMiddleware(AgentMiddleware):
                              ok=bool(verdict.get("accepted")), ms=0.0)
         if verdict.get("accepted"):
             self.ctx.accepted = True
+            self.ctx.coverage_claim_earned = bool(
+                verdict.get("coverage_claim_earned", False)
+            )
             self.ctx.answer = submitted
+            if verdict.get("negative_basis"):
+                self.ctx.answer["negative_basis"] = verdict["negative_basis"]
             out = {"accepted": True}
             if verdict.get("coverage_unreachable"):
                 # Accepted so the run ENDS, not because the coverage obligation was met. Told to
@@ -487,9 +547,9 @@ class AuditMiddleware(AgentMiddleware):
         gives: it swallows its own exceptions, so without a channel to say so a detector that
         has stopped working is indistinguishable from a run with no deadlock to report.
         """
-        from .run_triggers import detect_gate_obligations  # noqa: F401
+        from .run_triggers import detect_gate_obligations
         for t in detect_gate_obligations(spec=self.ctx.spec, coverage=self.ctx.coverage,
-                                         chart=self.ctx.chart, plan=self.ctx.plan,
+                                         chart=self.ctx.chart, plan=self.ctx.proof_plan,
                                          step=self.ctx.n_model_calls,
                                          tracer=self.ctx.tracer):
             self.ctx.pending_triggers.append(t)
@@ -573,12 +633,10 @@ class AuditMiddleware(AgentMiddleware):
             for d in (out.get("documents") or []):
                 reads.append((str(d.get("note_id", "")), 0, len(str(d.get("text", ""))),
                               d.get("total_chars")))
-        elif name == "read_section" and out.get("note_id") and "start" in out and "end" in out:
-            # A named section carries TRUE offsets and no document length, so it contributes
-            # coverage and can never on its own prove the document is complete. Reading FINAL
-            # DIAGNOSIS tells you nothing about what sits after it.
-            reads.append((str(out["note_id"]), int(out.get("start") or 0),
-                          max(0, int(out.get("end") or 0) - int(out.get("start") or 0)), None))
+        # The `read_section` arm is gone with the tool. It was the only read that reported true
+        # offsets and no document length, which is what made `READ_STATE_LENGTH_UNKNOWN` a state
+        # a real run could be in. Every read now reports `total_chars`, so document length is
+        # always known and `truncated` is always computable.
         for note_id, offset, returned, total in reads:
             settled = threads.note_read(note_id, offset=offset, returned_chars=returned,
                                         total_chars=total, step=self.ctx.n_model_calls)
@@ -697,23 +755,57 @@ def recursion_limit_for(agent, max_model_calls: int, *, slack: int = 8) -> int:
 # hook advances `ctx`, and this function, which owns those, assembles the record. The split is
 # the same one `graph.py` had between `_n_finalize` and `run`.
 
-def outstanding_obligations(spec, coverage, plan, threads) -> list[str]:
+def outstanding_obligations(
+    spec,
+    coverage,
+    plan,
+    threads,
+    *,
+    runtime_profile: str | None = None,
+    coverage_plan=None,
+    coverage_state: dict | None = None,
+) -> list[str]:
     """Everything this run still owes: the gate's misses plus the unsettled threads.
 
     A free function so the finalize path and the deadlock detector ask the same question. When
     the old runtime had two ways to compute it they disagreed about whether a run had finished.
     """
     from .answer_gate import check_gate, check_threads
-    try:
-        missing = list(check_gate(spec, coverage, plan).missing)
-    except Exception:      # noqa: BLE001 - a broken gate must not decide the answer's status
-        missing = []
+    from .runtime_profiles import (
+        COVERAGE_ALWAYS,
+        COVERAGE_ON_NEGATIVE_OR_MISSING,
+        DEFAULT_RUNTIME_PROFILE,
+        coverage_requirement,
+        resolve_runtime_policy,
+    )
+
+    profile_asset, _ = resolve_runtime_policy(
+        runtime_profile or DEFAULT_RUNTIME_PROFILE
+    )
+    requirement = coverage_requirement(profile_asset.ref)
+    active = bool((coverage_state or {}).get("active"))
+    if requirement == COVERAGE_ALWAYS:
+        active = True
+    if requirement != COVERAGE_ON_NEGATIVE_OR_MISSING and requirement != COVERAGE_ALWAYS or requirement == COVERAGE_ON_NEGATIVE_OR_MISSING and not active:
+        missing = (
+            []
+            if coverage.listed_documents
+            else ["list the patient's documents before ending targeted search"]
+        )
+    else:
+        try:
+            missing = list(check_gate(spec, coverage, coverage_plan or plan).missing)
+        except Exception:  # noqa: BLE001 - broken coverage must not decide answer status
+            missing = []
     return missing + check_threads(threads)
 
 
 def downgrade_a_positive_that_owes_something(ans: dict, *, spec, coverage, plan, threads,
                                              gate_validated: bool, termination: str,
-                                             tracer=None) -> None:
+                                             tracer=None,
+                                             runtime_profile: str | None = None,
+                                             coverage_plan=None,
+                                             coverage_state: dict | None = None) -> None:
     """A run that stopped owing an obligation may not walk out with a positive.
 
     NOT PORTED WITH THE RUNTIME, and that is worse than it sounds. The hooks runtime was setting
@@ -738,7 +830,25 @@ def downgrade_a_positive_that_owes_something(ans: dict, *, spec, coverage, plan,
     """
     if ans.get("status") != "FOUND" or gate_validated:
         return
-    obligations = outstanding_obligations(spec, coverage, plan, threads)
+    obligations = outstanding_obligations(
+        spec,
+        coverage,
+        plan,
+        threads,
+        runtime_profile=runtime_profile,
+        coverage_plan=coverage_plan,
+        coverage_state=coverage_state,
+    )
+    # In the weaker profile there may be no coverage obligations after list_documents.
+    # A positive that never actually passed the witness/answer gate still cannot escape with
+    # its value merely because the ablation intentionally removed exhaustive coverage.
+    if (
+        not gate_validated
+        and not obligations
+        and (runtime_profile or "").split("@", 1)[0]
+        in {"witness-first-baseline", "guideline-only"}
+    ):
+        obligations = ["the proposed positive never passed the deterministic answer gate"]
     if not obligations:
         return
     ans["status"] = "EVIDENCE_INSUFFICIENT"
@@ -765,18 +875,28 @@ def downgrade_a_positive_that_owes_something(ans: dict, *, spec, coverage, plan,
 def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads, catalogue,
                      tracer, gate, model, tools, system_prompt, backend, max_model_calls,
                      out_dir, elapsed_fn, expansion_budget, ctx_out=None,
-                     max_usd: float = 5.0, seed_record: dict | None = None) -> dict:
+                     max_usd: float = 5.0, seed_record: dict | None = None,
+                     runtime_profile_asset=None, runtime_policy_plan=None,
+                     coverage_plan=None, coverage_state: dict | None = None) -> dict:
     """One patient, one spec, through the library's graph. Returns the manifest."""
-    from .answer_contract import NO_COVERAGE_CLAIM, attach_coverage_claim
+    from .answer_contract import (
+        NO_COVERAGE_CLAIM,
+        assert_answer_is_reportable,
+        attach_coverage_claim,
+        build_spec_gap,
+        strip_value_from_spec_insufficient,
+    )
     from .coverage_planner import MONOTONICITY_VS_LEDGER
     from .plan_expansion import budget_report, expansion_is_spent, headroom
-    from .answer_contract import (assert_answer_is_reportable, build_spec_gap,
-                                  strip_value_from_spec_insufficient)
 
     seed_record = seed_record or {"effective": None, "provenance": "unrecorded",
                                   "caller_supplied": None}
     ctx = RunContext(spec=spec, chart=chart, plan=plan, coverage=coverage, threads=threads,
-                     catalogue=catalogue, tracer=tracer, gate=gate, toolbox=toolbox)
+                     catalogue=catalogue, tracer=tracer, gate=gate, toolbox=toolbox,
+                     runtime_profile_asset=runtime_profile_asset,
+                     runtime_policy_plan=runtime_policy_plan,
+                     coverage_plan=coverage_plan,
+                     coverage_state=coverage_state or {})
     # The typed channel goes in with the chart tools, so it is declared, audited by
     # `wrap_tool_call`, and counted in the tool surface like everything else.
     if ctx_out is not None:
@@ -796,9 +916,23 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
     except Exception as e:  # noqa: BLE001 -- a crashed run must still leave its trace
         crashed = True
         tracer.emit("runtime_error", severity="error", error=f"{type(e).__name__}: {e}")
-    # A crash and a spent budget end the loop the same way and mean different things to the
-    # person reading the manifest, so they are not folded into one word.
-    termination = "RUNTIME_ERROR" if crashed else "BUDGET_EXHAUSTED"
+    # Preserve the actual stopping mechanism.  The earlier binary assignment labelled every
+    # non-crash—including a clean accepted answer and a rejection-loop fallback—as
+    # BUDGET_EXHAUSTED, poisoning process attribution even when the answer itself was usable.
+    if crashed:
+        termination = "RUNTIME_ERROR"
+    elif ctx.stalled:
+        termination = "REJECTION_LOOP"
+    elif ctx.accepted:
+        termination = "ANSWER_ACCEPTED"
+    elif ctx.spend_stopped:
+        termination = "SPEND_LIMIT"
+    elif ctx.expansion_stopped:
+        termination = "EXPANSION_LIMIT"
+    elif ctx.n_model_calls >= max_model_calls:
+        termination = "MODEL_CALL_LIMIT"
+    else:
+        termination = "STOPPED_WITHOUT_ANSWER"
 
     # `value` present even on NO_ANSWER: `variables_from_answer` reads a MISSING field as a
     # silence and an explicit null as the answer's own statement, and a run that produced nothing
@@ -831,12 +965,20 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
     # BEFORE the FOUND labelling: a downgraded answer must not also be given WITNESS.
     downgrade_a_positive_that_owes_something(
         answer, spec=spec, coverage=coverage, plan=plan, threads=threads,
-        gate_validated=ctx.gate_validated, termination=termination, tracer=tracer)
+        gate_validated=ctx.gate_validated, termination=termination, tracer=tracer,
+        runtime_profile=(
+            runtime_profile_asset.module_id if runtime_profile_asset is not None else None
+        ),
+        coverage_plan=coverage_plan,
+        coverage_state=ctx.coverage_state,
+    )
     if answer.get("status") == "FOUND":
         # Witness proof: one qualifying document settles it, which is what the FOUND branch of
         # the gate checks. It never claims the universe was searched, so no coverage ledger is
         # attached here.
-        answer["proof_basis"] = "WITNESS"
+        answer["proof_basis"] = (
+            "WITNESS_PLUS_COVERAGE" if ctx.coverage_claim_earned else "WITNESS"
+        )
         answer["witness_count"] = len(evidence.items)
         if not ctx.accepted:
             answer["proof_basis"] = "UNGATED"
@@ -863,9 +1005,26 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # ledger and stamp GATE_VALIDATED over a run whose exclusion sampling was invalidated,
         # which is the precise thing `assert_answer_is_reportable` exists to refuse.
         attach_coverage_claim(
-            answer, gate_validated=ctx.gate_validated,
+            answer, gate_validated=ctx.coverage_claim_earned,
             ledger=coverage.to_dict(),
-            ungated_basis=("COVERAGE_UNREACHABLE" if ctx.coverage_unreachable else termination))
+            ungated_basis=(
+                "COVERAGE_UNREACHABLE"
+                if ctx.coverage_unreachable
+                else (
+                    str(ctx.answer.get("negative_basis") or "")
+                    or (
+                        "WITNESS_FIRST_BASELINE"
+                        if runtime_profile_asset is not None
+                        and runtime_profile_asset.module_id == "witness-first-baseline"
+                        else (
+                            "GUIDELINE_ONLY_TARGETED"
+                            if runtime_profile_asset is not None
+                            and runtime_profile_asset.module_id == "guideline-only"
+                            else termination
+                        )
+                    )
+                )
+            ))
         if ctx.coverage_unreachable:
             answer["coverage_unreachable"] = list(ctx.coverage_unreachable)
             answer["coverage_note"] = (
@@ -883,11 +1042,50 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # gate pass may be reported as a validated answer at all.
         "run_id": tracer.run_id,
         "model": getattr(model, "model_name", "") or str(model),
+        "model_temperature": getattr(model, "temperature", None),
         "spec_version": spec.spec_version,
         "trace": str(tracer.path),
         "runtime": "deepagents-hooks", "patient_id": chart.patient_id,
+        "runtime_profile_id": (
+            runtime_profile_asset.module_id
+            if runtime_profile_asset is not None
+            else "current-stratified-coverage"
+        ),
+        "runtime_profile_version": (
+            runtime_profile_asset.version if runtime_profile_asset is not None else "1.0.0"
+        ),
+        "runtime_profile_hash": (
+            runtime_profile_asset.content_hash if runtime_profile_asset is not None else ""
+        ),
+        "runtime_profile_ref": (
+            runtime_profile_asset.ref
+            if runtime_profile_asset is not None
+            else "current-stratified-coverage@1.0.0"
+        ),
+        "runtime_policy_plan": (
+            runtime_policy_plan.to_dict() if runtime_policy_plan is not None else None
+        ),
         "spec_id": spec.spec_id, "spec_hash": spec.spec_hash,
+        # WHAT THE MODEL WAS SHOWN, hashed. `spec_hash` and `runtime_profile_hash` covered the
+        # contract and the policy; they did not cover the three blocks added to the prompt on
+        # 2026-07-30 — the ICD-O-3 value domain, the document-concept reference and the method
+        # skills. Two runs of this cohort differed by exactly those and nothing in the artifacts
+        # could tell them apart, which is the same defect COVERAGE_THREE_ARM_PILOT recorded one
+        # layer down: "`292dc90-dirty` is not a reproducible code identity."
+        #
+        # Content hashes, not versions. All three are files a human is invited to edit — each
+        # code table carries a `what_a_human_must_check` field, and `refine` treats
+        # `skills/*/SKILL.md` as a tunable — so a corrected table under an unchanged
+        # `table_version` would otherwise masquerade as the one an earlier run used. The lung
+        # table gained eleven morphologies from one validation pass; manifests written either
+        # side of that must not compare as equal.
+        "prompt_assets": prompt_asset_manifest(spec, runtime_profile_asset),
         "answer": answer, "spec_gap": spec_gap, "gate_validated": ctx.gate_validated,
+        "coverage_gate_validated": ctx.coverage_claim_earned,
+        "coverage_activation": dict(ctx.coverage_state),
+        # Positive answers never carry `coverage_attested` inside the answer contract, but
+        # the always-coverage experiment still needs the worked ledger to be auditable.
+        "coverage_state": coverage.to_dict(),
         "rejections": ctx.rejections, "rule_attribution": tracer.rule_attribution(),
         "plan": plan.to_dict(),
         # THE DEVELOP-PLANE HARVEST. Lost in the port because this function assembles its own
@@ -941,6 +1139,17 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
             "rejection_loop_stopped": 1 if ctx.stalled else 0,
             "marker_catalogue_incomplete": 1 if catalogue.degraded else 0,
             "coverage_unreachable": 1 if ctx.coverage_unreachable else 0,
+            # A provider/runtime exception used to yield NO_ANSWER while every degradation
+            # counter remained zero.  Directory-level testing then reported ten clean runs
+            # even though every trace ended at its first model call.  Runtime failure is not a
+            # clinical abstention and must be visible to the same zero/non-zero filter.
+            "runtime_or_provider_errors": 1 if crashed else 0,
+            "model_call_limit_without_answer": (
+                1
+                if termination == "MODEL_CALL_LIMIT"
+                and answer.get("status") == "NO_ANSWER"
+                else 0
+            ),
         },
         # WHAT IT COST AND WHAT IT WAS ALLOWED TO COST, in one place. `spend_stopped` is
         # non-null only when the ceiling is what ended the run.
@@ -957,7 +1166,11 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # what the answer may be REPORTED as.
         "provenance": spec.provenance_for_run(
             answer.get("value") or {}, str(answer.get("status") or ""),
-            gate_validated=ctx.gate_validated),
+            gate_validated=(
+                ctx.coverage_claim_earned
+                if answer.get("status") == "EVIDENCE_INSUFFICIENT"
+                else ctx.gate_validated
+            )),
         "negative_basis": answer.get("negative_basis"),
         #: Non-empty when the coverage bar could not be met on this chart at all. This is a
         #: finding about the STRATIFICATION, not about the patient, and it is what the develop
@@ -988,9 +1201,12 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         "no_tool_call_recoveries": ctx.no_tool_call,
         # Non-null means the run was stopped for looping, not for lack of budget.
         "rejection_loop": ctx.stalled,
+        "termination_reason": termination,
         "elapsed_s": elapsed_fn(), **claim, "evidence": evidence.to_list(),
     }
-    (out_dir / f"{tracer.run_id}.manifest.json").write_text(json.dumps(manifest, indent=2))
+    manifest_path = out_dir / f"{tracer.run_id}.manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2))
+    manifest_path.chmod(0o600)
     tracer.emit("run_end", accepted=ctx.accepted, rejections=len(ctx.rejections),
                 n_model_calls=ctx.n_model_calls)
     return manifest
@@ -1151,7 +1367,9 @@ def make_revise_plan_tool(ctx: RunContext, budget) -> StructuredTool:
 
 def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_calls: int,
                 seed: int = 1234, expansion_budget=None, run_id: str | None = None,
-                ctx_out: list | None = None, max_usd: float = 5.0) -> dict:
+                ctx_out: list | None = None, max_usd: float = 5.0,
+                additional_task_context: str = "",
+                runtime_profile: str = "current-stratified-coverage") -> dict:
     """Assemble the ledgers, tools and gate for one patient and run it.
 
     The assembly lived in a scratch harness while this runtime was being proven. It belongs
@@ -1161,28 +1379,74 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
     """
     import time
 
-    from .coverage import CoverageLedger, ForcedSampler, strata_from_spec
-    from .coverage_planner import OpenThreadLedger, load_marker_catalogue, plan_from_spec
-    from .plan_expansion import price_expansion_budget
+    from deepagents.backends import StateBackend
+
     from .answer_gate import gate_answer
-    from .audit import _callbacks
-    from .state import Budget, EvidenceLedger
+    from .coverage import CoverageLedger, ForcedSampler, strata_from_spec
+    from .coverage_planner import (
+        OpenThreadLedger,
+        load_marker_catalogue,
+        plan_from_patient_inventory,
+        plan_from_spec,
+    )
+    from .plan_expansion import price_expansion_budget
+    from .runtime_profiles import (
+        RuntimePolicyContext,
+        resolve_runtime_policy,
+        runtime_policy_instruction,
+        runtime_policy_skills,
+        starts_with_coverage_assets,
+        uses_clinical_contract_view,
+    )
+    from .state import EvidenceLedger
     from .tools.toolbox import Toolbox
     from .trace import Tracer, rule_citation_block
-    from deepagents.backends import StateBackend
 
     chart = corpus.chart(patient_id)
     docs, _ = chart.list_documents(limit=100_000)
+    runtime_profile_asset, runtime_policy = resolve_runtime_policy(runtime_profile)
     tracer = Tracer.create(out_dir, run_id)
     tracer.emit("run_start", patient_id=patient_id, runtime="deepagents-hooks",
-                spec_id=spec.spec_id, spec_hash=spec.spec_hash, n_documents=len(docs))
+                spec_id=spec.spec_id, spec_hash=spec.spec_hash, n_documents=len(docs),
+                runtime_profile_ref=runtime_profile_asset.ref,
+                runtime_profile_hash=runtime_profile_asset.content_hash)
     tracer.bind_spec(spec)
 
     evidence = EvidenceLedger()
     coverage = CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(seed))
     toolbox = Toolbox(chart, evidence, coverage,
                       known_doc_types=corpus.doc_type_vocabulary())
-    plan = plan_from_spec(spec, chart)
+    coverage_plan = plan_from_spec(spec, chart)
+    plan = (
+        coverage_plan
+        if starts_with_coverage_assets(runtime_profile_asset.ref)
+        else plan_from_patient_inventory(spec, chart)
+    )
+    coverage_state = {
+        "active": bool(starts_with_coverage_assets(runtime_profile_asset.ref)),
+        "reason": (
+            ["profile_start"]
+            if starts_with_coverage_assets(runtime_profile_asset.ref)
+            else []
+        ),
+        "trigger_status": None,
+        "activated_at_model_call": (
+            0 if starts_with_coverage_assets(runtime_profile_asset.ref) else None
+        ),
+    }
+    runtime_policy_plan = runtime_policy.plan(RuntimePolicyContext(
+        case_ref=patient_id,
+        spec_snapshot={"spec_id": spec.spec_id, "spec_hash": spec.spec_hash},
+        positive_terms=tuple(
+            coverage_plan.keywords
+            if starts_with_coverage_assets(runtime_profile_asset.ref)
+            else ()
+        ),
+        document_types=tuple(row["doc_type"] for row in chart.type_summary()),
+        coverage_strata=tuple(row.name for row in coverage.specs),
+        max_rounds=max_model_calls,
+        max_documents=max(len(docs), 1),
+    ))
     threads = OpenThreadLedger()
     markers = load_marker_catalogue()
     if markers.degraded:
@@ -1197,7 +1461,10 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
     # One implementation of the rule, and now no holder around it.
     def gate(submitted: dict) -> dict:
         return gate_answer(spec, submitted, evidence=evidence, coverage=coverage, chart=chart,
-                           tracer=tracer, threads=threads, plan=plan)
+                           tracer=tracer, threads=threads, plan=plan,
+                           coverage_plan=coverage_plan,
+                           coverage_state=coverage_state,
+                           runtime_profile=runtime_profile_asset.ref)
 
     t0 = time.time()
     return run_chart_review(
@@ -1209,14 +1476,54 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
         # `submit_answer` is reachable from any turn — an agent asked at the last moment to cite
         # identifiers it has never seen invents them, and `rule_attribution.self_reported` then
         # records invented ids as if they were a measurement of the agent's reasoning.
-        system_prompt=(spec.as_prompt_block()
+        system_prompt=(spec.as_prompt_block(
+                           view=(
+                               "clinical_contract"
+                               if uses_clinical_contract_view(runtime_profile_asset.ref)
+                               else "full"
+                           )
+                       )
                        + (f"\n\n{cite}" if (cite := rule_citation_block(spec)) else "")
-                       + "\n\n" + TASK.format(patient=patient_id)),
+                       + "\n\n" + TASK.format(patient=patient_id)
+                       + "\n\n" + runtime_policy_instruction(
+                           runtime_profile_asset.module_id
+                       )
+                       # PORTABLE DOCUMENT CONCEPTS, as reference. Standard names and prose
+                       # saying what each kind of document is; no local type string, no ordering,
+                       # no measurement. It replaces `doc_type_matches`, which was the same
+                       # knowledge written as a substring list that gated reads and fed the
+                       # coverage gate. The model reads this beside `document_type_summary` and
+                       # decides for itself. A measured prior would render under its own heading
+                       # via `experience_block`, and there is none certified yet.
+                       + "\n\n" + baseline_block()
+                       # THE VALUE DOMAIN, when the Task Contract declares one. A run asserted
+                       # "C341 is right middle lobe" and coded C341 over evidence reading "right
+                       # middle lobe" (C341 is the upper lobe), and another coded histology 7205,
+                       # which is not a morphology. Both are facts about a published
+                       # classification, so the model is shown the table instead of being trusted
+                       # to recall it — and instead of being refused by a regex afterwards.
+                       + (f"\n\n{cb}" if (cb := code_domain_block(spec)) else "")
+                       # WHICH tumour, as opposed to which documents. Three runs answered about
+                       # the wrong neoplasm and the traces could not say why; this asks the model
+                       # to enumerate its candidates and name the one it answered for.
+                       + "\n\n" + anchor_block()
+                       # METHOD GUIDANCE. Until now nothing in this tree read a SKILL.md body
+                       # into a prompt, so moving the coverage obligation into
+                       # `skills/coverage-judgement/` deleted it rather than relocating it. The
+                       # profile chooses which skills load; see `acr.skills`.
+                       + (f"\n\n{sk}" if (sk := skills_block(
+                           runtime_policy_skills(runtime_profile_asset.module_id))) else "")
+                       + (f"\n\n{additional_task_context.strip()}"
+                          if additional_task_context.strip() else "")),
         backend=StateBackend(), max_model_calls=max_model_calls, out_dir=out_dir,
         elapsed_fn=lambda: round(time.time() - t0, 1), ctx_out=ctx_out,
         max_usd=max_usd,
         seed_record={"effective": seed, "provenance": "caller_supplied",
                      "caller_supplied": True},
+        runtime_profile_asset=runtime_profile_asset,
+        runtime_policy_plan=runtime_policy_plan,
+        coverage_plan=coverage_plan,
+        coverage_state=coverage_state,
         # PRICED AGAINST THE PLAN, not a constant. The old runtime computed this from the
         # plan's own size — how many types it may promote, how many documents that opens —
         # and this one shipped `ExpansionBudget(40, 8, 40, 6)`, four numbers that fit no

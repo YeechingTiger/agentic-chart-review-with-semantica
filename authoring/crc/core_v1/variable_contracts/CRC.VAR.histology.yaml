@@ -1,0 +1,104 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.histology
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.histology
+contract_kind: registry_projection_and_chart_extraction
+label: Histology ICD-O-3
+roles:
+- eligibility
+temporal_meaning: tumor_record_identity
+field_contract:
+  name: histology_icdo3
+  type: string
+  format: \d{4}
+  nullable: true
+  description: Four-digit ICD-O-3 histology code; schema eligibility is evaluated separately.
+registry_mapping:
+  standard: NAACCR_v26
+  item_name: Histologic Type ICD-O-3
+  item_number: '522'
+  xml_id: histologicTypeIcdO3
+  effective_years: all
+evidence_coverage:
+  registry_to_rule:
+    semantic: exact
+    temporal: exact
+    decision_boundary_preserved: true
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: direct
+    transformation_id: null
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: CoC STORE 2026 and NAACCR v26, with rule-specific ASCO context
+  items:
+  - Primary Site [400]
+  - Histologic Type ICD-O-3 [522]
+  - AJCC TNM Clin T [1001]
+  - AJCC TNM Clin N [1002]
+  source_refs:
+  - COC.STORE.2026
+  - NAACCR.SSDI.3_3
+  - ASCO.LARC.2024
+  - ASCO.MCRC.2022
+question: What is the Histology ICD-O-3 for the indexed CRC tumor or decision at tumor_record_identity?
+applicability_guard:
+  primary_sites:
+  - C180
+  - C182-C189
+  - C199
+  - C209
+  exclude_schemas:
+  - appendix
+  - NET
+  - GIST
+  - sarcoma
+  - Kaposi
+  rule_time_required: true
+evidence_contract:
+  establishing_source_documents:
+  - final_pathology
+  - pathology_addendum
+  - registry
+  excluded_sources:
+  - imaging_only
+  positive_witness: A tumor-linked source appropriate to tumor_record_identity establishes histology_icdo3.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - Histology
+    - ICD-O-3
+    - icdo3
+    statement: Unspecified carcinoma codes are positive specificity claims, not defaults.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Unspecified carcinoma codes are positive specificity claims, not defaults.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish histology_icdo3.
+  SPEC_INSUFFICIENT: The requested meaning of histology_icdo3 is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CANDIDATE.disease_context
+  output_field: histology_icdo3
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[histology_icdo3].format
+  origin: store_manual
+  basis: NAACCR v26 item [522] Histologic Type ICD-O-3; four-digit shape only.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - A candidate contract exists, but the current production owner in specs/ fails provenance enforcement and promotion/collision
+    resolution is pending.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 1348dc66afde91128f86c73d2be5c152bc436f04578decb0273a841a3e3c4784

@@ -1,0 +1,14 @@
+schema: acr.module_asset/1
+module_id: patient-boundary-audit
+version: 1.0.0
+kind: AUDIT_RULE
+runner: CODE
+inputs: [trajectory, application_events]
+output_schema: acr.audit_report/1
+implementation: audit.patient_boundary.v1
+truth_modes: [BLIND]
+capabilities: []
+maximum_authority: QUARANTINE_RESULT
+description: Detect tool calls naming a patient outside the current run scope.
+owner: privacy-engineer
+tags: [audit, patient-scope]

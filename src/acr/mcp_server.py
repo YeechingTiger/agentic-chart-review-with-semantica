@@ -682,6 +682,10 @@ class ChartReviewService:
             "run_id": run_id, "patient": run.patient_id, "spec_id": run.spec.spec_id,
             "verdict": "PASS" if decision["accepted"] else "FAIL",
             "missing": decision.get("missing", []),
+            # Coverage is advisory (see `coverage.evaluate_gate`): what the ledger observed and
+            # did not refuse has to reach the caller, or the model is asked to judge coverage
+            # without being shown what the runtime counted.
+            "advisories": decision.get("advisories", []),
             "why": decision.get("why", ""),
             "evidence_recorded": cites,
             # Reported so a caller cannot conclude its self-attestation was honoured.

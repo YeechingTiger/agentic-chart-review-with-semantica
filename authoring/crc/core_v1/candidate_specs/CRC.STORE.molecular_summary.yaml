@@ -1,0 +1,150 @@
+spec_id: CRC.STORE.molecular_summary
+spec_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+source_authority:
+  document: "NAACCR SSDI v3.3 / NAACCR v26 Colon and Rectum schema"
+  items:
+    - "KRAS [3866]"
+    - "Microsatellite Instability (MSI) [3890]"
+    - "BRAF Mutational Analysis [3940]"
+    - "NRAS Mutational Analysis [3941]"
+  source_refs: [NAACCR.SSDI.3_3, COC.STORE.2026]
+data_source: notes
+question: >
+  What STORE/NAACCR summary codes are supported for KRAS, MSI/MMR, BRAF, and NRAS
+  in this eligible colon/rectum carcinoma record?
+applicability_guard:
+  schema_id: "00200"
+  primary_sites: ["C180", "C182-C189", "C199", "C209"]
+  diagnosis_years:
+    kras: "2018+"
+    msi_mmr: "2018+"
+    braf: "2021+"
+    nras: "2021+"
+fields:
+  - name: kras_registry_code
+    type: string
+    allowable_values: ["0", "1", "2", "3", "4", "7", "8", "9"]
+    nullable: true
+    description: "NAACCR item 3866; preserves wild type, codon groups, other/unspecified mutation, ordered-no-result, not applicable and not documented."
+  - name: msi_mmr_registry_code
+    type: string
+    allowable_values: ["0", "1", "2", "8", "9"]
+    nullable: true
+    description: "NAACCR item 3890; a compressed field accepting MSS/pMMR, MSI-L, MSI-H/dMMR, not applicable and not documented/indeterminate."
+  - name: braf_registry_code
+    type: string
+    allowable_values: ["0", "1", "2", "3", "4", "7", "8", "9"]
+    nullable: true
+    description: "NAACCR item 3940 for diagnosis year 2021+; code 1 is BRAF V600E."
+  - name: nras_registry_code
+    type: string
+    allowable_values: ["0", "1", "2", "4", "7", "8", "9"]
+    nullable: true
+    description: "NAACCR item 3941 for diagnosis year 2021+."
+decision_rule:
+  - "Extract raw clinical molecular facts before mapping to a registry code; this spec is the lossy registry projection."
+  - "Code 7 means ordered with result not in chart; code 8 means not applicable/not collected; code 9 means not documented or unknown whether assessed. They are not interchangeable."
+  - "MSI/MMR item 3890 collapses two assay families and cannot preserve individual protein loss, method discordance, or indeterminate subtype."
+  - "KRAS/NRAS summary codes do not prove complete expanded-RAS exon/codon assay coverage or an exact actionable variant."
+evidence_rules:
+  counts_as_evidence:
+    - "Final molecular laboratory report, pathology biomarker addendum, or source-permitted physician statement when the standard allows it."
+    - "A test-order state explicitly documented as ordered with result unavailable for code 7."
+  does_not_count:
+    - "A treatment choice as a proxy for genotype."
+    - "A generic 'RAS negative' statement as proof of complete expanded-RAS coverage."
+    - "No mention of a test as proof of a negative result."
+conflict_rules:
+  - if: "a final molecular report conflicts with a copied oncology summary"
+    then: "use the final molecular report for the registry projection and retain the copied conflict"
+  - if: "MMR IHC and MSI methods disagree"
+    then: "do not force a clean registry code until the discordance rule has produced a final interpretation"
+  - if: "multiple valid specimens disagree"
+    then: "retain specimen/date context and route to molecular review rather than choosing the most convenient result"
+proof_obligation:
+  for_positive: "A tumor-linked molecular source supports the exact summary code and diagnosis-year applicability."
+  for_negative:
+    mode: stratified_exclusion
+    required_coverage:
+      - "Review molecular reports, pathology addenda and relevant oncology summaries before using an unknown-shaped code."
+    required_keywords: [KRAS, MSI, BRAF, NRAS]
+    statement: >
+      Code 9 and code 8 are positive missingness/applicability claims. If source coverage is
+      inadequate, return EVIDENCE_INSUFFICIENT instead of manufacturing a registry code.
+abstention:
+  EVIDENCE_INSUFFICIENT: "The eligible chart does not support a defensible registry projection."
+  SPEC_INSUFFICIENT: "The case is outside schema 00200, outside the item effective year, or requires raw molecular detail this summary cannot represent."
+answer_checks:
+  - field: kras_registry_code
+    kind: nos_requires_search
+    nos_values: ["9"]
+    required_searches: [KRAS]
+    message: "KRAS code 9 requires a documented search for the test/result."
+  - field: msi_mmr_registry_code
+    kind: nos_requires_search
+    nos_values: ["9"]
+    required_searches: [MSI, MMR]
+    message: "MSI/MMR code 9 requires searching both MSI and MMR terminology."
+  - field: braf_registry_code
+    kind: nos_requires_search
+    nos_values: ["9"]
+    required_searches: [BRAF]
+    message: "BRAF code 9 requires a documented search for the test/result."
+  - field: nras_registry_code
+    kind: nos_requires_search
+    nos_values: ["9"]
+    required_searches: [NRAS]
+    message: "NRAS code 9 requires a documented search for the test/result."
+boundary_cases:
+  - case: "IHC shows MLH1/PMS2 loss; no MSI PCR was performed"
+    result: "item 3890 may project dMMR under the standard, while raw IHC pattern remains in the detail spec"
+  - case: "KRAS G12C is documented"
+    result: "project to the applicable KRAS codon-group code but retain G12C only in a future exact-variant extension"
+  - case: "BRAF testing was ordered and the report is absent"
+    result: "code 7, not code 9 and not wild type"
+search_hints: [KRAS, MSI, MMR, BRAF, NRAS, microsatellite, mismatch_repair]
+downstream_warning:
+  - "This spec is suitable for registry agreement, not complete treatment eligibility."
+provenance:
+  - element: "fields[kras_registry_code].allowable_values"
+    origin: store_manual
+    basis: "NAACCR v26 item [3866] KRAS allowable values."
+    status: draft
+  - element: "fields[msi_mmr_registry_code].allowable_values"
+    origin: store_manual
+    basis: "NAACCR v26 item [3890] Microsatellite Instability (MSI) allowable values."
+    status: draft
+  - element: "fields[braf_registry_code].allowable_values"
+    origin: store_manual
+    basis: "NAACCR v26 item [3940] BRAF Mutational Analysis allowable values."
+    status: draft
+  - element: "fields[nras_registry_code].allowable_values"
+    origin: store_manual
+    basis: "NAACCR v26 item [3941] NRAS Mutational Analysis allowable values."
+    status: draft
+  - element: "answer_checks[kras_registry_code.nos_requires_search.9]"
+    origin: model_authored
+    basis: "no external source; host-runtime check operationalizing the burden of registry code 9."
+    status: draft
+  - element: "answer_checks[msi_mmr_registry_code.nos_requires_search.9]"
+    origin: model_authored
+    basis: "no external source; host-runtime check operationalizing the burden of registry code 9."
+    status: draft
+  - element: "answer_checks[braf_registry_code.nos_requires_search.9]"
+    origin: model_authored
+    basis: "no external source; host-runtime check operationalizing the burden of registry code 9."
+    status: draft
+  - element: "answer_checks[nras_registry_code.nos_requires_search.9]"
+    origin: model_authored
+    basis: "no external source; host-runtime check operationalizing the burden of registry code 9."
+    status: draft
+  - element: proof_obligation.for_negative.required_coverage
+    origin: model_authored
+    basis: "no external source; project-specific chart coverage requirement."
+    status: draft
+  - element: proof_obligation.for_negative.required_keywords
+    origin: model_authored
+    basis: "no external source; candidate terms not yet measured on the CRC linked corpus."
+    status: draft

@@ -1,0 +1,84 @@
+schema_version: '2.0'
+category: ovarian_metastasis_local
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 1
+rules:
+- candidate_id: E26-LOCAL-19
+  parent_recommendation_id: E26-LOCAL-R19
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Ovarian metastasis recommendation
+  category: ovarian_metastasis_local
+  title: Resect ovarian metastases
+  core_or_supplemental: core
+  source_context:
+    eligibility: Ovarian metastasis from CRC
+    action: Perform resection when feasible
+    timing: Local-treatment planning
+    exceptions: Surgical feasibility
+    predicate_logic: ovarian_metastasis AND resectable => resection
+  requirements:
+    eligibility:
+      expression: Ovarian metastasis from CRC
+      variables:
+      - crc.metastatic_status
+      - crc.ovarian_metastasis_laterality
+      - crc.ovarian_metastasis_status_at_decision
+      - crc.primary_site
+      - crc.resectability_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ovarian_metastasis_status_at_decision
+        - variable: crc.ovarian_metastasis_laterality
+        - variable: crc.resectability_status
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Perform resection when feasible
+      variables:
+      - crc.local_treatment_at_decision
+      - crc.metastasis_surgery_event
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastasis_surgery_event
+        - variable: crc.local_treatment_at_decision
+    timing:
+      expression: Local-treatment planning
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Surgical feasibility
+      variables:
+      - crc.resectability_status
+      evidence_logic:
+        variable: crc.resectability_status
+  required_variables:
+  - crc.decision_date
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastasis_surgery_event
+  - crc.metastatic_status
+  - crc.ovarian_metastasis_laterality
+  - crc.ovarian_metastasis_status_at_decision
+  - crc.primary_site
+  - crc.resectability_status
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

@@ -1,0 +1,90 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.rectal_tumor_height
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.rectal_tumor_height
+contract_kind: chart_extraction
+label: Rectal tumor height
+roles:
+- action
+- eligibility
+temporal_meaning: pretreatment
+field_contract:
+  name: rectal_tumor_height_cm
+  type: string
+  format: \d+(?:\.\d+)?
+  nullable: true
+  description: Distance in cm from the source-specified landmark; preserve the landmark in evidence.
+registry_mapping:
+  standard: none
+  item_name: none
+  item_number: none
+  xml_id: none
+  effective_years: none
+evidence_coverage:
+  registry_to_rule:
+    semantic: absent
+    temporal: misaligned
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: none
+    transformation_id: null
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: ASCO Management of Locally Advanced Rectal Cancer 2024
+  items:
+  - Recommendations 1.2, 1.3 and 2.1
+  source_refs:
+  - ASCO.LARC.2024
+  - ESMO.RECTAL_LOCALIZED.2025
+question: What is the Rectal tumor height for the indexed CRC tumor or decision at pretreatment?
+applicability_guard:
+  primary_site: rectum
+  disease_setting: locally_advanced
+  timepoint: before_first_cancer_directed_treatment
+evidence_contract:
+  establishing_source_documents:
+  - pelvic_mri_report
+  - endoscopy
+  excluded_sources:
+  - number_without_landmark
+  positive_witness: A tumor-linked source appropriate to pretreatment establishes rectal_tumor_height_cm.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - tumor deposit
+    - mesorectal_fascia
+    - height
+    statement: A distance without landmark is incomplete, not a usable height.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: A distance without landmark is incomplete, not a usable height.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish rectal_tumor_height_cm.
+  SPEC_INSUFFICIENT: The requested meaning of rectal_tumor_height_cm is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CHART.rectal_mri_risk
+  output_field: rectal_tumor_height_cm
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[rectal_tumor_height_cm].format
+  origin: model_authored
+  basis: no external source; candidate nonnegative decimal representation.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 0d1fc18b6c3694eb2100253f710f79a19ce26e966e1471f8163cc28f58718a5c

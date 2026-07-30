@@ -1,0 +1,331 @@
+schema_version: '2.0'
+category: oligometastatic_systemic
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 4
+rules:
+- candidate_id: E26-LOCAL-08
+  parent_recommendation_id: E26-LOCAL-R08
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Local treatment recommendation 8
+  category: oligometastatic_systemic
+  title: Postoperative doublet after upfront local therapy
+  core_or_supplemental: core
+  source_context:
+    eligibility: Local treatment completed without preoperative therapy
+    action: Consider postoperative oxaliplatin doublet
+    timing: Postoperative
+    exceptions: Fitness and prior therapy
+    predicate_logic: no_preop_systemic AND local_complete => consider_postop_doublet
+  requirements:
+    eligibility:
+      expression: Local treatment completed without preoperative therapy
+      variables:
+      - crc.line_of_therapy
+      - crc.local_treatment_event
+      - crc.metastatic_status
+      - crc.oxaliplatin_fitness_at_decision
+      - crc.preoperative_systemic_therapy_event
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.preoperative_systemic_therapy_event
+        - variable: crc.local_treatment_event
+        - variable: crc.oxaliplatin_fitness_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Consider postoperative oxaliplatin doublet
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Postoperative
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Fitness and prior therapy
+      variables:
+      - crc.oxaliplatin_fitness_at_decision
+      - crc.preoperative_systemic_therapy_event
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.oxaliplatin_fitness_at_decision
+        - variable: crc.preoperative_systemic_therapy_event
+  required_variables:
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.local_treatment_event
+  - crc.metastatic_status
+  - crc.oxaliplatin_fitness_at_decision
+  - crc.preoperative_systemic_therapy_event
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-LOCAL-09
+  parent_recommendation_id: E26-LOCAL-R09
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Local treatment recommendation 9
+  category: oligometastatic_systemic
+  title: Postoperative systemic therapy after preoperative treatment
+  core_or_supplemental: core
+  source_context:
+    eligibility: Preoperative systemic therapy followed by local treatment
+    action: May give postoperative systemic therapy
+    timing: Postoperative
+    exceptions: Response, toxicity, and total duration
+    predicate_logic: preop_systemic AND local_treatment => may_postop_systemic
+  requirements:
+    eligibility:
+      expression: Preoperative systemic therapy followed by local treatment
+      variables:
+      - crc.line_of_therapy
+      - crc.local_treatment_event
+      - crc.metastatic_status
+      - crc.preoperative_systemic_regimen
+      - crc.primary_site
+      - crc.treatment_response_before_local_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.preoperative_systemic_regimen
+        - variable: crc.treatment_response_before_local_decision
+        - variable: crc.local_treatment_event
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: May give postoperative systemic therapy
+      variables:
+      - crc.postoperative_systemic_regimen
+      - crc.systemic_regimen
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.postoperative_systemic_regimen
+        - variable: crc.systemic_regimen
+    timing:
+      expression: Postoperative
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Response, toxicity, and total duration
+      variables:
+      - crc.total_perioperative_systemic_therapy_duration
+      - crc.treatment_response_before_local_decision
+      - crc.treatment_toxicity_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.treatment_response_before_local_decision
+        - variable: crc.treatment_toxicity_at_decision
+        - variable: crc.total_perioperative_systemic_therapy_duration
+  required_variables:
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.local_treatment_event
+  - crc.metastatic_status
+  - crc.postoperative_systemic_regimen
+  - crc.preoperative_systemic_regimen
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.total_perioperative_systemic_therapy_duration
+  - crc.treatment_response_before_local_decision
+  - crc.treatment_toxicity_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-LOCAL-10
+  parent_recommendation_id: E26-LOCAL-R10
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Local treatment recommendation 10
+  category: oligometastatic_systemic
+  title: Six-month peri-local systemic duration
+  core_or_supplemental: core
+  source_context:
+    eligibility: Preoperative and or postoperative systemic therapy around local treatment
+    action: Target about six months total
+    timing: Combined preoperative and postoperative
+    exceptions: Toxicity and response
+    predicate_logic: peri_local_systemic => total_duration_about_6m
+  requirements:
+    eligibility:
+      expression: Preoperative and or postoperative systemic therapy around local treatment
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Target about six months total
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Combined preoperative and postoperative
+      variables:
+      - crc.decision_date
+      - crc.postoperative_systemic_therapy_duration
+      - crc.preoperative_systemic_therapy_duration
+      - crc.systemic_therapy_start_date
+      - crc.total_perioperative_systemic_therapy_duration
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.preoperative_systemic_therapy_duration
+        - variable: crc.postoperative_systemic_therapy_duration
+        - variable: crc.total_perioperative_systemic_therapy_duration
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Toxicity and response
+      variables:
+      - crc.treatment_toxicity_at_decision
+      evidence_logic:
+        variable: crc.treatment_toxicity_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.postoperative_systemic_therapy_duration
+  - crc.preoperative_systemic_therapy_duration
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.total_perioperative_systemic_therapy_duration
+  - crc.treatment_toxicity_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-LOCAL-12
+  parent_recommendation_id: ASCO22-LOCAL-R7.1
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_local
+  source_anchor: Recommendation 7.1 duration qualifier
+  category: oligometastatic_systemic
+  title: Six months total perioperative chemotherapy
+  core_or_supplemental: core
+  source_context:
+    eligibility: Perioperative chemotherapy selected for liver metastases
+    action: Use six months total preoperative plus postoperative chemotherapy
+    timing: Across perioperative course
+    exceptions: Toxicity and clinical judgment
+    predicate_logic: periop_chemo_selected => total_duration_6m
+  requirements:
+    eligibility:
+      expression: Perioperative chemotherapy selected for liver metastases
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use six months total preoperative plus postoperative chemotherapy
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Across perioperative course
+      variables:
+      - crc.decision_date
+      - crc.postoperative_systemic_therapy_duration
+      - crc.preoperative_systemic_therapy_duration
+      - crc.systemic_therapy_start_date
+      - crc.total_perioperative_systemic_therapy_duration
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.preoperative_systemic_therapy_duration
+        - variable: crc.postoperative_systemic_therapy_duration
+        - variable: crc.total_perioperative_systemic_therapy_duration
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Toxicity and clinical judgment
+      variables:
+      - crc.treatment_toxicity_at_decision
+      evidence_logic:
+        variable: crc.treatment_toxicity_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.postoperative_systemic_therapy_duration
+  - crc.preoperative_systemic_therapy_duration
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.total_perioperative_systemic_therapy_duration
+  - crc.treatment_toxicity_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

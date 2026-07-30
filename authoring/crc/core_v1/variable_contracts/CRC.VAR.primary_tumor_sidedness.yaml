@@ -1,0 +1,111 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.primary_tumor_sidedness
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.primary_tumor_sidedness
+contract_kind: derivation
+label: Primary tumor sidedness
+roles:
+- eligibility
+temporal_meaning: primary_tumor_identity
+field_contract:
+  name: primary_tumor_sidedness
+  type: string
+  allowable_values:
+  - right
+  - left
+  - transverse
+  - rectosigmoid
+  - rectum
+  - unknown
+  nullable: true
+  description: Deterministic local mapping from primary site with transverse/rectosigmoid/rectum preserved.
+registry_mapping:
+  standard: NAACCR_v26
+  item_name: Derived from Primary Site
+  item_number: '400'
+  xml_id: primarySite
+  effective_years: all
+evidence_coverage:
+  registry_to_rule:
+    semantic: coarsened
+    temporal: conditional
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: coarsened
+    transformation_id: PENDING_VERSIONED_PROJECTION
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: CoC STORE 2026 and NAACCR v26, with rule-specific ASCO context
+  items:
+  - Primary Site [400]
+  - Histologic Type ICD-O-3 [522]
+  - AJCC TNM Clin T [1001]
+  - AJCC TNM Clin N [1002]
+  source_refs:
+  - COC.STORE.2026
+  - NAACCR.SSDI.3_3
+  - ASCO.LARC.2024
+  - ASCO.MCRC.2022
+question: What is the Primary tumor sidedness for the indexed CRC tumor or decision at primary_tumor_identity?
+applicability_guard:
+  primary_sites:
+  - C180
+  - C182-C189
+  - C199
+  - C209
+  exclude_schemas:
+  - appendix
+  - NET
+  - GIST
+  - sarcoma
+  - Kaposi
+  rule_time_required: true
+evidence_contract:
+  establishing_source_documents:
+  - registry_primary_site
+  - pathology
+  - endoscopy
+  - operative_report
+  excluded_sources:
+  - metastasis_location
+  positive_witness: A tumor-linked source appropriate to primary_tumor_identity establishes primary_tumor_sidedness.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - tumor_board
+    - Primary
+    - sidedness
+    statement: Transverse, rectosigmoid and rectum remain explicit until a versioned mapping is approved.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Transverse, rectosigmoid and rectum remain explicit until a versioned mapping is approved.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish primary_tumor_sidedness.
+  SPEC_INSUFFICIENT: The requested meaning of primary_tumor_sidedness is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CANDIDATE.disease_context
+  output_field: primary_tumor_sidedness
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[primary_tumor_sidedness].allowable_values
+  origin: model_authored
+  basis: no external source; local mapping preserves ambiguous segments pending clinical approval.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: c65a7f5f209e35b7f0288b526e62123d102571a57fdf7a307da0109205ad6a33

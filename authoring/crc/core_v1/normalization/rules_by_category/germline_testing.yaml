@@ -1,0 +1,77 @@
+schema_version: '2.0'
+category: germline_testing
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 1
+rules:
+- candidate_id: ASCO-SGT-06
+  parent_recommendation_id: ASCO-SGT-PCO1.5
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_somatic_genomic_2022
+  source_anchor: PCO 1.5
+  category: germline_testing
+  title: Germline testing for therapy-linked germline alterations
+  core_or_supplemental: core
+  source_context:
+    eligibility: Approved therapy linked to a germline alteration
+    action: Perform germline testing regardless of family-history criteria; counsel after pathogenic or likely pathogenic
+      result
+    timing: Before or during treatment selection
+    exceptions: Tumor sequencing is not a substitute
+    predicate_logic: germline_linked_therapy => germline_test; P_or_LP => counseling
+  requirements:
+    eligibility:
+      expression: Approved therapy linked to a germline alteration
+      variables:
+      - crc.germline_testing_indication
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.germline_testing_indication
+    action:
+      expression: Perform germline testing regardless of family-history criteria; counsel after pathogenic or likely pathogenic
+        result
+      variables:
+      - crc.genetic_counseling_status
+      - crc.germline_result
+      - crc.germline_test_status
+      - crc.molecular_variant_pathogenicity
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genetic_counseling_status
+        - variable: crc.germline_result
+        - variable: crc.germline_test_status
+        - variable: crc.molecular_variant_pathogenicity
+    timing:
+      expression: Before or during treatment selection
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before or during treatment selection
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Tumor sequencing is not a substitute
+      variables:
+      - crc.family_history_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.family_history_status
+  required_variables:
+  - crc.family_history_status
+  - crc.genetic_counseling_status
+  - crc.germline_result
+  - crc.germline_test_status
+  - crc.germline_testing_indication
+  - crc.molecular_variant_pathogenicity
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HEREDITARY_PARTIAL
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

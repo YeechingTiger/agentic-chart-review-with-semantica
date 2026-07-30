@@ -1,0 +1,223 @@
+schema_version: '2.0'
+category: rectal_surgery
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 3
+rules:
+- candidate_id: ER25-TX-24
+  parent_recommendation_id: ER25-TX-R23
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Immunotherapy persistence recommendation
+  category: rectal_surgery
+  title: Salvage resection after immunotherapy failure
+  core_or_supplemental: core
+  source_context:
+    eligibility: Persistent tumor or local recurrence after immunotherapy
+    action: Perform salvage resection when feasible
+    timing: At persistence or recurrence
+    exceptions: Surgical feasibility and MDT
+    predicate_logic: persistence OR local_recurrence_after_ICI => salvage_resection
+  requirements:
+    eligibility:
+      expression: Persistent tumor or local recurrence after immunotherapy
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_response.overall_category.post_neoadjuvant
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.rectal_response.overall_category.post_neoadjuvant
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Perform salvage resection when feasible
+      variables:
+      - crc.multidisciplinary_team.decision
+      - crc.rectal_surgery.planned_procedure
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.multidisciplinary_team.decision
+        - variable: crc.rectal_surgery.planned_procedure
+    timing:
+      expression: At persistence or recurrence
+      variables:
+      - crc.rectal_post_immunotherapy.recurrence_date
+      - crc.rectal_surgery.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_post_immunotherapy.recurrence_date
+        - variable: crc.rectal_surgery.decision_date
+    exceptions:
+      expression: Surgical feasibility and MDT
+      variables:
+      - crc.rectal_surgery.resectability_at_salvage_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_surgery.resectability_at_salvage_decision
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.multidisciplinary_team.decision
+  - crc.rectal_post_immunotherapy.recurrence_date
+  - crc.rectal_response.overall_category.post_neoadjuvant
+  - crc.rectal_surgery.decision_date
+  - crc.rectal_surgery.planned_procedure
+  - crc.rectal_surgery.resectability_at_salvage_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-NOM-05
+  parent_recommendation_id: ER25-NOM-R05
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: NOM regrowth recommendation
+  category: rectal_surgery
+  title: Salvage resection for local regrowth
+  core_or_supplemental: core
+  source_context:
+    eligibility: Local regrowth during watch-and-wait
+    action: Perform salvage resection rather than local excision
+    timing: At regrowth detection
+    exceptions: Surgical feasibility
+    predicate_logic: local_regrowth => salvage_resection AND not_local_excision
+  requirements:
+    eligibility:
+      expression: Local regrowth during watch-and-wait
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_nom.local_regrowth_extent
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.local_regrowth_extent
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Perform salvage resection rather than local excision
+      variables:
+      - crc.rectal_surgery.planned_procedure
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_surgery.planned_procedure
+    timing:
+      expression: At regrowth detection
+      variables:
+      - crc.rectal_nom.local_regrowth_date
+      - crc.rectal_surgery.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_nom.local_regrowth_date
+        - variable: crc.rectal_surgery.decision_date
+    exceptions:
+      expression: Surgical feasibility
+      variables:
+      - crc.rectal_surgery.resectability_at_salvage_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_surgery.resectability_at_salvage_decision
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_nom.local_regrowth_date
+  - crc.rectal_nom.local_regrowth_extent
+  - crc.rectal_surgery.decision_date
+  - crc.rectal_surgery.planned_procedure
+  - crc.rectal_surgery.resectability_at_salvage_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ1-05
+  parent_recommendation_id: ASTRO25-KQ1-R5
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ1 recommendation 5
+  category: rectal_surgery
+  title: Upfront surgery for lower-risk disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Lower-risk rectal cancer meeting source criteria
+    action: May use upfront surgery without RT
+    timing: Initial treatment
+    exceptions: Higher-risk or preservation goals
+    predicate_logic: all_lower_risk => may_upfront_surgery
+  requirements:
+    eligibility:
+      expression: Lower-risk rectal cancer meeting source criteria
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_anatomy.height_category.pretreatment
+      - crc.rectal_mri.emvi_status.pretreatment
+      - crc.rectal_mri.mrf_status.pretreatment
+      - crc.rectal_stage.clinical_n.pretreatment
+      - crc.rectal_stage.clinical_t.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_stage.clinical_n.pretreatment
+        - variable: crc.rectal_mri.mrf_status.pretreatment
+        - variable: crc.rectal_mri.emvi_status.pretreatment
+        - variable: crc.rectal_anatomy.height_category.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: May use upfront surgery without RT
+      variables:
+      - crc.rectal_surgery.planned_procedure
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_surgery.planned_procedure
+    timing:
+      expression: Initial treatment
+      variables:
+      - crc.rectal_surgery.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_surgery.decision_date
+    exceptions:
+      expression: Higher-risk or preservation goals
+      variables:
+      - crc.rectal_treatment.goal
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.goal
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_anatomy.height_category.pretreatment
+  - crc.rectal_mri.emvi_status.pretreatment
+  - crc.rectal_mri.mrf_status.pretreatment
+  - crc.rectal_stage.clinical_n.pretreatment
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_surgery.decision_date
+  - crc.rectal_surgery.planned_procedure
+  - crc.rectal_treatment.goal
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

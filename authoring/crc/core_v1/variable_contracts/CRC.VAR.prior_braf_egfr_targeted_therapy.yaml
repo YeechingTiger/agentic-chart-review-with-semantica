@@ -1,0 +1,107 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.prior_braf_egfr_targeted_therapy
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.prior_braf_egfr_targeted_therapy
+contract_kind: chart_extraction
+label: Prior BRAF/EGFR targeted exposure
+roles:
+- exceptions
+temporal_meaning: before_indexed_BRAF_line
+field_contract:
+  name: prior_braf_egfr_targeted_therapy
+  type: string
+  allowable_values:
+  - present
+  - absent
+  - unknown
+  - not_applicable
+  nullable: true
+  description: Prior BRAF/EGFR-targeted exposure before the indexed BRAF rule.
+registry_mapping:
+  standard: none
+  item_name: none
+  item_number: none
+  xml_id: none
+  effective_years: none
+evidence_coverage:
+  registry_to_rule:
+    semantic: absent
+    temporal: misaligned
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: none
+    transformation_id: null
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: CoC STORE 2026 / NAACCR v26 first-course treatment items plus source-specific CRC treatment guidelines
+  items:
+  - Date 1st Crs RX CoC [1270]
+  - RX Summ--Treatment Status [1285]
+  - RX Date Chemo [1220]
+  - RX Summ--Chemo [1390]
+  - RX Date BRM [1240]
+  - RX Summ--BRM [1410]
+  - RX Date Systemic [3230]
+  - RX Date Radiation [1210]
+  - RX Date Rad Ended [3220]
+  - RX Summ--Surg/Rad Seq [1380]
+  - RX Summ--Systemic/Sur Seq [1639]
+  source_refs:
+  - COC.STORE.2026
+  - ASCO.LARC.2024
+  - ASCO.MCRC.2022
+  - ESMO.MCRC.2026
+question: What is the Prior BRAF/EGFR targeted exposure for the indexed CRC tumor or decision at before_indexed_BRAF_line?
+applicability_guard:
+  disease: colorectal_carcinoma
+  distinguish_first_course_from_later_course: true
+  do_not_infer_agent_from_registry_summary: true
+evidence_contract:
+  establishing_source_documents:
+  - oncology_timeline
+  - administration
+  - pharmacy
+  - outside_records
+  excluded_sources:
+  - planned_but_not_administered
+  positive_witness: A tumor-linked source appropriate to before_indexed_BRAF_line establishes prior_braf_egfr_targeted_therapy.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - immunotherapy
+    - Prior
+    - BRAF
+    statement: Unknown is not absent.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Unknown is not absent.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish prior_braf_egfr_targeted_therapy.
+  SPEC_INSUFFICIENT: The requested meaning of prior_braf_egfr_targeted_therapy is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.STORE_CHART.systemic_treatment
+  output_field: prior_braf_egfr_targeted_therapy
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[prior_braf_egfr_targeted_therapy].allowable_values
+  origin: model_authored
+  basis: no external source; local prior-exposure state.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 7445818ec0f0823de18a130e91683d310bf0f9e3b8c747e4ac167fa2bb01ae43

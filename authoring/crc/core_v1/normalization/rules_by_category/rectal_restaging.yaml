@@ -1,0 +1,287 @@
+schema_version: '2.0'
+category: rectal_restaging
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 4
+rules:
+- candidate_id: ER25-RESTAGE-01
+  parent_recommendation_id: ER25-RESTAGE-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Restaging recommendation 1
+  category: rectal_restaging
+  title: MRI, endoscopy, and DRE for response
+  core_or_supplemental: core
+  source_context:
+    eligibility: After neoadjuvant rectal treatment
+    action: Restage with MRI, endoscopy, and DRE
+    timing: Response assessment
+    exceptions: None
+    predicate_logic: post_neoadjuvant => MRI AND endoscopy AND DRE
+  requirements:
+    eligibility:
+      expression: After neoadjuvant rectal treatment
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Restage with MRI, endoscopy, and DRE
+      variables:
+      - crc.rectal_response.dre_category.post_neoadjuvant
+      - crc.rectal_response.endoscopy_category.post_neoadjuvant
+      - crc.rectal_response.mri_category.post_neoadjuvant
+      - crc.rectal_restaging.completed_modalities.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.mri_category.post_neoadjuvant
+        - variable: crc.rectal_response.endoscopy_category.post_neoadjuvant
+        - variable: crc.rectal_response.dre_category.post_neoadjuvant
+        - variable: crc.rectal_restaging.completed_modalities.post_neoadjuvant
+    timing:
+      expression: Response assessment
+      variables:
+      - crc.rectal_response.assessment_date.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.assessment_date.post_neoadjuvant
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_response.assessment_date.post_neoadjuvant
+  - crc.rectal_response.dre_category.post_neoadjuvant
+  - crc.rectal_response.endoscopy_category.post_neoadjuvant
+  - crc.rectal_response.mri_category.post_neoadjuvant
+  - crc.rectal_restaging.completed_modalities.post_neoadjuvant
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-RESTAGE-02
+  parent_recommendation_id: ER25-RESTAGE-R02
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Restaging recommendation 2
+  category: rectal_restaging
+  title: No ERUS for restaging
+  core_or_supplemental: core
+  source_context:
+    eligibility: Post-neoadjuvant restaging
+    action: Do not use ERUS as the restaging modality
+    timing: Response assessment
+    exceptions: None
+    predicate_logic: restaging => not_ERUS
+  requirements:
+    eligibility:
+      expression: Post-neoadjuvant restaging
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Do not use ERUS as the restaging modality
+      variables:
+      - crc.rectal_restaging.completed_modalities.post_neoadjuvant
+      - crc.rectal_restaging.modality_used
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_restaging.modality_used
+        - variable: crc.rectal_restaging.completed_modalities.post_neoadjuvant
+    timing:
+      expression: Response assessment
+      variables:
+      - crc.rectal_response.assessment_date.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.assessment_date.post_neoadjuvant
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_response.assessment_date.post_neoadjuvant
+  - crc.rectal_restaging.completed_modalities.post_neoadjuvant
+  - crc.rectal_restaging.modality_used
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ER25-RESTAGE-03
+  parent_recommendation_id: ER25-RESTAGE-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: Restaging recommendation 3
+  category: rectal_restaging
+  title: No routine biopsy to establish cCR for watch-and-wait
+  core_or_supplemental: core
+  source_context:
+    eligibility: Possible cCR being assessed for watch-and-wait
+    action: Do not require biopsy
+    timing: At NOM decision
+    exceptions: Investigate clinically suspicious findings
+    predicate_logic: cCR_assessment => not_routine_biopsy
+  requirements:
+    eligibility:
+      expression: Possible cCR being assessed for watch-and-wait
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_response.overall_category.post_neoadjuvant
+      - crc.rectal_response.suspicious_finding.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.overall_category.post_neoadjuvant
+        - variable: crc.rectal_response.suspicious_finding.post_neoadjuvant
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Do not require biopsy
+      variables:
+      - crc.rectal_response.biopsy_performed.post_neoadjuvant
+      - crc.rectal_restaging.completed_modalities.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.biopsy_performed.post_neoadjuvant
+        - variable: crc.rectal_restaging.completed_modalities.post_neoadjuvant
+    timing:
+      expression: At NOM decision
+      variables:
+      - crc.rectal_response.assessment_date.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.assessment_date.post_neoadjuvant
+    exceptions:
+      expression: Investigate clinically suspicious findings
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_response.assessment_date.post_neoadjuvant
+  - crc.rectal_response.biopsy_performed.post_neoadjuvant
+  - crc.rectal_response.overall_category.post_neoadjuvant
+  - crc.rectal_response.suspicious_finding.post_neoadjuvant
+  - crc.rectal_restaging.completed_modalities.post_neoadjuvant
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ3-06
+  parent_recommendation_id: ASTRO25-KQ3-R6
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ3 recommendation 6
+  category: rectal_restaging
+  title: Multimodal NOM response assessment
+  core_or_supplemental: core
+  source_context:
+    eligibility: NOM considered after treatment
+    action: Assess with pelvic MRI, CT abdomen and pelvis, endoscopy, and DRE
+    timing: Two to three months after treatment
+    exceptions: None
+    predicate_logic: NOM_considered => multimodal_assessment_2_to_3m
+  requirements:
+    eligibility:
+      expression: NOM considered after treatment
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Assess with pelvic MRI, CT abdomen and pelvis, endoscopy, and DRE
+      variables:
+      - crc.rectal_response.ct_performed.post_neoadjuvant
+      - crc.rectal_response.dre_performed.post_neoadjuvant
+      - crc.rectal_response.endoscopy_performed.post_neoadjuvant
+      - crc.rectal_response.mri_performed.post_neoadjuvant
+      - crc.rectal_restaging.completed_modalities.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_response.mri_performed.post_neoadjuvant
+        - variable: crc.rectal_response.ct_performed.post_neoadjuvant
+        - variable: crc.rectal_response.endoscopy_performed.post_neoadjuvant
+        - variable: crc.rectal_response.dre_performed.post_neoadjuvant
+        - variable: crc.rectal_restaging.completed_modalities.post_neoadjuvant
+    timing:
+      expression: Two to three months after treatment
+      variables:
+      - crc.rectal_neoadjuvant.completion_date
+      - crc.rectal_response.assessment_date.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.completion_date
+        - variable: crc.rectal_response.assessment_date.post_neoadjuvant
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_neoadjuvant.completion_date
+  - crc.rectal_response.assessment_date.post_neoadjuvant
+  - crc.rectal_response.ct_performed.post_neoadjuvant
+  - crc.rectal_response.dre_performed.post_neoadjuvant
+  - crc.rectal_response.endoscopy_performed.post_neoadjuvant
+  - crc.rectal_response.mri_performed.post_neoadjuvant
+  - crc.rectal_restaging.completed_modalities.post_neoadjuvant
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

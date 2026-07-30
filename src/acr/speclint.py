@@ -49,7 +49,8 @@ F6 = "F6 ABSTENTION_TOTALITY"
 F7 = "F7 CONFLICT_MATRIX"
 F8 = "F8 GATE_SATISFIABILITY"
 F9 = "F9 ANSWER_CHECK_INTEGRITY"
-TIER1_CHECKS = (F1, F2, F3, F4, F5, F6, F7, F8, F9)
+F10 = "F10 LOCAL_TYPE_NAMES_IN_CONTRACT"
+TIER1_CHECKS = (F1, F2, F3, F4, F5, F6, F7, F8, F9, F10)
 
 ABSTENTIONS = ("EVIDENCE_INSUFFICIENT", "SPEC_INSUFFICIENT")
 
@@ -467,12 +468,48 @@ def _f9_answer_checks(spec) -> Iterable[Finding]:
                               f"is rejected for not doing something the prompt never asked for.")
 
 
+def _f10_local_type_names(spec) -> Iterable[Finding]:
+    """A stratum still selecting documents by substring over raw local type names.
+
+    Two findings in one, and the placement one is why this is Tier 1 rather than Tier 2.
+
+    PLACEMENT. `docs/CHART_REVIEW_KNOWLEDGE_AND_SEARCH_LAYERS.md` gives the Task Contract
+    everything about what the answer MEANS and forbids it "keywords, raw local note types,
+    sampling thresholds". `doc_type_matches: ["Pathology", "Cytology"]` is a raw local note
+    type, in the Task Contract, and no corpus is needed to see that.
+
+    CORRECTNESS. The expression is a case-insensitive SUBSTRING, and measured on this corpus
+    it was wrong in both directions: it matched Speech-Language-Pathology-Note and missed
+    Non-Gyn-Cyto-FNA (1,285 documents), FN-Aspirate-Report (881) and SURG-PATH-RESULT (231).
+    107 of the 219 patients with no matching type name held one of those reports anyway --
+    stratified as unable to establish histology while a cytology diagnosis sat in the chart.
+    `T2 dead_doc_types` cannot see any of this: a token that selects SOMETHING is not dead,
+    and every token above selects something. It just also misses the documents that matter.
+
+    The repair is `means:` prose plus a Site Mapping (`acr site-mapping build`), not a longer
+    substring list. STORE.700_880 already tried the longer list -- 24 tokens, with a comment
+    explaining that `Pathology` was the wrong instrument -- which is the same conclusion
+    reached twice and answered twice with the same tool.
+    """
+    for label, s in _strata(spec):
+        toks = _identity_tokens(s)
+        if not toks:
+            continue
+        yield Finding(F10, FAIL, spec.spec_id,
+                      f"{label}.strata[{s.get('name')}].match.doc_type_matches",
+                      f"{len(toks)} raw local type-name substring(s) {toks[:4]}"
+                      f"{'...' if len(toks) > 4 else ''} decide this stratum. Raw local note "
+                      f"types do not belong in a Task Contract, and as a case-insensitive "
+                      f"substring this expression was measured wrong in both directions on "
+                      f"this corpus. Replace it with `means:` prose and a Site Mapping.")
+
+
 def lint_spec(spec) -> list[Finding]:
     """Tier 1 only. Deterministic, offline, and ordered by check so a diff of two runs reads."""
     out: list[Finding] = []
     for fn in (_f1_formats, _f2_totality, _f3_establishes, _f4_keyword_coverage,
                _f5_evidence_closure, _f6_abstention_totality, _f7_conflicts, _f8_gate,
-               _f9_answer_checks):
+               _f9_answer_checks, _f10_local_type_names):
         out.extend(fn(spec))
     return out
 

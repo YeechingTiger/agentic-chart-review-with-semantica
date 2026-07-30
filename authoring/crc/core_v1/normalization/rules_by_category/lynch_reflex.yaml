@@ -1,0 +1,436 @@
+schema_version: '2.0'
+category: lynch_reflex
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 6
+rules:
+- candidate_id: E26-MOL-015
+  parent_recommendation_id: E26-MOL-R12
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations Lynch qualifier
+  category: lynch_reflex
+  title: Use dMMR or MSI-H to inform Lynch counseling
+  core_or_supplemental: core
+  source_context:
+    eligibility: dMMR or MSI-H tumor result
+    action: Initiate Lynch-risk counseling or referral workflow
+    timing: After the tumor result
+    exceptions: Tumor result is not a germline diagnosis
+    predicate_logic: lynch_suggestive_tumor_result => counseling_or_referral
+  requirements:
+    eligibility:
+      expression: dMMR or MSI-H tumor result
+      variables:
+      - crc.mmr_loss_pattern
+      - crc.msi_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mmr_loss_pattern
+        - variable: crc.msi_status
+    action:
+      expression: Initiate Lynch-risk counseling or referral workflow
+      variables:
+      - crc.braf_v600e_status
+      - crc.genetics_referral_status
+      - crc.lynch_risk_communication
+      - crc.mlh1_promoter_methylation_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.braf_v600e_status
+        - variable: crc.genetics_referral_status
+        - variable: crc.lynch_risk_communication
+        - variable: crc.mlh1_promoter_methylation_status
+    timing:
+      expression: After the tumor result
+      variables:
+      - crc.genetics_referral_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genetics_referral_date
+    exceptions:
+      expression: Tumor result is not a germline diagnosis
+      variables:
+      - crc.germline_result
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.germline_result
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.genetics_referral_date
+  - crc.genetics_referral_status
+  - crc.germline_result
+  - crc.lynch_risk_communication
+  - crc.mlh1_promoter_methylation_status
+  - crc.mmr_loss_pattern
+  - crc.msi_status
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_HEREDITARY_PARTIAL
+    - B_NCCN_DEPENDENCY
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP22-MMR-004
+  parent_recommendation_id: CAP22-GPS1
+  related_parent_recommendation_ids: []
+  candidate_kind: good_practice
+  source_id: cap_mmr_msi_2022
+  source_anchor: Good Practice Statement 1
+  category: lynch_reflex
+  title: Communicate a Lynch-consistent tumor pattern
+  core_or_supplemental: core
+  source_context:
+    eligibility: MMR or MSI pattern consistent with possible Lynch syndrome
+    action: Pathologist communicates the finding to the treating physician
+    timing: At result interpretation
+    exceptions: Communication is not a germline diagnosis
+    predicate_logic: Lynch_consistent_pattern => communicate_to_treating_physician
+  requirements:
+    eligibility:
+      expression: MMR or MSI pattern consistent with possible Lynch syndrome
+      variables:
+      - crc.braf_v600e_status
+      - crc.mlh1_promoter_methylation_status
+      - crc.mmr_loss_pattern
+      - crc.msi_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.braf_v600e_status
+        - variable: crc.mlh1_promoter_methylation_status
+        - variable: crc.mmr_loss_pattern
+        - variable: crc.msi_status
+    action:
+      expression: Pathologist communicates the finding to the treating physician
+      variables:
+      - crc.lynch_risk_communication
+      - crc.lynch_risk_communication_recipient
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.lynch_risk_communication
+        - variable: crc.lynch_risk_communication_recipient
+    timing:
+      expression: At result interpretation
+      variables:
+      - crc.lynch_risk_communication_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.lynch_risk_communication_date
+    exceptions:
+      expression: Communication is not a germline diagnosis
+      variables:
+      - crc.genetics_referral_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genetics_referral_status
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.genetics_referral_status
+  - crc.lynch_risk_communication
+  - crc.lynch_risk_communication_date
+  - crc.lynch_risk_communication_recipient
+  - crc.mlh1_promoter_methylation_status
+  - crc.mmr_loss_pattern
+  - crc.msi_status
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HEREDITARY_PARTIAL
+    - B_NCCN_DEPENDENCY
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-03
+  parent_recommendation_id: CAP17-STMT2
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 2b
+  category: lynch_reflex
+  title: BRAF reflex after MLH1 loss
+  core_or_supplemental: core
+  source_context:
+    eligibility: dMMR with MLH1 loss
+    action: Test BRAF V600 to assess Lynch risk
+    timing: After MLH1 loss
+    exceptions: BRAF negative does not exclude Lynch
+    predicate_logic: dMMR AND MLH1_loss => BRAF_V600; BRAF_negative != no_Lynch
+  requirements:
+    eligibility:
+      expression: dMMR with MLH1 loss
+      variables:
+      - crc.mmr_mlh1
+      - crc.mmr_msh2
+      - crc.mmr_msh6
+      - crc.mmr_pms2
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mmr_mlh1
+        - variable: crc.mmr_msh2
+        - variable: crc.mmr_msh6
+        - variable: crc.mmr_pms2
+    action:
+      expression: Test BRAF V600 to assess Lynch risk
+      variables:
+      - crc.braf_v600e_status
+      - crc.mlh1_promoter_methylation_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.braf_v600e_status
+        - variable: crc.mlh1_promoter_methylation_status
+    timing:
+      expression: After MLH1 loss
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: After MLH1 loss
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: BRAF negative does not exclude Lynch
+      variables:
+      - crc.genetics_referral_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genetics_referral_status
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.genetics_referral_status
+  - crc.mlh1_promoter_methylation_status
+  - crc.mmr_mlh1
+  - crc.mmr_msh2
+  - crc.mmr_msh6
+  - crc.mmr_pms2
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - B_HEREDITARY_PARTIAL
+    - B_NCCN_DEPENDENCY
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-LYNCH-MSH-01
+  parent_recommendation_id: EC20-MMR-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_colon_2020
+  source_anchor: Lynch reflex prose MSH branch
+  category: lynch_reflex
+  title: MSH2 or MSH6 loss referral
+  core_or_supplemental: core
+  source_context:
+    eligibility: MSH2 or MSH6 loss
+    action: Flag Lynch suspicion and refer
+    timing: After IHC result
+    exceptions: Not germline diagnosis
+    predicate_logic: MSH2_loss OR MSH6_loss => Lynch_referral
+  requirements:
+    eligibility:
+      expression: MSH2 or MSH6 loss
+      variables:
+      - crc.mmr_ihc_controls_status
+      - crc.mmr_msh2
+      - crc.mmr_msh6
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_msh2
+          - variable: crc.mmr_msh6
+        - variable: crc.mmr_ihc_controls_status
+    action:
+      expression: Flag Lynch suspicion and refer
+      variables:
+      - crc.genetics_referral_status
+      - crc.lynch_suspicion_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genetics_referral_status
+        - variable: crc.lynch_suspicion_status
+    timing:
+      expression: After IHC result
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: After IHC result
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Not germline diagnosis
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Not germline diagnosis
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.genetics_referral_status
+  - crc.lynch_suspicion_status
+  - crc.mmr_ihc_controls_status
+  - crc.mmr_msh2
+  - crc.mmr_msh6
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HEREDITARY_PARTIAL
+    - B_NCCN_DEPENDENCY
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-LYNCH-MLH1-01
+  parent_recommendation_id: EC20-MMR-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_colon_2020
+  source_anchor: Lynch reflex prose MLH1 branch
+  category: lynch_reflex
+  title: Reflex after MLH1 or PMS2 loss
+  core_or_supplemental: core
+  source_context:
+    eligibility: MLH1 or PMS2 loss pattern
+    action: Test BRAF V600E and or MLH1 promoter methylation
+    timing: After IHC result
+    exceptions: Follow current hereditary workflow
+    predicate_logic: MLH1_PMS2_loss => BRAF_V600E OR MLH1_methylation
+  requirements:
+    eligibility:
+      expression: MLH1 or PMS2 loss pattern
+      variables:
+      - crc.mmr_mlh1
+      - crc.mmr_pms2
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.mmr_mlh1
+        - variable: crc.mmr_pms2
+    action:
+      expression: Test BRAF V600E and or MLH1 promoter methylation
+      variables:
+      - crc.braf_v600e_status
+      - crc.mlh1_promoter_methylation_status
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.braf_v600e_status
+        - variable: crc.mlh1_promoter_methylation_status
+    timing:
+      expression: After IHC result
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: After IHC result
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Follow current hereditary workflow
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Follow current hereditary workflow
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.mlh1_promoter_methylation_status
+  - crc.mmr_mlh1
+  - crc.mmr_pms2
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HEREDITARY_PARTIAL
+    - B_NCCN_DEPENDENCY
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-LYNCH-SPORADIC-01
+  parent_recommendation_id: EC20-MMR-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_colon_2020
+  source_anchor: Lynch reflex prose somatic branch
+  category: lynch_reflex
+  title: Interpret a possible somatic MLH1 pathway
+  core_or_supplemental: core
+  source_context:
+    eligibility: MLH1 or PMS2 loss with BRAF mutation or MLH1 methylation
+    action: Classify as supporting a somatic MLH1 pathway
+    timing: After reflex testing
+    exceptions: Does not prove absence of Lynch syndrome
+    predicate_logic: BRAF_mut OR MLH1_methylated => supports_somatic; not_excludes_Lynch
+  requirements:
+    eligibility:
+      expression: MLH1 or PMS2 loss with BRAF mutation or MLH1 methylation
+      variables:
+      - crc.braf_variant_hgvs
+      - crc.mlh1_promoter_methylation_status
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.braf_variant_hgvs
+        - variable: crc.mlh1_promoter_methylation_status
+    action:
+      expression: Classify as supporting a somatic MLH1 pathway
+      variables:
+      - crc.somatic_mlh1_pathway_support
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.somatic_mlh1_pathway_support
+    timing:
+      expression: After reflex testing
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: After reflex testing
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Does not prove absence of Lynch syndrome
+      variables:
+      - crc.genetics_referral_status
+      - crc.germline_result
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genetics_referral_status
+        - variable: crc.germline_result
+  required_variables:
+  - crc.braf_variant_hgvs
+  - crc.genetics_referral_status
+  - crc.germline_result
+  - crc.mlh1_promoter_methylation_status
+  - crc.somatic_mlh1_pathway_support
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HEREDITARY_PARTIAL
+    - B_NCCN_DEPENDENCY
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

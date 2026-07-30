@@ -1,0 +1,14 @@
+schema: acr.module_asset/1
+module_id: guideline-only
+version: 1.0.0
+kind: RUNTIME_POLICY
+runner: CODE
+inputs: [run_context]
+output_schema: acr.search_plan/1
+implementation: runtime.guideline_only.v1
+truth_modes: [BLIND]
+capabilities: []
+maximum_authority: OBSERVE
+description: Clinical task contract and patient inventory only; no task retrieval priors.
+owner: runtime-owner
+tags: [runtime, baseline, guideline-only]

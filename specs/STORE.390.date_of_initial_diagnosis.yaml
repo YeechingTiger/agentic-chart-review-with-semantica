@@ -10,11 +10,12 @@ question: "On what date was this tumour first diagnosed by a physician?"
 fields:
   - name: date_of_initial_diagnosis
     type: string
-    format: "CCYYMMDD"
+    format: "(19|20)\\d{2}(0[1-9]|1[0-2]|99)([0-2]\\d|3[01]|99)"
     nullable: false
-    description: "8 digits; blanks are not allowed by the registry standard"
+    description: "CCYYMMDD; 99 may represent an unknown month or day; blanks are not allowed"
   - name: month_day_imputed
     type: boolean
+    allowable_values: [true, false]
     description: "true if month or day came from a seasonal/approximate phrase rather than an explicit date"
 
 decision_rule:
@@ -130,11 +131,19 @@ provenance:
     origin: model_authored
     status: draft
     basis: >-
-      no external source; written by a language model in commit e5229b0 (2026-07-25) and
-      committed under a human author's name. The value written here is registry notation for an
-      eight-digit date, NOT a pattern -- but the software applies it as one, with a full match,
-      so this field rejects every valid date it is ever given. The bug is real, known, and still
-      unfixed; it is reported in the review document rather than paraphrased away.
+      no external source; mechanically replaced the literal registry notation written by a
+      language model in commit e5229b0 (2026-07-25) with a Python full-match pattern. The
+      pattern admits the file's own 20100499 boundary case and rejects non-date text, but its
+      year range and unknown-component rules have not been checked against STORE item [390];
+      it remains draft until that comparison is done.
+  - element: "fields[month_day_imputed].allowable_values"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; this boolean domain was added mechanically so the runtime no longer
+      accepts arbitrary strings for month_day_imputed. The field itself was written by a
+      language model in commit e5229b0 (2026-07-25), and whether this auxiliary flag is the
+      right representation for STORE item [390] has not been reviewed by a registrar.
   - element: "proof_obligation.for_negative.gate.require_can_establish_nonempty"
     origin: model_authored
     status: draft

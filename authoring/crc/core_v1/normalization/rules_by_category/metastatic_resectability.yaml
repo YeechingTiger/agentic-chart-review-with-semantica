@@ -1,0 +1,87 @@
+schema_version: '2.0'
+category: metastatic_resectability
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 1
+rules:
+- candidate_id: E26-STAGE-07
+  parent_recommendation_id: E26-STAGE-R07
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Staging recommendation 7
+  category: metastatic_resectability
+  title: Repeated resectability assessment
+  core_or_supplemental: core
+  source_context:
+    eligibility: mCRC receiving systemic therapy
+    action: Define resectability on recent baseline imaging and reassess every two to three months and after major response
+    timing: Baseline imaging under four weeks then serially
+    exceptions: None
+    predicate_logic: systemic_treatment => baseline_recent AND q2_3m_resectability_review
+  requirements:
+    eligibility:
+      expression: mCRC receiving systemic therapy
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.multidisciplinary_review
+      - crc.primary_site
+      - crc.resectability_status
+      - crc.treatment_response_at_resectability_assessment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.resectability_status
+        - variable: crc.line_of_therapy
+        - variable: crc.treatment_response_at_resectability_assessment
+        - variable: crc.multidisciplinary_review
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Define resectability on recent baseline imaging and reassess every two to three months and after major response
+      variables:
+      - crc.resectability_reassessment_event
+      evidence_logic:
+        variable: crc.resectability_reassessment_event
+    timing:
+      expression: Baseline imaging under four weeks then serially
+      variables:
+      - crc.decision_date
+      - crc.resectability_assessment_date
+      - crc.resectability_imaging_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.resectability_imaging_date
+        - variable: crc.resectability_assessment_date
+        - variable: crc.decision_date
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.multidisciplinary_review
+  - crc.primary_site
+  - crc.resectability_assessment_date
+  - crc.resectability_imaging_date
+  - crc.resectability_reassessment_event
+  - crc.resectability_status
+  - crc.treatment_response_at_resectability_assessment
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

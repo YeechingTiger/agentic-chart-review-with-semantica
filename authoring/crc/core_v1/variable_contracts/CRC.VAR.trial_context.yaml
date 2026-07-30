@@ -1,0 +1,97 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.trial_context
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.trial_context
+contract_kind: chart_extraction
+label: Molecular testing trial context
+roles:
+- exceptions
+temporal_meaning: at_indexed_test_and_treatment_decision
+field_contract:
+  name: trial_context
+  type: string
+  allowable_values:
+  - interventional_trial
+  - observational_trial
+  - routine_care
+  - not_documented
+  - not_applicable
+  nullable: true
+  description: Trial context relevant to subclonal/assay-specific handling.
+registry_mapping:
+  standard: none
+  item_name: none
+  item_number: none
+  xml_id: none
+  effective_years: none
+evidence_coverage:
+  registry_to_rule:
+    semantic: absent
+    temporal: misaligned
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: none
+    transformation_id: null
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: CAP/AMP/Fight CRC 2022 MMR/MSI guideline plus ASCP/CAP/AMP/ASCO 2017 CRC biomarker guideline
+  items:
+  - CAP 2022 Recommendation 1 and Good Practice Statements 1-3
+  - CAP 2017 Statements 1, 2b, 3, 9-21
+  source_refs:
+  - CAP.MMR_MSI_ICI.2022
+  - ASCO.CAP_MMR_MSI_ENDORSEMENT.2023
+  - CAP.CRC_BIOMARKERS.2017
+question: What is the Molecular testing trial context for the indexed CRC tumor or decision at at_indexed_test_and_treatment_decision?
+applicability_guard:
+  disease: colorectal_carcinoma
+  tumor_identity_required: true
+  do_not_merge_specimens: true
+evidence_contract:
+  establishing_source_documents:
+  - trial_consent
+  - protocol_note
+  - oncology
+  excluded_sources:
+  - research_assay_without_trial_link
+  positive_witness: A tumor-linked source appropriate to at_indexed_test_and_treatment_decision establishes trial_context.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - Molecular
+    - testing
+    - trial
+    statement: Not documented and routine care remain distinct.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Not documented and routine care remain distinct.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish trial_context.
+  SPEC_INSUFFICIENT: The requested meaning of trial_context is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CHART.molecular_detail
+  output_field: trial_context
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[trial_context].allowable_values
+  origin: model_authored
+  basis: no external source; local trial-context states.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 906a57742f4164755099426fd6e722110a406c9f511d5ba32e919991634178dc

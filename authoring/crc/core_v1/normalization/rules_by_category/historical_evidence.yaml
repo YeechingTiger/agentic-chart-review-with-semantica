@@ -1,0 +1,201 @@
+schema_version: '2.0'
+category: historical_evidence
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 3
+rules:
+- candidate_id: CAP17-BIO-05
+  parent_recommendation_id: CAP17-STMT4
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 4 no-recommendation
+  category: historical_evidence
+  title: Historical BRAF anti-EGFR predictive uncertainty
+  core_or_supplemental: core
+  source_context:
+    eligibility: 2017 anti-EGFR prediction context
+    action: Do not infer a current treatment rule from the 2017 no-recommendation statement
+    timing: Historical only
+    exceptions: Modern BRAF treatment evidence supersedes treatment inference
+    predicate_logic: historical_no_recommendation != active_negative_rule
+  requirements:
+    eligibility:
+      expression: 2017 anti-EGFR prediction context
+      variables:
+      - crc.braf_summary_status
+      - crc.source_effective_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.braf_summary_status
+        - variable: crc.source_effective_date
+    action:
+      expression: Do not infer a current treatment rule from the 2017 no-recommendation statement
+      variables:
+      - crc.historical_rule_activation_status
+      - crc.indexed_therapy
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.historical_rule_activation_status
+        - variable: crc.indexed_therapy
+    timing:
+      expression: Historical only
+      variables:
+      - crc.source_effective_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.source_effective_date
+    exceptions:
+      expression: Modern BRAF treatment evidence supersedes treatment inference
+      variables:
+      - crc.source_effective_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.source_effective_date
+  required_variables:
+  - crc.braf_summary_status
+  - crc.historical_rule_activation_status
+  - crc.indexed_therapy
+  - crc.source_effective_date
+  computability:
+    status: not_computable
+    blockers:
+    - B_CAP_UPDATE
+    - B_HISTORICAL_ONLY
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-06
+  parent_recommendation_id: CAP17-STMT5
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 5 no-recommendation
+  category: historical_evidence
+  title: Historical PIK3CA treatment-selection uncertainty
+  core_or_supplemental: core
+  source_context:
+    eligibility: Therapy selection outside a trial
+    action: No positive treatment-selection rule from PIK3CA
+    timing: Historical only
+    exceptions: Clinical trials allowed
+    predicate_logic: outside_trial => no_PIK3CA_treatment_rule
+  requirements:
+    eligibility:
+      expression: Therapy selection outside a trial
+      variables:
+      - crc.pik3ca_variant
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.pik3ca_variant
+    action:
+      expression: No positive treatment-selection rule from PIK3CA
+      variables:
+      - crc.historical_rule_activation_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.historical_rule_activation_status
+    timing:
+      expression: Historical only
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Historical only
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Clinical trials allowed
+      variables:
+      - crc.aspirin_treatment_context
+      - crc.trial_context
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.aspirin_treatment_context
+        - variable: crc.trial_context
+  required_variables:
+  - crc.aspirin_treatment_context
+  - crc.historical_rule_activation_status
+  - crc.pik3ca_variant
+  - crc.trial_context
+  computability:
+    status: not_computable
+    blockers:
+    - B_CAP_UPDATE
+    - B_HISTORICAL_ONLY
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-07
+  parent_recommendation_id: CAP17-STMT6
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 6 no-recommendation
+  category: historical_evidence
+  title: Historical PTEN treatment-selection uncertainty
+  core_or_supplemental: core
+  source_context:
+    eligibility: Therapy selection outside a trial
+    action: No positive treatment-selection rule from PTEN IHC or FISH
+    timing: Historical only
+    exceptions: Clinical trials allowed
+    predicate_logic: outside_trial => no_PTEN_treatment_rule
+  requirements:
+    eligibility:
+      expression: Therapy selection outside a trial
+      variables:
+      - crc.pten_assay_method
+      - crc.pten_result
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.pten_assay_method
+        - variable: crc.pten_result
+    action:
+      expression: No positive treatment-selection rule from PTEN IHC or FISH
+      variables:
+      - crc.historical_rule_activation_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.historical_rule_activation_status
+    timing:
+      expression: Historical only
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Historical only
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Clinical trials allowed
+      variables:
+      - crc.trial_context
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.trial_context
+  required_variables:
+  - crc.historical_rule_activation_status
+  - crc.pten_assay_method
+  - crc.pten_result
+  - crc.trial_context
+  computability:
+    status: not_computable
+    blockers:
+    - B_CAP_UPDATE
+    - B_HISTORICAL_ONLY
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

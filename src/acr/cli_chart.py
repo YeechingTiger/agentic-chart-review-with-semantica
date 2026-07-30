@@ -18,7 +18,6 @@ from rich.table import Table
 from . import cli_common
 from .cli_common import API_BASE, CORPUS, MODEL, con
 from .corpus import Corpus
-from .agent import run_patient
 from .spec import load_spec, load_specs
 from .trace import load_trace, plan_summary
 
@@ -67,21 +66,73 @@ def run(
     model: str = MODEL,
     api_base: str = API_BASE,
     max_steps: int = cli_common.MAX_STEPS,
+    max_usd: float = cli_common.MAX_USD,
     out: str = typer.Option("runs", "--out"),
     temperature: float = typer.Option(1.0, "--temperature"),
     seed: int = typer.Option(1234, "--seed",
                              help="validation-sampling seed; fix it to make two runs comparable"),
+    runtime_profile: str = typer.Option(
+        "current-stratified-coverage",
+        "--runtime-profile",
+        help=(
+            "registered search policy. Experimental three-arm profiles are "
+            "guideline-only, conditional-negative-coverage, and always-coverage; "
+            "current-stratified-coverage and witness-first-baseline remain as "
+            "legacy-compatible profiles"
+        ),
+    ),
+    conflict_refine: bool = typer.Option(
+        False, "--conflict-refine",
+        help="OPTIONAL: run bounded conflict-informed candidates around the same deepagents "
+             "runtime. Off by default; the baseline path is unchanged."),
+    conflict_candidates: int = typer.Option(
+        3, "--conflict-candidates", min=2,
+        help="deepagents candidates per optional refinement round"),
+    conflict_rounds: int = typer.Option(
+        2, "--conflict-rounds", min=1,
+        help="maximum optional refinement rounds"),
+    conflict_max_usd: float = typer.Option(
+        15.0, "--conflict-max-usd", min=0.01,
+        help="total priced ceiling across optional candidates; per-run --max-usd still applies"),
 ):
-    """Run the agent for one patient and one spec."""
+    """Run the agent for one patient and one spec; optional refinement never replaces it."""
+    from .agent import run_patient
+
     sp = load_spec(spec)
     c = Corpus(Path(corpus))
     ch = c.chart(patient)
     con.print(f"[bold]{sp.spec_id}[/] v{sp.spec_version} (hash {sp.spec_hash}) "
               f"→ patient {patient} ({len(ch)} docs)")
-    show(run_patient(spec=sp, corpus=c, patient_id=patient,
-                     out_dir=cli_common.unique_run_dir(out),
-                     model=cli_common.chat_model(model, api_base, temperature),
-                     max_model_calls=max_steps, seed=seed))
+    run_dir = cli_common.unique_run_dir(out)
+    chat = cli_common.chat_model(model, api_base, temperature)
+    if not conflict_refine:
+        # THE BASELINE PATH. Keep this direct: an optional feature that wraps even its
+        # disabled arm has already replaced the runtime in the only sense users can observe.
+        show(run_patient(spec=sp, corpus=c, patient_id=patient, out_dir=run_dir,
+                         model=chat, max_model_calls=max_steps, seed=seed,
+                         max_usd=max_usd, runtime_profile=runtime_profile))
+        return
+
+    from .conflict_refinement import run_conflict_refinement
+
+    result = run_conflict_refinement(
+        runner=run_patient, candidates_per_round=conflict_candidates,
+        max_rounds=conflict_rounds, max_total_usd=conflict_max_usd,
+        runner_kwargs={
+            "spec": sp, "corpus": c, "patient_id": patient, "out_dir": run_dir,
+            "model": chat, "max_model_calls": max_steps, "seed": seed,
+            "max_usd": max_usd, "runtime_profile": runtime_profile,
+        })
+    summary = result.to_dict(include_manifests=False)
+    path = run_dir / "conflict-refinement.json"
+    path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    if result.selected_manifest:
+        con.print(f"[green]{result.status}[/]: selected a gate-valid deepagents run")
+        show(dict(result.selected_manifest))
+    else:
+        con.print(f"[bold yellow]{result.status}[/]: {result.reason}")
+        con.print("No modal answer was selected; route this case to review.")
+    con.print(f"→ {path}")
 
 
 @chart_app.command("batch")
@@ -92,8 +143,12 @@ def batch(
     api_base: str = API_BASE,
     patients_arg: str = typer.Option("", "--patients", help="comma list; default all"),
     max_steps: int = cli_common.MAX_STEPS,
+    max_usd: float = cli_common.MAX_USD,
     temperature: float = typer.Option(1.0, "--temperature"),
     seed: int = typer.Option(1234, "--seed"),
+    runtime_profile: str = typer.Option(
+        "current-stratified-coverage", "--runtime-profile"
+    ),
     out: str = typer.Option("runs", "--out"),
 ):
     """Run one spec across many patients.
@@ -101,6 +156,8 @@ def batch(
     `acr extract` is the cohort-scale command and writes the artifact chain; this one is for
     debugging a handful of charts and writes one JSON summary.
     """
+    from .agent import run_patient
+
     sp = load_spec(spec)
     c = Corpus(Path(corpus))
     pids = [p.strip() for p in patients_arg.split(",") if p.strip()] or c.patient_ids()
@@ -111,7 +168,9 @@ def batch(
         try:
             results.append(run_patient(spec=sp, corpus=c, patient_id=pid, out_dir=run_dir,
                                        model=cli_common.chat_model(model, api_base, temperature),
-                                       max_model_calls=max_steps, seed=seed, run_id=pid))
+                                       max_model_calls=max_steps, seed=seed, run_id=pid,
+                                       max_usd=max_usd,
+                                       runtime_profile=runtime_profile))
         except Exception as e:  # noqa: BLE001
             con.print(f"[red]{pid} failed: {e}[/]")
             results.append({"patient_id": pid, "error": str(e)})
@@ -136,6 +195,10 @@ def consistency(
     temperature: float = typer.Option(1.0, "--temperature"),
     corpus: str = CORPUS, model: str = MODEL, api_base: str = API_BASE,
     max_steps: int = cli_common.MAX_STEPS,
+    max_usd: float = cli_common.MAX_USD,
+    runtime_profile: str = typer.Option(
+        "current-stratified-coverage", "--runtime-profile"
+    ),
     out: str = typer.Option("runs", "--out"),
 ):
     """Run the same spec N times to measure SELF-consistency.
@@ -143,6 +206,8 @@ def consistency(
     High self-consistency is not validity: a model can settle on one wrong reading and repeat
     it. Report this next to accuracy, never instead of it.
     """
+    from .agent import run_patient
+
     sp = load_spec(spec)
     c = Corpus(Path(corpus))
     run_dir = cli_common.unique_run_dir(out)
@@ -150,7 +215,8 @@ def consistency(
     for i in range(n):
         r = run_patient(spec=sp, corpus=c, patient_id=patient, out_dir=run_dir,
                         model=cli_common.chat_model(model, api_base, temperature),
-                        max_model_calls=max_steps, seed=1234, run_id=f"{patient}__c{i}")
+                        max_model_calls=max_steps, seed=1234, run_id=f"{patient}__c{i}",
+                        max_usd=max_usd, runtime_profile=runtime_profile)
         outs.append(r)
         con.print(f"  run {i+1}/{n}: {r['answer'].get('status')} "
                   f"{json.dumps(r['answer'].get('value', {}), ensure_ascii=False)}")

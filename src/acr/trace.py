@@ -44,18 +44,20 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import threading
 import time
 import uuid
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 from .answer_checks import answer_check_rule_id, field_rule_id
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 # ===========================================================================================
@@ -355,6 +357,9 @@ class Tracer:
     path: Path
     events: list[dict] = field(default_factory=list)
     t0: float = field(default_factory=time.time)
+    _emit_lock: threading.Lock = field(
+        default_factory=threading.Lock, repr=False, compare=False
+    )
 
     # -- rule attribution state ---------------------------------------------------
     #: The spec's rule catalog, bound once per run. Empty until `bind_spec` is called, and
@@ -384,11 +389,15 @@ class Tracer:
     n_gate_evaluations: int = 0
 
     @classmethod
-    def create(cls, out_dir: str | Path, run_id: str | None = None) -> "Tracer":
+    def create(cls, out_dir: str | Path, run_id: str | None = None) -> Tracer:
         rid = run_id or f"run-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
         d = Path(out_dir)
-        d.mkdir(parents=True, exist_ok=True)
-        return cls(run_id=rid, path=d / f"{rid}.jsonl")
+        d.mkdir(parents=True, exist_ok=True, mode=0o700)
+        d.chmod(0o700)
+        path = d / f"{rid}.jsonl"
+        path.touch(mode=0o600, exist_ok=True)
+        path.chmod(0o600)
+        return cls(run_id=rid, path=path)
 
     def emit(self, kind: str, /, **payload: Any) -> dict:
         """Append one event. `kind` is POSITIONAL-ONLY, and a colliding payload key is
@@ -403,23 +412,25 @@ class Tracer:
         payload that silently overwrote `kind` would re-file the event as some other type of
         event and the reader would never know.
         """
-        clashes = [k for k in payload if k in RESERVED_EVENT_KEYS]
-        for k in clashes:
-            payload[f"payload_{k}"] = payload.pop(k)
-        ev = {
-            "run_id": self.run_id,
-            "seq": len(self.events),
-            "ts": _now(),
-            "elapsed_s": round(time.time() - self.t0, 3),
-            "kind": kind,
-            **payload,
-        }
-        if clashes:
-            ev["reserved_key_collisions"] = clashes
-            ev["severity"] = "warning"
-        self.events.append(ev)
-        with self.path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(ev, ensure_ascii=False, default=str) + "\n")
+        with self._emit_lock:
+            clashes = [k for k in payload if k in RESERVED_EVENT_KEYS]
+            for k in clashes:
+                payload[f"payload_{k}"] = payload.pop(k)
+            ev = {
+                "run_id": self.run_id,
+                "seq": len(self.events),
+                "ts": _now(),
+                "elapsed_s": round(time.time() - self.t0, 3),
+                "kind": kind,
+                **payload,
+            }
+            if clashes:
+                ev["reserved_key_collisions"] = clashes
+                ev["severity"] = "warning"
+            self.events.append(ev)
+            with self.path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(ev, ensure_ascii=False, default=str) + "\n")
+            self.path.chmod(0o600)
         return ev
 
     # convenience emitters ------------------------------------------------------
@@ -467,6 +478,20 @@ class Tracer:
                          n_rules=len(cat),
                          rules=[r.to_dict() for r in cat])
 
+    def note_gate_evaluation(self) -> int:
+        """One submitted answer was evaluated. Returns the new count.
+
+        Owns `n_gate_evaluations` because it is the only thing that happens on EVERY evaluation.
+        The counter used to live in `answer_check_outcome`, which was called unconditionally --
+        including on clean evaluations, so that a rejection streak could see its gaps. After the
+        clinical answer_checks were removed on 2026-07-30 that method only runs when something
+        actually fired, and a count incremented there would have been a count of rejections
+        wearing the name of evaluations. `rejections_by_rule` and the streak logic still live
+        there, where they belong.
+        """
+        self.n_gate_evaluations += 1
+        return self.n_gate_evaluations
+
     def answer_check_outcome(self, violations: Sequence[Any], *, status: str = "FOUND") -> dict:
         """Record which checks rejected this submission — and which did not.
 
@@ -475,7 +500,9 @@ class Tracer:
         alone would make "rejected, revised, rejected again for something else, rejected for
         the first rule once more" read as a three-deep loop on rule one.
         """
-        self.n_gate_evaluations += 1
+        # NOT incremented here any more. `note_gate_evaluation` owns the count, called once per
+        # `gate_answer` regardless of what fired — this method now runs only when something did,
+        # so counting here would count rejections and call them evaluations.
         # Two projections of one violation, and the difference is the quote. The trace keeps
         # it — it already holds every document the agent read, so the text is not new there —
         # and the manifest keeps `evidence_index` instead, which points into the evidence

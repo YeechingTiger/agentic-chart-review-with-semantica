@@ -11,7 +11,6 @@ from __future__ import annotations
 import csv
 import io
 import json
-import os
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -147,11 +146,20 @@ def extract(
     model: str = MODEL,
     api_base: str = API_BASE,
     max_steps: int = cli_common.MAX_STEPS,
+    max_usd: float = cli_common.MAX_USD,
     # 1.0, not 0.0. gpt-5.6-luna REJECTS any temperature but its default and 400s on the first
     # call; litellm's drop_params drops unsupported PARAMETERS, not unsupported VALUES, so a 0.0
     # reaches the API. A determinism default that cannot run is worse than an honest 1.0.
     temperature: float = typer.Option(1.0, "--temperature"),
     seed: int = typer.Option(None, "--seed", help="validation-sampling seed; share it across arms"),
+    runtime_profile: str = typer.Option(
+        "current-stratified-coverage",
+        "--runtime-profile",
+        help=(
+            "registered search policy; use the same patient/model/seed/budget "
+            "when comparing coverage arms"
+        ),
+    ),
     limit: int = typer.Option(0, "--limit", help="first N patients only; 0 = all"),
     out: str = typer.Option("runs", "--out"),
     dry_run: bool = typer.Option(False, "--dry-run",
@@ -187,7 +195,6 @@ def extract(
         return
 
     c = Corpus(Path(corpus))
-    vocab = c.doc_type_vocabulary()
     run_dir = cli_common.unique_run_dir(f"{out}/extract")
     specs = {sid: catalog.specs[sid] for sid in res.spec_ids}
 
@@ -204,7 +211,8 @@ def extract(
                     spec=sp, corpus=c, patient_id=pid, out_dir=run_dir,
                     model=cli_common.chat_model(model, api_base, temperature),
                     max_model_calls=max_steps, seed=seed or 1234,
-                    run_id=f"{pid}__{sid}")
+                    run_id=f"{pid}__{sid}", max_usd=max_usd,
+                    runtime_profile=runtime_profile)
             except Exception as e:  # noqa: BLE001
                 # One patient failing must not silently shrink the cohort: the row survives,
                 # carries the error, and the command exits non-zero at the end.
@@ -229,9 +237,32 @@ def extract(
                     pass          # a failed run must not be made worse by a failed write
                 continue
             ans = r.get("answer", {})
+            runtime_failed = bool(
+                (r.get("degradation") or {}).get("runtime_or_provider_errors")
+            )
+            incomplete = str(ans.get("status") or "") == "NO_ANSWER"
+            if runtime_failed or incomplete:
+                failed += 1
+                rec["errors"].append({
+                    "spec_id": sid,
+                    "error": (
+                        "RUNTIME_OR_PROVIDER_ERROR"
+                        if runtime_failed
+                        else "NO_ANSWER_AT_TERMINATION"
+                    ),
+                    "manifest": r.get("run_id"),
+                })
             rec["answers"][sid] = ans
             rec["runs"].append({
                 "spec_id": sid, "run_id": r.get("run_id"), "status": ans.get("status"),
+                "outcome": (
+                    "RUN_DEGRADED"
+                    if runtime_failed
+                    else "RUN_INCOMPLETE"
+                    if incomplete
+                    else "RUN_COMPLETED"
+                ),
+                "termination_reason": r.get("termination_reason"),
                 "gate_validated": r.get("gate_validated"),
                 "steps_to_gate_pass": r.get("steps_to_gate_pass"),
                 "negative_basis": ans.get("negative_basis"), "proof_basis": ans.get("proof_basis"),
@@ -255,6 +286,7 @@ def extract(
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "code_sha": code_sha(),
         "corpus": str(corpus), "specs_dir": specs_dir, "cohort": str(Path(cohort).resolve()),
+        "runtime_profile": runtime_profile,
         "model": (model or "default"), "sample_seed": seed,
         "resolution": res.to_dict(),
         "specs": {sid: specs[sid].identity() | {"question": specs[sid].question,
@@ -270,6 +302,7 @@ def extract(
     }
     path = run_dir / "extract.json"
     path.write_text(json.dumps(doc, indent=2, default=str), encoding="utf-8")
+    path.chmod(0o600)
 
     t = Table("patient", *res.names)
     for rec in patients:

@@ -1,0 +1,4216 @@
+schema_version: '2.0'
+category: metastatic_systemic
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 50
+rules:
+- candidate_id: E26-SYS-1L-01
+  parent_recommendation_id: E26-SYS-1L-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line recommendations dMMR or MSI-H
+  category: metastatic_systemic
+  title: First-line nivolumab plus ipilimumab for dMMR or MSI-H
+  core_or_supplemental: core
+  source_context:
+    eligibility: Unresectable mCRC with dMMR or MSI-H
+    action: Use nivolumab plus ipilimumab
+    timing: First line
+    exceptions: Checkpoint-inhibitor contraindication
+    predicate_logic: unresectable AND first_line AND (dMMR OR MSI_H) AND no_ICI_contraindication => nivo_ipi
+  requirements:
+    eligibility:
+      expression: Unresectable mCRC with dMMR or MSI-H
+      variables:
+      - crc.age_at_decision
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.primary_site
+      - crc.prior_ici_before_decision
+      - crc.resectability_status
+      - crc.therapy_regulatory_availability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.resectability_status
+        - variable: crc.line_of_therapy
+        - variable: crc.prior_ici_before_decision
+        - variable: crc.age_at_decision
+        - variable: crc.therapy_regulatory_availability_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use nivolumab plus ipilimumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Checkpoint-inhibitor contraindication
+      variables:
+      - crc.ici_contraindication
+      evidence_logic:
+        variable: crc.ici_contraindication
+  required_variables:
+  - crc.age_at_decision
+  - crc.decision_date
+  - crc.ici_contraindication
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.primary_site
+  - crc.prior_ici_before_decision
+  - crc.resectability_status
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.therapy_regulatory_availability_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-02
+  parent_recommendation_id: E26-SYS-1L-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line dMMR or MSI-H pembrolizumab branch
+  category: metastatic_systemic
+  title: Pembrolizumab when the doublet is not possible
+  core_or_supplemental: core
+  source_context:
+    eligibility: First-line dMMR or MSI-H and nivolumab-ipilimumab not possible
+    action: Use pembrolizumab
+    timing: First line
+    exceptions: Doublet feasible means the preferred ESMO branch remains nivolumab-ipilimumab
+    predicate_logic: first_line AND (dMMR OR MSI_H) AND doublet_not_possible => pembrolizumab
+  requirements:
+    eligibility:
+      expression: First-line dMMR or MSI-H and nivolumab-ipilimumab not possible
+      variables:
+      - crc.ici_doublet_infeasibility_reason_at_decision
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.line_of_therapy
+        - variable: crc.ici_doublet_infeasibility_reason_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use pembrolizumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Doublet feasible means the preferred ESMO branch remains nivolumab-ipilimumab
+      variables:
+      - crc.ici_contraindication
+      evidence_logic:
+        variable: crc.ici_contraindication
+  required_variables:
+  - crc.decision_date
+  - crc.ici_contraindication
+  - crc.ici_doublet_infeasibility_reason_at_decision
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-03
+  parent_recommendation_id: E26-SYS-1L-R02
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line pMMR or MSS RAS-mutated fit branch
+  category: metastatic_systemic
+  title: Triplet plus bevacizumab for fit RAS-mutated disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: pMMR or MSS, RAS-mutated, age under 70 with ECOG 0-2 or age 71-75 with ECOG 0
+    action: Use FOLFOXIRI plus bevacizumab
+    timing: First line
+    exceptions: Outside the stated age and performance-status gate
+    predicate_logic: pMMR_or_MSS AND RAS_mut AND fitness_gate => FOLFOXIRI_bev
+  requirements:
+    eligibility:
+      expression: pMMR or MSS, RAS-mutated, age under 70 with ECOG 0-2 or age 71-75 with ECOG 0
+      variables:
+      - crc.age_at_decision
+      - crc.ecog_performance_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.expanded_ras_result
+        - variable: crc.age_at_decision
+        - variable: crc.ecog_performance_status
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use FOLFOXIRI plus bevacizumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Outside the stated age and performance-status gate
+      variables:
+      - crc.organ_function_constraints
+      - crc.treatment_contraindication
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.organ_function_constraints
+        - variable: crc.treatment_contraindication
+  required_variables:
+  - crc.age_at_decision
+  - crc.decision_date
+  - crc.ecog_performance_status
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.organ_function_constraints
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.treatment_contraindication
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-04
+  parent_recommendation_id: E26-SYS-1L-R02
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line RAS-mutated doublet branch
+  category: metastatic_systemic
+  title: Doublet plus bevacizumab for RAS-mutated disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: pMMR or MSS and RAS-mutated when triplet is less suitable or not preferred
+    action: Use FOLFIRI or an oxaliplatin doublet plus bevacizumab
+    timing: First line
+    exceptions: Regimen-specific contraindications
+    predicate_logic: pMMR_or_MSS AND RAS_mut => FOLFIRI_bev OR oxaliplatin_doublet_bev
+  requirements:
+    eligibility:
+      expression: pMMR or MSS and RAS-mutated when triplet is less suitable or not preferred
+      variables:
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.expanded_ras_result
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use FOLFIRI or an oxaliplatin doublet plus bevacizumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Regimen-specific contraindications
+      variables:
+      - crc.irinotecan_toxicity_risk_at_decision
+      - crc.neuropathy_at_decision
+      - crc.patient_preference
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.neuropathy_at_decision
+        - variable: crc.irinotecan_toxicity_risk_at_decision
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.irinotecan_toxicity_risk_at_decision
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.neuropathy_at_decision
+  - crc.patient_preference
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-05
+  parent_recommendation_id: E26-SYS-1L-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line BRAF V600E preferred branch
+  category: metastatic_systemic
+  title: FOLFOX plus encorafenib and cetuximab for BRAF V600E
+  core_or_supplemental: core
+  source_context:
+    eligibility: pMMR or MSS mCRC with exact BRAF V600E
+    action: Use FOLFOX plus encorafenib and cetuximab
+    timing: First line
+    exceptions: Non-V600E BRAF and jurisdictional unavailability
+    predicate_logic: first_line AND pMMR_or_MSS AND BRAF_V600E => FOLFOX_EC
+  requirements:
+    eligibility:
+      expression: pMMR or MSS mCRC with exact BRAF V600E
+      variables:
+      - crc.braf_variant
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.oxaliplatin_fitness_at_decision
+      - crc.primary_site
+      - crc.therapy_regulatory_availability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.braf_variant
+        - variable: crc.oxaliplatin_fitness_at_decision
+        - variable: crc.therapy_regulatory_availability_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use FOLFOX plus encorafenib and cetuximab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Non-V600E BRAF and jurisdictional unavailability
+      variables:
+      - crc.braf_variant
+      - crc.therapy_regulatory_availability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.braf_variant
+        - variable: crc.therapy_regulatory_availability_at_decision
+  required_variables:
+  - crc.braf_variant
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.oxaliplatin_fitness_at_decision
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.therapy_regulatory_availability_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-06
+  parent_recommendation_id: E26-SYS-1L-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line BRAF V600E oxaliplatin exception
+  category: metastatic_systemic
+  title: FOLFIRI plus encorafenib and cetuximab when oxaliplatin is unsuitable
+  core_or_supplemental: core
+  source_context:
+    eligibility: BRAF V600E with prior adjuvant oxaliplatin or oxaliplatin contraindication
+    action: Use FOLFIRI plus encorafenib and cetuximab
+    timing: First line
+    exceptions: Availability and label constraints
+    predicate_logic: BRAF_V600E AND (prior_adjuvant_oxaliplatin OR oxaliplatin_contraindication) => FOLFIRI_EC
+  requirements:
+    eligibility:
+      expression: BRAF V600E with prior adjuvant oxaliplatin or oxaliplatin contraindication
+      variables:
+      - crc.braf_variant
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.prior_oxaliplatin_before_decision
+      - crc.therapy_regulatory_availability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.braf_variant
+        - variable: crc.prior_oxaliplatin_before_decision
+        - variable: crc.therapy_regulatory_availability_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use FOLFIRI plus encorafenib and cetuximab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.prior_oxaliplatin_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.prior_oxaliplatin_date
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Availability and label constraints
+      variables:
+      - crc.oxaliplatin_contraindication_at_decision
+      evidence_logic:
+        variable: crc.oxaliplatin_contraindication_at_decision
+  required_variables:
+  - crc.braf_variant
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.oxaliplatin_contraindication_at_decision
+  - crc.primary_site
+  - crc.prior_oxaliplatin_before_decision
+  - crc.prior_oxaliplatin_date
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.therapy_regulatory_availability_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-07
+  parent_recommendation_id: E26-SYS-1L-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line BRAF V600E unavailable-targeted branch
+  category: metastatic_systemic
+  title: Oxaliplatin doublet plus bevacizumab when targeted combination is unavailable
+  core_or_supplemental: core
+  source_context:
+    eligibility: BRAF V600E, FOLFOX-encorafenib-cetuximab unavailable, and oxaliplatin fit
+    action: Use an oxaliplatin doublet plus bevacizumab
+    timing: First line
+    exceptions: Oxaliplatin contraindication
+    predicate_logic: BRAF_V600E AND target_combo_unavailable AND oxaliplatin_fit => oxaliplatin_doublet_bev
+  requirements:
+    eligibility:
+      expression: BRAF V600E, FOLFOX-encorafenib-cetuximab unavailable, and oxaliplatin fit
+      variables:
+      - crc.braf_variant
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.oxaliplatin_fitness_at_decision
+      - crc.primary_site
+      - crc.targeted_combination_availability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.braf_variant
+        - variable: crc.targeted_combination_availability_at_decision
+        - variable: crc.oxaliplatin_fitness_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use an oxaliplatin doublet plus bevacizumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Oxaliplatin contraindication
+      variables:
+      - crc.oxaliplatin_contraindication_at_decision
+      evidence_logic:
+        variable: crc.oxaliplatin_contraindication_at_decision
+  required_variables:
+  - crc.braf_variant
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.oxaliplatin_contraindication_at_decision
+  - crc.oxaliplatin_fitness_at_decision
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.targeted_combination_availability_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-08
+  parent_recommendation_id: E26-SYS-1L-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line BRAF V600E right-sided selected branch
+  category: metastatic_systemic
+  title: FOLFOXIRI plus bevacizumab for selected right-sided BRAF V600E
+  core_or_supplemental: core
+  source_context:
+    eligibility: Right-sided BRAF V600E, selected and fit, targeted combination unavailable
+    action: Use FOLFOXIRI plus bevacizumab
+    timing: First line
+    exceptions: Must satisfy triplet fitness gate
+    predicate_logic: BRAF_V600E AND right_sided AND selected_fit AND target_combo_unavailable => FOLFOXIRI_bev
+  requirements:
+    eligibility:
+      expression: Right-sided BRAF V600E, selected and fit, targeted combination unavailable
+      variables:
+      - crc.age_at_decision
+      - crc.braf_variant
+      - crc.ecog_performance_status
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      - crc.targeted_combination_availability_at_decision
+      - crc.treatment_selection_rationale
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.braf_variant
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.age_at_decision
+        - variable: crc.ecog_performance_status
+        - variable: crc.targeted_combination_availability_at_decision
+        - variable: crc.treatment_selection_rationale
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use FOLFOXIRI plus bevacizumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Must satisfy triplet fitness gate
+      variables:
+      - crc.age_at_decision
+      - crc.ecog_performance_status
+      - crc.treatment_selection_rationale
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.age_at_decision
+        - variable: crc.ecog_performance_status
+        - variable: crc.treatment_selection_rationale
+  required_variables:
+  - crc.age_at_decision
+  - crc.braf_variant
+  - crc.decision_date
+  - crc.ecog_performance_status
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.targeted_combination_availability_at_decision
+  - crc.treatment_selection_rationale
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-09
+  parent_recommendation_id: E26-SYS-1L-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line left-sided doublet anti-EGFR branch
+  category: metastatic_systemic
+  title: Doublet plus anti-EGFR for left-sided RAS and BRAF wild type
+  core_or_supplemental: core
+  source_context:
+    eligibility: pMMR or MSS, RAS wild type, BRAF wild type, left-sided primary
+    action: Use FOLFIRI or FOLFOX plus anti-EGFR
+    timing: First line
+    exceptions: Anti-EGFR or backbone contraindication
+    predicate_logic: pMMR_or_MSS AND RAS_WT AND BRAF_WT AND left_sided => doublet_antiEGFR
+  requirements:
+    eligibility:
+      expression: pMMR or MSS, RAS wild type, BRAF wild type, left-sided primary
+      variables:
+      - crc.braf_v600e_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use FOLFIRI or FOLFOX plus anti-EGFR
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Anti-EGFR or backbone contraindication
+      variables:
+      - crc.treatment_contraindication
+      evidence_logic:
+        variable: crc.treatment_contraindication
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.treatment_contraindication
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-10
+  parent_recommendation_id: E26-SYS-1L-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line left-sided triplet-bevacizumab alternative
+  category: metastatic_systemic
+  title: Triplet plus bevacizumab alternative for fit left-sided wild type disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Left-sided RAS and BRAF wild type and triplet fit
+    action: Use FOLFOXIRI plus bevacizumab as an alternative
+    timing: First line
+    exceptions: Lower hierarchy than doublet plus anti-EGFR
+    predicate_logic: left_RAS_BRAF_WT AND triplet_fit => alternative_FOLFOXIRI_bev
+  requirements:
+    eligibility:
+      expression: Left-sided RAS and BRAF wild type and triplet fit
+      variables:
+      - crc.age_at_decision
+      - crc.braf_v600e_status
+      - crc.ecog_performance_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.age_at_decision
+        - variable: crc.ecog_performance_status
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use FOLFOXIRI plus bevacizumab as an alternative
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Lower hierarchy than doublet plus anti-EGFR
+      variables:
+      - crc.patient_preference
+      evidence_logic:
+        variable: crc.patient_preference
+  required_variables:
+  - crc.age_at_decision
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.ecog_performance_status
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.patient_preference
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-11
+  parent_recommendation_id: E26-SYS-1L-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line left-sided doublet-bevacizumab alternative
+  category: metastatic_systemic
+  title: Doublet plus bevacizumab alternative for left-sided wild type disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Left-sided RAS and BRAF wild type with alternative biologic strategy
+    action: Use a chemotherapy doublet plus bevacizumab
+    timing: First line
+    exceptions: Lower hierarchy than doublet plus anti-EGFR
+    predicate_logic: left_RAS_BRAF_WT => alternative_doublet_bev
+  requirements:
+    eligibility:
+      expression: Left-sided RAS and BRAF wild type with alternative biologic strategy
+      variables:
+      - crc.braf_v600e_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use a chemotherapy doublet plus bevacizumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Lower hierarchy than doublet plus anti-EGFR
+      variables:
+      - crc.patient_preference
+      - crc.treatment_contraindication
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.treatment_contraindication
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.patient_preference
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.treatment_contraindication
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-12
+  parent_recommendation_id: E26-SYS-1L-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line left-sided modified triplet anti-EGFR selected branch
+  category: metastatic_systemic
+  title: Modified triplet plus anti-EGFR in carefully selected left-sided disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Left-sided RAS and BRAF wild type and carefully selected fit patient
+    action: May consider modified FOLFOXIRI plus anti-EGFR
+    timing: First line
+    exceptions: Not a default strategy because of selection and toxicity
+    predicate_logic: left_RAS_BRAF_WT AND selected_fit => consider_mFOLFOXIRI_antiEGFR
+  requirements:
+    eligibility:
+      expression: Left-sided RAS and BRAF wild type and carefully selected fit patient
+      variables:
+      - crc.age_at_decision
+      - crc.braf_v600e_status
+      - crc.ecog_performance_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      - crc.treatment_selection_rationale
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.age_at_decision
+        - variable: crc.ecog_performance_status
+        - variable: crc.treatment_selection_rationale
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: May consider modified FOLFOXIRI plus anti-EGFR
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Not a default strategy because of selection and toxicity
+      variables:
+      - crc.treatment_toxicity_risk_at_decision
+      evidence_logic:
+        variable: crc.treatment_toxicity_risk_at_decision
+  required_variables:
+  - crc.age_at_decision
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.ecog_performance_status
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.treatment_selection_rationale
+  - crc.treatment_toxicity_risk_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_SOURCE_CONFLICT
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-13
+  parent_recommendation_id: E26-SYS-1L-R05
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line right-sided triplet-bevacizumab branch
+  category: metastatic_systemic
+  title: Triplet plus bevacizumab for fit right-sided RAS and BRAF wild type
+  core_or_supplemental: core
+  source_context:
+    eligibility: pMMR or MSS, RAS and BRAF wild type, right-sided, triplet fit
+    action: Use FOLFOXIRI plus bevacizumab
+    timing: First line
+    exceptions: Must satisfy triplet fitness gate
+    predicate_logic: pMMR_or_MSS AND right_RAS_BRAF_WT AND fit => FOLFOXIRI_bev
+  requirements:
+    eligibility:
+      expression: pMMR or MSS, RAS and BRAF wild type, right-sided, triplet fit
+      variables:
+      - crc.age_at_decision
+      - crc.braf_v600e_status
+      - crc.ecog_performance_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.age_at_decision
+        - variable: crc.ecog_performance_status
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use FOLFOXIRI plus bevacizumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Must satisfy triplet fitness gate
+      variables:
+      - crc.age_at_decision
+      - crc.ecog_performance_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.age_at_decision
+        - variable: crc.ecog_performance_status
+  required_variables:
+  - crc.age_at_decision
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.ecog_performance_status
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-14
+  parent_recommendation_id: E26-SYS-1L-R05
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line right-sided FOLFIRI-bevacizumab alternative
+  category: metastatic_systemic
+  title: FOLFIRI plus bevacizumab alternative for right-sided wild type disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Right-sided RAS and BRAF wild type with triplet less suitable
+    action: Use FOLFIRI plus bevacizumab
+    timing: First line
+    exceptions: Irinotecan contraindication
+    predicate_logic: right_RAS_BRAF_WT AND triplet_less_suitable => FOLFIRI_bev
+  requirements:
+    eligibility:
+      expression: Right-sided RAS and BRAF wild type with triplet less suitable
+      variables:
+      - crc.braf_v600e_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use FOLFIRI plus bevacizumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Irinotecan contraindication
+      variables:
+      - crc.irinotecan_contraindication_at_decision
+      - crc.patient_preference
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.irinotecan_contraindication_at_decision
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.irinotecan_contraindication_at_decision
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.patient_preference
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-15
+  parent_recommendation_id: E26-SYS-1L-R05
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line right-sided oxaliplatin-bevacizumab alternative
+  category: metastatic_systemic
+  title: Oxaliplatin doublet plus bevacizumab alternative for right-sided wild type disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Right-sided RAS and BRAF wild type with alternative backbone selected
+    action: Use an oxaliplatin doublet plus bevacizumab
+    timing: First line
+    exceptions: Oxaliplatin contraindication
+    predicate_logic: right_RAS_BRAF_WT => oxaliplatin_doublet_bev
+  requirements:
+    eligibility:
+      expression: Right-sided RAS and BRAF wild type with alternative backbone selected
+      variables:
+      - crc.braf_v600e_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use an oxaliplatin doublet plus bevacizumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Oxaliplatin contraindication
+      variables:
+      - crc.oxaliplatin_contraindication_at_decision
+      - crc.patient_preference
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.oxaliplatin_contraindication_at_decision
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.oxaliplatin_contraindication_at_decision
+  - crc.patient_preference
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-16
+  parent_recommendation_id: E26-SYS-1L-R05
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line right-sided selected doublet anti-EGFR branch
+  category: metastatic_systemic
+  title: Selected doublet plus anti-EGFR for right-sided wild type disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Right-sided RAS and BRAF wild type and carefully selected for anti-EGFR strategy
+    action: May consider FOLFIRI or FOLFOX plus anti-EGFR
+    timing: First line
+    exceptions: Lower evidence and careful profiling required
+    predicate_logic: right_RAS_BRAF_WT AND selected => consider_doublet_antiEGFR
+  requirements:
+    eligibility:
+      expression: Right-sided RAS and BRAF wild type and carefully selected for anti-EGFR strategy
+      variables:
+      - crc.braf_v600e_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      - crc.treatment_response_goal_at_decision
+      - crc.treatment_selection_rationale
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.treatment_selection_rationale
+        - variable: crc.treatment_response_goal_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: May consider FOLFIRI or FOLFOX plus anti-EGFR
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Lower evidence and careful profiling required
+      variables:
+      - crc.treatment_response_goal_at_decision
+      - crc.treatment_selection_rationale
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.treatment_selection_rationale
+        - variable: crc.treatment_response_goal_at_decision
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.treatment_response_goal_at_decision
+  - crc.treatment_selection_rationale
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_SOURCE_CONFLICT
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-17
+  parent_recommendation_id: E26-SYS-1L-R05
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line right-sided selected modified triplet anti-EGFR branch
+  category: metastatic_systemic
+  title: Selected modified triplet plus anti-EGFR for right-sided disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Right-sided RAS and BRAF wild type and carefully selected fit patient
+    action: May consider modified FOLFOXIRI plus anti-EGFR
+    timing: First line
+    exceptions: Selection and toxicity constraints
+    predicate_logic: right_RAS_BRAF_WT AND selected_fit => consider_mFOLFOXIRI_antiEGFR
+  requirements:
+    eligibility:
+      expression: Right-sided RAS and BRAF wild type and carefully selected fit patient
+      variables:
+      - crc.age_at_decision
+      - crc.braf_v600e_status
+      - crc.ecog_performance_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      - crc.treatment_selection_rationale
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.age_at_decision
+        - variable: crc.ecog_performance_status
+        - variable: crc.treatment_selection_rationale
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: May consider modified FOLFOXIRI plus anti-EGFR
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Selection and toxicity constraints
+      variables:
+      - crc.treatment_toxicity_risk_at_decision
+      evidence_logic:
+        variable: crc.treatment_toxicity_risk_at_decision
+  required_variables:
+  - crc.age_at_decision
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.ecog_performance_status
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.treatment_selection_rationale
+  - crc.treatment_toxicity_risk_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_SOURCE_CONFLICT
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-18
+  parent_recommendation_id: E26-SYS-1L-R06
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line unfit pMMR or MSS branch
+  category: metastatic_systemic
+  title: Fluoropyrimidine plus bevacizumab for combination-unfit disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: pMMR or MSS and unable or unwilling to receive intensive combinations
+    action: Use fluoropyrimidine plus bevacizumab
+    timing: First line
+    exceptions: Fluoropyrimidine or bevacizumab contraindication
+    predicate_logic: pMMR_or_MSS AND intensive_combination_unfit => fluoropyrimidine_bev
+  requirements:
+    eligibility:
+      expression: pMMR or MSS and unable or unwilling to receive intensive combinations
+      variables:
+      - crc.dpyd_function_status_at_decision
+      - crc.intensive_therapy_infeasibility_reason_at_decision
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.intensive_therapy_infeasibility_reason_at_decision
+        - variable: crc.dpyd_function_status_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use fluoropyrimidine plus bevacizumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Fluoropyrimidine or bevacizumab contraindication
+      variables:
+      - crc.bevacizumab_contraindication_at_decision
+      - crc.patient_preference
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.patient_preference
+        - variable: crc.bevacizumab_contraindication_at_decision
+  required_variables:
+  - crc.bevacizumab_contraindication_at_decision
+  - crc.decision_date
+  - crc.dpyd_function_status_at_decision
+  - crc.intensive_therapy_infeasibility_reason_at_decision
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.patient_preference
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DPD_IMPLEMENTATION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-19
+  parent_recommendation_id: E26-SYS-1L-R06
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line unfit left-sided targeted branch
+  category: metastatic_systemic
+  title: 5-FU and leucovorin plus anti-EGFR for unfit left-sided disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Combination-unfit, RAS and BRAF wild type, left-sided
+    action: Use 5-FU and leucovorin plus anti-EGFR
+    timing: First line
+    exceptions: Anti-EGFR or fluoropyrimidine contraindication
+    predicate_logic: unfit AND left_RAS_BRAF_WT => 5FU_LV_antiEGFR
+  requirements:
+    eligibility:
+      expression: Combination-unfit, RAS and BRAF wild type, left-sided
+      variables:
+      - crc.braf_v600e_status
+      - crc.dpyd_function_status_at_decision
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.dpyd_function_status_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use 5-FU and leucovorin plus anti-EGFR
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Anti-EGFR or fluoropyrimidine contraindication
+      variables:
+      - crc.anti_egfr_contraindication_at_decision
+      evidence_logic:
+        variable: crc.anti_egfr_contraindication_at_decision
+  required_variables:
+  - crc.anti_egfr_contraindication_at_decision
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.dpyd_function_status_at_decision
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DPD_IMPLEMENTATION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-1L-20
+  parent_recommendation_id: E26-SYS-1L-R06
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: First-line unfit anti-EGFR monotherapy branch
+  category: metastatic_systemic
+  title: Anti-EGFR monotherapy when chemotherapy is not possible
+  core_or_supplemental: core
+  source_context:
+    eligibility: Unfit left-sided RAS and BRAF wild type and unable to receive chemotherapy
+    action: May consider anti-EGFR monotherapy
+    timing: First line
+    exceptions: Low-evidence option and not the preferred branch
+    predicate_logic: unfit_left_RAS_BRAF_WT AND chemotherapy_not_possible => consider_antiEGFR_monotherapy
+  requirements:
+    eligibility:
+      expression: Unfit left-sided RAS and BRAF wild type and unable to receive chemotherapy
+      variables:
+      - crc.braf_v600e_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: May consider anti-EGFR monotherapy
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Low-evidence option and not the preferred branch
+      variables:
+      - crc.chemotherapy_contraindication_at_decision
+      - crc.patient_preference
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.chemotherapy_contraindication_at_decision
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.chemotherapy_contraindication_at_decision
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.patient_preference
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-2L-21
+  parent_recommendation_id: E26-SYS-2L-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Second-line dMMR or MSI-H immunotherapy recommendation
+  category: metastatic_systemic
+  title: Second-line nivolumab plus ipilimumab for ICI-naive dMMR or MSI-H
+  core_or_supplemental: core
+  source_context:
+    eligibility: dMMR or MSI-H mCRC without prior checkpoint inhibitor
+    action: Use nivolumab plus ipilimumab
+    timing: Second line
+    exceptions: Prior ICI or ICI contraindication
+    predicate_logic: second_line AND (dMMR OR MSI_H) AND no_prior_ICI => nivo_ipi
+  requirements:
+    eligibility:
+      expression: dMMR or MSI-H mCRC without prior checkpoint inhibitor
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.primary_site
+      - crc.prior_ici_before_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.line_of_therapy
+        - variable: crc.prior_ici_before_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use nivolumab plus ipilimumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Second line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Prior ICI or ICI contraindication
+      variables:
+      - crc.ici_contraindication
+      evidence_logic:
+        variable: crc.ici_contraindication
+  required_variables:
+  - crc.decision_date
+  - crc.ici_contraindication
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.primary_site
+  - crc.prior_ici_before_decision
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-2L-22
+  parent_recommendation_id: E26-SYS-2L-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Second-line dMMR or MSI-H pembrolizumab alternative
+  category: metastatic_systemic
+  title: Pembrolizumab alternative in ICI-naive dMMR or MSI-H
+  core_or_supplemental: core
+  source_context:
+    eligibility: dMMR or MSI-H mCRC without prior ICI
+    action: May use pembrolizumab as an alternative
+    timing: Second line
+    exceptions: Lower source strength than nivolumab-ipilimumab
+    predicate_logic: second_line AND (dMMR OR MSI_H) AND no_prior_ICI => may_pembrolizumab
+  requirements:
+    eligibility:
+      expression: dMMR or MSI-H mCRC without prior ICI
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.primary_site
+      - crc.prior_ici_before_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.line_of_therapy
+        - variable: crc.prior_ici_before_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: May use pembrolizumab as an alternative
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Second line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Lower source strength than nivolumab-ipilimumab
+      variables:
+      - crc.ici_contraindication
+      evidence_logic:
+        variable: crc.ici_contraindication
+  required_variables:
+  - crc.decision_date
+  - crc.ici_contraindication
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.primary_site
+  - crc.prior_ici_before_decision
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-2L-23
+  parent_recommendation_id: E26-SYS-2L-R02
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Second-line BRAF V600E recommendation
+  category: metastatic_systemic
+  title: Encorafenib plus cetuximab for previously unused BRAF-target branch
+  core_or_supplemental: core
+  source_context:
+    eligibility: BRAF V600E with pMMR or MSS, or dMMR or MSI-H after ICI, and no prior encorafenib-cetuximab
+    action: Use encorafenib plus cetuximab
+    timing: Second line
+    exceptions: Prior exposure to the combination
+    predicate_logic: BRAF_V600E AND (pMMR_or_MSS OR prior_ICI_for_dMMR) AND no_prior_EC => EC
+  requirements:
+    eligibility:
+      expression: BRAF V600E with pMMR or MSS, or dMMR or MSI-H after ICI, and no prior encorafenib-cetuximab
+      variables:
+      - crc.braf_variant
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.primary_site
+      - crc.prior_encorafenib_cetuximab_before_decision
+      - crc.prior_ici_before_decision
+      - crc.progression_before_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.braf_variant
+        - variable: crc.prior_ici_before_decision
+        - variable: crc.prior_encorafenib_cetuximab_before_decision
+        - variable: crc.progression_before_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use encorafenib plus cetuximab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Second line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Prior exposure to the combination
+      variables:
+      - crc.prior_encorafenib_cetuximab_before_decision
+      evidence_logic:
+        variable: crc.prior_encorafenib_cetuximab_before_decision
+  required_variables:
+  - crc.braf_variant
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.primary_site
+  - crc.prior_encorafenib_cetuximab_before_decision
+  - crc.prior_ici_before_decision
+  - crc.progression_before_decision
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-2L-24
+  parent_recommendation_id: E26-SYS-2L-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Second-line left-sided anti-EGFR recommendation
+  category: metastatic_systemic
+  title: Anti-EGFR plus irinotecan-based therapy after oxaliplatin
+  core_or_supplemental: core
+  source_context:
+    eligibility: Left-sided RAS and BRAF wild type, prior oxaliplatin doublet or FOLFOXIRI-bevacizumab, anti-EGFR naive
+    action: May choose FOLFIRI-cetuximab, FOLFIRI-panitumumab, or irinotecan-cetuximab
+    timing: Second line
+    exceptions: No demonstrated overall-survival benefit and regimen labels vary
+    predicate_logic: left_RAS_BRAF_WT AND prior_oxaliplatin_based AND antiEGFR_naive => one_of_three_antiEGFR_regimens
+  requirements:
+    eligibility:
+      expression: Left-sided RAS and BRAF wild type, prior oxaliplatin doublet or FOLFOXIRI-bevacizumab, anti-EGFR naive
+      variables:
+      - crc.braf_v600e_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      - crc.prior_anti_egfr_before_decision
+      - crc.prior_systemic_therapy
+      - crc.therapy_regulatory_availability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.prior_systemic_therapy
+        - variable: crc.prior_anti_egfr_before_decision
+        - variable: crc.therapy_regulatory_availability_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: May choose FOLFIRI-cetuximab, FOLFIRI-panitumumab, or irinotecan-cetuximab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Second line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: No demonstrated overall-survival benefit and regimen labels vary
+      variables:
+      - crc.therapy_regulatory_availability_at_decision
+      evidence_logic:
+        variable: crc.therapy_regulatory_availability_at_decision
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.prior_anti_egfr_before_decision
+  - crc.prior_systemic_therapy
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.therapy_regulatory_availability_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-3L-25
+  parent_recommendation_id: E26-SYS-3L-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Third-line subtype-option inheritance recommendation
+  category: metastatic_systemic
+  title: Use an unused subtype-specific second-line option later
+  core_or_supplemental: core
+  source_context:
+    eligibility: dMMR or MSI-H or BRAF V600E with the corresponding option not previously used
+    action: Use the applicable unused immunotherapy or BRAF-target option
+    timing: Third line or later
+    exceptions: Prior exposure or progression on that option
+    predicate_logic: subtype AND unused_corresponding_option => inherit_E26_SYS_2L_21_to_23
+  requirements:
+    eligibility:
+      expression: dMMR or MSI-H or BRAF V600E with the corresponding option not previously used
+      variables:
+      - crc.actionable_molecular_subtype_at_decision
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.prior_systemic_therapy
+      - crc.progression_before_decision
+      - crc.unused_eligible_subtype_therapy_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.line_of_therapy
+        - variable: crc.actionable_molecular_subtype_at_decision
+        - variable: crc.prior_systemic_therapy
+        - variable: crc.progression_before_decision
+        - variable: crc.unused_eligible_subtype_therapy_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use the applicable unused immunotherapy or BRAF-target option
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Third line or later
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Prior exposure or progression on that option
+      variables:
+      - crc.prior_systemic_therapy
+      - crc.progression_before_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.prior_systemic_therapy
+        - variable: crc.progression_before_decision
+  required_variables:
+  - crc.actionable_molecular_subtype_at_decision
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.prior_systemic_therapy
+  - crc.progression_before_decision
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.unused_eligible_subtype_therapy_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-3L-26
+  parent_recommendation_id: E26-SYS-3L-R02
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Third-line anti-EGFR-naive recommendation
+  category: metastatic_systemic
+  title: Anti-EGFR monotherapy for later-line RAS and BRAF wild type
+  core_or_supplemental: core
+  source_context:
+    eligibility: RAS and BRAF wild type and anti-EGFR naive
+    action: Use cetuximab or panitumumab
+    timing: Third line or later
+    exceptions: Prior anti-EGFR exposure
+    predicate_logic: line_ge_3 AND RAS_WT AND BRAF_WT AND antiEGFR_naive => cetuximab OR panitumumab
+  requirements:
+    eligibility:
+      expression: RAS and BRAF wild type and anti-EGFR naive
+      variables:
+      - crc.braf_v600e_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      - crc.prior_anti_egfr_before_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.line_of_therapy
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.prior_anti_egfr_before_decision
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use cetuximab or panitumumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Third line or later
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Prior anti-EGFR exposure
+      variables:
+      - crc.prior_anti_egfr_before_decision
+      evidence_logic:
+        variable: crc.prior_anti_egfr_before_decision
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.prior_anti_egfr_before_decision
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-3L-27
+  parent_recommendation_id: E26-SYS-3L-R02
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Third-line irinotecan-refractory qualifier
+  category: metastatic_systemic
+  title: Add irinotecan to cetuximab after irinotecan resistance
+  core_or_supplemental: core
+  source_context:
+    eligibility: Later-line cetuximab branch and irinotecan-refractory disease
+    action: Prefer cetuximab plus irinotecan over cetuximab alone
+    timing: Third line or later
+    exceptions: Irinotecan contraindication or intolerance
+    predicate_logic: E26_SYS_3L_26 AND irinotecan_refractory => prefer_cetuximab_irinotecan
+  requirements:
+    eligibility:
+      expression: Later-line cetuximab branch and irinotecan-refractory disease
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.prior_irinotecan_before_decision
+      - crc.progression_on_irinotecan_before_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.prior_irinotecan_before_decision
+        - variable: crc.progression_on_irinotecan_before_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Prefer cetuximab plus irinotecan over cetuximab alone
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Third line or later
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Irinotecan contraindication or intolerance
+      variables:
+      - crc.irinotecan_toxicity_at_decision
+      - crc.treatment_contraindication
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.irinotecan_toxicity_at_decision
+        - variable: crc.treatment_contraindication
+  required_variables:
+  - crc.decision_date
+  - crc.irinotecan_toxicity_at_decision
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.prior_irinotecan_before_decision
+  - crc.progression_on_irinotecan_before_decision
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.treatment_contraindication
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-3L-28
+  parent_recommendation_id: E26-SYS-3L-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Third-line anti-EGFR rechallenge recommendation
+  category: metastatic_systemic
+  title: ctDNA-selected anti-EGFR rechallenge
+  core_or_supplemental: core
+  source_context:
+    eligibility: Prior anti-EGFR with ctDNA RAS and BRAF wild type and preferably EGFR ectodomain wild type
+    action: May consider anti-EGFR retreatment
+    timing: Refractory later-line setting after an interval
+    exceptions: Detected resistance alteration favors an alternative; EGFR testing is preferred not mandatory
+    predicate_logic: prior_antiEGFR AND ctDNA_RAS_WT AND ctDNA_BRAF_WT AND preferred_EGFR_WT => consider_rechallenge
+  requirements:
+    eligibility:
+      expression: Prior anti-EGFR with ctDNA RAS and BRAF wild type and preferably EGFR ectodomain wild type
+      variables:
+      - crc.ctdna_resistance_alterations
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.prior_anti_egfr_before_decision
+      - crc.prior_anti_egfr_response
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.prior_anti_egfr_before_decision
+        - variable: crc.prior_anti_egfr_response
+        - variable: crc.ctdna_resistance_alterations
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: May consider anti-EGFR retreatment
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Refractory later-line setting after an interval
+      variables:
+      - crc.anti_egfr_washout_interval
+      - crc.ctdna_specimen_date
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.anti_egfr_washout_interval
+        - variable: crc.ctdna_specimen_date
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Detected resistance alteration favors an alternative; EGFR testing is preferred not mandatory
+      variables:
+      - crc.ctdna_resistance_alterations
+      evidence_logic:
+        variable: crc.ctdna_resistance_alterations
+  required_variables:
+  - crc.anti_egfr_washout_interval
+  - crc.ctdna_resistance_alterations
+  - crc.ctdna_specimen_date
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.prior_anti_egfr_before_decision
+  - crc.prior_anti_egfr_response
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_ASSAY_DEFINITION
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-3L-29
+  parent_recommendation_id: E26-SYS-3L-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Third-line HER2-positive RAS-WT preferred branch
+  category: metastatic_systemic
+  title: Tucatinib plus trastuzumab for HER2-positive RAS-WT disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: HER2-positive, RAS wild type, with prior fluoropyrimidine, oxaliplatin, and irinotecan
+    action: Use tucatinib plus trastuzumab
+    timing: Third line or later
+    exceptions: Regimen-specific HER2 definition and jurisdictional availability
+    predicate_logic: HER2_positive AND RAS_WT AND prior_F AND prior_O AND prior_I => tucatinib_trastuzumab
+  requirements:
+    eligibility:
+      expression: HER2-positive, RAS wild type, with prior fluoropyrimidine, oxaliplatin, and irinotecan
+      variables:
+      - crc.expanded_ras_result
+      - crc.her2_amplification_result
+      - crc.her2_protein_expression_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.prior_fluoropyrimidine_before_decision
+      - crc.prior_irinotecan_before_decision
+      - crc.prior_oxaliplatin_before_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.her2_protein_expression_result
+        - variable: crc.her2_amplification_result
+        - variable: crc.expanded_ras_result
+        - variable: crc.prior_fluoropyrimidine_before_decision
+        - variable: crc.prior_oxaliplatin_before_decision
+        - variable: crc.prior_irinotecan_before_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use tucatinib plus trastuzumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Third line or later
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Regimen-specific HER2 definition and jurisdictional availability
+      variables:
+      - crc.her2_amplification_result
+      - crc.her2_protein_expression_result
+      - crc.therapy_regulatory_availability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.her2_protein_expression_result
+        - variable: crc.her2_amplification_result
+        - variable: crc.therapy_regulatory_availability_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.her2_amplification_result
+  - crc.her2_protein_expression_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.prior_fluoropyrimidine_before_decision
+  - crc.prior_irinotecan_before_decision
+  - crc.prior_oxaliplatin_before_decision
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.therapy_regulatory_availability_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - B_ASSAY_DEFINITION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-3L-30
+  parent_recommendation_id: E26-SYS-3L-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Third-line HER2-positive alternative branch
+  category: metastatic_systemic
+  title: Alternative HER2 combinations after standard chemotherapy
+  core_or_supplemental: core
+  source_context:
+    eligibility: HER2-positive and RAS wild type after fluoropyrimidine, oxaliplatin, and irinotecan
+    action: May consider lapatinib-trastuzumab, pertuzumab-trastuzumab, or zanidatamab
+    timing: Third line or later
+    exceptions: Not FDA or EMA approved in the source context
+    predicate_logic: HER2_positive AND RAS_WT AND prior_FOI => one_of_HER2_alternatives
+  requirements:
+    eligibility:
+      expression: HER2-positive and RAS wild type after fluoropyrimidine, oxaliplatin, and irinotecan
+      variables:
+      - crc.expanded_ras_result
+      - crc.her2_amplification_result
+      - crc.her2_protein_expression_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.prior_systemic_therapy
+      - crc.trial_availability
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.her2_protein_expression_result
+        - variable: crc.her2_amplification_result
+        - variable: crc.expanded_ras_result
+        - variable: crc.prior_systemic_therapy
+        - variable: crc.trial_availability
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: May consider lapatinib-trastuzumab, pertuzumab-trastuzumab, or zanidatamab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Third line or later
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Not FDA or EMA approved in the source context
+      variables:
+      - crc.therapy_regulatory_availability_at_decision
+      - crc.trial_availability
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.therapy_regulatory_availability_at_decision
+        - variable: crc.trial_availability
+  required_variables:
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.her2_amplification_result
+  - crc.her2_protein_expression_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.prior_systemic_therapy
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.therapy_regulatory_availability_at_decision
+  - crc.trial_availability
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_OFF_LABEL
+    - B_DYNAMIC_LABEL
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-3L-31
+  parent_recommendation_id: E26-SYS-3L-R05
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Third-line HER2 IHC3-positive recommendation
+  category: metastatic_systemic
+  title: Trastuzumab deruxtecan for HER2 IHC3-positive disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: HER2 IHC3-positive with prior fluoropyrimidine-oxaliplatin-irinotecan or prior anti-HER2 treatment
+    action: Use trastuzumab deruxtecan
+    timing: Third line or later
+    exceptions: IHC2-positive with ISH amplification is not this formal branch; assess pneumonitis risk
+    predicate_logic: HER2_IHC3 AND (prior_FOI OR prior_antiHER2) => TDXd
+  requirements:
+    eligibility:
+      expression: HER2 IHC3-positive with prior fluoropyrimidine-oxaliplatin-irinotecan or prior anti-HER2 treatment
+      variables:
+      - crc.her2_amplification_result
+      - crc.her2_protein_expression_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.prior_anti_her2_before_decision
+      - crc.prior_systemic_therapy
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.her2_protein_expression_result
+        - variable: crc.her2_amplification_result
+        - variable: crc.prior_systemic_therapy
+        - variable: crc.prior_anti_her2_before_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use trastuzumab deruxtecan
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Third line or later
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: IHC2-positive with ISH amplification is not this formal branch; assess pneumonitis risk
+      variables:
+      - crc.ild_pneumonitis_risk_at_decision
+      evidence_logic:
+        variable: crc.ild_pneumonitis_risk_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.her2_amplification_result
+  - crc.her2_protein_expression_result
+  - crc.ild_pneumonitis_risk_at_decision
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.prior_anti_her2_before_decision
+  - crc.prior_systemic_therapy
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - B_ASSAY_DEFINITION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-3L-32
+  parent_recommendation_id: E26-SYS-3L-R06
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Third-line KRAS G12C recommendation
+  category: metastatic_systemic
+  title: KRAS G12C targeted combinations after standard chemotherapy
+  core_or_supplemental: core
+  source_context:
+    eligibility: Exact KRAS G12C with prior fluoropyrimidine, oxaliplatin, and irinotecan
+    action: Use panitumumab-sotorasib or cetuximab-adagrasib
+    timing: Third line or later
+    exceptions: Only exact G12C and jurisdictional label
+    predicate_logic: KRAS_G12C AND prior_F AND prior_O AND prior_I => pani_soto OR cetux_ada
+  requirements:
+    eligibility:
+      expression: Exact KRAS G12C with prior fluoropyrimidine, oxaliplatin, and irinotecan
+      variables:
+      - crc.kras_variant
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.prior_fluoropyrimidine_before_decision
+      - crc.prior_irinotecan_before_decision
+      - crc.prior_oxaliplatin_before_decision
+      - crc.therapy_regulatory_availability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.kras_variant
+        - variable: crc.prior_fluoropyrimidine_before_decision
+        - variable: crc.prior_oxaliplatin_before_decision
+        - variable: crc.prior_irinotecan_before_decision
+        - variable: crc.therapy_regulatory_availability_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use panitumumab-sotorasib or cetuximab-adagrasib
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Third line or later
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Only exact G12C and jurisdictional label
+      variables:
+      - crc.kras_variant
+      - crc.therapy_regulatory_availability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.kras_variant
+        - variable: crc.therapy_regulatory_availability_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.kras_variant
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.prior_fluoropyrimidine_before_decision
+  - crc.prior_irinotecan_before_decision
+  - crc.prior_oxaliplatin_before_decision
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.therapy_regulatory_availability_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-3L-33
+  parent_recommendation_id: E26-SYS-3L-R07
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Third-line NTRK fusion recommendation
+  category: metastatic_systemic
+  title: First-generation TRK inhibitor for NTRK fusion
+  core_or_supplemental: core
+  source_context:
+    eligibility: Oncogenic NTRK1, NTRK2, or NTRK3 fusion
+    action: Use entrectinib or larotrectinib
+    timing: Third line or later
+    exceptions: Point mutation or overexpression is not a fusion
+    predicate_logic: line_ge_3 AND oncogenic_NTRK_fusion => entrectinib OR larotrectinib
+  requirements:
+    eligibility:
+      expression: Oncogenic NTRK1, NTRK2, or NTRK3 fusion
+      variables:
+      - crc.fusion_in_frame_status
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.molecular_assay_method
+      - crc.ntrk_fusion_result
+      - crc.primary_site
+      - crc.prior_trk_inhibitor_before_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ntrk_fusion_result
+        - variable: crc.fusion_in_frame_status
+        - variable: crc.molecular_assay_method
+        - variable: crc.prior_trk_inhibitor_before_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use entrectinib or larotrectinib
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Third line or later
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Point mutation or overexpression is not a fusion
+      variables:
+      - crc.ntrk_fusion_result
+      evidence_logic:
+        variable: crc.ntrk_fusion_result
+  required_variables:
+  - crc.decision_date
+  - crc.fusion_in_frame_status
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.molecular_assay_method
+  - crc.ntrk_fusion_result
+  - crc.primary_site
+  - crc.prior_trk_inhibitor_before_decision
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - B_ASSAY_DEFINITION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-3L-34
+  parent_recommendation_id: E26-SYS-3L-R07
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Third-line NTRK acquired-resistance branch
+  category: metastatic_systemic
+  title: Repotrectinib after earlier TRK inhibitor progression
+  core_or_supplemental: core
+  source_context:
+    eligibility: NTRK fusion with progression on entrectinib or larotrectinib
+    action: Use repotrectinib
+    timing: After prior TRK inhibitor progression
+    exceptions: Resistance and label constraints
+    predicate_logic: NTRK_fusion AND progression_on_first_generation_TRKi => repotrectinib
+  requirements:
+    eligibility:
+      expression: NTRK fusion with progression on entrectinib or larotrectinib
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.ntrk_fusion_result
+      - crc.ntrk_resistance_mutation
+      - crc.primary_site
+      - crc.prior_trk_inhibitor_before_decision
+      - crc.therapy_regulatory_availability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ntrk_fusion_result
+        - variable: crc.prior_trk_inhibitor_before_decision
+        - variable: crc.ntrk_resistance_mutation
+        - variable: crc.therapy_regulatory_availability_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use repotrectinib
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: After prior TRK inhibitor progression
+      variables:
+      - crc.decision_date
+      - crc.progression_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.progression_date
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Resistance and label constraints
+      variables:
+      - crc.ntrk_resistance_mutation
+      - crc.therapy_regulatory_availability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ntrk_resistance_mutation
+        - variable: crc.therapy_regulatory_availability_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.ntrk_fusion_result
+  - crc.ntrk_resistance_mutation
+  - crc.primary_site
+  - crc.prior_trk_inhibitor_before_decision
+  - crc.progression_date
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.therapy_regulatory_availability_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-3L-35
+  parent_recommendation_id: E26-SYS-3L-R08
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Third-line RET rearrangement recommendation
+  category: metastatic_systemic
+  title: Selpercatinib for RET-rearranged disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Oncogenic RET rearrangement in mCRC
+    action: Use selpercatinib
+    timing: Third line or later
+    exceptions: True rearrangement required; approval and availability vary
+    predicate_logic: line_ge_3 AND oncogenic_RET_fusion => selpercatinib
+  requirements:
+    eligibility:
+      expression: Oncogenic RET rearrangement in mCRC
+      variables:
+      - crc.fusion_in_frame_status
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.molecular_assay_method
+      - crc.primary_site
+      - crc.ret_fusion_result
+      - crc.therapy_regulatory_availability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ret_fusion_result
+        - variable: crc.fusion_in_frame_status
+        - variable: crc.molecular_assay_method
+        - variable: crc.therapy_regulatory_availability_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use selpercatinib
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Third line or later
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: True rearrangement required; approval and availability vary
+      variables:
+      - crc.ret_fusion_result
+      - crc.therapy_regulatory_availability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ret_fusion_result
+        - variable: crc.therapy_regulatory_availability_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.fusion_in_frame_status
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.molecular_assay_method
+  - crc.primary_site
+  - crc.ret_fusion_result
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.therapy_regulatory_availability_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - B_ASSAY_DEFINITION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-3L-36
+  parent_recommendation_id: E26-SYS-3L-R09
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Third-line POLE or POLD1 recommendation
+  category: metastatic_systemic
+  title: Nivolumab for qualified POLE or POLD1-altered disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Pathogenic proofreading-domain POLE or POLD1 alteration with ultramutated phenotype
+    action: May use nivolumab
+    timing: Third line or later
+    exceptions: VUS or mutation without a matching phenotype is insufficient
+    predicate_logic: line_ge_3 AND pathogenic_proofreading_POLE_POLD1 AND ultramutated => consider_nivolumab
+  requirements:
+    eligibility:
+      expression: Pathogenic proofreading-domain POLE or POLD1 alteration with ultramutated phenotype
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.msi_status
+      - crc.pole_pold1_variant
+      - crc.primary_site
+      - crc.tumor_mutational_burden_result
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.pole_pold1_variant
+        - variable: crc.tumor_mutational_burden_result
+        - variable: crc.msi_status
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: May use nivolumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Third line or later
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: VUS or mutation without a matching phenotype is insufficient
+      variables:
+      - crc.msi_status
+      - crc.pole_pold1_variant
+      - crc.tumor_mutational_burden_result
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.pole_pold1_variant
+        - variable: crc.tumor_mutational_burden_result
+        - variable: crc.msi_status
+  required_variables:
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.msi_status
+  - crc.pole_pold1_variant
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.tumor_mutational_burden_result
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_OFF_LABEL
+    - B_ASSAY_DEFINITION
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-3L-37
+  parent_recommendation_id: E26-SYS-3L-R10
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Third-line cross-subgroup FTD-TPI recommendation
+  category: metastatic_systemic
+  title: FTD-TPI plus bevacizumab across molecular subgroups
+  core_or_supplemental: core
+  source_context:
+    eligibility: Later-line mCRC after fluoropyrimidine, oxaliplatin, irinotecan, and relevant biologics
+    action: Use FTD-TPI plus bevacizumab
+    timing: Third line or later
+    exceptions: Availability or bevacizumab contraindication
+    predicate_logic: line_ge_3 AND prior_required_agents => FTD_TPI_bev independent_of_subtype
+  requirements:
+    eligibility:
+      expression: Later-line mCRC after fluoropyrimidine, oxaliplatin, irinotecan, and relevant biologics
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.prior_biologic_therapy_before_decision
+      - crc.prior_fluoropyrimidine_before_decision
+      - crc.prior_irinotecan_before_decision
+      - crc.prior_oxaliplatin_before_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.line_of_therapy
+        - variable: crc.prior_fluoropyrimidine_before_decision
+        - variable: crc.prior_oxaliplatin_before_decision
+        - variable: crc.prior_irinotecan_before_decision
+        - variable: crc.prior_biologic_therapy_before_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use FTD-TPI plus bevacizumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Third line or later
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Availability or bevacizumab contraindication
+      variables:
+      - crc.bevacizumab_contraindication_at_decision
+      evidence_logic:
+        variable: crc.bevacizumab_contraindication_at_decision
+  required_variables:
+  - crc.bevacizumab_contraindication_at_decision
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.prior_biologic_therapy_before_decision
+  - crc.prior_fluoropyrimidine_before_decision
+  - crc.prior_irinotecan_before_decision
+  - crc.prior_oxaliplatin_before_decision
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-SYS-3L-38
+  parent_recommendation_id: E26-SYS-3L-R10
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_systemic
+  source_anchor: Later-line FTD-TPI bevacizumab-contraindication branch
+  category: metastatic_systemic
+  title: FTD-TPI alone when bevacizumab is contraindicated
+  core_or_supplemental: core
+  source_context:
+    eligibility: Later-line mCRC with bevacizumab contraindication
+    action: Use FTD-TPI alone
+    timing: Later line
+    exceptions: None beyond standard FTD-TPI contraindications
+    predicate_logic: later_line AND bevacizumab_contraindicated => FTD_TPI
+  requirements:
+    eligibility:
+      expression: Later-line mCRC with bevacizumab contraindication
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.prior_systemic_therapy
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.line_of_therapy
+        - variable: crc.prior_systemic_therapy
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use FTD-TPI alone
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Later line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: None beyond standard FTD-TPI contraindications
+      variables:
+      - crc.bevacizumab_contraindication_at_decision
+      - crc.treatment_contraindication
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.bevacizumab_contraindication_at_decision
+        - variable: crc.treatment_contraindication
+  required_variables:
+  - crc.bevacizumab_contraindication_at_decision
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.prior_systemic_therapy
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.treatment_contraindication
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-MCRC-01
+  parent_recommendation_id: ASCO22-MCRC-R1.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_mcrc_2022_systemic
+  source_anchor: Recommendation 1.1
+  category: metastatic_systemic
+  title: First-line doublet for initially unresectable MSS or pMMR
+  core_or_supplemental: core
+  source_context:
+    eligibility: Initially unresectable MSS or pMMR mCRC
+    action: Offer FOLFOX or FOLFIRI
+    timing: First line
+    exceptions: Backbone contraindications
+    predicate_logic: unresectable AND MSS_or_pMMR => FOLFOX OR FOLFIRI
+  requirements:
+    eligibility:
+      expression: Initially unresectable MSS or pMMR mCRC
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.primary_site
+      - crc.resectability_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.resectability_status
+        - variable: crc.line_of_therapy
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Offer FOLFOX or FOLFIRI
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Backbone contraindications
+      variables:
+      - crc.regimen_contraindication_at_decision
+      evidence_logic:
+        variable: crc.regimen_contraindication_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.primary_site
+  - crc.regimen_contraindication_at_decision
+  - crc.resectability_status
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-MCRC-02
+  parent_recommendation_id: ASCO22-MCRC-R1.1
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_systemic
+  source_anchor: Recommendation 1.1 qualifying statement
+  category: metastatic_systemic
+  title: CAPOX substitution for FOLFOX
+  core_or_supplemental: core
+  source_context:
+    eligibility: FOLFOX candidate after clinician-patient discussion
+    action: CAPOX may substitute
+    timing: First line
+    exceptions: Clinical discretion and oral feasibility
+    predicate_logic: FOLFOX_candidate AND SDM => may_CAPOX
+  requirements:
+    eligibility:
+      expression: FOLFOX candidate after clinician-patient discussion
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.oral_chemotherapy_feasibility_at_decision
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.oral_chemotherapy_feasibility_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: CAPOX may substitute
+      variables:
+      - crc.clinician_treatment_choice_at_decision
+      - crc.systemic_regimen
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.clinician_treatment_choice_at_decision
+        - variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Clinical discretion and oral feasibility
+      variables:
+      - crc.patient_preference
+      evidence_logic:
+        variable: crc.patient_preference
+  required_variables:
+  - crc.clinician_treatment_choice_at_decision
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.oral_chemotherapy_feasibility_at_decision
+  - crc.patient_preference
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-MCRC-03
+  parent_recommendation_id: ASCO22-MCRC-R1.2
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_mcrc_2022_systemic
+  source_anchor: Recommendation 1.2
+  category: metastatic_systemic
+  title: Selected first-line triplet
+  core_or_supplemental: core
+  source_context:
+    eligibility: Selected fit initially unresectable MSS or pMMR mCRC
+    action: May offer FOLFOXIRI
+    timing: First line
+    exceptions: Greater toxicity and selection required
+    predicate_logic: MSS_or_pMMR AND selected_fit => may_FOLFOXIRI
+  requirements:
+    eligibility:
+      expression: Selected fit initially unresectable MSS or pMMR mCRC
+      variables:
+      - crc.age_at_decision
+      - crc.ecog_performance_status
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.treatment_selection_rationale
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.age_at_decision
+        - variable: crc.ecog_performance_status
+        - variable: crc.treatment_selection_rationale
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: May offer FOLFOXIRI
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Greater toxicity and selection required
+      variables:
+      - crc.comorbidity_constraints
+      - crc.organ_function_constraints
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.organ_function_constraints
+        - variable: crc.comorbidity_constraints
+  required_variables:
+  - crc.age_at_decision
+  - crc.comorbidity_constraints
+  - crc.decision_date
+  - crc.ecog_performance_status
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.organ_function_constraints
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.treatment_selection_rationale
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-MCRC-04
+  parent_recommendation_id: ASCO22-MCRC-R1.1
+  related_parent_recommendation_ids:
+  - ASCO22-MCRC-R1.1
+  - ASCO22-MCRC-R1.2
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_systemic
+  source_anchor: Recommendations 1.1 and 1.2 qualifying statement 1
+  category: metastatic_systemic
+  title: Bevacizumab evidence-base qualifier
+  core_or_supplemental: core
+  source_context:
+    eligibility: Use of ASCO doublet or triplet evidence pathway
+    action: Record that evidence included bevacizumab with the backbone
+    timing: At evidence interpretation
+    exceptions: Do not convert provenance into an independent must rule
+    predicate_logic: ASCO_backbone_evidence => provenance_includes_bevacizumab
+  requirements:
+    eligibility:
+      expression: Use of ASCO doublet or triplet evidence pathway
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.unresolved.guideline_evidence_context
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.unresolved.guideline_evidence_context
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Record that evidence included bevacizumab with the backbone
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: At evidence interpretation
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Do not convert provenance into an independent must rule
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.unresolved.guideline_evidence_context
+  computability:
+    status: not_computable
+    blockers:
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    - UNRESOLVED_SOURCE_CONCEPT:evidence_context
+    unresolved_source_concepts:
+    - evidence_context
+    unresolved_variable_ids:
+    - crc.unresolved.guideline_evidence_context
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-MCRC-06
+  parent_recommendation_id: ASCO22-MCRC-R2.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_mcrc_2022_systemic
+  source_anchor: Recommendation 2.1
+  category: metastatic_systemic
+  title: First-line pembrolizumab for MSI-H or dMMR
+  core_or_supplemental: core
+  source_context:
+    eligibility: MSI-H or dMMR mCRC
+    action: Use pembrolizumab
+    timing: First line
+    exceptions: ICI contraindication
+    predicate_logic: first_line AND (MSI_H OR dMMR) => pembrolizumab
+  requirements:
+    eligibility:
+      expression: MSI-H or dMMR mCRC
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.line_of_therapy
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use pembrolizumab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: ICI contraindication
+      variables:
+      - crc.ici_contraindication
+      evidence_logic:
+        variable: crc.ici_contraindication
+  required_variables:
+  - crc.decision_date
+  - crc.ici_contraindication
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - B_DYNAMIC_LABEL
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-MCRC-07
+  parent_recommendation_id: ASCO22-MCRC-R3.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_mcrc_2022_systemic
+  source_anchor: Recommendation 3.1
+  category: metastatic_systemic
+  title: Anti-EGFR doublet for left-sided RAS-WT disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: MSS or pMMR, left-sided, treatment-naive, RAS wild type
+    action: Use doublet chemotherapy plus anti-EGFR
+    timing: First line
+    exceptions: ASCO predicate does not explicitly require BRAF WT
+    predicate_logic: MSS_or_pMMR AND left AND RAS_WT => doublet_antiEGFR
+  requirements:
+    eligibility:
+      expression: MSS or pMMR, left-sided, treatment-naive, RAS wild type
+      variables:
+      - crc.braf_v600e_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Use doublet chemotherapy plus anti-EGFR
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: ASCO predicate does not explicitly require BRAF WT
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-MCRC-08
+  parent_recommendation_id: ASCO22-MCRC-R3.1
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_systemic
+  source_anchor: Recommendation 3.1 qualifier 1
+  category: metastatic_systemic
+  title: Avoid first-line anti-EGFR for right-sided RAS-WT
+  core_or_supplemental: core
+  source_context:
+    eligibility: Right-sided RAS wild type mCRC
+    action: Do not use anti-EGFR; offer chemotherapy plus anti-VEGF
+    timing: First line
+    exceptions: ESMO 2026 has a selected-patient option
+    predicate_logic: right AND RAS_WT => not_antiEGFR AND chemo_antiVEGF
+  requirements:
+    eligibility:
+      expression: Right-sided RAS wild type mCRC
+      variables:
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.expanded_ras_result
+        - variable: crc.line_of_therapy
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Do not use anti-EGFR; offer chemotherapy plus anti-VEGF
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: ESMO 2026 has a selected-patient option
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-MCRC-09
+  parent_recommendation_id: ASCO22-MCRC-R3.1
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_systemic
+  source_anchor: Recommendation 3.1 qualifier 2
+  category: metastatic_systemic
+  title: Avoid anti-EGFR in RAS-mutated disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Exact RAS mutation detected
+    action: Do not use anti-EGFR therapy
+    timing: Any anti-EGFR decision
+    exceptions: None stated
+    predicate_logic: RAS_mutated => not_antiEGFR
+  requirements:
+    eligibility:
+      expression: Exact RAS mutation detected
+      variables:
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.somatic_variant_result
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.expanded_ras_result
+        - variable: crc.somatic_variant_result
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Do not use anti-EGFR therapy
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Any anti-EGFR decision
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: None stated
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.somatic_variant_result
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-MCRC-10
+  parent_recommendation_id: ASCO22-MCRC-R3.1
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_systemic
+  source_anchor: Recommendation 3.1 qualifier 3
+  category: metastatic_systemic
+  title: Avoid first-line triplet plus anti-EGFR
+  core_or_supplemental: core
+  source_context:
+    eligibility: Proposed first-line triplet plus anti-EGFR
+    action: Do not recommend the combination
+    timing: First line
+    exceptions: ESMO 2026 permits a carefully selected option
+    predicate_logic: first_line AND triplet AND antiEGFR => not_recommended
+  requirements:
+    eligibility:
+      expression: Proposed first-line triplet plus anti-EGFR
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.treatment_selection_rationale
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.line_of_therapy
+        - variable: crc.treatment_selection_rationale
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Do not recommend the combination
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: ESMO 2026 permits a carefully selected option
+      variables:
+      - crc.treatment_selection_rationale
+      evidence_logic:
+        variable: crc.treatment_selection_rationale
+  required_variables:
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.treatment_selection_rationale
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-MCRC-11
+  parent_recommendation_id: ASCO22-MCRC-R3.1
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_systemic
+  source_anchor: Recommendation 3.1 qualifier 4
+  category: metastatic_systemic
+  title: Anti-VEGF remains an active left-sided alternative
+  core_or_supplemental: core
+  source_context:
+    eligibility: Left-sided treatment-naive RAS-WT disease
+    action: Prefer anti-EGFR but allow anti-VEGF as an active option
+    timing: First line
+    exceptions: Current ESMO also requires BRAF WT for the preferred branch
+    predicate_logic: left_RAS_WT => prefer_antiEGFR; may_antiVEGF
+  requirements:
+    eligibility:
+      expression: Left-sided treatment-naive RAS-WT disease
+      variables:
+      - crc.braf_v600e_status
+      - crc.expanded_ras_result
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_sidedness
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.primary_tumor_sidedness
+        - variable: crc.expanded_ras_result
+        - variable: crc.braf_v600e_status
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Prefer anti-EGFR but allow anti-VEGF as an active option
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: First line
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Current ESMO also requires BRAF WT for the preferred branch
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.expanded_ras_result
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.primary_tumor_sidedness
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-MCRC-13
+  parent_recommendation_id: ASCO22-MCRC-R4.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_mcrc_2022_systemic
+  source_anchor: Recommendation 4.1
+  category: metastatic_systemic
+  title: Encorafenib plus cetuximab after progression
+  core_or_supplemental: core
+  source_context:
+    eligibility: BRAF V600E mCRC progressed after at least one prior line
+    action: Offer encorafenib plus cetuximab
+    timing: Second line or later in the source
+    exceptions: Source predates current first-line BRAF-target use and lacks a no-rechallenge qualifier
+    predicate_logic: BRAF_V600E AND prior_lines_ge_1 AND progressed => EC
+  requirements:
+    eligibility:
+      expression: BRAF V600E mCRC progressed after at least one prior line
+      variables:
+      - crc.braf_variant
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.prior_braf_targeted_therapy_before_decision
+      - crc.prior_systemic_line_count_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.braf_variant
+        - variable: crc.prior_systemic_line_count_at_decision
+        - variable: crc.prior_braf_targeted_therapy_before_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.line_of_therapy
+    action:
+      expression: Offer encorafenib plus cetuximab
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Second line or later in the source
+      variables:
+      - crc.decision_date
+      - crc.progression_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.progression_date
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Source predates current first-line BRAF-target use and lacks a no-rechallenge qualifier
+      variables:
+      - crc.prior_braf_targeted_therapy_before_decision
+      evidence_logic:
+        variable: crc.prior_braf_targeted_therapy_before_decision
+  required_variables:
+  - crc.braf_variant
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.prior_braf_targeted_therapy_before_decision
+  - crc.prior_systemic_line_count_at_decision
+  - crc.progression_date
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - B_DYNAMIC_LABEL
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: SITC23-CRC-04
+  parent_recommendation_id: SITC23-CRC-R4
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: sitc_gi_2023_crc_guards
+  source_anchor: CRC panel recommendation MSS guard
+  category: metastatic_systemic
+  title: No trial-external ICI for untreated MSS or pMMR based on TMB alone
+  core_or_supplemental: supplemental
+  source_context:
+    eligibility: Untreated metastatic MSS or pMMR CRC without qualified POLE-POLD1 phenotype
+    action: Do not use ICI outside a trial
+    timing: Initial treatment decision
+    exceptions: Clinical trial or pathogenic proofreading alteration with ultramutated phenotype
+    predicate_logic: untreated_mCRC AND MSS_pMMR AND no_qualified_POLE_POLD1 AND no_trial => not_ICI
+  requirements:
+    eligibility:
+      expression: Untreated metastatic MSS or pMMR CRC without qualified POLE-POLD1 phenotype
+      variables:
+      - crc.line_of_therapy
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.pole_pold1_variant
+      - crc.primary_site
+      - crc.tumor_mutational_burden_result
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.line_of_therapy
+        - variable: crc.tumor_mutational_burden_result
+        - variable: crc.pole_pold1_variant
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Do not use ICI outside a trial
+      variables:
+      - crc.systemic_regimen
+      evidence_logic:
+        variable: crc.systemic_regimen
+    timing:
+      expression: Initial treatment decision
+      variables:
+      - crc.decision_date
+      - crc.systemic_therapy_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.systemic_therapy_start_date
+    exceptions:
+      expression: Clinical trial or pathogenic proofreading alteration with ultramutated phenotype
+      variables:
+      - crc.trial_context
+      evidence_logic:
+        variable: crc.trial_context
+  required_variables:
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.pole_pold1_variant
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.systemic_therapy_start_date
+  - crc.trial_context
+  - crc.tumor_mutational_burden_result
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SITC_LIVING
+    - B_SUPPLEMENT_ONLY
+    - B_ASSAY_DEFINITION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

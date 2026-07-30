@@ -751,7 +751,6 @@ CONTEXT_ANSWER_KEY = "expected_output"
 
 #: Tool -> the cheapest cost class that can honestly declare it.
 EVALUATOR_TOOLS = {"read_document": COST_READS_DOCUMENTS,
-                   "read_section": COST_READS_DOCUMENTS,
                    "list_documents": COST_READS_DOCUMENTS,
                    "search_notes": COST_RERUNS_SEARCHES}
 #: The ONLY permissible scope. Not a default and not a maximum — the only accepted value, so

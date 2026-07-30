@@ -11,6 +11,8 @@ graph out of the source with `ast`.
 from __future__ import annotations
 
 import ast
+import subprocess
+import sys
 from pathlib import Path
 
 import typer.main
@@ -87,10 +89,33 @@ def test_every_command_group_states_one_responsibility_in_its_first_sentence():
 def test_every_group_mounted_in_cli_is_reachable_from_the_command_line():
     """The only thing that can break in a mounting board is an app that was not mounted."""
     top = typer.main.get_command(app).commands
-    for group in ("spec", "derive", "assets", "label", "refine", "eval", "judge"):
+    for group in (
+        "spec", "derive", "assets", "label", "refine", "eval", "judge", "gold",
+        "repair", "evaluation", "attribute",
+    ):
         assert group in top, f"{group} is not mounted"
         assert top[group].commands, f"{group} mounted with no commands"
     # The commands that were top-level before the split are still top-level after it.
     for name in ("patients", "chart", "specs", "run", "batch", "consistency", "trace",
                  "extract", "concord", "explain", "ask", "deps"):
         assert name in top, f"{name} stopped being a top-level command"
+
+
+def test_help_does_not_import_model_runtimes():
+    """Metadata-only CLI use must not pay the model stack's startup and memory cost."""
+    code = (
+        "import sys; import acr.cli; "
+        "assert 'acr.agent' not in sys.modules; "
+        "assert 'litellm' not in sys.modules"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_runtime_dependencies_are_declared_directly():
+    """A fresh base install must contain everything `acr run` imports."""
+    import tomllib
+
+    project = tomllib.loads((SRC.parents[1] / "pyproject.toml").read_text(encoding="utf-8"))
+    names = {d.split("[", 1)[0].split("<", 1)[0].split(">", 1)[0].split("=", 1)[0]
+             for d in project["project"]["dependencies"]}
+    assert {"deepagents", "langchain", "langchain-openai"} <= names

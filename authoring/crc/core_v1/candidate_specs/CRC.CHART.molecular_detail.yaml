@@ -1,0 +1,283 @@
+spec_id: CRC.CHART.molecular_detail
+spec_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+source_authority:
+  document: "CAP/AMP/Fight CRC 2022 MMR/MSI guideline plus ASCP/CAP/AMP/ASCO 2017 CRC biomarker guideline"
+  items:
+    - "CAP 2022 Recommendation 1 and Good Practice Statements 1-3"
+    - "CAP 2017 Statements 1, 2b, 3, 9-21"
+  source_refs:
+    - CAP.MMR_MSI_ICI.2022
+    - ASCO.CAP_MMR_MSI_ENDORSEMENT.2023
+    - CAP.CRC_BIOMARKERS.2017
+data_source: notes
+question: >
+  What raw MMR/MSI assay evidence, validation/QC context, specimen timing, RAS coverage,
+  and Lynch-workup detail are documented for this CRC tumor?
+applicability_guard:
+  disease: colorectal_carcinoma
+  tumor_identity_required: true
+  do_not_merge_specimens: true
+fields:
+  - name: mmr_ihc_integrated_status
+    type: string
+    allowable_values: [pMMR, dMMR, indeterminate, discordant, not_performed, not_documented]
+    nullable: true
+    description: "Integrated MMR-IHC interpretation; retain all four protein results separately."
+  - name: mmr_mlh1
+    type: string
+    allowable_values: [retained, lost, subclonal_loss, equivocal, not_performed, not_documented]
+    nullable: true
+    description: "MLH1 nuclear expression result for the indexed tumor/specimen."
+  - name: mmr_pms2
+    type: string
+    allowable_values: [retained, lost, subclonal_loss, equivocal, not_performed, not_documented]
+    nullable: true
+    description: "PMS2 nuclear expression result for the indexed tumor/specimen."
+  - name: mmr_msh2
+    type: string
+    allowable_values: [retained, lost, subclonal_loss, equivocal, not_performed, not_documented]
+    nullable: true
+    description: "MSH2 nuclear expression result for the indexed tumor/specimen."
+  - name: mmr_msh6
+    type: string
+    allowable_values: [retained, lost, subclonal_loss, equivocal, not_performed, not_documented]
+    nullable: true
+    description: "MSH6 nuclear expression result for the indexed tumor/specimen."
+  - name: msi_status
+    type: string
+    allowable_values: [MSS, MSI_L, MSI_H, indeterminate, not_performed, not_documented]
+    nullable: true
+    description: "Raw MSI assay interpretation; do not substitute MMR IHC unless explicitly creating the registry projection."
+  - name: molecular_assay_method
+    type: string
+    allowable_values: [MMR_IHC, MSI_PCR, MSI_NGS, targeted_DNA_NGS, comprehensive_NGS, methylation_assay, germline_assay, other, not_documented]
+    nullable: true
+    description: "Method for the indexed result; multiple methods require separate evidence records even if summarized here."
+  - name: molecular_assay_validation_status
+    type: string
+    allowable_values: [validated_for_intended_use, validation_asserted_no_detail, not_validated, not_documented, not_applicable]
+    nullable: true
+    description: "Laboratory validation status for the intended MMR/MSI use; never infer from the platform name."
+  - name: molecular_qc_status
+    type: string
+    allowable_values: [pass, fail, indeterminate, insufficient_tumor, controls_failed, not_documented]
+    nullable: true
+    description: "Specimen/test quality state for the indexed result."
+  - name: molecular_specimen_id
+    type: string
+    format: ".+"
+    nullable: true
+    description: "Accession/block/region identifier as documented; must not contain invented identifiers."
+  - name: molecular_specimen_date
+    type: string
+    format: "\\d{4}(?:\\d{2}(?:\\d{2})?)?"
+    nullable: true
+    description: "Specimen date with documented precision only: YYYY, YYYYMM, or YYYYMMDD."
+  - name: molecular_result_date
+    type: string
+    format: "\\d{4}(?:\\d{2}(?:\\d{2})?)?"
+    nullable: true
+    description: "Final result/report date with documented precision only."
+  - name: mmr_msi_discordance_status
+    type: string
+    allowable_values: [concordant, discordant_unresolved, discordant_resolved, single_method_only, indeterminate, not_assessed]
+    nullable: true
+    description: "Relationship across methods; a single method is not 'concordant'."
+  - name: mmr_subclonal_loss
+    type: string
+    allowable_values: [present, absent, equivocal, not_assessed, not_applicable]
+    nullable: true
+    description: "Subclonal IHC loss status and not a substitute for the per-protein values."
+  - name: molecular_peer_review_status
+    type: string
+    allowable_values: [completed, requested, not_documented, not_applicable]
+    nullable: true
+    description: "Review status for a discordant/indeterminate result."
+  - name: molecular_repeat_test_result
+    type: string
+    allowable_values: [supports_deficiency, supports_proficiency, remains_discordant, indeterminate, not_performed, not_documented]
+    nullable: true
+    description: "Normalized outcome of repeat/alternate testing; raw method/specimen remains in evidence."
+  - name: molecular_final_interpretation
+    type: string
+    allowable_values: [pMMR_MSS, dMMR_MSI_H, discordant_positive_evidence, indeterminate, other_explicit, not_documented]
+    nullable: true
+    description: "Final pathology/oncology interpretation after preserving all raw results."
+  - name: trial_context
+    type: string
+    allowable_values: [interventional_trial, observational_trial, routine_care, not_documented, not_applicable]
+    nullable: true
+    description: "Trial context relevant to subclonal/assay-specific handling."
+  - name: expanded_ras_coverage
+    type: string
+    allowable_values: [complete_source_defined, incomplete, assay_failed, not_documented, not_applicable]
+    nullable: true
+    description: "Whether KRAS and NRAS exon/codon coverage meets the bound source definition; not derived from wild-type summary codes alone."
+  - name: mlh1_promoter_methylation_status
+    type: string
+    allowable_values: [methylated, unmethylated, indeterminate, not_tested, not_documented]
+    nullable: true
+    description: "Tumor MLH1 promoter methylation result when obtained."
+  - name: lynch_risk_communication
+    type: string
+    allowable_values: [communicated_to_treating_clinician, documented_in_report_only, not_communicated, not_documented, not_applicable]
+    nullable: true
+    description: "Communication state after a tumor pattern consistent with Lynch risk."
+  - name: genetics_referral_status
+    type: string
+    allowable_values: [referred, completed, declined, not_referred, not_documented, not_applicable]
+    nullable: true
+    description: "Referral status only; full referral eligibility remains blocked pending licensed guidance."
+  - name: germline_result
+    type: string
+    allowable_values: [pathogenic_or_likely_pathogenic, VUS, negative, indeterminate, pending, not_tested, not_documented]
+    nullable: true
+    description: "High-level germline result; exact gene/variant needs a later genetics extension."
+decision_rule:
+  - "Never collapse individual MMR proteins, MSI method, quality, specimen and final interpretation into one Boolean."
+  - "A single method cannot establish concordance; discordance is evaluated only across method-specific results."
+  - "Wild-type KRAS/NRAS registry summaries do not establish expanded-RAS coverage."
+  - "BRAF mutation favors a sporadic MLH1-loss pathway but a wild-type result does not exclude Lynch syndrome."
+  - "Every date preserves source precision; no month/day is imputed."
+evidence_rules:
+  counts_as_evidence:
+    - "Final molecular report, pathology biomarker addendum, IHC report, methylation/germline report, and explicit molecular pathology interpretation."
+    - "Documented laboratory validation/QC or treating-team communication for their corresponding fields."
+  does_not_count:
+    - "Treatment choice as a proxy for a molecular result."
+    - "A registry summary code as proof of method, specimen, QC, exact protein pattern, or assay coverage."
+    - "No mention in an oncology note as proof that testing was not done."
+conflict_rules:
+  - if: "a copied summary conflicts with the final molecular report"
+    then: "prefer the final report and retain the copied conflict"
+  - if: "MMR IHC and MSI disagree"
+    then: "set discordance explicitly; do not overwrite either raw result"
+  - if: "repeat testing uses a different block or region"
+    then: "retain both specimen identities and do not merge them as duplicate measurements"
+proof_obligation:
+  for_positive: "A tumor-linked, specimen-linked source establishes each returned raw or normalized molecular field."
+  for_negative:
+    mode: stratified_exclusion
+    required_coverage:
+      - "Review final molecular reports, pathology addenda and relevant genetics/oncology documentation."
+    required_keywords: [MLH1, PMS2, MSH2, MSH6, MSI, assay, specimen]
+    statement: >
+      Not documented/not performed/absent values require source coverage appropriate to the
+      field. They are not defaults. Discordance and indeterminate results trigger review,
+      never a forced negative.
+abstention:
+  EVIDENCE_INSUFFICIENT: "The chart lacks enough method/specimen evidence to establish the requested molecular detail."
+  SPEC_INSUFFICIENT: "The result requires exact HGVS/VAF, rare-biomarker, or genetics interpretation not represented by this contract."
+boundary_cases:
+  - case: "All four IHC proteins retained; no MSI assay"
+    result: "mmr_ihc_integrated_status=pMMR; msi_status=not_performed; discordance=single_method_only"
+  - case: "MLH1/PMS2 loss and BRAF wild type"
+    result: "retain dMMR and BRAF wild type; do not conclude that Lynch is absent"
+  - case: "MSI-H by NGS but retained IHC"
+    result: "retain both results and set discordant_unresolved until reviewed"
+search_hints: [MLH1, PMS2, MSH2, MSH6, MSI, assay, specimen, microsatellite, mismatch_repair, methylation, germline, exon, codon]
+downstream_warning:
+  - "All normalized value domains and coverage rules are draft until molecular-pathology review."
+provenance:
+  - element: "fields[mmr_ihc_integrated_status].allowable_values"
+    origin: model_authored
+    basis: "no external source; normalization preserving CAP method and interpretation distinctions."
+    status: draft
+  - element: "fields[mmr_mlh1].allowable_values"
+    origin: model_authored
+    basis: "no external source; per-protein normalization derived for extraction, not copied from a code set."
+    status: draft
+  - element: "fields[mmr_pms2].allowable_values"
+    origin: model_authored
+    basis: "no external source; per-protein normalization derived for extraction, not copied from a code set."
+    status: draft
+  - element: "fields[mmr_msh2].allowable_values"
+    origin: model_authored
+    basis: "no external source; per-protein normalization derived for extraction, not copied from a code set."
+    status: draft
+  - element: "fields[mmr_msh6].allowable_values"
+    origin: model_authored
+    basis: "no external source; per-protein normalization derived for extraction, not copied from a code set."
+    status: draft
+  - element: "fields[msi_status].allowable_values"
+    origin: model_authored
+    basis: "no external source; raw MSI normalization separated from NAACCR item 3890."
+    status: draft
+  - element: "fields[molecular_assay_method].allowable_values"
+    origin: model_authored
+    basis: "no external source; local assay-family normalization."
+    status: draft
+  - element: "fields[molecular_assay_validation_status].allowable_values"
+    origin: model_authored
+    basis: "no external source; local validation-evidence states."
+    status: draft
+  - element: "fields[molecular_qc_status].allowable_values"
+    origin: model_authored
+    basis: "no external source; local quality-state normalization."
+    status: draft
+  - element: "fields[molecular_specimen_id].format"
+    origin: model_authored
+    basis: "no external source; nonempty documented identifier only."
+    status: draft
+  - element: "fields[molecular_specimen_date].format"
+    origin: model_authored
+    basis: "no external source; partial-date syntax preserving source precision."
+    status: draft
+  - element: "fields[molecular_result_date].format"
+    origin: model_authored
+    basis: "no external source; partial-date syntax preserving source precision."
+    status: draft
+  - element: "fields[mmr_msi_discordance_status].allowable_values"
+    origin: model_authored
+    basis: "no external source; local multimethod relationship states."
+    status: draft
+  - element: "fields[mmr_subclonal_loss].allowable_values"
+    origin: model_authored
+    basis: "no external source; local subclonal-loss normalization."
+    status: draft
+  - element: "fields[molecular_peer_review_status].allowable_values"
+    origin: model_authored
+    basis: "no external source; local review-workflow normalization."
+    status: draft
+  - element: "fields[molecular_repeat_test_result].allowable_values"
+    origin: model_authored
+    basis: "no external source; local repeat-test outcome normalization."
+    status: draft
+  - element: "fields[molecular_final_interpretation].allowable_values"
+    origin: model_authored
+    basis: "no external source; local final-interpretation normalization."
+    status: draft
+  - element: "fields[trial_context].allowable_values"
+    origin: model_authored
+    basis: "no external source; local trial-context states."
+    status: draft
+  - element: "fields[expanded_ras_coverage].allowable_values"
+    origin: model_authored
+    basis: "no external source; operational projection of CAP 2017 Statement 1 coverage."
+    status: draft
+  - element: "fields[mlh1_promoter_methylation_status].allowable_values"
+    origin: model_authored
+    basis: "no external source; local methylation-result normalization."
+    status: draft
+  - element: "fields[lynch_risk_communication].allowable_values"
+    origin: model_authored
+    basis: "no external source; local communication-state normalization."
+    status: draft
+  - element: "fields[genetics_referral_status].allowable_values"
+    origin: model_authored
+    basis: "no external source; incomplete referral status pending licensed hereditary guidance."
+    status: draft
+  - element: "fields[germline_result].allowable_values"
+    origin: model_authored
+    basis: "no external source; high-level germline result normalization."
+    status: draft
+  - element: proof_obligation.for_negative.required_coverage
+    origin: model_authored
+    basis: "no external source; project-specific evidence coverage requirement."
+    status: draft
+  - element: proof_obligation.for_negative.required_keywords
+    origin: model_authored
+    basis: "no external source; unmeasured candidate search vocabulary."
+    status: draft

@@ -274,9 +274,9 @@ boundary_cases:
   - case: "3.2 cm upper lobe mass with visceral pleural invasion, no nodes, no metastasis, no resection"
     answer: "clinical_t cT2a, clinical_n cN0, clinical_m cM0, clinical_stage_group IB, summary_stage 1"
     why: "All three categories quotable, so the group may be reported. No resection means no pathologic stage."
-  - case: "Separate tumour nodule in a different ipsilateral lobe"
-    answer: "T4"
-    why: "Same lobe is T3, different ipsilateral lobe is T4, contralateral lung is M1a."
+  - case: "Pre-treatment staging documents a separate tumour nodule in a different ipsilateral lobe"
+    answer: "clinical_t cT4"
+    why: "The clinical field must carry its c-prefix: same lobe is cT3, different ipsilateral lobe is cT4, contralateral lung is cM1a."
   - case: "Malignant pleural effusion"
     answer: "cM1a, summary_stage 7"
     why: "Pleural or pericardial effusion or nodules are M1a, not a T descriptor."
@@ -301,123 +301,37 @@ search_hints:
   - lobectomy
   - "tumor board"
   - "extent of disease"
-
-# Deterministic post-checks, enforced in src/acr/answer_checks.py against a FOUND answer.
-# Every rule below is also stated in decision_rule or conflict_rules above; these are the ones
-# that are mechanically decidable, so they are decided rather than hoped for. The clinical
-# content lives here where a registrar can review it; the checker contains no oncology.
+# ------------------------------------------------------------------ answer_checks: REMOVED
+# This spec used to declare deterministic post-checks that decided clinical questions by
+# matching word lists against the model's own cited quotes. All of them were removed on
+# 2026-07-30 after being measured over every trace this project has recorded (266 traces, 202
+# joinable to registry gold, 122 firings):
 #
-# The three kinds carry their measured pedigree from STORE.400_522_523 and each transfers to a
-# structurally identical staging failure:
-#   not_less_specific   <- coding 8046 over "favor squamous"     -> coding cT2 over cT2a
-#   nos_requires_search <- coding C349 having run zero searches  -> coding 99 / cTX / cNX
-#   origin_not_specimen <- coding the biopsy site as the origin  -> reading the clinical stage
-#                                                                   off the resection specimen
-answer_checks:
-  # --- unknown and X values are negative claims -------------------------------------------
-  - field: clinical_stage_group
-    kind: not_less_specific
-    nos_values: ["99"]
-    contradicted_by:
-      ["clinical stage", "ajcc stage", "stage i", "stage ii", "stage iii", "stage iv"]
-    message: >
-      99 asserts that no stage is documented anywhere in the record. A cited quote that states
-      a stage falsifies that outright.
-
-  - field: clinical_stage_group
-    kind: nos_requires_search
-    nos_values: ["99"]
-    required_searches: ["stage", "tnm"]
-    message: >
-      99 is a claim of absence and carries the same burden as EVIDENCE_INSUFFICIENT. The stage
-      is stated in an oncology assessment or a tumour board note far more often than in
-      pathology. Search before claiming it is nowhere.
-
-  - field: pathologic_stage_group
-    kind: nos_requires_search
-    nos_values: ["99"]
-    required_searches: ["stage", "resection"]
-    message: >
-      Before coding 99, establish whether the primary was ever resected. If it was not, there
-      is no pathologic stage to find and the honest answer is EVIDENCE_INSUFFICIENT with that
-      reason, not an unknown code.
-
-  - field: clinical_t
-    kind: nos_requires_search
-    nos_values: ["cTX"]
-    required_searches: ["tumor size", "pleural"]
-    message: >
-      cTX asserts the primary tumour could not be assessed. Size and visceral pleural invasion
-      are what separate cT1a from cT2a and they are routinely in the imaging report, not the
-      pathology. Look there before asserting non-assessability.
-
-  - field: clinical_n
-    kind: nos_requires_search
-    nos_values: ["cNX"]
-    required_searches: ["lymph node", "mediastin"]
-    message: >
-      cNX asserts the regional nodes could not be assessed. A staging CT or PET reporting node
-      stations is an assessment; cNX is not the code for "I did not read it".
-
-  - field: summary_stage
-    kind: nos_requires_search
-    nos_values: ["9"]
-    required_searches: ["stage", "metasta"]
-    message: >
-      Summary Stage 9 claims the extent of disease is undocumented. Extent is assembled from
-      the whole record, so it survives a missing AJCC group.
-
-  - field: summary_stage
-    kind: not_less_specific
-    nos_values: ["9"]
-    contradicted_by:
-      ["distant metasta", "metastatic disease", "regional lymph node", "confined to",
-       "localized", "in situ"]
-    message: >
-      Summary Stage is derived from documented extent of disease, not from the presence of an
-      AJCC group. The quote you cited states the extent.
-
-  # --- do not take the less specific category when a more specific one is documented -------
-  # One entry per NOS value rather than one per field: contradicted_by is a flat list, so
-  # folding cT1 and cT2 together would make "ct1a" in the blob reject a correctly coded cT2.
-  - field: clinical_t
-    kind: not_less_specific
-    nos_values: ["cT1"]
-    contradicted_by: ["ct1mi", "ct1a", "ct1b", "ct1c"]
-    message: "AJCC 8th subdivides T1 by size; cT1 undivided asserts the size is undocumented."
-  - field: clinical_t
-    kind: not_less_specific
-    nos_values: ["cT2"]
-    contradicted_by: ["ct2a", "ct2b"]
-    message: "T2a and T2b are different stage groups at the same N. cT2 undivided is not a category AJCC 8th assigns."
-  - field: pathologic_t
-    kind: not_less_specific
-    nos_values: ["pT1"]
-    contradicted_by: ["pt1mi", "pt1a", "pt1b", "pt1c"]
-    message: "A resection specimen is measured. An undivided pT1 over a documented subcategory discards that measurement."
-  - field: pathologic_t
-    kind: not_less_specific
-    nos_values: ["pT2"]
-    contradicted_by: ["pt2a", "pt2b"]
-    message: "T2a and T2b are different stage groups at the same N."
-
-  # --- clinical stage must not be read off the resection specimen --------------------------
-  # answer_checks._evidence_for deliberately ignores the field and returns the WHOLE ledger,
-  # so this fires only when every quote in the run is specimen text -- i.e. exactly the run
-  # that derived its clinical stage from the pathology. Declaring the same check on
-  # clinical_t/clinical_n would not catch anything further; it would emit the identical
-  # message three more times.
-  - field: clinical_stage_group
-    kind: origin_not_specimen
-    specimen_markers:
-      ["specimen received", "specimen:", "gross description", "microscopic description",
-       "synoptic", "final pathologic diagnosis", "resection specimen",
-       "lobectomy specimen", "segmentectomy specimen", "pneumonectomy specimen"]
-    message: >
-      Every quote supporting this answer is resection or specimen text. The specimen reports
-      what was found after treatment began; the clinical stage is what was known before it.
-      Cite the pre-treatment workup -- imaging, endoscopy, the oncology or tumour board
-      assessment -- or leave the clinical group null.
+#   not_less_specific        22 fires   22 rejected the registry's own value    0 ever helped
+#   nos_requires_search      24 fires   21 rejected the registry's own value    0 ever helped
+#   conflict_requires_nos    67 fires   18 rejected the registry's own value   15 "helped"
+#   origin_not_specimen       2 fires    0                                      0
+#   code_matches_cited_text   0 fires    -                                      -
+#
+# `conflict_requires_nos` looked like it broke even. All 15 of its helps were the same event,
+# a push to C349, because that is the only remedy its message offers -- and C349 is the
+# registry's answer for 9.6% of this corpus against C341's 52.7%. It never helped a run reach
+# a specific subsite.
+#
+# Counted per submission: 60 of 254 recorded rejections refused a tuple that was exactly the
+# registry's, and 12 runs held the exact registry answer and shipped something else -- 8 of
+# them shipped nothing at all.
+#
+# The clinical content these checks encoded is NOT lost: every one of them restated a rule
+# that is already written above in `decision_rule` and `conflict_rules`, where a registrar can
+# read it and where it reaches the model as instruction. A value that violates those rules is
+# an instruction-following failure and is measured as one. It is not repaired by a word list
+# written from one chart and applied to every chart.
+#
+# `acr.answer_checks.ANSWER_CHECK_KINDS` is now empty, so re-adding a block here makes this
+# file fail to load rather than declare rules that never fire. Field `format` and
+# `allowable_values` are still enforced -- they are a contract on shape, they carry no
+# oncology, and they are the only check with a positive measured record.
 
 downstream_warning:
   - >
@@ -535,114 +449,6 @@ provenance:
       it may contain codes the table does not have. Check it against the manual before relying
       on it -- and note that this record is NOT a citation of the manual, precisely because that
       check has not been done.
-  - element: "answer_checks[clinical_stage_group.not_less_specific.99]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by an agent on 2026-07-26, in this repository, with no manual
-      open. A deterministic post-check invented for this repository; no manual has such a
-      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
-      file, but the wordings it matches on were written from a model's idea of how clinicians
-      write, and have never been measured against real notes.
-  - element: "answer_checks[clinical_stage_group.nos_requires_search.99]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by an agent on 2026-07-26, in this repository, with no manual
-      open. A deterministic post-check invented for this repository; no manual has such a
-      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
-      file, but the wordings it matches on were written from a model's idea of how clinicians
-      write, and have never been measured against real notes.
-  - element: "answer_checks[pathologic_stage_group.nos_requires_search.99]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by an agent on 2026-07-26, in this repository, with no manual
-      open. A deterministic post-check invented for this repository; no manual has such a
-      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
-      file, but the wordings it matches on were written from a model's idea of how clinicians
-      write, and have never been measured against real notes.
-  - element: "answer_checks[clinical_t.nos_requires_search.cTX]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by an agent on 2026-07-26, in this repository, with no manual
-      open. A deterministic post-check invented for this repository; no manual has such a
-      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
-      file, but the wordings it matches on were written from a model's idea of how clinicians
-      write, and have never been measured against real notes.
-  - element: "answer_checks[clinical_n.nos_requires_search.cNX]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by an agent on 2026-07-26, in this repository, with no manual
-      open. A deterministic post-check invented for this repository; no manual has such a
-      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
-      file, but the wordings it matches on were written from a model's idea of how clinicians
-      write, and have never been measured against real notes.
-  - element: "answer_checks[summary_stage.nos_requires_search.9]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by an agent on 2026-07-26, in this repository, with no manual
-      open. A deterministic post-check invented for this repository; no manual has such a
-      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
-      file, but the wordings it matches on were written from a model's idea of how clinicians
-      write, and have never been measured against real notes.
-  - element: "answer_checks[summary_stage.not_less_specific.9]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by an agent on 2026-07-26, in this repository, with no manual
-      open. A deterministic post-check invented for this repository; no manual has such a
-      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
-      file, but the wordings it matches on were written from a model's idea of how clinicians
-      write, and have never been measured against real notes.
-  - element: "answer_checks[clinical_t.not_less_specific.cT1]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by an agent on 2026-07-26, in this repository, with no manual
-      open. A deterministic post-check invented for this repository; no manual has such a
-      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
-      file, but the wordings it matches on were written from a model's idea of how clinicians
-      write, and have never been measured against real notes.
-  - element: "answer_checks[clinical_t.not_less_specific.cT2]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by an agent on 2026-07-26, in this repository, with no manual
-      open. A deterministic post-check invented for this repository; no manual has such a
-      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
-      file, but the wordings it matches on were written from a model's idea of how clinicians
-      write, and have never been measured against real notes.
-  - element: "answer_checks[pathologic_t.not_less_specific.pT1]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by an agent on 2026-07-26, in this repository, with no manual
-      open. A deterministic post-check invented for this repository; no manual has such a
-      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
-      file, but the wordings it matches on were written from a model's idea of how clinicians
-      write, and have never been measured against real notes.
-  - element: "answer_checks[pathologic_t.not_less_specific.pT2]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by an agent on 2026-07-26, in this repository, with no manual
-      open. A deterministic post-check invented for this repository; no manual has such a
-      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
-      file, but the wordings it matches on were written from a model's idea of how clinicians
-      write, and have never been measured against real notes.
-  - element: "answer_checks[clinical_stage_group.origin_not_specimen]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by an agent on 2026-07-26, in this repository, with no manual
-      open. A deterministic post-check invented for this repository; no manual has such a
-      construct. The clinical rule inside it restates a rule stated in prose elsewhere in this
-      file, but the wordings it matches on were written from a model's idea of how clinicians
-      write, and have never been measured against real notes.
   - element: "proof_obligation.for_negative.required_keywords"
     origin: model_authored
     status: draft

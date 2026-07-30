@@ -1,0 +1,110 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.disease_setting
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.disease_setting
+contract_kind: canonical_extraction_with_lossy_registry_projection
+label: Decision-time disease setting
+roles:
+- eligibility
+temporal_meaning: at_indexed_rule_decision
+field_contract:
+  name: disease_setting
+  type: string
+  allowable_values:
+  - localized
+  - locally_advanced
+  - metastatic_at_diagnosis
+  - metastatic_recurrence
+  - indeterminate
+  nullable: true
+  description: Disease setting at the rule decision time, not merely at initial diagnosis.
+registry_mapping:
+  standard: NAACCR_v26
+  item_name: AJCC/Summary Stage/recurrence composite
+  item_number: 1004/764/1860/1880
+  xml_id: composite_not_single_item
+  effective_years: varies
+evidence_coverage:
+  registry_to_rule:
+    semantic: coarsened
+    temporal: conditional
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: coarsened
+    transformation_id: PENDING_VERSIONED_PROJECTION
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: CoC STORE 2026 and NAACCR v26, with rule-specific ASCO context
+  items:
+  - Primary Site [400]
+  - Histologic Type ICD-O-3 [522]
+  - AJCC TNM Clin T [1001]
+  - AJCC TNM Clin N [1002]
+  source_refs:
+  - COC.STORE.2026
+  - NAACCR.SSDI.3_3
+  - ASCO.LARC.2024
+  - ASCO.MCRC.2022
+question: What is the Decision-time disease setting for the indexed CRC tumor or decision at at_indexed_rule_decision?
+applicability_guard:
+  primary_sites:
+  - C180
+  - C182-C189
+  - C199
+  - C209
+  exclude_schemas:
+  - appendix
+  - NET
+  - GIST
+  - sarcoma
+  - Kaposi
+  rule_time_required: true
+evidence_contract:
+  establishing_source_documents:
+  - staging_imaging
+  - oncology
+  - tumor_board
+  - registry
+  excluded_sources:
+  - initial_stage_without_time_anchor
+  positive_witness: A tumor-linked source appropriate to at_indexed_rule_decision establishes disease_setting.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - Decision-time
+    - disease
+    - setting
+    statement: Initial M0 does not establish absence of later metastatic recurrence.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Initial M0 does not establish absence of later metastatic recurrence.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish disease_setting.
+  SPEC_INSUFFICIENT: The requested meaning of disease_setting is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CANDIDATE.disease_context
+  output_field: disease_setting
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[disease_setting].allowable_values
+  origin: model_authored
+  basis: no external source; local normalization needed to preserve decision-time disease setting.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: e4a2eb5737618a08d7b294f067508a02b70ec1ae8cae745c3220fdbe973d883e

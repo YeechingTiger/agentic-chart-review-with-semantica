@@ -1,0 +1,383 @@
+schema_version: '2.0'
+category: metastatic_staging
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 5
+rules:
+- candidate_id: E26-STAGE-01
+  parent_recommendation_id: E26-STAGE-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Staging recommendation 1
+  category: metastatic_staging
+  title: Contrast CT chest abdomen pelvis
+  core_or_supplemental: core
+  source_context:
+    eligibility: New mCRC
+    action: Perform contrast CT thorax abdomen and pelvis
+    timing: Baseline
+    exceptions: Contrast contraindication
+    predicate_logic: mCRC => contrast_CT_CAP
+  requirements:
+    eligibility:
+      expression: New mCRC
+      variables:
+      - crc.metastatic_sites_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.staging_ct_contrast_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.staging_ct_contrast_status
+        - variable: crc.metastatic_sites_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Perform contrast CT thorax abdomen and pelvis
+      variables:
+      - crc.staging_ct_result
+      evidence_logic:
+        variable: crc.staging_ct_result
+    timing:
+      expression: Baseline
+      variables:
+      - crc.decision_date
+      - crc.staging_assessment_date
+      - crc.staging_ct_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.staging_ct_date
+        - variable: crc.staging_assessment_date
+        - variable: crc.decision_date
+    exceptions:
+      expression: Contrast contraindication
+      variables:
+      - crc.iv_contrast_contraindication_at_decision
+      evidence_logic:
+        variable: crc.iv_contrast_contraindication_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.iv_contrast_contraindication_at_decision
+  - crc.metastatic_sites_at_decision
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.staging_assessment_date
+  - crc.staging_ct_contrast_status
+  - crc.staging_ct_date
+  - crc.staging_ct_result
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-STAGE-02
+  parent_recommendation_id: E26-STAGE-R02
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Staging recommendation 2
+  category: metastatic_staging
+  title: Standardized CT protocol
+  core_or_supplemental: core
+  source_context:
+    eligibility: mCRC staging CT
+    action: Use EORTC ESOI ESGAR protocols
+    timing: Image acquisition
+    exceptions: Local equivalent requires validation
+    predicate_logic: staging_CT => approved_protocol
+  requirements:
+    eligibility:
+      expression: mCRC staging CT
+      variables:
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.staging_ct_protocol
+      - crc.staging_ct_quality
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.staging_ct_protocol
+        - variable: crc.staging_ct_quality
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use EORTC ESOI ESGAR protocols
+      variables:
+      - crc.staging_ct_protocol
+      evidence_logic:
+        variable: crc.staging_ct_protocol
+    timing:
+      expression: Image acquisition
+      variables:
+      - crc.decision_date
+      - crc.staging_assessment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.staging_assessment_date
+        - variable: crc.decision_date
+    exceptions:
+      expression: Local equivalent requires validation
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.decision_date
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.staging_assessment_date
+  - crc.staging_ct_protocol
+  - crc.staging_ct_quality
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-STAGE-03
+  parent_recommendation_id: E26-STAGE-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Staging recommendation 3
+  category: metastatic_staging
+  title: Liver MRI for local-treatment candidates
+  core_or_supplemental: core
+  source_context:
+    eligibility: Potential locoregional treatment or atypical liver lesion
+    action: Perform hepatobiliary-contrast liver MRI
+    timing: Before local-treatment decision
+    exceptions: MRI contraindication
+    predicate_logic: local_candidate OR atypical_liver_lesion => liver_MRI
+  requirements:
+    eligibility:
+      expression: Potential locoregional treatment or atypical liver lesion
+      variables:
+      - crc.liver_metastasis_burden_at_decision
+      - crc.liver_mri_contrast_status
+      - crc.liver_mri_result
+      - crc.local_treatment_candidacy_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.local_treatment_candidacy_at_decision
+        - variable: crc.liver_metastasis_burden_at_decision
+        - variable: crc.liver_mri_contrast_status
+        - variable: crc.liver_mri_result
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Perform hepatobiliary-contrast liver MRI
+      variables:
+      - crc.liver_mri_result
+      evidence_logic:
+        variable: crc.liver_mri_result
+    timing:
+      expression: Before local-treatment decision
+      variables:
+      - crc.decision_date
+      - crc.staging_assessment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.staging_assessment_date
+        - variable: crc.decision_date
+    exceptions:
+      expression: MRI contraindication
+      variables:
+      - crc.mri_contraindication_at_decision
+      evidence_logic:
+        variable: crc.mri_contraindication_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.liver_metastasis_burden_at_decision
+  - crc.liver_mri_contrast_status
+  - crc.liver_mri_result
+  - crc.local_treatment_candidacy_at_decision
+  - crc.metastatic_status
+  - crc.mri_contraindication_at_decision
+  - crc.primary_site
+  - crc.staging_assessment_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-STAGE-04
+  parent_recommendation_id: E26-STAGE-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Staging recommendation 4
+  category: metastatic_staging
+  title: Staging laparoscopy for peritoneal surgery
+  core_or_supplemental: core
+  source_context:
+    eligibility: Peritoneal-metastasis surgical candidate
+    action: Perform staging laparoscopy
+    timing: Before definitive surgery
+    exceptions: Infeasibility
+    predicate_logic: peritoneal_surgery_candidate => staging_laparoscopy
+  requirements:
+    eligibility:
+      expression: Peritoneal-metastasis surgical candidate
+      variables:
+      - crc.metastatic_status
+      - crc.peritoneal_metastatic_disease_at_decision
+      - crc.primary_site
+      - crc.staging_laparoscopy_result
+      - crc.surgical_candidacy_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.peritoneal_metastatic_disease_at_decision
+        - variable: crc.surgical_candidacy_at_decision
+        - variable: crc.staging_laparoscopy_result
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Perform staging laparoscopy
+      variables:
+      - crc.staging_laparoscopy_result
+      evidence_logic:
+        variable: crc.staging_laparoscopy_result
+    timing:
+      expression: Before definitive surgery
+      variables:
+      - crc.decision_date
+      - crc.staging_assessment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.staging_assessment_date
+        - variable: crc.decision_date
+    exceptions:
+      expression: Infeasibility
+      variables:
+      - crc.staging_laparoscopy_feasibility_at_decision
+      evidence_logic:
+        variable: crc.staging_laparoscopy_feasibility_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.metastatic_status
+  - crc.peritoneal_metastatic_disease_at_decision
+  - crc.primary_site
+  - crc.staging_assessment_date
+  - crc.staging_laparoscopy_feasibility_at_decision
+  - crc.staging_laparoscopy_result
+  - crc.surgical_candidacy_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-STAGE-05
+  parent_recommendation_id: E26-STAGE-R05
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Staging recommendation 5
+  category: metastatic_staging
+  title: Selected PET staging
+  core_or_supplemental: core
+  source_context:
+    eligibility: Marker elevation without lesions or need to define extrahepatic extent before local treatment
+    action: Use PET selectively
+    timing: Before local treatment
+    exceptions: Not routine
+    predicate_logic: marker_no_lesion OR extrahepatic_extent_needed => PET
+  requirements:
+    eligibility:
+      expression: Marker elevation without lesions or need to define extrahepatic extent before local treatment
+      variables:
+      - crc.conventional_imaging_result_at_decision
+      - crc.metastatic_status
+      - crc.pet_staging_result
+      - crc.primary_site
+      - crc.tumor_marker_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.tumor_marker_status_at_decision
+        - variable: crc.conventional_imaging_result_at_decision
+        - variable: crc.pet_staging_result
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use PET selectively
+      variables:
+      - crc.local_treatment_at_decision
+      - crc.pet_staging_result
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.local_treatment_at_decision
+        - variable: crc.pet_staging_result
+    timing:
+      expression: Before local treatment
+      variables:
+      - crc.decision_date
+      - crc.staging_assessment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.staging_assessment_date
+        - variable: crc.decision_date
+    exceptions:
+      expression: Not routine
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.conventional_imaging_result_at_decision
+  - crc.decision_date
+  - crc.local_treatment_at_decision
+  - crc.metastatic_status
+  - crc.pet_staging_result
+  - crc.primary_site
+  - crc.staging_assessment_date
+  - crc.tumor_marker_status_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

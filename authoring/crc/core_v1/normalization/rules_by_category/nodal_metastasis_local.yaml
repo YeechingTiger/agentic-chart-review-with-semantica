@@ -1,0 +1,166 @@
+schema_version: '2.0'
+category: nodal_metastasis_local
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 2
+rules:
+- candidate_id: E26-LOCAL-20
+  parent_recommendation_id: E26-LOCAL-R20
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Retroperitoneal node recommendation 1
+  category: nodal_metastasis_local
+  title: Surgery for selected retroperitoneal nodal OMD
+  core_or_supplemental: core
+  source_context:
+    eligibility: Selected retroperitoneal-node oligometastatic disease with NED achievable
+    action: Surgically remove nodes
+    timing: Local-treatment planning
+    exceptions: Technical feasibility and biology
+    predicate_logic: selected_RP_node_OMD AND NED_possible => surgery
+  requirements:
+    eligibility:
+      expression: Selected retroperitoneal-node oligometastatic disease with NED achievable
+      variables:
+      - crc.extra_target_organ_metastatic_disease_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.retroperitoneal_nodal_metastasis_count_at_decision
+      - crc.retroperitoneal_nodal_metastasis_sites_at_decision
+      - crc.retroperitoneal_nodal_resectability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.retroperitoneal_nodal_metastasis_sites_at_decision
+        - variable: crc.retroperitoneal_nodal_metastasis_count_at_decision
+        - variable: crc.extra_target_organ_metastatic_disease_at_decision
+        - variable: crc.retroperitoneal_nodal_resectability_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Surgically remove nodes
+      variables:
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        variable: crc.local_treatment_at_decision
+    timing:
+      expression: Local-treatment planning
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Technical feasibility and biology
+      variables:
+      - crc.retroperitoneal_nodal_resectability_at_decision
+      - crc.unresolved.metastatic_biology
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.retroperitoneal_nodal_resectability_at_decision
+        - variable: crc.unresolved.metastatic_biology
+  required_variables:
+  - crc.decision_date
+  - crc.extra_target_organ_metastatic_disease_at_decision
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.retroperitoneal_nodal_metastasis_count_at_decision
+  - crc.retroperitoneal_nodal_metastasis_sites_at_decision
+  - crc.retroperitoneal_nodal_resectability_at_decision
+  - crc.unresolved.metastatic_biology
+  computability:
+    status: not_computable
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    - UNRESOLVED_NORMALIZED_VARIABLE:crc.unresolved.metastatic_biology
+    unresolved_source_concepts: []
+    unresolved_variable_ids:
+    - crc.unresolved.metastatic_biology
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-LOCAL-21
+  parent_recommendation_id: E26-LOCAL-R21
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Retroperitoneal node recommendation 2
+  category: nodal_metastasis_local
+  title: SBRT for selected retroperitoneal nodal OMD
+  core_or_supplemental: core
+  source_context:
+    eligibility: Selected retroperitoneal-node oligometastatic disease
+    action: May use SBRT
+    timing: Local-treatment planning
+    exceptions: Radiation feasibility
+    predicate_logic: selected_RP_node_OMD => may_SBRT
+  requirements:
+    eligibility:
+      expression: Selected retroperitoneal-node oligometastatic disease
+      variables:
+      - crc.extra_target_organ_metastatic_disease_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.retroperitoneal_nodal_metastasis_count_at_decision
+      - crc.retroperitoneal_nodal_metastasis_sites_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.retroperitoneal_nodal_metastasis_sites_at_decision
+        - variable: crc.retroperitoneal_nodal_metastasis_count_at_decision
+        - variable: crc.extra_target_organ_metastatic_disease_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: May use SBRT
+      variables:
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        variable: crc.local_treatment_at_decision
+    timing:
+      expression: Local-treatment planning
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Radiation feasibility
+      variables:
+      - crc.radiation_feasibility_at_decision
+      evidence_logic:
+        variable: crc.radiation_feasibility_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.extra_target_organ_metastatic_disease_at_decision
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.radiation_feasibility_at_decision
+  - crc.retroperitoneal_nodal_metastasis_count_at_decision
+  - crc.retroperitoneal_nodal_metastasis_sites_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

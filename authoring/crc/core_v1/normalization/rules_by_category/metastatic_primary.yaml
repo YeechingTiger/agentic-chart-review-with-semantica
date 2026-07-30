@@ -1,0 +1,79 @@
+schema_version: '2.0'
+category: metastatic_primary
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 1
+rules:
+- candidate_id: E26-LOCAL-02
+  parent_recommendation_id: E26-LOCAL-R02
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Local treatment recommendation 2
+  category: metastatic_primary
+  title: Do not resect asymptomatic primary with unresectable metastases
+  core_or_supplemental: core
+  source_context:
+    eligibility: Asymptomatic primary and unresectable synchronous metastases
+    action: Do not resect primary routinely
+    timing: Initial treatment
+    exceptions: Symptoms or complications
+    predicate_logic: asymptomatic_primary AND unresectable_synchronous => no_primary_resection
+  requirements:
+    eligibility:
+      expression: Asymptomatic primary and unresectable synchronous metastases
+      variables:
+      - crc.metastasis_timing
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_symptom_status_at_decision
+      - crc.resectability_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.primary_tumor_symptom_status_at_decision
+        - variable: crc.metastasis_timing
+        - variable: crc.resectability_status
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Do not resect primary routinely
+      variables:
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        variable: crc.local_treatment_at_decision
+    timing:
+      expression: Initial treatment
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Symptoms or complications
+      variables:
+      - crc.primary_tumor_symptom_status_at_decision
+      evidence_logic:
+        variable: crc.primary_tumor_symptom_status_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastasis_timing
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.primary_tumor_symptom_status_at_decision
+  - crc.resectability_status
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

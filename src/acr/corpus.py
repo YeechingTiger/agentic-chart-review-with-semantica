@@ -14,7 +14,7 @@ operations — that is what makes coverage attestation auditable.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import date
 from functools import lru_cache
 from pathlib import Path
@@ -23,8 +23,23 @@ FILENAME_RE = re.compile(
     r"^(?P<doc_type>.+?)_(?P<date>\d{4}-\d{2}-\d{2})(?:__(?P<seq>\d+))?$"
 )
 
-# A section header is an ALL-CAPS (or Title-cased all-caps-ish) line ending in a colon.
-SECTION_RE = re.compile(r"^(?P<name>[A-Z][A-Z0-9 /&'\-]{2,60}):\s*$", re.MULTILINE)
+#: Separators a clinical phrase may be written with, in the query and in the text: any run of
+#: whitespace (including a hard line wrap) or hyphens. Used only to relate one spelling of a
+#: phrase to another -- never to relate one WORD to another. See `PatientChart.search`.
+_SEPARATORS = re.compile(r"[\s\-]+")
+
+
+def _notation_tolerant(query: str) -> str:
+    """A literal query, with its separators allowed to be spelled any of the ways this corpus
+    spells them. Returns a regex source string.
+
+    Single-token queries come back as a plain escaped literal, so substring behaviour is
+    unchanged: `lobe` still matches inside `lobes`, as it always did.
+    """
+    tokens = [re.escape(t) for t in _SEPARATORS.split(query.strip()) if t]
+    if not tokens:
+        return re.escape(query)
+    return _SEPARATORS.pattern.join(tokens)
 
 
 @dataclass(frozen=True)
@@ -156,34 +171,44 @@ class PatientChart:
             "text": chunk,
         }
 
-    def sections(self, note_id: str) -> list[str]:
-        return [m.group("name").strip() for m in SECTION_RE.finditer(self._text(note_id))]
-
-    def read_section(self, note_id: str, section: str) -> dict:
-        """Return one named section (e.g. IMPRESSION, FINAL DIAGNOSIS) with true offsets."""
-        text = self._text(note_id)
-        marks = list(SECTION_RE.finditer(text))
-        target = section.strip().upper()
-        for i, m in enumerate(marks):
-            if m.group("name").strip().upper() == target:
-                start = m.end()
-                end = marks[i + 1].start() if i + 1 < len(marks) else len(text)
-                meta = self._docs[note_id]
-                return {
-                    "note_id": note_id,
-                    "doc_type": meta.doc_type,
-                    "date": meta.date.isoformat(),
-                    "section": m.group("name").strip(),
-                    "start": start,
-                    "end": end,
-                    "text": text[start:end].strip("\n"),
-                }
-        return {
-            "note_id": note_id,
-            "section": section,
-            "error": "section not found",
-            "available_sections": [m.group("name").strip() for m in marks],
-        }
+    # ------------------------------------------------------------------ sections: REMOVED
+    # `sections()` and `read_section()` are gone, and so is the `SECTION_RE` they ran on:
+    #
+    #     SECTION_RE = re.compile(r"^(?P<name>[A-Z][A-Z0-9 /&'\-]{2,60}):\s*$", re.MULTILINE)
+    #
+    # It required an ALL-CAPS line with nothing after the colon. Measured over the 12,221
+    # diagnosis-bearing documents in this corpus -- documents containing the phrase, against
+    # documents where `read_section` could actually address it:
+    #
+    #     final diagnosis               7390 contain      170 addressable    2.3%
+    #     final pathologic diagnosis    6262 contain      332 addressable    5.3%
+    #     microscopic description       5914 contain      479 addressable    8.1%
+    #     diagnosis                    12082 contain       42 addressable    0.3%
+    #     addendum                      2401 contain        0 addressable    0.0%
+    #
+    # The reason is in the real spellings. Title Case dominates and the regex admits none of it:
+    #
+    #     no    3899  'Pre-Operative Diagnosis:'      YES   308  'FINAL PATHOLOGIC DIAGNOSIS:'
+    #     no    2807  'Final Diagnosis:'              YES   104  'FINAL DIAGNOSIS:'
+    #     no    2154  'Final Cytologic Diagnosis:'    no     28  '***DIAGNOSIS***'
+    #
+    # Two consequences, and the second is worse than low recall. `ADDENDUM` was addressable in
+    # 0 of 2,401 documents while the thread machinery was refusing answers 40 times and telling
+    # the agent to go chase an addendum -- an obligation whose tool could never reach its
+    # target. And `read_section` with no section returned `available_sections`, so in 97.7% of
+    # documents the model asked what was in the file and got back a list with the final
+    # diagnosis missing from it. That is not a tool failing to help; it is a tool answering
+    # wrongly.
+    #
+    # THE REPLACEMENT IS ALREADY HERE and needs no vocabulary: `search` returns the offset of
+    # every hit, and `read` takes an offset and a limit. "Jump to the diagnosis" is a search
+    # inside one document followed by a read around the hit, composed by the model, and it works
+    # whatever the heading looks like -- or whether there is a heading at all.
+    #
+    # It also removes a state: `read_section` reported true offsets and no document length, and
+    # that was the ONLY source of `coverage_planner.READ_STATE_LENGTH_UNKNOWN` -- a run that had
+    # only ever read sections could not tell that it had left a hole. Every read is now a `read`
+    # with offsets, so total length is always known and `truncated` is always computable.
 
     def search(
         self,
@@ -192,10 +217,48 @@ class PatientChart:
         doc_type_contains: str | None = None,
         date_from: str | None = None,
         date_to: str | None = None,
-        context: int = 160,
+        context: int = 250,
         max_hits: int = 40,
     ) -> list[SearchHit]:
-        pattern = re.compile(query if regex else re.escape(query), re.IGNORECASE)
+        """Find `query` in this patient's documents. The model chooses the term; this finds it.
+
+        NOTATION-TOLERANT, NOT SYNONYM-AWARE, and the line between those two is the point.
+
+        A literal `re.escape(query)` made three different searches out of one clinical phrase,
+        because this corpus writes the same thing three ways: `non-small cell`, `non small
+        cell`, and the same phrase broken across a hard line wrap. So a run of whitespace or
+        hyphen in the QUERY now matches any run of whitespace or hyphen in the text, and the
+        match stays case-insensitive.
+
+        Measured over the 12,190 diagnosis-bearing documents in this corpus, documents found:
+
+            non-small cell            2251 -> 2476   +225  (+10.0%)
+            small cell carcinoma      1537 -> 1552    +15
+            right upper lobe          1270 -> 1277     +7
+            right lower lobe           876 ->  883     +7
+            squamous cell carcinoma   2615 -> 2623     +8
+            ten phrases, total       16797 -> 17064   +267   (+1.6%)
+
+        So the line-wrap case is small and the hyphen case is real. Both are free.
+
+        WHAT THIS DELIBERATELY DOES NOT DO is fold synonyms. Same measurement, single terms,
+        share of diagnosis-bearing documents each one appears in:
+
+            carcinoma 57.5%   malignan 50.1%   tumor 36.8%   cancer 32.7%
+            adenocarcinoma 27.6%   neoplasm 4.3%   tumour 0.0%
+
+        677 documents (5.6%) contain `cancer` and not `carcinoma`, and 23.9% contain none of
+        those seven. No fixed list is close to complete, so a matcher that silently expanded
+        `cancer` into a synonym set would be guessing on the model's behalf and hiding the miss
+        rate inside a hit. Recall comes from the model issuing several searches and reading the
+        hits -- which is what it has this tool for -- not from a vocabulary compiled in here.
+
+        Nor does it split inside a token: query `nonsmall` still will not find `non-small`.
+        That needs a word list, which is the thing above.
+
+        `regex=True` is honoured verbatim: a caller that wrote its own pattern gets it.
+        """
+        pattern = re.compile(query if regex else _notation_tolerant(query), re.IGNORECASE)
         docs, _ = self.list_documents(
             doc_type_contains=doc_type_contains, date_from=date_from, date_to=date_to, limit=10_000
         )
@@ -295,3 +358,58 @@ class Corpus:
             except OSError:
                 pass  # a read-only corpus is fine; we just pay the scan next time
         return vocab
+
+    COUNT_CACHE = ".doc_type_counts.json"
+
+    def doc_type_counts(self, use_cache: bool = True) -> dict[str, int]:
+        """Every document type in the corpus, and how many documents carry it.
+
+        Same scan and the same reason as `doc_type_vocabulary` -- directory entries only,
+        never `stat()`, because a stat per file is ~276,000 metadata ops and 39 minutes on
+        this filesystem. The counts are what `site_mapping` needs on top of the names: they
+        order a 1,516-row review table by how much of the corpus each row decides, so a
+        registrar with one hour spends it on `Surgical-Pathology-Document` (3,849 documents)
+        rather than on `ELECTRONYSTAGMOGRAM` (1).
+
+        Cached separately from the vocabulary so an existing warm vocabulary cache is not
+        invalidated by asking a new question of the same scan.
+        """
+        import json
+        import os
+        from collections import Counter
+
+        cache = self.root / self.COUNT_CACHE
+        if use_cache and cache.is_file():
+            try:
+                v = json.loads(cache.read_text())
+                if isinstance(v, dict) and v:
+                    return {str(k): int(n) for k, n in v.items()}
+            except (json.JSONDecodeError, OSError, TypeError, ValueError):
+                pass
+
+        counts: Counter[str] = Counter()
+        with os.scandir(self.root) as patients:
+            for pent in patients:
+                if not pent.is_dir():
+                    continue
+                try:
+                    with os.scandir(pent.path) as docs:
+                        for dent in docs:
+                            name = dent.name
+                            if not name.endswith(".txt"):
+                                continue
+                            parsed = parse_filename(name[:-4])
+                            if parsed is not None:
+                                counts[parsed[0]] += 1
+                except OSError:
+                    continue
+
+        out = dict(sorted(counts.items()))
+        if use_cache:
+            try:
+                tmp = cache.with_suffix(".tmp")
+                tmp.write_text(json.dumps(out, indent=0))
+                os.replace(tmp, cache)
+            except OSError:
+                pass
+        return out

@@ -1,0 +1,93 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.mri_tumor_deposits
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.mri_tumor_deposits
+contract_kind: chart_extraction
+label: MRI tumor deposits
+roles:
+- action
+- eligibility
+temporal_meaning: pretreatment
+field_contract:
+  name: mri_tumor_deposits
+  type: string
+  allowable_values:
+  - present
+  - absent
+  - indeterminate
+  - not_reported
+  nullable: true
+  description: Tumor deposits identified on MRI; not the surgical-pathology STORE SSDI.
+registry_mapping:
+  standard: none
+  item_name: none
+  item_number: none
+  xml_id: none
+  effective_years: none
+evidence_coverage:
+  registry_to_rule:
+    semantic: absent
+    temporal: misaligned
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: none
+    transformation_id: null
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: ASCO Management of Locally Advanced Rectal Cancer 2024
+  items:
+  - Recommendations 1.2, 1.3 and 2.1
+  source_refs:
+  - ASCO.LARC.2024
+  - ESMO.RECTAL_LOCALIZED.2025
+question: What is the MRI tumor deposits for the indexed CRC tumor or decision at pretreatment?
+applicability_guard:
+  primary_site: rectum
+  disease_setting: locally_advanced
+  timepoint: before_first_cancer_directed_treatment
+evidence_contract:
+  establishing_source_documents:
+  - pelvic_mri_report
+  excluded_sources:
+  - pathologic_STORE_item_3934_as_MRI_finding
+  positive_witness: A tumor-linked source appropriate to pretreatment establishes mri_tumor_deposits.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - tumor deposit
+    - MRI
+    - deposits
+    statement: Not reported/indeterminate are not absent.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Not reported/indeterminate are not absent.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish mri_tumor_deposits.
+  SPEC_INSUFFICIENT: The requested meaning of mri_tumor_deposits is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CHART.rectal_mri_risk
+  output_field: mri_tumor_deposits
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[mri_tumor_deposits].allowable_values
+  origin: model_authored
+  basis: no external source; local MRI tumor-deposit normalization.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: e3df884702920b09b47e50bd62cd2df9b64b01a18c368d5da68874490c9a7b7f

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
 
 import pytest
 from typer.testing import CliRunner
@@ -109,6 +108,10 @@ def test_the_hooks_runtime_runs_through_extract_and_writes_an_artifact(tmp_path,
     doc = json.loads(path.read_text(encoding="utf-8"))
     assert doc["n_failed_runs"] == 0
     assert [p["patient_id"] for p in doc["patients"]] == ["SYN0001"]
+    assert path.stat().st_mode & 0o777 == 0o600
+    assert path.parent.stat().st_mode & 0o777 == 0o700
+    for artifact in path.parent.glob("SYN0001__*"):
+        assert artifact.stat().st_mode & 0o777 == 0o600
 
 
 def test_the_provider_seam_is_the_only_way_out(tmp_path, scripted_chat):
@@ -125,6 +128,91 @@ def test_the_manifest_records_what_the_library_graph_did(tmp_path, scripted_chat
     # Derived from the graph, not a constant: a middleware added later must move it.
     assert d["recursion_limit"] > d["max_model_calls"]
     assert "replan" in d and "no_tool_call_recoveries" in d
+    assert d["termination_reason"] == "ANSWER_ACCEPTED"
+
+
+def test_runtime_profile_is_executed_and_recorded_in_lineage(tmp_path, scripted_chat):
+    r = _extract(
+        tmp_path,
+        "--runtime-profile",
+        "witness-first-baseline",
+    )
+    assert r.exit_code == 0, r.output
+    (artifact,) = list((tmp_path / "runs").glob("extract__*/extract.json"))
+    assert json.loads(artifact.read_text(encoding="utf-8"))["runtime_profile"] == (
+        "witness-first-baseline"
+    )
+    (manifest,) = list((tmp_path / "runs").glob("extract__*/*.manifest.json"))
+    record = json.loads(manifest.read_text(encoding="utf-8"))
+    assert record["runtime_profile_ref"] == "witness-first-baseline@1.0.0"
+    assert len(record["runtime_profile_hash"]) == 64
+    assert record["runtime_policy_plan"]["strategy"] == "WITNESS_FIRST"
+    assert record["coverage_gate_validated"] is False
+
+
+def test_chat_model_adapts_litellm_openai_prefix_for_openai_compatible_endpoint(
+        monkeypatch):
+    """The shared ACR_MODEL may be LiteLLM-qualified; ChatOpenAI needs a deployment name."""
+    import langchain_openai
+
+    from acr import cli_common
+
+    captured = {}
+
+    def fake_chat_openai(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(langchain_openai, "ChatOpenAI", fake_chat_openai)
+    monkeypatch.setenv("ACR_API_KEY", "test-only")
+    cli_common.chat_model(
+        "openai/gpt-5.6-luna",
+        "https://approved.example/openai/v1",
+        1.0,
+    )
+    assert captured["model"] == "gpt-5.6-luna"
+
+
+def test_runtime_provider_error_is_visible_in_manifest_degradation(tmp_path):
+    """A failed first model call is runtime failure, not a clean clinical NO_ANSWER."""
+    from langchain_core.language_models.chat_models import BaseChatModel
+
+    from acr.agent import run_patient
+    from acr.corpus import Corpus
+    from acr.spec import load_spec
+
+    class BrokenProvider(BaseChatModel):
+        @property
+        def _llm_type(self):
+            return "broken-provider"
+
+        def bind_tools(self, tools, **kwargs):
+            return self
+
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            raise RuntimeError("simulated provider failure")
+
+    manifest = run_patient(
+        spec=load_spec(ROOT / "specs/STORE.400_522_523.site_histology_behavior.yaml"),
+        corpus=Corpus(ROOT / "corpus/patients"),
+        patient_id="SYN0001",
+        out_dir=tmp_path,
+        model=BrokenProvider(),
+        max_model_calls=2,
+        seed=7,
+        run_id="provider-error",
+    )
+    assert manifest["answer"]["status"] == "NO_ANSWER"
+    assert manifest["degradation"]["runtime_or_provider_errors"] == 1
+    assert manifest["termination_reason"] == "RUNTIME_ERROR"
+
+
+def test_the_cli_cost_ceiling_reaches_the_manifest(tmp_path, scripted_chat):
+    r = _extract(tmp_path, "--max-usd", "0.75")
+    assert r.exit_code == 0, r.output
+    (m,) = list((tmp_path / "runs").glob("extract__*/*.manifest.json"))
+    d = json.loads(m.read_text(encoding="utf-8"))
+    assert d["spend"]["max_usd"] == 0.75
 
 
 def test_a_gated_positive_carries_its_witness_and_its_evidence(tmp_path, scripted_chat):

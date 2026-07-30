@@ -46,7 +46,8 @@ def manifest(patient="SYN0001", *, status="FOUND", value=None, gate=True, n_read
     return {"patient_id": patient, "spec_id": SPEC, "spec_hash": "abc123",
             "answer": {"status": status, "value": value or {}},
             "gate_validated": gate, "rejections": list(rejections),
-            "usage": {"total_tokens": tokens, "llm_calls": turns}, "cost_usd": cost,
+            "usage": {"total_tokens": tokens, "llm_calls": turns},
+            "spend": {"usd": cost, "priced": cost is not None},
             "coverage_attested": {"n_read": n_read, "searched_terms": list(searched)},
             "evidence": list(evidence)}
 
@@ -406,19 +407,12 @@ def test_cost_is_read_from_the_key_a_real_manifest_actually_writes():
     ten-patient real batch of 2026-07-28 scored as `cost None / n_cost_unknown 10` while its
     manifests summed to $3.5247, each carrying its own price.
 
-    Note that `manifest()` above builds the fictional `cost_usd` key, which is why the whole
-    eval suite was green on a property no real run had: the fixture agreed with the bug. These
-    two use the real shape.
+    The fixture uses the same `spend` shape as the extraction runtime.
     """
     priced = E.RunRecord({**manifest(), "spend": {"usd": 0.6752, "priced": True,
                                                   "model": "gpt-5.6-luna", "max_usd": 5.0}},
                          source="real-shape")
     assert priced.cost_usd == pytest.approx(0.6752)
-
-    # And the legacy key still works, for a manifest written by something that does report it.
-    legacy = E.RunRecord({**manifest(cost=0.11)}, source="legacy-shape")
-    assert legacy.cost_usd == pytest.approx(0.11)
-
 
 def test_an_unpriced_model_reads_as_unknown_and_never_as_zero():
     """`spend.usd` is None when the model is not in prices.json, and None must survive.
@@ -427,7 +421,7 @@ def test_an_unpriced_model_reads_as_unknown_and_never_as_zero():
     that reads as measured, and `n_cost_unknown` -- the field whose whole job is to say how
     much of the total is missing -- goes to zero at the same time.
     """
-    unpriced = E.RunRecord({**{k: v for k, v in manifest().items() if k != "cost_usd"},
+    unpriced = E.RunRecord({**manifest(),
                             "spend": {"usd": None, "priced": False, "model": "some-local-gguf"}},
                            source="unpriced")
     assert unpriced.cost_usd is None, "an unpriced model is unknown, not free"
@@ -494,7 +488,7 @@ def test_an_unkeyed_run_is_counted_as_unkeyed_and_never_as_wrong():
 
 def test_unmeasured_cost_and_tokens_report_as_none_beside_their_counters():
     m = manifest()
-    m.pop("usage"), m.pop("cost_usd")
+    m.pop("usage"), m.pop("spend")
     rep = score([E.RunRecord(m)])
     assert rep.totals["tokens_mean"] is None and rep.totals["cost_usd_total"] is None
     assert rep.totals["n_tokens_unknown"] == 1 and rep.totals["n_cost_unknown"] == 1

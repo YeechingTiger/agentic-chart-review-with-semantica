@@ -1,0 +1,1568 @@
+schema_version: '2.0'
+category: molecular_operations
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 23
+rules:
+- candidate_id: E26-MOL-001
+  parent_recommendation_id: E26-MOL-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Diagnosis recommendations bullet 1
+  category: molecular_operations
+  title: Histologic confirmation before therapy
+  core_or_supplemental: core
+  source_context:
+    eligibility: Suspected metastatic colorectal cancer
+    action: Confirm colorectal adenocarcinoma in primary or metastatic tissue
+    timing: Before treatment
+    exceptions: None stated
+    predicate_logic: suspected_mcrc AND pretherapy => histologic_confirmation
+  requirements:
+    eligibility:
+      expression: Suspected metastatic colorectal cancer
+      variables:
+      - crc.mcrc_suspicion_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mcrc_suspicion_date
+    action:
+      expression: Confirm colorectal adenocarcinoma in primary or metastatic tissue
+      variables:
+      - crc.histology
+      - crc.molecular_specimen_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.histology
+        - variable: crc.molecular_specimen_site
+    timing:
+      expression: Before treatment
+      variables:
+      - crc.histologic_confirmation_date
+      - crc.mcrc_suspicion_date
+      - crc.treatment_start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.histologic_confirmation_date
+        - variable: crc.mcrc_suspicion_date
+        - variable: crc.treatment_start_date
+    exceptions:
+      expression: None stated
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.histologic_confirmation_date
+  - crc.histology
+  - crc.mcrc_suspicion_date
+  - crc.molecular_specimen_site
+  - crc.treatment_start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-002
+  parent_recommendation_id: E26-MOL-R02
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Diagnosis recommendations bullet 2
+  category: molecular_operations
+  title: Biopsy timeliness
+  core_or_supplemental: core
+  source_context:
+    eligibility: Suspected mCRC at first consultation
+    action: Obtain biopsy
+    timing: Generally within 14 days
+    exceptions: Preserve generally and record reason for delay
+    predicate_logic: first_consultation => biopsy_days <= 14 generally
+  requirements:
+    eligibility:
+      expression: Suspected mCRC at first consultation
+      variables:
+      - crc.first_oncology_consult_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.first_oncology_consult_date
+    action:
+      expression: Obtain biopsy
+      variables:
+      - crc.biopsy_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.biopsy_date
+    timing:
+      expression: Generally within 14 days
+      variables:
+      - crc.biopsy_date
+      - crc.first_oncology_consult_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.biopsy_date
+        - variable: crc.first_oncology_consult_date
+    exceptions:
+      expression: Preserve generally and record reason for delay
+      variables:
+      - crc.biopsy_nonperformance_reason
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.biopsy_nonperformance_reason
+  required_variables:
+  - crc.biopsy_date
+  - crc.biopsy_nonperformance_reason
+  - crc.first_oncology_consult_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_LOCAL_CLOCK
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-003
+  parent_recommendation_id: E26-MOL-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Diagnosis recommendations bullet 3
+  category: molecular_operations
+  title: Pathology reporting service target
+  core_or_supplemental: core
+  source_context:
+    eligibility: Biopsies entering the diagnostic service
+    action: Report at least 80 percent within seven days
+    timing: Biopsy to report interval
+    exceptions: Aggregate benchmark rather than patient-level mandate
+    predicate_logic: cohort_pct(report_days <= 7) >= 0.80
+  requirements:
+    eligibility:
+      expression: Biopsies entering the diagnostic service
+      variables:
+      - crc.biopsy_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.biopsy_date
+    action:
+      expression: Report at least 80 percent within seven days
+      variables:
+      - crc.service_cohort_denominator
+      - crc.service_cohort_numerator
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.service_cohort_denominator
+        - variable: crc.service_cohort_numerator
+    timing:
+      expression: Biopsy to report interval
+      variables:
+      - crc.biopsy_date
+      - crc.pathology_report_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.biopsy_date
+        - variable: crc.pathology_report_date
+    exceptions:
+      expression: Aggregate benchmark rather than patient-level mandate
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Aggregate benchmark rather than patient-level mandate
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.biopsy_date
+  - crc.pathology_report_date
+  - crc.service_cohort_denominator
+  - crc.service_cohort_numerator
+  computability:
+    status: not_computable
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_SERVICE_LEVEL
+    - B_LOCAL_CLOCK
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - EXCEPTION_MODEL_MISSING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-004
+  parent_recommendation_id: E26-MOL-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations specimen review
+  category: molecular_operations
+  title: Pathologist selection of best molecular specimen
+  core_or_supplemental: core
+  source_context:
+    eligibility: Multiple specimens available for molecular characterization
+    action: Review all specimens and select the best specimen
+    timing: Before molecular extraction
+    exceptions: None stated
+    predicate_logic: specimens_available => pathologist_review AND documented_selection
+  requirements:
+    eligibility:
+      expression: Multiple specimens available for molecular characterization
+      variables:
+      - crc.molecular_specimen_adequacy
+      - crc.molecular_specimen_date
+      - crc.molecular_specimen_id
+      - crc.molecular_specimen_inventory
+      - crc.molecular_specimen_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_specimen_adequacy
+        - variable: crc.molecular_specimen_date
+        - variable: crc.molecular_specimen_id
+        - variable: crc.molecular_specimen_inventory
+        - variable: crc.molecular_specimen_site
+    action:
+      expression: Review all specimens and select the best specimen
+      variables:
+      - crc.molecular_pathologist_reviewer
+      - crc.molecular_selected_specimen_id
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_pathologist_reviewer
+        - variable: crc.molecular_selected_specimen_id
+    timing:
+      expression: Before molecular extraction
+      variables:
+      - crc.molecular_specimen_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_specimen_date
+    exceptions:
+      expression: None stated
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.molecular_pathologist_reviewer
+  - crc.molecular_selected_specimen_id
+  - crc.molecular_specimen_adequacy
+  - crc.molecular_specimen_date
+  - crc.molecular_specimen_id
+  - crc.molecular_specimen_inventory
+  - crc.molecular_specimen_site
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-005
+  parent_recommendation_id: E26-MOL-R05
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations tumor enrichment
+  category: molecular_operations
+  title: Tumor-content enrichment
+  core_or_supplemental: core
+  source_context:
+    eligibility: Selected specimen with insufficient tumor content
+    action: Macrodissect or microdissect to enrich tumor content above 20 percent
+    timing: Before DNA extraction
+    exceptions: No enrichment needed when already adequate is inferred operationally
+    predicate_logic: tumor_pct <= 20 => enrich_to > 20
+  requirements:
+    eligibility:
+      expression: Selected specimen with insufficient tumor content
+      variables:
+      - crc.pre_enrichment_tumor_percent
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.pre_enrichment_tumor_percent
+    action:
+      expression: Macrodissect or microdissect to enrich tumor content above 20 percent
+      variables:
+      - crc.post_enrichment_tumor_percent
+      - crc.tumor_enrichment_method
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.post_enrichment_tumor_percent
+        - variable: crc.tumor_enrichment_method
+    timing:
+      expression: Before DNA extraction
+      variables:
+      - crc.molecular_extraction_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_extraction_date
+    exceptions:
+      expression: No enrichment needed when already adequate is inferred operationally
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: No enrichment needed when already adequate is inferred operationally
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.molecular_extraction_date
+  - crc.post_enrichment_tumor_percent
+  - crc.pre_enrichment_tumor_percent
+  - crc.tumor_enrichment_method
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_OPERATIONAL_INFERENCE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-MOL-007
+  parent_recommendation_id: E26-MOL-R07
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations turnaround time
+  category: molecular_operations
+  title: Molecular result turnaround
+  core_or_supplemental: core
+  source_context:
+    eligibility: mCRC molecular testing ordered
+    action: Issue molecular results within 14 days
+    timing: Clock origin not specified
+    exceptions: Cannot score until the local clock is defined
+    predicate_logic: molecular_test => report_days <= 14
+  requirements:
+    eligibility:
+      expression: mCRC molecular testing ordered
+      variables:
+      - crc.molecular_test_order_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_test_order_date
+    action:
+      expression: Issue molecular results within 14 days
+      variables:
+      - crc.molecular_result_released_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_result_released_status
+    timing:
+      expression: Clock origin not specified
+      variables:
+      - crc.molecular_result_date
+      - crc.molecular_specimen_receipt_date
+      - crc.molecular_test_order_date
+      - crc.molecular_turnaround_clock_definition
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_result_date
+        - variable: crc.molecular_specimen_receipt_date
+        - variable: crc.molecular_test_order_date
+        - variable: crc.molecular_turnaround_clock_definition
+    exceptions:
+      expression: Cannot score until the local clock is defined
+      variables:
+      - crc.molecular_turnaround_clock_definition
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_turnaround_clock_definition
+  required_variables:
+  - crc.molecular_result_date
+  - crc.molecular_result_released_status
+  - crc.molecular_specimen_receipt_date
+  - crc.molecular_test_order_date
+  - crc.molecular_turnaround_clock_definition
+  computability:
+    status: not_computable
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_LOCAL_CLOCK
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP22-MMR-006
+  parent_recommendation_id: CAP22-GPS2
+  related_parent_recommendation_ids: []
+  candidate_kind: good_practice
+  source_id: cap_mmr_msi_2022
+  source_anchor: Good Practice Statement 2 indeterminate branch
+  category: molecular_operations
+  title: Resolve an indeterminate MMR or MSI result
+  core_or_supplemental: core
+  source_context:
+    eligibility: Indeterminate result by any method
+    action: Use an alternative technique or repeat on another block with robust peer review
+    timing: Before final classification
+    exceptions: Do not coerce indeterminate to positive or negative
+    predicate_logic: indeterminate => (alternate_method OR other_block_repeat) AND peer_review
+  requirements:
+    eligibility:
+      expression: Indeterminate result by any method
+      variables:
+      - crc.molecular_indeterminate_reason
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_indeterminate_reason
+    action:
+      expression: Use an alternative technique or repeat on another block with robust peer review
+      variables:
+      - crc.molecular_alternate_method
+      - crc.molecular_final_status
+      - crc.molecular_peer_reviewers
+      - crc.molecular_repeat_block_id
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_final_status
+        - op: any_of
+          operands:
+          - variable: crc.molecular_alternate_method
+          - variable: crc.molecular_repeat_block_id
+        - variable: crc.molecular_peer_reviewers
+    timing:
+      expression: Before final classification
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before final classification
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Do not coerce indeterminate to positive or negative
+      variables:
+      - crc.molecular_final_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_final_status
+  required_variables:
+  - crc.molecular_alternate_method
+  - crc.molecular_final_status
+  - crc.molecular_indeterminate_reason
+  - crc.molecular_peer_reviewers
+  - crc.molecular_repeat_block_id
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HUMAN_REVIEW
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP22-MMR-007
+  parent_recommendation_id: CAP22-GPS3
+  related_parent_recommendation_ids: []
+  candidate_kind: good_practice
+  source_id: cap_mmr_msi_2022
+  source_anchor: Good Practice Statement 3
+  category: molecular_operations
+  title: Targeted MSI-PCR for subclonal MMR loss
+  core_or_supplemental: core
+  source_context:
+    eligibility: Subclonal or clonal MMR-IHC loss and ICI clinical-trial consideration
+    action: Dissect the loss area and perform MSI-PCR
+    timing: During trial-eligibility workup
+    exceptions: Do not generalize beyond the stated trial context
+    predicate_logic: subclonal_loss AND trial_consideration => targeted_dissection_and_PCR
+  requirements:
+    eligibility:
+      expression: Subclonal or clonal MMR-IHC loss and ICI clinical-trial consideration
+      variables:
+      - crc.mmr_loss_area
+      - crc.mmr_loss_extent
+      - crc.mmr_lost_protein
+      - crc.trial_identifier
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_lost_protein
+          - variable: crc.mmr_loss_extent
+          - variable: crc.mmr_loss_area
+        - variable: crc.trial_identifier
+    action:
+      expression: Dissect the loss area and perform MSI-PCR
+      variables:
+      - crc.msi_pcr_result
+      - crc.targeted_dissection_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.msi_pcr_result
+        - variable: crc.targeted_dissection_status
+    timing:
+      expression: During trial-eligibility workup
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: During trial-eligibility workup
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Do not generalize beyond the stated trial context
+      variables:
+      - crc.trial_identifier
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.trial_identifier
+  required_variables:
+  - crc.mmr_loss_area
+  - crc.mmr_loss_extent
+  - crc.mmr_lost_protein
+  - crc.msi_pcr_result
+  - crc.targeted_dissection_status
+  - crc.trial_identifier
+  computability:
+    status: partially_specified
+    blockers:
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-08
+  parent_recommendation_id: CAP17-STMT7
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 7
+  category: molecular_operations
+  title: Historical metastatic-specimen preference
+  core_or_supplemental: core
+  source_context:
+    eligibility: Recurrent or metastatic tissue available and adequate
+    action: Prefer recurrent or metastatic specimen; otherwise use primary
+    timing: Before predictive testing
+    exceptions: Inadequate or unavailable metastatic tissue
+    predicate_logic: adequate_metastatic => prefer_metastatic; else_primary
+  requirements:
+    eligibility:
+      expression: Recurrent or metastatic tissue available and adequate
+      variables:
+      - crc.molecular_specimen_adequacy
+      - crc.molecular_specimen_date
+      - crc.molecular_specimen_id
+      - crc.molecular_specimen_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_specimen_adequacy
+        - variable: crc.molecular_specimen_date
+        - variable: crc.molecular_specimen_id
+        - variable: crc.molecular_specimen_site
+    action:
+      expression: Prefer recurrent or metastatic specimen; otherwise use primary
+      variables:
+      - crc.molecular_specimen_preference_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_specimen_preference_decision
+    timing:
+      expression: Before predictive testing
+      variables:
+      - crc.molecular_specimen_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_specimen_date
+    exceptions:
+      expression: Inadequate or unavailable metastatic tissue
+      variables:
+      - crc.molecular_specimen_adequacy
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_specimen_adequacy
+  required_variables:
+  - crc.molecular_specimen_adequacy
+  - crc.molecular_specimen_date
+  - crc.molecular_specimen_id
+  - crc.molecular_specimen_preference_decision
+  - crc.molecular_specimen_site
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - B_SOURCE_CONFLICT
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-09
+  parent_recommendation_id: CAP17-STMT8
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 8
+  category: molecular_operations
+  title: FFPE and alternative-specimen validation
+  core_or_supplemental: core
+  source_context:
+    eligibility: CRC molecular testing specimen
+    action: Accept FFPE; validate other specimen or process types
+    timing: Before clinical use
+    exceptions: Validated alternatives allowed
+    predicate_logic: FFPE => acceptable; non_FFPE => validation_required
+  requirements:
+    eligibility:
+      expression: CRC molecular testing specimen
+      variables:
+      - crc.molecular_specimen_fixation
+      - crc.molecular_specimen_processing
+      - crc.molecular_specimen_type
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_specimen_fixation
+        - variable: crc.molecular_specimen_processing
+        - variable: crc.molecular_specimen_type
+    action:
+      expression: Accept FFPE; validate other specimen or process types
+      variables:
+      - crc.molecular_assay_validation_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_assay_validation_status
+    timing:
+      expression: Before clinical use
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before clinical use
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Validated alternatives allowed
+      variables:
+      - crc.molecular_assay_validation_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_assay_validation_status
+  required_variables:
+  - crc.molecular_assay_validation_status
+  - crc.molecular_specimen_fixation
+  - crc.molecular_specimen_processing
+  - crc.molecular_specimen_type
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-10
+  parent_recommendation_id: CAP17-STMT9
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 9
+  category: molecular_operations
+  title: Intended-use assay validation
+  core_or_supplemental: core
+  source_context:
+    eligibility: Any CRC biomarker assay for clinical use
+    action: Use a validated method with intended-use performance
+    timing: Before deployment
+    exceptions: None
+    predicate_logic: clinical_assay => validated_for_intended_use
+  requirements:
+    eligibility:
+      expression: Any CRC biomarker assay for clinical use
+      variables:
+      - crc.molecular_assay_intended_use
+      - crc.molecular_assay_version
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_assay_intended_use
+        - variable: crc.molecular_assay_version
+    action:
+      expression: Use a validated method with intended-use performance
+      variables:
+      - crc.molecular_assay_accuracy
+      - crc.molecular_assay_lod
+      - crc.molecular_assay_precision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_assay_accuracy
+        - variable: crc.molecular_assay_lod
+        - variable: crc.molecular_assay_precision
+    timing:
+      expression: Before deployment
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before deployment
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.molecular_assay_accuracy
+  - crc.molecular_assay_intended_use
+  - crc.molecular_assay_lod
+  - crc.molecular_assay_precision
+  - crc.molecular_assay_version
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-11
+  parent_recommendation_id: CAP17-STMT10
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 10
+  category: molecular_operations
+  title: Validate assay deployment and change
+  core_or_supplemental: core
+  source_context:
+    eligibility: New or changed assay performance claim
+    action: Validate according to laboratory best practice
+    timing: Before use of the claim
+    exceptions: None
+    predicate_logic: assay_deployment_or_change => validation
+  requirements:
+    eligibility:
+      expression: New or changed assay performance claim
+      variables:
+      - crc.molecular_assay_version
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_assay_version
+    action:
+      expression: Validate according to laboratory best practice
+      variables:
+      - crc.molecular_validation_plan
+      - crc.molecular_validation_results
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_validation_plan
+        - variable: crc.molecular_validation_results
+    timing:
+      expression: Before use of the claim
+      variables:
+      - crc.regulatory_approval_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.regulatory_approval_date
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.molecular_assay_version
+  - crc.molecular_validation_plan
+  - crc.molecular_validation_results
+  - crc.regulatory_approval_date
+  computability:
+    status: not_computable
+    blockers:
+    - B_CAP_UPDATE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-12
+  parent_recommendation_id: CAP17-STMT11
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 11
+  category: molecular_operations
+  title: Validate four-protein MMR IHC
+  core_or_supplemental: core
+  source_context:
+    eligibility: MMR IHC implementation
+    action: Validate MLH1, MSH2, MSH6, and PMS2 assays
+    timing: Before clinical use
+    exceptions: None
+    predicate_logic: MMR_IHC => all_four_assays_validated
+  requirements:
+    eligibility:
+      expression: MMR IHC implementation
+      variables:
+      - crc.mmr_ihc_antibody_clone
+      - crc.mmr_ihc_platform
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mmr_ihc_antibody_clone
+        - variable: crc.mmr_ihc_platform
+    action:
+      expression: Validate MLH1, MSH2, MSH6, and PMS2 assays
+      variables:
+      - crc.mmr_ihc_controls_status
+      - crc.mmr_ihc_validation_version
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mmr_ihc_controls_status
+        - variable: crc.mmr_ihc_validation_version
+    timing:
+      expression: Before clinical use
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before clinical use
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.mmr_ihc_antibody_clone
+  - crc.mmr_ihc_controls_status
+  - crc.mmr_ihc_platform
+  - crc.mmr_ihc_validation_version
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-13
+  parent_recommendation_id: CAP17-STMT12
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 12
+  category: molecular_operations
+  title: Appropriate turnaround and tissue optimization
+  core_or_supplemental: core
+  source_context:
+    eligibility: Clinically relevant CRC biomarker testing
+    action: Provide appropriate TAT and optimize tissue with suitable techniques or multiplexing
+    timing: Across the testing pathway
+    exceptions: Example techniques are not mandates
+    predicate_logic: testing => appropriate_TAT AND tissue_optimized
+  requirements:
+    eligibility:
+      expression: Clinically relevant CRC biomarker testing
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: DENOMINATOR_VARIABLES_INCOMPLETE
+        expression: Clinically relevant CRC biomarker testing
+      evidence_requirement_status: unresolved
+    action:
+      expression: Provide appropriate TAT and optimize tissue with suitable techniques or multiplexing
+      variables:
+      - crc.molecular_local_tat_target
+      - crc.molecular_panel_design
+      - crc.molecular_tissue_use_plan
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_local_tat_target
+        - variable: crc.molecular_panel_design
+        - variable: crc.molecular_tissue_use_plan
+    timing:
+      expression: Across the testing pathway
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Across the testing pathway
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Example techniques are not mandates
+      variables:
+      - crc.molecular_testing_failure_reason
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_testing_failure_reason
+  required_variables:
+  - crc.molecular_local_tat_target
+  - crc.molecular_panel_design
+  - crc.molecular_testing_failure_reason
+  - crc.molecular_tissue_use_plan
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - B_LOCAL_CLOCK
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - DENOMINATOR_VARIABLES_INCOMPLETE
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-14
+  parent_recommendation_id: CAP17-STMT13
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 13
+  category: molecular_operations
+  title: Timely test initiation
+  core_or_supplemental: core
+  source_context:
+    eligibility: Clinical scenario indicates testing
+    action: Initiate testing by case order or standing policy
+    timing: Timely under local specification
+    exceptions: Local medical-staff policy
+    predicate_logic: clinical_trigger => case_order OR reflex_policy
+  requirements:
+    eligibility:
+      expression: Clinical scenario indicates testing
+      variables:
+      - crc.molecular_testing_trigger
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_testing_trigger
+    action:
+      expression: Initiate testing by case order or standing policy
+      variables:
+      - crc.molecular_ordering_actor
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_ordering_actor
+    timing:
+      expression: Timely under local specification
+      variables:
+      - crc.molecular_test_order_date
+      - crc.molecular_testing_policy_version
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_test_order_date
+        - variable: crc.molecular_testing_policy_version
+    exceptions:
+      expression: Local medical-staff policy
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Local medical-staff policy
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.molecular_ordering_actor
+  - crc.molecular_test_order_date
+  - crc.molecular_testing_policy_version
+  - crc.molecular_testing_trigger
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - B_LOCAL_CLOCK
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-15
+  parent_recommendation_id: CAP17-STMT14
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 14
+  category: molecular_operations
+  title: Efficient tissue-utilization policy
+  core_or_supplemental: core
+  source_context:
+    eligibility: Candidate specimen, especially a small specimen
+    action: Apply a laboratory policy for efficient tissue allocation
+    timing: Before sectioning and molecular testing
+    exceptions: None
+    predicate_logic: small_specimen => tissue_policy AND allocation_plan
+  requirements:
+    eligibility:
+      expression: Candidate specimen, especially a small specimen
+      variables:
+      - crc.molecular_specimen_inventory
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_specimen_inventory
+    action:
+      expression: Apply a laboratory policy for efficient tissue allocation
+      variables:
+      - crc.molecular_sectioning_plan
+      - crc.molecular_testing_failure_reason
+      - crc.molecular_tissue_exhaustion_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_sectioning_plan
+        - variable: crc.molecular_testing_failure_reason
+        - variable: crc.molecular_tissue_exhaustion_status
+    timing:
+      expression: Before sectioning and molecular testing
+      variables:
+      - crc.molecular_testing_policy_version
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_testing_policy_version
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.molecular_sectioning_plan
+  - crc.molecular_specimen_inventory
+  - crc.molecular_testing_failure_reason
+  - crc.molecular_testing_policy_version
+  - crc.molecular_tissue_exhaustion_status
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-16
+  parent_recommendation_id: CAP17-STMT15
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 15
+  category: molecular_operations
+  title: Authorized team-member test initiation
+  core_or_supplemental: core
+  source_context:
+    eligibility: Institutional policy permits ordering
+    action: Authorized medical-team members including pathologists may initiate testing
+    timing: At the clinical trigger
+    exceptions: Institution-specific authority
+    predicate_logic: authorized_role => may_order
+  requirements:
+    eligibility:
+      expression: Institutional policy permits ordering
+      variables:
+      - crc.molecular_order_authority
+      - crc.molecular_ordering_role
+      - crc.molecular_testing_policy_version
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_order_authority
+        - variable: crc.molecular_ordering_role
+        - variable: crc.molecular_testing_policy_version
+    action:
+      expression: Authorized medical-team members including pathologists may initiate testing
+      variables:
+      - crc.molecular_test_order_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_test_order_status
+    timing:
+      expression: At the clinical trigger
+      variables:
+      - crc.molecular_test_order_date
+      - crc.molecular_testing_policy_version
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_test_order_date
+        - variable: crc.molecular_testing_policy_version
+    exceptions:
+      expression: Institution-specific authority
+      variables:
+      - crc.molecular_order_authority
+      - crc.molecular_testing_policy_version
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_order_authority
+        - variable: crc.molecular_testing_policy_version
+  required_variables:
+  - crc.molecular_order_authority
+  - crc.molecular_ordering_role
+  - crc.molecular_test_order_date
+  - crc.molecular_test_order_status
+  - crc.molecular_testing_policy_version
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-17
+  parent_recommendation_id: CAP17-STMT16
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 16
+  category: molecular_operations
+  title: Send-out processing benchmark
+  core_or_supplemental: core
+  source_context:
+    eligibility: Predictive test requires send-out
+    action: Promptly process and ship; suggested 90 percent within three working days
+    timing: Accession to shipment
+    exceptions: Aggregate benchmark
+    predicate_logic: cohort_pct(ship_workdays <= 3) >= 0.90
+  requirements:
+    eligibility:
+      expression: Predictive test requires send-out
+      variables:
+      - crc.molecular_sendout_required
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_sendout_required
+    action:
+      expression: Promptly process and ship; suggested 90 percent within three working days
+      variables:
+      - crc.service_cohort_metric
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.service_cohort_metric
+    timing:
+      expression: Accession to shipment
+      variables:
+      - crc.molecular_accession_date
+      - crc.molecular_shipment_date
+      - crc.working_day_calendar_version
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_accession_date
+        - variable: crc.molecular_shipment_date
+        - variable: crc.working_day_calendar_version
+    exceptions:
+      expression: Aggregate benchmark
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Aggregate benchmark
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.molecular_accession_date
+  - crc.molecular_sendout_required
+  - crc.molecular_shipment_date
+  - crc.service_cohort_metric
+  - crc.working_day_calendar_version
+  computability:
+    status: not_computable
+    blockers:
+    - B_CAP_UPDATE
+    - B_SERVICE_LEVEL
+    - B_LOCAL_CLOCK
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - EXCEPTION_MODEL_MISSING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-18
+  parent_recommendation_id: CAP17-STMT17
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 17
+  category: molecular_operations
+  title: Document molecular specimen adequacy
+  core_or_supplemental: core
+  source_context:
+    eligibility: Candidate specimen before testing
+    action: Pathologist evaluates quality, quantity, and tumor fraction and documents adequacy
+    timing: Before testing and in the report
+    exceptions: None
+    predicate_logic: candidate_specimen => evaluate AND document_adequacy
+  requirements:
+    eligibility:
+      expression: Candidate specimen before testing
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: DENOMINATOR_VARIABLES_INCOMPLETE
+        expression: Candidate specimen before testing
+      evidence_requirement_status: unresolved
+    action:
+      expression: Pathologist evaluates quality, quantity, and tumor fraction and documents adequacy
+      variables:
+      - crc.molecular_adequacy_report_field
+      - crc.molecular_pathologist_reviewer
+      - crc.molecular_specimen_quality
+      - crc.molecular_specimen_quantity
+      - crc.molecular_tumor_fraction
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_adequacy_report_field
+        - variable: crc.molecular_pathologist_reviewer
+        - variable: crc.molecular_specimen_quality
+        - variable: crc.molecular_specimen_quantity
+        - variable: crc.molecular_tumor_fraction
+    timing:
+      expression: Before testing and in the report
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before testing and in the report
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.molecular_adequacy_report_field
+  - crc.molecular_pathologist_reviewer
+  - crc.molecular_specimen_quality
+  - crc.molecular_specimen_quantity
+  - crc.molecular_tumor_fraction
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - DENOMINATOR_VARIABLES_INCOMPLETE
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-19
+  parent_recommendation_id: CAP17-STMT18
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 18
+  category: molecular_operations
+  title: Low-allele-fraction assay capability
+  core_or_supplemental: core
+  source_context:
+    eligibility: CRC mutation assay
+    action: Use capability of at least five-percent MAF and sufficient tumor content relative to LoD
+    timing: At validation and specimen acceptance
+    exceptions: Assay-specific LoD and enrichment
+    predicate_logic: LoD <= 5_percent AND tumor_content >= 2_times_LoD
+  requirements:
+    eligibility:
+      expression: CRC mutation assay
+      variables:
+      - crc.molecular_assay_lod
+      - crc.molecular_tumor_fraction
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_assay_lod
+        - variable: crc.molecular_tumor_fraction
+    action:
+      expression: Use capability of at least five-percent MAF and sufficient tumor content relative to LoD
+      variables:
+      - crc.molecular_variant_allele_fraction
+      - crc.tumor_enrichment_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_variant_allele_fraction
+        - variable: crc.tumor_enrichment_status
+    timing:
+      expression: At validation and specimen acceptance
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: At validation and specimen acceptance
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Assay-specific LoD and enrichment
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Assay-specific LoD and enrichment
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.molecular_assay_lod
+  - crc.molecular_tumor_fraction
+  - crc.molecular_variant_allele_fraction
+  - crc.tumor_enrichment_status
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - B_ASSAY_DEFINITION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-20
+  parent_recommendation_id: CAP17-STMT19
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 19
+  category: molecular_operations
+  title: Biomarker reporting benchmark
+  core_or_supplemental: core
+  source_context:
+    eligibility: Clinical biomarker reports
+    action: Suggested 90 percent within ten working days
+    timing: Procedure to report
+    exceptions: Aggregate benchmark
+    predicate_logic: cohort_pct(report_workdays <= 10) >= 0.90
+  requirements:
+    eligibility:
+      expression: Clinical biomarker reports
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: DENOMINATOR_VARIABLES_INCOMPLETE
+        expression: Clinical biomarker reports
+      evidence_requirement_status: unresolved
+    action:
+      expression: Suggested 90 percent within ten working days
+      variables:
+      - crc.service_cohort_metric
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.service_cohort_metric
+    timing:
+      expression: Procedure to report
+      variables:
+      - crc.molecular_procedure_date
+      - crc.molecular_result_date
+      - crc.working_day_calendar_version
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_procedure_date
+        - variable: crc.molecular_result_date
+        - variable: crc.working_day_calendar_version
+    exceptions:
+      expression: Aggregate benchmark
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Aggregate benchmark
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.molecular_procedure_date
+  - crc.molecular_result_date
+  - crc.service_cohort_metric
+  - crc.working_day_calendar_version
+  computability:
+    status: not_computable
+    blockers:
+    - B_CAP_UPDATE
+    - B_SERVICE_LEVEL
+    - B_LOCAL_CLOCK
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - DENOMINATOR_VARIABLES_INCOMPLETE
+    - EXCEPTION_MODEL_MISSING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-22
+  parent_recommendation_id: CAP17-STMT21
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 21
+  category: molecular_operations
+  title: Quality improvement and proficiency testing
+  core_or_supplemental: core
+  source_context:
+    eligibility: Ongoing CRC biomarker service
+    action: Monitor QI and participate in proficiency testing or alternative assurance
+    timing: Continuously
+    exceptions: Alternative assurance when PT unavailable
+    predicate_logic: service => QI AND (PT OR alternative_assurance)
+  requirements:
+    eligibility:
+      expression: Ongoing CRC biomarker service
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: DENOMINATOR_VARIABLES_INCOMPLETE
+        expression: Ongoing CRC biomarker service
+      evidence_requirement_status: unresolved
+    action:
+      expression: Monitor QI and participate in proficiency testing or alternative assurance
+      variables:
+      - crc.laboratory_alternative_quality_assurance
+      - crc.laboratory_corrective_action
+      - crc.laboratory_proficiency_cycle_results
+      - crc.laboratory_proficiency_program
+      - crc.laboratory_qi_metrics
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.laboratory_qi_metrics
+        - op: any_of
+          operands:
+          - variable: crc.laboratory_proficiency_program
+          - variable: crc.laboratory_alternative_quality_assurance
+        - variable: crc.laboratory_proficiency_cycle_results
+        - variable: crc.laboratory_corrective_action
+    timing:
+      expression: Continuously
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Continuously
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Alternative assurance when PT unavailable
+      variables:
+      - crc.laboratory_proficiency_program
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.laboratory_proficiency_program
+  required_variables:
+  - crc.laboratory_alternative_quality_assurance
+  - crc.laboratory_corrective_action
+  - crc.laboratory_proficiency_cycle_results
+  - crc.laboratory_proficiency_program
+  - crc.laboratory_qi_metrics
+  computability:
+    status: not_computable
+    blockers:
+    - B_CAP_UPDATE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - DENOMINATOR_VARIABLES_INCOMPLETE
+    - TEMPORAL_ANCHOR_MISSING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO-SGT-04
+  parent_recommendation_id: ASCO-SGT-PCO1.3
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_somatic_genomic_2022
+  source_anchor: PCO 1.3
+  category: molecular_operations
+  title: Certified laboratory for clinical genomic testing
+  core_or_supplemental: core
+  source_context:
+    eligibility: Genomic result will inform care
+    action: Use a certified laboratory
+    timing: Before test placement
+    exceptions: Certification maps to jurisdiction
+    predicate_logic: clinical_use => certified_lab
+  requirements:
+    eligibility:
+      expression: Genomic result will inform care
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: DENOMINATOR_VARIABLES_INCOMPLETE
+        expression: Genomic result will inform care
+      evidence_requirement_status: unresolved
+    action:
+      expression: Use a certified laboratory
+      variables:
+      - crc.genomic_accreditation_jurisdiction
+      - crc.genomic_laboratory
+      - crc.genomic_laboratory_certification_id
+      - crc.molecular_assay_version
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genomic_accreditation_jurisdiction
+        - variable: crc.genomic_laboratory
+        - variable: crc.genomic_laboratory_certification_id
+        - variable: crc.molecular_assay_version
+    timing:
+      expression: Before test placement
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before test placement
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Certification maps to jurisdiction
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Certification maps to jurisdiction
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.genomic_accreditation_jurisdiction
+  - crc.genomic_laboratory
+  - crc.genomic_laboratory_certification_id
+  - crc.molecular_assay_version
+  computability:
+    status: not_computable
+    blockers:
+    - B_DYNAMIC_LABEL
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - DENOMINATOR_VARIABLES_INCOMPLETE
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

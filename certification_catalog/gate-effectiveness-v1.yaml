@@ -1,0 +1,12 @@
+schema: acr.certification_suite/1
+suite_id: gate-effectiveness-certification
+version: 1.0.0
+module_ref: gate-effectiveness@1.0.0
+must_pass: [SYN-GATE-EFFECT-001-clean]
+must_fail:
+  - SYN-GATE-EFFECT-002-rejection-loop
+  - SYN-GATE-EFFECT-003-coverage-misroute
+metric_thresholds:
+  fixture_accuracy: 1.0
+max_cost_usd: 0
+required_citation_validity: 1.0

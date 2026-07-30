@@ -1,0 +1,306 @@
+schema_version: '2.0'
+category: metastatic_mdt
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 4
+rules:
+- candidate_id: E26-STAGE-06
+  parent_recommendation_id: E26-STAGE-R06
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Staging recommendation 6
+  category: metastatic_mdt
+  title: Organ-specific MDT at diagnosis
+  core_or_supplemental: core
+  source_context:
+    eligibility: mCRC with potential organ-directed care
+    action: Review in organ-specific MDT
+    timing: At diagnosis
+    exceptions: None
+    predicate_logic: mCRC => organ_specific_MDT
+  requirements:
+    eligibility:
+      expression: mCRC with potential organ-directed care
+      variables:
+      - crc.mdt_participating_specialties
+      - crc.metastatic_sites_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mdt_participating_specialties
+        - variable: crc.metastatic_sites_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Review in organ-specific MDT
+      variables:
+      - crc.mdt_recommendation
+      - crc.multidisciplinary_review
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mdt_recommendation
+        - variable: crc.multidisciplinary_review
+    timing:
+      expression: At diagnosis
+      variables:
+      - crc.decision_date
+      - crc.mdt_review_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mdt_review_date
+        - variable: crc.decision_date
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.decision_date
+  - crc.mdt_participating_specialties
+  - crc.mdt_recommendation
+  - crc.mdt_review_date
+  - crc.metastatic_sites_at_decision
+  - crc.metastatic_status
+  - crc.multidisciplinary_review
+  - crc.primary_site
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-LOCAL-03
+  parent_recommendation_id: ASCO22-LOCAL-R5.1
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_local
+  source_anchor: Recommendation 5.1 qualifying statement MDT
+  category: metastatic_mdt
+  title: MDT for CRS
+  core_or_supplemental: core
+  source_context:
+    eligibility: CRS candidate
+    action: Review with medical oncology, surgical oncology, radiology, and pathology
+    timing: Before CRS
+    exceptions: None
+    predicate_logic: CRS_candidate => required_MDT_specialties
+  requirements:
+    eligibility:
+      expression: CRS candidate
+      variables:
+      - crc.cytoreductive_surgery_candidacy_at_decision
+      - crc.mdt_participating_specialties
+      - crc.metastatic_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mdt_participating_specialties
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.cytoreductive_surgery_candidacy_at_decision
+    action:
+      expression: Review with medical oncology, surgical oncology, radiology, and pathology
+      variables:
+      - crc.multidisciplinary_review
+      evidence_logic:
+        variable: crc.multidisciplinary_review
+    timing:
+      expression: Before CRS
+      variables:
+      - crc.decision_date
+      - crc.mdt_review_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mdt_review_date
+        - variable: crc.decision_date
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.cytoreductive_surgery_candidacy_at_decision
+  - crc.decision_date
+  - crc.mdt_participating_specialties
+  - crc.mdt_review_date
+  - crc.metastatic_status
+  - crc.multidisciplinary_review
+  - crc.primary_site
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-LOCAL-08
+  parent_recommendation_id: ASCO22-LOCAL-R6.1
+  related_parent_recommendation_ids:
+  - ASCO22-LOCAL-R6.1
+  - ASCO22-LOCAL-R6.2
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_local
+  source_anchor: Recommendations 6.1 and 6.2 MDT qualifier
+  category: metastatic_mdt
+  title: MDT for SBRT or SIRT
+  core_or_supplemental: core
+  source_context:
+    eligibility: SBRT or SIRT considered
+    action: Review with medical oncology, radiation oncology, hepatobiliary surgery, and interventional radiology
+    timing: Before treatment
+    exceptions: None
+    predicate_logic: SBRT_or_SIRT_candidate => required_MDT_specialties
+  requirements:
+    eligibility:
+      expression: SBRT or SIRT considered
+      variables:
+      - crc.liver_directed_radiation_candidacy_at_decision
+      - crc.mdt_participating_specialties
+      - crc.metastatic_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mdt_participating_specialties
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.liver_directed_radiation_candidacy_at_decision
+    action:
+      expression: Review with medical oncology, radiation oncology, hepatobiliary surgery, and interventional radiology
+      variables:
+      - crc.multidisciplinary_review
+      evidence_logic:
+        variable: crc.multidisciplinary_review
+    timing:
+      expression: Before treatment
+      variables:
+      - crc.decision_date
+      - crc.mdt_review_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mdt_review_date
+        - variable: crc.decision_date
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.decision_date
+  - crc.liver_directed_radiation_candidacy_at_decision
+  - crc.mdt_participating_specialties
+  - crc.mdt_review_date
+  - crc.metastatic_status
+  - crc.multidisciplinary_review
+  - crc.primary_site
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-LOCAL-11
+  parent_recommendation_id: ASCO22-LOCAL-R7.1
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_local
+  source_anchor: Recommendation 7.1 MDT qualifier
+  category: metastatic_mdt
+  title: MDT for liver resection sequence
+  core_or_supplemental: core
+  source_context:
+    eligibility: Curative liver resection candidate
+    action: Discuss chemotherapy choice and sequence with medical oncology and hepatobiliary surgery
+    timing: Before treatment
+    exceptions: None
+    predicate_logic: liver_resection_candidate => medical_oncology_AND_hepatobiliary_MDT
+  requirements:
+    eligibility:
+      expression: Curative liver resection candidate
+      variables:
+      - crc.liver_metastasis_resectability_at_decision
+      - crc.mdt_participating_specialties
+      - crc.metastatic_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mdt_participating_specialties
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.liver_metastasis_resectability_at_decision
+    action:
+      expression: Discuss chemotherapy choice and sequence with medical oncology and hepatobiliary surgery
+      variables:
+      - crc.multidisciplinary_review
+      - crc.treatment_sequence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.treatment_sequence
+        - variable: crc.multidisciplinary_review
+    timing:
+      expression: Before treatment
+      variables:
+      - crc.decision_date
+      - crc.mdt_review_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mdt_review_date
+        - variable: crc.decision_date
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.decision_date
+  - crc.liver_metastasis_resectability_at_decision
+  - crc.mdt_participating_specialties
+  - crc.mdt_review_date
+  - crc.metastatic_status
+  - crc.multidisciplinary_review
+  - crc.primary_site
+  - crc.treatment_sequence
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

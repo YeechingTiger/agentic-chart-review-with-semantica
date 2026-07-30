@@ -1,0 +1,109 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.metastatic_status
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.metastatic_status
+contract_kind: canonical_extraction_with_lossy_registry_projection
+label: Metastatic status
+roles:
+- eligibility
+temporal_meaning: at_indexed_rule_decision
+field_contract:
+  name: metastatic_status
+  type: string
+  allowable_values:
+  - present_at_diagnosis
+  - present_at_recurrence
+  - absent_at_rule_time
+  - indeterminate
+  nullable: true
+  description: Metastatic status at the rule decision time.
+registry_mapping:
+  standard: NAACCR_v26
+  item_name: AJCC M and Mets at Diagnosis
+  item_number: 1003/1013/1023/1112-1117
+  xml_id: multiple_items
+  effective_years: varies
+evidence_coverage:
+  registry_to_rule:
+    semantic: coarsened
+    temporal: conditional
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: coarsened
+    transformation_id: PENDING_VERSIONED_PROJECTION
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: CoC STORE 2026 and NAACCR v26, with rule-specific ASCO context
+  items:
+  - Primary Site [400]
+  - Histologic Type ICD-O-3 [522]
+  - AJCC TNM Clin T [1001]
+  - AJCC TNM Clin N [1002]
+  source_refs:
+  - COC.STORE.2026
+  - NAACCR.SSDI.3_3
+  - ASCO.LARC.2024
+  - ASCO.MCRC.2022
+question: What is the Metastatic status for the indexed CRC tumor or decision at at_indexed_rule_decision?
+applicability_guard:
+  primary_sites:
+  - C180
+  - C182-C189
+  - C199
+  - C209
+  exclude_schemas:
+  - appendix
+  - NET
+  - GIST
+  - sarcoma
+  - Kaposi
+  rule_time_required: true
+evidence_contract:
+  establishing_source_documents:
+  - imaging
+  - pathology
+  - oncology
+  - registry
+  excluded_sources:
+  - diagnosis_timepoint_only_for_later_decision
+  positive_witness: A tumor-linked source appropriate to at_indexed_rule_decision establishes metastatic_status.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - metastatic
+    - AJCC
+    - and
+    statement: Registry items are strong at diagnosis but do not fully represent later recurrence.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Registry items are strong at diagnosis but do not fully represent later recurrence.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish metastatic_status.
+  SPEC_INSUFFICIENT: The requested meaning of metastatic_status is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CANDIDATE.disease_context
+  output_field: metastatic_status
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[metastatic_status].allowable_values
+  origin: model_authored
+  basis: no external source; local temporal normalization separates diagnosis from recurrence.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 8d3c2b39ecf7e29f3f12b5dd7519b3afaf869c108241fc329e50e0078c3aefcc

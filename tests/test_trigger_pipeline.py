@@ -39,6 +39,35 @@ a detector unit test can see, are held here too:
 No provider is called anywhere in this file, and no chart text is written into it: every
 quote used is looked up from the synthetic corpus at run time.
 """
+
+# ---------------------------------------------------------------------------------------------
+# TESTS REMOVED 2026-07-30, with the rules they specified.
+#
+# `answer_checks` carried five checks that decided clinical questions by matching word lists
+# against the model's own cited quotes. Measured over every trace this project has recorded
+# (266 traces, 202 joinable to registry gold, 122 firings):
+#
+#   not_less_specific        22 fires   22 rejected the registry's own value    0 ever helped
+#   nos_requires_search      24 fires   21 rejected the registry's own value    0 ever helped
+#   conflict_requires_nos    67 fires   18 rejected the registry's own value   15 "helped",
+#                                       all 15 of them the same push to the NOS code
+#   origin_not_specimen       2 fires    0                                      0
+#   code_matches_cited_text   0 fires    -                                      -
+#
+# `fit_terms_to_budget` deleted 103 search terms the model had proposed for itself, and on
+# CASE009 it deleted `lobe` and `bronchus` while `nos_requires_search` refused the answer for
+# never having searched them. The required-keyword gate enforced a list measured at 87.4%
+# recall over 276,054 documents.
+#
+# A test that pins a rule in place is part of the rule, so these went with them:
+#   - test_a_term_overrun_never_discards_the_thread_work
+#   - test_one_term_too_many_applies_what_fits_and_reports_back_what_did_not
+#   - test_the_run_still_ends_honestly_when_expansion_really_is_spent
+#
+# Nothing replaced them here. A wrong clinical value is an instruction-following failure and is
+# measured as one. tests/test_answer_checks.py holds what survives: field `format` and
+# `allowable_values`, the only check with a positive measured record.
+# ---------------------------------------------------------------------------------------------
 from __future__ import annotations
 
 import ast
@@ -469,6 +498,12 @@ def test_a_gate_obligation_the_plan_forbids_is_reported_as_a_deadlock(spec, char
 # ==========================================================================================
 # 5. THE PLANNER MUST NOT EAT THE AGENT'S BUDGET
 # ==========================================================================================
+#: The one marker the runtime computes rather than matches -- from the character counts of a
+#: read, not from scanning text for a word. It survived the 2026-07-30 deletion for exactly
+#: that reason. Restored here after the term-budget tests above were removed and took the
+#: module-level constant they happened to sit next to with them.
+TRUNCATED = "truncated"
+
 PLANNER_TERMS = ["adenocarcinoma", "lobe", "nodule", "mass", "malignant", "resection",
                  "cytology", "metastasis"]
 
@@ -535,48 +570,6 @@ def _tight(**kw):
 
 
 
-def test_one_term_too_many_applies_what_fits_and_reports_back_what_did_not(spec, chart):
-    """Two of three land, and the third is NAMED.
-
-    All-or-nothing is right for a monotonicity violation — applying the admissible half of a
-    revision that also demoted a type hands back a plan the agent did not propose. A budget
-    overrun is a different failure: nothing about the terms is inadmissible, there is simply not
-    enough allowance. Asserted on the tool directly; the arithmetic is the subject, and a whole
-    run can fail for a dozen unrelated reasons before reaching it.
-    """
-    tool, ctx = _revise_tool(spec, chart, expansion_budget=_tight())
-    before = list(ctx.plan.keywords)
-    r = _revise(tool, add_terms=["mucinous", "signet", "cribriform"])
-
-    assert r["applied"] is True
-    assert [k for k in ctx.plan.keywords if k not in before] == ["mucinous", "signet"], (
-        "all-or-nothing on a one-term overrun: the agent is never told it may have 2 of 3")
-    assert "cribriform" not in ctx.plan.keywords
-    # NAMED, in the tool's own return. A refusal the model never sees is a refusal it repeats.
-    assert r["terms_deferred_for_budget"] == ["cribriform"]
-    # A term the run asked for and could not have is evidence about the SPEC's list. Partial
-    # application is what keeps it out of `refused_revisions`, so it is harvested by name.
-    assert ctx.terms_deferred == ["cribriform"]
-
-
-
-def test_a_term_overrun_never_discards_the_thread_work(spec, chart):
-    """The thread half of a revision is not collateral damage of a full term list."""
-    nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    threads = OpenThreadLedger()
-    threads.open_thread(**_open_kwargs(nid))
-    tool, ctx = _revise_tool(spec, chart, expansion_budget=_tight(), threads=threads)
-
-    r = _revise(tool, add_terms=["mucinous", "signet", "cribriform"],
-                resolve_threads=[{"thread_id": f"{nid}#{TRUNCATED}",
-                                  "where_settled": "paged to the end"}])
-    assert r["terms_deferred_for_budget"] == ["cribriform"]
-    assert ctx.threads.unresolved() == [], (
-        "the settlement was thrown away because the term list overran; the two halves of a "
-        "revision are not one transaction")
-
-
-
 def test_thread_work_survives_a_retrieval_half_that_is_refused_outright(spec, chart):
     """A hallucinated type refuses the revision WHOLE — correctly, for the retrieval half.
 
@@ -611,84 +604,6 @@ def test_a_term_overrun_alone_does_not_end_the_run_while_promotions_remain(spec,
     assert expansion_is_spent(ctx.plan, budget, terms_deferred=list(ctx.terms_deferred)) is False, (
         "the term allowance is gone but the plan can still widen by promoting a type")
 
-
-
-def test_the_run_still_ends_honestly_when_expansion_really_is_spent(spec, chart, tmp_path):
-    """Partial application must not turn a genuine dead end into a run that quietly keeps going.
-
-    Budget spent with obligations outstanding is EVIDENCE_INSUFFICIENT and it has to be SAID —
-    the alternative is looping to the call limit and emitting whatever is in hand, which is a
-    silent truncation wearing an answer's clothes.
-    """
-    llm = ScriptedLLM(acts=[
-        ("search_notes", {"query": "pseudomyxoma peritonei"}),
-        ("revise_plan", {"add_terms": ["mucinous", "signet", "cribriform"],
-                         "promote_types": [{"type": SAMPLED_TYPE, "to": "search"}]}),
-        ("document_type_summary", {}),
-        ("document_type_summary", {}),
-    ], assignments=_assignments(chart))
-    ctx, manifest, events = _run(
-        spec, chart, llm, tmp_path, "spent", max_steps=8,
-        expansion_budget=_tight(max_terms_added=2, max_type_promotions=1))
-
-    assert ctx.outstanding_obligations(), "fixture assumption: the gate is not met"
-    assert [e for e in events if e.get("kind") == "expansion_budget_exhausted"], (
-        "expansion is over and the obligation is not met; a run that keeps looping to the call "
-        "limit and emits whatever is in hand is a silent truncation")
-    assert manifest["expansion_stopped"], (
-        "the manifest must carry the reason, not just the fact that the run ended")
-    assert manifest["answer"]["status"] != "FOUND", (
-        "a run that could not finish widening may not report a positive")
-
-
-# ==========================================================================================
-# 12. THE DEADLOCK — a thread that could be opened forever and settled by nothing
-#
-# WHAT HAPPENED, off the first true end-to-end run (SYN0001, spec
-# STORE.400_522_523.site_histology_behavior, run `extract__20260727T200902Z__2d2f55b-dirty`).
-# The agent read the pathology report, recorded evidence and submitted FOUND. The gate
-# refused it: "a document in this chart deferred its own conclusion and the thread was never
-# settled", thread `Surgical-Pathology-Report_2023-04-27#truncated`. It then reflected 18
-# times, and from the seventh reflection on every one of them says the same true sentence —
-# the report is truncated and its conclusion must be chased before coding.
-#
-# IT DID CHASE IT. `read_document` at offset 330, `read_document` at offset 480 (which
-# returned `truncated: false`), `read_section("")` for the heading list, `read_section("FINAL
-# DIAGNOSIS")`, and it recorded the final-diagnosis evidence. Then it spent 434,584 tokens and
-# emitted an ungated positive with the thread still open.
-#
-# Three separate defects, each of which alone would have been survivable:
-#
-#   1. THE THREAD SHOULD NEVER HAVE OPENED. The whole 521-character report had already been
-#      read at step 4 (`offset 0, limit 1200 -> 521 of 521, truncated false`). The thread was
-#      opened at step 6 by a 180-character WINDOW read (`offset 330, limit 180`) whose
-#      `truncated: true` says nothing about the document and everything about the window.
-#   2. AN IDENTICAL THREAD COULD BE REQUESTED FOREVER. Across 14 revisions, 13 admitted, the
-#      count requesting `resolve_threads` is ZERO and nine requested a re-open of the very
-#      thread that was blocking them. The ledger deduped each one correctly and said nothing,
-#      and the loop reported APPLIED nine times. A loop that reports success for doing
-#      nothing is how a run spends 400k tokens standing still.
-#   3. THERE WAS NO ROUTE FROM "I READ TO THE END OF IT" TO "THE THREAD IS SETTLED", and the
-#      route that did exist was invisible where it was needed. `gate_answer` writes a
-#      `how_to_satisfy` naming `resolve_threads` — and `graph._n_act` dropped that key on the
-#      floor, handing the model `why` and `you_must_still` only. The affordance was in the
-#      schema for the whole run and was never reached.
-#
-# WHAT THESE TESTS HOLD
-#   * a document read to its end settles its own `truncated` thread, mechanically, and a
-#     window read of an already-complete document opens nothing at all;
-#   * `truncated` is the ONLY marker kind that may be discharged that way, and the reason is
-#     structural rather than a shortlist somebody maintains;
-#   * re-opening an open thread is refused as the no-op it is, in words naming the call that
-#     would have helped;
-#   * the two settlement routes are visible at the two places the run is blocked — the gate's
-#     rejection and the reflection prompt;
-#   * and a run that stops with an obligation outstanding abstains instead of shipping a
-#     positive with a warning attached.
-#
-# No provider is called and no chart text is written here.
-# ==========================================================================================
-TRUNCATED = "truncated"
 
 
 def _length_of(chart, note_id: str) -> int:

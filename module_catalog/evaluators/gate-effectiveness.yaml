@@ -1,0 +1,14 @@
+schema: acr.module_asset/1
+module_id: gate-effectiveness
+version: 1.0.0
+kind: EVALUATOR
+runner: CODE
+inputs: [trajectory]
+output_schema: acr.gate_effectiveness/1
+implementation: evaluation.gate_effectiveness.v1
+truth_modes: [BLIND, REGISTRY_REFERENCE, GOLD]
+capabilities: []
+maximum_authority: BLOCK_RELEASE
+description: Detect rejection loops, coverage misrouting, and excessive gate/process failures.
+owner: evaluation-engineer
+tags: [gate, process, quality]

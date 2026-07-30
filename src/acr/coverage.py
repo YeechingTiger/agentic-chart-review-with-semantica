@@ -38,11 +38,13 @@ import hashlib
 import hmac
 import os
 import random
-from dataclasses import dataclass, field, asdict
+from collections.abc import Iterable, Sequence
+from dataclasses import asdict, dataclass, field
 from datetime import date, timedelta
-from typing import Any, Iterable, Literal, Sequence
+from typing import Any, Literal
 
-from .corpus import DocMeta, PatientChart
+from .corpus import DocMeta
+from .site_mapping import SiteMapping, SiteMappingError
 
 Disposition = Literal[
     "covered", "interior_gap",
@@ -70,7 +72,7 @@ def clopper_pearson_upper(hits: int, n: int, confidence: float = 0.95) -> float:
         # Bisection on the regularised incomplete beta via the binomial tail; no scipy needed.
         from math import comb
         def tail(p: float) -> float:
-            return sum(comb(n, i) * p**i * (1 - p) ** (n - i) for i in range(0, hits + 1))
+            return sum(comb(n, i) * p**i * (1 - p) ** (n - i) for i in range(hits + 1))
         lo, hi = 0.0, 1.0
         for _ in range(200):
             mid = (lo + hi) / 2
@@ -111,11 +113,27 @@ class StratumSpec:
     # The architecture taught it that error; the spec text said the opposite.
     establishes: list[str] = field(default_factory=list)
 
+    # -- what this stratum is ABOUT, in prose, for a Site Mapping to classify against ------
+    #
+    # `means` replaces `doc_type_matches`. The substring list it replaces was measured wrong
+    # on this corpus: `["Pathology", "Cytology"]` matched Speech-Language-Pathology-Note and
+    # missed Non-Gyn-Cyto-FNA (1,285 documents), FN-Aspirate-Report (881) and
+    # SURG-PATH-RESULT (231), so 107 patients holding an FNA diagnosis were stratified as
+    # holding nothing that could establish histology. See `acr.site_mapping` for the
+    # measurement and for the two ablation cases that prove both halves of it.
+    #
+    # `concept` is the portable name the mapping assigns to; it defaults to `name` so a
+    # stratum only sets it when the local stratum name and the portable concept differ.
+    concept: str | None = None
+    means: str = ""
+
     @classmethod
-    def from_dict(cls, d: dict) -> "StratumSpec":
+    def from_dict(cls, d: dict) -> StratumSpec:
         m = d.get("match") or {}
         return cls(
             name=d["name"], policy=d["policy"],
+            concept=(d.get("concept") or None),
+            means=str(d.get("means") or ""),
             doc_type_matches=list(m.get("doc_type_matches") or []),
             rest=bool(m.get("rest")),
             required_keywords=list(d.get("required_keywords") or []),
@@ -129,22 +147,88 @@ class StratumSpec:
             establishes=list(d.get("establishes") or []),
         )
 
-    def matches(self, doc: DocMeta) -> bool:
+    @property
+    def concept_name(self) -> str:
+        """The concept a Site Mapping assigns documents to for this stratum."""
+        return self.concept or self.name
+
+    @property
+    def is_mapped(self) -> bool:
+        """True when this stratum selects documents through a Site Mapping.
+
+        Declaring `means:` is the switch. A stratum that declares it has retired its substring
+        list and cannot fall back to one: see `matches`.
+        """
+        return bool(str(self.means).strip())
+
+    def matches(self, doc: DocMeta, mapping: SiteMapping | None = None) -> bool:
+        """Does this stratum claim `doc`?
+
+        Three paths, and the ordering is the whole safety property:
+
+        `rest`          claims anything, as it always did. It is a declared destination, not a
+                        match, so a mapping is irrelevant to it.
+
+        `means:`        the Site Mapping decides, and NOTHING ELSE MAY. If the mapping has no
+                        opinion about this type name the answer is False, so the document falls
+                        through to the spec's `rest` stratum -- the author's declared default
+                        for an unclassified document. It does NOT quietly fall back to
+                        `doc_type_matches`: a substring list that runs only when the mapping
+                        is absent is the same defect with a lower firing rate, and it would be
+                        hardest to notice exactly when the mapping is broken.
+
+        legacy          `doc_type_matches` as a case-insensitive substring, for the strata not
+                        yet migrated. `speclint` reports every one of these as a placement
+                        violation (raw local type names do not belong in a Task Contract) and
+                        `acr.site_mapping` records what the expression measured wrong here.
+        """
         if self.rest:
             return True
+        if self.is_mapped:
+            if mapping is None:
+                raise SiteMappingError(
+                    f"stratum {self.name!r} selects documents through a Site Mapping "
+                    f"(concept {self.concept_name!r}) and no mapping was supplied. Refusing "
+                    f"rather than stratifying: with no mapping every document falls to the "
+                    f"`rest` stratum, the gate counts an empty `{self.name}` as a satisfied "
+                    f"one, and a run reports a coverage proof it never performed. Build one "
+                    f"with `acr site-mapping build` and pass it to assign_strata."
+                )
+            return mapping.concept_for(doc.doc_type) == self.concept_name
         return any(pat.lower() in doc.doc_type.lower() for pat in self.doc_type_matches)
 
 
-def assign_strata(docs: Sequence[DocMeta], specs: Sequence[StratumSpec]) -> dict[str, list[DocMeta]]:
-    """First match wins; the `rest: true` stratum sweeps up whatever is left."""
+def assign_strata(docs: Sequence[DocMeta], specs: Sequence[StratumSpec],
+                  mapping: SiteMapping | None = None) -> dict[str, list[DocMeta]]:
+    """First match wins; the `rest: true` stratum sweeps up whatever is left.
+
+    `mapping` is required as soon as any stratum declares `means:` -- `StratumSpec.matches`
+    raises rather than guessing. Passing one to strata that declare no `means:` is harmless
+    and changes nothing, so a caller may pass it unconditionally.
+    """
     out: dict[str, list[DocMeta]] = {s.name: [] for s in specs}
     ordered = [s for s in specs if not s.rest] + [s for s in specs if s.rest]
     for d in docs:
         for s in ordered:
-            if s.matches(d):
+            if s.matches(d, mapping):
                 out[s.name].append(d)
                 break
     return out
+
+
+def unmapped_doc_types(docs: Sequence[DocMeta], specs: Sequence[StratumSpec],
+                       mapping: SiteMapping | None) -> list[str]:
+    """Type names in this chart that a `means:`-declaring stratification cannot speak for.
+
+    Recorded in the manifest rather than inferred later. A document whose type the mapping
+    never saw is not evidence that the document is irrelevant -- it is evidence that the
+    mapping is older than the corpus -- and the difference is invisible once the run is over
+    and everything has landed in `rest`.
+    """
+    if mapping is None or not any(s.is_mapped for s in specs):
+        return []
+    _, unknown = mapping.coverage_of(d.doc_type for d in docs)
+    return unknown
 
 
 # ---------------------------------------------------------------------------- sampling
@@ -390,12 +474,18 @@ class CoverageLedger:
     """
 
     def __init__(self, docs: Sequence[DocMeta], strata_specs: Sequence[StratumSpec],
-                 sampler: "ForcedSampler | None" = None, confidence: float = 0.95):
+                 sampler: ForcedSampler | None = None, confidence: float = 0.95,
+                 mapping: SiteMapping | None = None):
         self.docs = list(docs)
         self.specs = list(strata_specs)
         self.confidence = confidence
         self.sampler = sampler or ForcedSampler()
-        self.by_stratum = assign_strata(self.docs, self.specs) if self.specs else {}
+        self.mapping = mapping
+        self.by_stratum = assign_strata(self.docs, self.specs, mapping) if self.specs else {}
+        #: Type names this chart carries that the Site Mapping never classified. Kept on the
+        #: ledger so the manifest can report it: these documents are in `rest` because nobody
+        #: judged them, which is a different fact from being judged irrelevant.
+        self.unmapped_doc_types = unmapped_doc_types(self.docs, self.specs, mapping)
         self.total_documents = len(self.docs)
 
         self.listed_documents = False
@@ -680,7 +770,7 @@ REFUSED = "REFUSED"
 UNDECLARED = "UNDECLARED"
 
 
-def admissibility_for_citations(spec, coverage: "CoverageLedger", evidence: Sequence[dict],
+def admissibility_for_citations(spec, coverage: CoverageLedger, evidence: Sequence[dict],
                                 fields: Sequence[str] = ()) -> list[dict]:
     """Which evidence rule admitted or refused each cited document, per field.
 
@@ -787,14 +877,60 @@ class GateResult:
     #: what failed. This says only that asking again will not change it.
     terminal: list[str] = field(default_factory=list)
 
+    #: What the ledger OBSERVED, in the advisory mode that is now the default: the same
+    #: sentences `missing` used to carry, addressed to the model as information instead of to
+    #: the loop as a refusal. See `evaluate_gate`.
+    advisories: list[str] = field(default_factory=list)
+
     def to_dict(self) -> dict:
         return asdict(self)
 
 
 def evaluate_gate(gate_spec: dict, strata: Sequence[StratumResult],
-                  windows: Sequence[Window] | None = None) -> GateResult:
+                  windows: Sequence[Window] | None = None,
+                  enforce: bool = False) -> GateResult:
+    """What the coverage ledger observed, and — only if `enforce` — what it refuses.
+
+    ADVISORY BY DEFAULT, AND THAT IS THE CHANGE. Every sentence this function produces still
+    gets produced; `enforce=False` routes it to `advisories` instead of `missing`, so it reaches
+    the model as information about its own run and stops being a condition on the answer. The
+    counting is unchanged and still deterministic: how many `can_establish` documents exist, how
+    many were reviewed, what residual bound the draws earn. Those are facts and the runtime is
+    the right thing to compute them.
+
+    "Have I looked at enough of this chart to say that something is absent?" is not a fact. It
+    is a clinical judgement about this patient and this question, and the three-arm pilot
+    measured what happens when code makes it instead of the model:
+
+      - conditional coverage activated on 7 of 10 cases, completed its proof on 1, and lost 13
+        populated field values across 5 cases to reach 2 recovered ones;
+      - always-on coverage recovered nothing guideline-only lacked and lost 15 values across 6;
+      - across every recorded trace, coverage obligations produced ~150 answer rejections, 27 of
+        which refused a tuple that was exactly the registry's answer;
+      - one run submitted the conflict-resolving gold answer ten times and was rejected into a
+        model-call-limit failure.
+
+    The obligation now lives in `skills/coverage-judgement/SKILL.md` and reaches the model as
+    prose it can act on and decline. What it may not do is decline silently: `advisories` is
+    recorded in the manifest, so "the reviewer decided the chart was adequately searched" and
+    "the reviewer never looked" stay distinguishable after the fact — which was always the real
+    requirement, and it never needed a refusal.
+
+    `enforce=True` keeps the old behaviour verbatim for the diagnostic arm.
+    COVERAGE_THREE_ARM_PILOT.md already calls always-on coverage a diagnostic arm and not a
+    candidate default; this is that sentence expressed in the signature.
+    """
     g = GateResult()
-    c, miss, terminal = g.checks, g.missing, g.terminal
+    c = g.checks
+    # One list to append to, and one decision about where it goes. Writing `miss` twice — once
+    # for enforcement and once for advice — is how the two drift until they disagree about what
+    # the run observed.
+    miss = g.missing if enforce else g.advisories
+    # `terminal` says "asking again will not change this", which is a statement ABOUT A REFUSAL.
+    # In advisory mode nothing is refused, so there is nothing to declare undischargeable and it
+    # stays empty — which also keeps `terminal` a subset of `missing` in both modes, the
+    # invariant `test_gate_must_reject` asserts and the reason a reader can trust either list.
+    terminal = g.terminal if enforce else []
     by = {s.name: s for s in strata}
 
     if gate_spec.get("require_can_establish_nonempty") or gate_spec.get("per_claim_can_establish_nonempty"):
@@ -943,7 +1079,11 @@ def evaluate_gate(gate_spec: dict, strata: Sequence[StratumResult],
                 "an empty interior window is an evidence gap, never an absence of events"
             )
 
-    g.verdict = "PASS" if not miss else "FAIL"
+    # The verdict is over `missing`, which is empty unless `enforce`. So an advisory run reports
+    # PASS with a populated `advisories` list, and that pair is the honest description of what
+    # happened: the runtime counted, it has something to say, and it is not refusing the answer.
+    # Reading the verdict off `advisories` too would reinstate the gate under a new name.
+    g.verdict = "PASS" if not g.missing else "FAIL"
     return g
 
 

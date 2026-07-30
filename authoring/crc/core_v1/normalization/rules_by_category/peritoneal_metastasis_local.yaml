@@ -1,0 +1,402 @@
+schema_version: '2.0'
+category: peritoneal_metastasis_local
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 5
+rules:
+- candidate_id: E26-LOCAL-17
+  parent_recommendation_id: E26-LOCAL-R17
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Peritoneal recommendation 1
+  category: peritoneal_metastasis_local
+  title: Complete CRS for peritoneal-only disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Peritoneal-only metastases amenable to complete cytoreduction
+    action: Perform complete cytoreductive surgery
+    timing: Selected local treatment
+    exceptions: Extra-peritoneal disease or incomplete resection feasibility
+    predicate_logic: peritoneal_only AND complete_CRS_feasible => CRS
+  requirements:
+    eligibility:
+      expression: Peritoneal-only metastases amenable to complete cytoreduction
+      variables:
+      - crc.complete_macroscopic_resection_feasibility_at_decision
+      - crc.metastatic_status
+      - crc.peritoneal_cancer_index_at_decision
+      - crc.peritoneal_only_metastatic_disease_at_decision
+      - crc.primary_site
+      - crc.treatment_center_expertise
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.peritoneal_only_metastatic_disease_at_decision
+        - variable: crc.peritoneal_cancer_index_at_decision
+        - variable: crc.complete_macroscopic_resection_feasibility_at_decision
+        - variable: crc.treatment_center_expertise
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Perform complete cytoreductive surgery
+      variables:
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        variable: crc.local_treatment_at_decision
+    timing:
+      expression: Selected local treatment
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Extra-peritoneal disease or incomplete resection feasibility
+      variables:
+      - crc.complete_macroscopic_resection_feasibility_at_decision
+      - crc.extra_peritoneal_disease_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.extra_peritoneal_disease_at_decision
+        - variable: crc.complete_macroscopic_resection_feasibility_at_decision
+  required_variables:
+  - crc.complete_macroscopic_resection_feasibility_at_decision
+  - crc.decision_date
+  - crc.extra_peritoneal_disease_at_decision
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastatic_status
+  - crc.peritoneal_cancer_index_at_decision
+  - crc.peritoneal_only_metastatic_disease_at_decision
+  - crc.primary_site
+  - crc.treatment_center_expertise
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-LOCAL-18
+  parent_recommendation_id: E26-LOCAL-R18
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Peritoneal recommendation 2
+  category: peritoneal_metastasis_local
+  title: No routine HIPEC outside trial
+  core_or_supplemental: core
+  source_context:
+    eligibility: Peritoneal metastasis treatment
+    action: Do not routinely use HIPEC outside a clinical trial
+    timing: At CRS planning
+    exceptions: Clinical trial
+    predicate_logic: not_trial => no_HIPEC
+  requirements:
+    eligibility:
+      expression: Peritoneal metastasis treatment
+      variables:
+      - crc.metastatic_status
+      - crc.peritoneal_metastatic_disease_at_decision
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.peritoneal_metastatic_disease_at_decision
+    action:
+      expression: Do not routinely use HIPEC outside a clinical trial
+      variables:
+      - crc.hipec_agent
+      - crc.hipec_event
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.hipec_event
+        - variable: crc.hipec_agent
+        - variable: crc.local_treatment_at_decision
+    timing:
+      expression: At CRS planning
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Clinical trial
+      variables:
+      - crc.trial_context
+      evidence_logic:
+        variable: crc.trial_context
+  required_variables:
+  - crc.decision_date
+  - crc.hipec_agent
+  - crc.hipec_event
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastatic_status
+  - crc.peritoneal_metastatic_disease_at_decision
+  - crc.primary_site
+  - crc.trial_context
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-LOCAL-01
+  parent_recommendation_id: ASCO22-LOCAL-R5.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_mcrc_2022_local
+  source_anchor: Recommendation 5.1
+  category: peritoneal_metastasis_local
+  title: CRS plus systemic therapy for selected peritoneal-only disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Peritoneal metastases, no extra-peritoneal disease, complete macroscopic resection feasible
+    action: May use CRS plus systemic chemotherapy
+    timing: Selected multimodality treatment
+    exceptions: Selection and specialized-center requirements
+    predicate_logic: peritoneal_only AND complete_resection_feasible => may_CRS_systemic
+  requirements:
+    eligibility:
+      expression: Peritoneal metastases, no extra-peritoneal disease, complete macroscopic resection feasible
+      variables:
+      - crc.complete_macroscopic_resection_feasibility_at_decision
+      - crc.extra_peritoneal_disease_at_decision
+      - crc.metastatic_status
+      - crc.peritoneal_metastatic_disease_at_decision
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.peritoneal_metastatic_disease_at_decision
+        - variable: crc.extra_peritoneal_disease_at_decision
+        - variable: crc.complete_macroscopic_resection_feasibility_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: May use CRS plus systemic chemotherapy
+      variables:
+      - crc.local_treatment_at_decision
+      - crc.systemic_therapy_event
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.systemic_therapy_event
+        - variable: crc.local_treatment_at_decision
+    timing:
+      expression: Selected multimodality treatment
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Selection and specialized-center requirements
+      variables:
+      - crc.complete_macroscopic_resection_feasibility_at_decision
+      - crc.treatment_center_expertise
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.complete_macroscopic_resection_feasibility_at_decision
+        - variable: crc.treatment_center_expertise
+  required_variables:
+  - crc.complete_macroscopic_resection_feasibility_at_decision
+  - crc.decision_date
+  - crc.extra_peritoneal_disease_at_decision
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastatic_status
+  - crc.peritoneal_metastatic_disease_at_decision
+  - crc.primary_site
+  - crc.systemic_therapy_event
+  - crc.treatment_center_expertise
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-LOCAL-02
+  parent_recommendation_id: ASCO22-LOCAL-R5.1
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_local
+  source_anchor: Recommendation 5.1 qualifying statement specialized center
+  category: peritoneal_metastasis_local
+  title: Specialized center for CRS
+  core_or_supplemental: core
+  source_context:
+    eligibility: CRS considered
+    action: Use a center with substantial clinical experience
+    timing: Before referral and surgery
+    exceptions: None
+    predicate_logic: CRS_considered => specialized_center
+  requirements:
+    eligibility:
+      expression: CRS considered
+      variables:
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.treatment_center_expertise
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.treatment_center_expertise
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use a center with substantial clinical experience
+      variables:
+      - crc.local_treatment_at_decision
+      - crc.specialty_center_referral_event
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.specialty_center_referral_event
+        - variable: crc.local_treatment_at_decision
+    timing:
+      expression: Before referral and surgery
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.decision_date
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.specialty_center_referral_event
+  - crc.treatment_center_expertise
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-LOCAL-05
+  parent_recommendation_id: ASCO22-LOCAL-R5.2
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_mcrc_2022_local
+  source_anchor: Recommendation 5.2
+  category: peritoneal_metastasis_local
+  title: No oxaliplatin HIPEC addition
+  core_or_supplemental: core
+  source_context:
+    eligibility: CRS for colorectal peritoneal metastases
+    action: Do not add oxaliplatin-based HIPEC
+    timing: At CRS planning
+    exceptions: None stated
+    predicate_logic: CRS => not_oxaliplatin_HIPEC
+  requirements:
+    eligibility:
+      expression: CRS for colorectal peritoneal metastases
+      variables:
+      - crc.cytoreductive_surgery_event
+      - crc.metastatic_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+        - variable: crc.cytoreductive_surgery_event
+    action:
+      expression: Do not add oxaliplatin-based HIPEC
+      variables:
+      - crc.cytoreductive_surgery_event
+      - crc.hipec_agent
+      - crc.hipec_event
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.cytoreductive_surgery_event
+        - variable: crc.hipec_event
+        - variable: crc.hipec_agent
+        - variable: crc.local_treatment_at_decision
+    timing:
+      expression: At CRS planning
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: None stated
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.cytoreductive_surgery_event
+  - crc.decision_date
+  - crc.hipec_agent
+  - crc.hipec_event
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastatic_status
+  - crc.primary_site
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

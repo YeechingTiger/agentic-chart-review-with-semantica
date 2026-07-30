@@ -1,0 +1,160 @@
+schema_version: '2.0'
+category: molecular_reporting
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 2
+rules:
+- candidate_id: E26-MOL-010
+  parent_recommendation_id: E26-MOL-R09
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: esmo_mcrc_2026_molecular_ops
+  source_anchor: Molecular recommendations RAS reporting qualifier
+  category: molecular_reporting
+  title: Report the specific RAS alteration
+  core_or_supplemental: core
+  source_context:
+    eligibility: RAS alteration detected
+    action: Report the specific gene and variant
+    timing: At result release
+    exceptions: A generic RAS-positive label is insufficient
+    predicate_logic: RAS_detected => gene AND exact_variant
+  requirements:
+    eligibility:
+      expression: RAS alteration detected
+      variables:
+      - crc.molecular_variant_gene
+      - crc.molecular_variant_hgvs_c
+      - crc.molecular_variant_hgvs_p
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_variant_gene
+        - variable: crc.molecular_variant_hgvs_c
+        - variable: crc.molecular_variant_hgvs_p
+    action:
+      expression: Report the specific gene and variant
+      variables:
+      - crc.molecular_variant_allele_fraction
+      - crc.molecular_variant_codon
+      - crc.molecular_variant_exon
+      - crc.molecular_variant_gene
+      - crc.molecular_variant_hgvs_c
+      - crc.molecular_variant_hgvs_p
+      - crc.molecular_variant_transcript
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_variant_allele_fraction
+        - variable: crc.molecular_variant_codon
+        - variable: crc.molecular_variant_exon
+        - variable: crc.molecular_variant_gene
+        - variable: crc.molecular_variant_hgvs_c
+        - variable: crc.molecular_variant_hgvs_p
+        - variable: crc.molecular_variant_transcript
+    timing:
+      expression: At result release
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: At result release
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: A generic RAS-positive label is insufficient
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: A generic RAS-positive label is insufficient
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.molecular_variant_allele_fraction
+  - crc.molecular_variant_codon
+  - crc.molecular_variant_exon
+  - crc.molecular_variant_gene
+  - crc.molecular_variant_hgvs_c
+  - crc.molecular_variant_hgvs_p
+  - crc.molecular_variant_transcript
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP17-BIO-21
+  parent_recommendation_id: CAP17-STMT20
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_crc_biomarkers_2017
+  source_anchor: Statement 20
+  category: molecular_reporting
+  title: Readable standardized biomarker report
+  core_or_supplemental: core
+  source_context:
+    eligibility: CRC biomarker result release
+    action: Report result and interpretation with HGVS, HUGO, and relevant legacy names
+    timing: At report release
+    exceptions: None
+    predicate_logic: result_release => result AND interpretation AND HGVS AND HUGO
+  requirements:
+    eligibility:
+      expression: CRC biomarker result release
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: DENOMINATOR_VARIABLES_INCOMPLETE
+        expression: CRC biomarker result release
+      evidence_requirement_status: unresolved
+    action:
+      expression: Report result and interpretation with HGVS, HUGO, and relevant legacy names
+      variables:
+      - crc.molecular_final_interpretation
+      - crc.molecular_report_legacy_designation
+      - crc.molecular_variant_gene
+      - crc.molecular_variant_hgvs_c
+      - crc.molecular_variant_hgvs_p
+      - crc.molecular_variant_transcript
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_final_interpretation
+        - variable: crc.molecular_report_legacy_designation
+        - variable: crc.molecular_variant_gene
+        - variable: crc.molecular_variant_hgvs_c
+        - variable: crc.molecular_variant_hgvs_p
+        - variable: crc.molecular_variant_transcript
+    timing:
+      expression: At report release
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: At report release
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.molecular_final_interpretation
+  - crc.molecular_report_legacy_designation
+  - crc.molecular_variant_gene
+  - crc.molecular_variant_hgvs_c
+  - crc.molecular_variant_hgvs_p
+  - crc.molecular_variant_transcript
+  computability:
+    status: partially_specified
+    blockers:
+    - B_CAP_UPDATE
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - DENOMINATOR_VARIABLES_INCOMPLETE
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

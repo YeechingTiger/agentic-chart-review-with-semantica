@@ -393,3 +393,33 @@ def build_manifest(*, spec, patient_id: str, model: str, plan, coverage, threads
         "elapsed_s": elapsed_s,
         "trace": str(tracer.path),
     }
+
+
+def prompt_asset_manifest(spec, runtime_profile_asset=None) -> dict:
+    """The identity of every prompt block whose content can change a run's answer.
+
+    Lives here rather than in `agent` because a manifest field belongs with the manifest, and
+    because `mcp_server` builds its own answer dict and will need the same block if it ever grows
+    a prompt.
+
+    Every entry is content-hashed and every entry carries whether anybody has signed it off. Both
+    are `False` today, and that is the honest state: the code tables were recalled by a model, the
+    document concepts are unmeasured by construction, and no registrar has read either. A manifest
+    that recorded the names without that would let a reader assume otherwise.
+    """
+    from .document_concepts import concepts_manifest
+    from .icdo3 import table_manifest
+    from .runtime_profiles import runtime_policy_skills
+    from .skills import skills_manifest
+
+    module_id = getattr(runtime_profile_asset, "module_id", "") or ""
+    try:
+        skills = skills_manifest(runtime_policy_skills(module_id))
+    except Exception as exc:            # noqa: BLE001 - a manifest must not take down a run
+        skills = [{"error": f"{type(exc).__name__}: {exc}"}]
+    return {
+        "value_domain": table_manifest(spec),
+        "document_concepts": concepts_manifest(),
+        "skills": skills,
+        "any_signed_off": False,
+    }

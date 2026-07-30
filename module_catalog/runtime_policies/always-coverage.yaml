@@ -1,0 +1,14 @@
+schema: acr.module_asset/1
+module_id: always-coverage
+version: 1.0.0
+kind: RUNTIME_POLICY
+runner: CODE
+inputs: [run_context]
+output_schema: acr.search_plan/1
+implementation: runtime.always_coverage.v1
+truth_modes: [BLIND]
+capabilities: []
+maximum_authority: BLOCK_CURRENT_ANSWER
+description: Experimental arm requiring coverage before any positive or negative answer.
+owner: runtime-owner
+tags: [runtime, coverage, always-on, experiment]

@@ -11,6 +11,33 @@ made-up list is complete, and that a sign-off dies when the text it approved cha
 `spec review` is not tested for prose quality; nothing can be. It is tested for the failures
 that would make the prose a lie.
 """
+
+# ---------------------------------------------------------------------------------------------
+# TESTS REMOVED 2026-07-30, with the rules they specified.
+#
+# `answer_checks` carried five checks that decided clinical questions by matching word lists
+# against the model's own cited quotes. Measured over every trace this project has recorded
+# (266 traces, 202 joinable to registry gold, 122 firings):
+#
+#   not_less_specific        22 fires   22 rejected the registry's own value    0 ever helped
+#   nos_requires_search      24 fires   21 rejected the registry's own value    0 ever helped
+#   conflict_requires_nos    67 fires   18 rejected the registry's own value   15 "helped",
+#                                       all 15 of them the same push to the NOS code
+#   origin_not_specimen       2 fires    0                                      0
+#   code_matches_cited_text   0 fires    -                                      -
+#
+# `fit_terms_to_budget` deleted 103 search terms the model had proposed for itself, and on
+# CASE009 it deleted `lobe` and `bronchus` while `nos_requires_search` refused the answer for
+# never having searched them. The required-keyword gate enforced a list measured at 87.4%
+# recall over 276,054 documents.
+#
+# A test that pins a rule in place is part of the rule, so these went with them:
+#   - test_store400_surfaces_the_hedged_wording_decision
+#
+# Nothing replaced them here. A wrong clinical value is an instruction-following failure and is
+# measured as one. tests/test_answer_checks.py holds what survives: field `format` and
+# `allowable_values`, the only check with a positive measured record.
+# ---------------------------------------------------------------------------------------------
 from __future__ import annotations
 
 import json
@@ -59,9 +86,8 @@ def test_no_field_format_regex_reaches_the_reviewer(path: Path):
     """`cT(X|0|is|1mi|1a|...)` is not a fact about lung cancer. A registrar who hits one
     stops reading, and the sentence they stopped before is where the clinical content was.
 
-    `CCYYMMDD` is exempt, and is asserted the other way round below: it is not a regex, it is
-    registry notation that the software mistakes for one, and paraphrasing it away would
-    conceal a field that rejects every value it is given.
+    Registry notation such as `CCYYMMDD` may appear in a field's prose description, but the
+    executable Python pattern must never reach the reviewer.
     """
     doc = review(path)
     for f in load_spec(path).fields:
@@ -92,18 +118,12 @@ def test_every_icdo_code_carries_its_name(path: Path):
     assert not bare, f"{path.name}: unglossed code(s): {[b[0] for b in bare]}\n{bare[:3]}"
 
 
-# ------------------------------------------------------- the CCYYMMDD bug must be visible
-def test_registry_notation_masquerading_as_a_pattern_is_reported_loudly():
-    """STORE.390 declares `format: CCYYMMDD`, which check_field_formats applies with
-    re.fullmatch -- so it rejects 20100612 and every other valid date. It is still unfixed.
-    A review document that renders this field as though it worked is worse than no document.
-    """
+# ------------------------------------------------------ the CCYYMMDD regression stays fixed
+def test_registry_notation_is_description_not_a_broken_pattern():
+    """The reviewer may see STORE notation, but no longer a claim that all dates are rejected."""
     doc = review(DXDATE)
-    assert "CCYYMMDD" in doc, "the broken pattern must be named, not paraphrased away"
-    assert "every" in doc.lower() and "reject" in doc.lower()
-    ids = [d.element_id for d in decisions(load_spec(DXDATE), source_path=DXDATE)]
-    assert any(i.startswith("answer.date_of_initial_diagnosis") for i in ids), \
-        "a field that can never validate is a decision for the reviewer, not a footnote"
+    assert "CCYYMMDD" in doc
+    assert "reject every valid value" not in doc.lower()
 
 
 def test_a_working_pattern_is_not_reported_as_broken():
@@ -293,14 +313,6 @@ def test_store400_surfaces_the_radiology_localisation_decision():
     assert "where" in t and ("start" in t or "origin" in t)
 
 
-def test_store400_surfaces_the_hedged_wording_decision():
-    """`favor squamous cell carcinoma` -> 8070 or 8046? The spec has already decided. A
-    pathologist may well disagree, and cannot disagree with a `contradicted_by` list."""
-    t = _decisions_text(SHB).lower()
-    assert "favor squamous" in t
-    assert "8070" in t
-
-
 def test_store400_surfaces_the_residual_miss_tolerance_as_a_number_a_clinician_can_refuse():
     t = _decisions_text(SHB)
     assert "12" in t and "%" in t
@@ -331,11 +343,11 @@ def test_every_decision_says_who_chose_it_and_what_changes_if_the_reviewer_disag
 # ------------------------------------------------------------------------------ sign-off
 def test_signoff_records_reviewer_date_and_the_element_hash(tmp_path):
     spec = load_spec(SHB)
-    rec = record_signoff(tmp_path, spec, "check.1", reviewer="A. Registrar",
+    rec = record_signoff(tmp_path, spec, "conflict.3", reviewer="A. Registrar",
                          source_path=SHB, note="agreed")
     assert rec["reviewer"] == "A. Registrar"
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", rec["signed_at"])
-    el = next(e for e in elements(spec, source_path=SHB) if e.element_id == "check.1")
+    el = next(e for e in elements(spec, source_path=SHB) if e.element_id == "conflict.3")
     assert rec["element_hash"] == el.element_hash
     assert rec["spec_hash"] == spec.spec_hash
     assert load_signoffs(tmp_path, spec.spec_id) == [rec]
@@ -433,7 +445,7 @@ def test_cli_review_writes_the_document(tmp_path):
 def test_cli_signoff_appends_and_shows_up_in_the_next_render(tmp_path):
     led = tmp_path / "signoffs"
     r = runner.invoke(app, ["spec", "signoff", "--spec", str(SHB), "--reviewer", "A. Registrar",
-                            "--element", "check.1", "--signoffs", str(led)])
+                            "--element", "conflict.3", "--signoffs", str(led)])
     assert r.exit_code == 0, r.output
     rows = [json.loads(x) for x in
             (led / "STORE.400_522_523.site_histology_behavior.jsonl").read_text().splitlines()]

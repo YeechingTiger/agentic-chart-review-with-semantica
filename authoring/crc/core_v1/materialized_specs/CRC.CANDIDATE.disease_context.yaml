@@ -1,0 +1,233 @@
+spec_id: CRC.CANDIDATE.disease_context
+spec_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+source_authority:
+  document: CoC STORE 2026 and NAACCR v26, with rule-specific ASCO context
+  items:
+  - Primary Site [400]
+  - Histologic Type ICD-O-3 [522]
+  - AJCC TNM Clin T [1001]
+  - AJCC TNM Clin N [1002]
+  source_refs:
+  - COC.STORE.2026
+  - NAACCR.SSDI.3_3
+  - ASCO.LARC.2024
+  - ASCO.MCRC.2022
+data_source: notes
+question: 'What disease site, histology, extent, treatment setting, resectability, line, and primary-tumor sidedness apply
+  at the decision time for this CRC rule?
+
+  '
+applicability_guard:
+  primary_sites:
+  - C180
+  - C182-C189
+  - C199
+  - C209
+  exclude_schemas:
+  - appendix
+  - NET
+  - GIST
+  - sarcoma
+  - Kaposi
+  rule_time_required: true
+fields:
+- name: primary_site_icdo3
+  type: string
+  format: C\d{3}
+  nullable: true
+  description: ICD-O-3 topography at the tumor-record level; candidate routing later restricts to CRC carcinoma sites.
+- name: histology_icdo3
+  type: string
+  format: \d{4}
+  nullable: true
+  description: Four-digit ICD-O-3 histology code; schema eligibility is evaluated separately.
+- name: disease_setting
+  type: string
+  allowable_values:
+  - localized
+  - locally_advanced
+  - metastatic_at_diagnosis
+  - metastatic_recurrence
+  - indeterminate
+  nullable: true
+  description: Disease setting at the rule decision time, not merely at initial diagnosis.
+- name: larc_status
+  type: string
+  allowable_values:
+  - 'yes'
+  - 'no'
+  - indeterminate
+  - not_applicable
+  nullable: true
+  description: Locally advanced rectal cancer status under a locally reviewed operational definition.
+- name: metastatic_status
+  type: string
+  allowable_values:
+  - present_at_diagnosis
+  - present_at_recurrence
+  - absent_at_rule_time
+  - indeterminate
+  nullable: true
+  description: Metastatic status at the rule decision time.
+- name: resectability_status
+  type: string
+  allowable_values:
+  - resectable
+  - potentially_resectable
+  - initially_unresectable
+  - indeterminate
+  - not_assessed
+  nullable: true
+  description: Explicit multidisciplinary/clinician assessment; never derive solely from M category.
+- name: line_of_therapy
+  type: string
+  allowable_values:
+  - first
+  - second
+  - third_or_later
+  - not_applicable
+  - indeterminate
+  nullable: true
+  description: Metastatic/systemic line at the decision time; first-course registry treatment is not sufficient.
+- name: primary_tumor_sidedness
+  type: string
+  allowable_values:
+  - right
+  - left
+  - transverse
+  - rectosigmoid
+  - rectum
+  - unknown
+  nullable: true
+  description: Deterministic local mapping from primary site with transverse/rectosigmoid/rectum preserved.
+- name: clinical_t
+  type: string
+  format: cT(?:X|0|is|1|2|3|4|1a|1b|1c|2a|2b|3a|3b|3c|4a|4b)
+  nullable: true
+  description: Pretreatment clinical T as explicitly documented or derived under an approved staging spec.
+- name: clinical_n
+  type: string
+  format: cN(?:X|0|1|1a|1b|1c|2|2a|2b)
+  nullable: true
+  description: Pretreatment clinical N as explicitly documented or derived under an approved staging spec.
+- name: multidisciplinary_review
+  type: string
+  allowable_values:
+  - documented
+  - not_documented
+  - unknown
+  nullable: true
+  description: Whether a relevant multidisciplinary resectability/treatment review is documented.
+decision_rule:
+- Route site and histology before applying CRC SSDIs; C181 appendix, NET, GIST and other histology schemas do not enter this
+  contract.
+- All setting, extent, resectability and line values are anchored to the rule decision time.
+- Metastatic does not imply unresectable, and M0 at diagnosis does not imply localized at a later recurrence decision.
+- Primary sidedness is a versioned local derivation from site; transverse, rectosigmoid and rectum are never silently forced
+  left or right.
+evidence_rules:
+  counts_as_evidence:
+  - Primary pathology, operative/endoscopy reports, staging imaging, tumor-board documentation and treating-oncologist assessment.
+  - An explicit line, resectability or treatment-setting statement tied to a date.
+  does_not_count:
+  - Problem-list labels without tumor identity or a decision-time anchor.
+  - A registry first-course flag alone as proof of later metastatic line.
+  - Metastatic status as a substitute for resectability.
+conflict_rules:
+- if: primary site differs between a summary note and definitive pathology/endoscopy/operative localization
+  then: retain the conflict and prefer the most definitive tumor-identity source after registrar review
+- if: resectability assessments differ over time
+  then: use the assessment closest before the indexed treatment decision and retain earlier assessments
+- if: line cannot be established after outside treatment
+  then: return indeterminate, not first
+proof_obligation:
+  for_positive: A dated, tumor-linked source establishes each returned decision-time field.
+  for_negative:
+    mode: stratified_exclusion
+    required_coverage:
+    - Review tumor identity, staging, oncology and treatment-history sources relevant to the decision time.
+    required_keywords:
+    - metastatic
+    - resectable
+    - line of therapy
+    - rectal
+    statement: 'Unknown or indeterminate is a claim that adequate decision-time evidence was searched but did not establish
+      the value. Silence in one note is not a negative finding.
+
+      '
+abstention:
+  EVIDENCE_INSUFFICIENT: The decision-time chart does not establish one or more context fields.
+  SPEC_INSUFFICIENT: The tumor routes to a non-CRC-carcinoma schema or the requested treatment setting is outside this contract.
+boundary_cases:
+- case: Rectosigmoid primary documented as C199
+  result: primary_tumor_sidedness=rectosigmoid until a reviewed treatment-specific mapping says otherwise
+- case: M1 liver disease judged resectable by liver multidisciplinary conference
+  result: metastatic_status=present_at_diagnosis and resectability_status=resectable
+- case: Outside first-line treatment is mentioned but details are missing
+  result: line_of_therapy is not first; use indeterminate if the indexed line cannot be counted
+search_hints:
+- metastatic
+- resectable
+- line of therapy
+- rectal
+- colon
+- rectosigmoid
+- tumor_board
+downstream_warning:
+- The current project STORE site/histology and stage specs do not load under provenance enforcement; this candidate must not
+  silently consume them.
+provenance:
+- element: fields[primary_site_icdo3].format
+  origin: store_manual
+  basis: NAACCR v26 item [400] Primary Site; regex shape is a candidate implementation of the ICD-O topography representation.
+  status: draft
+- element: fields[histology_icdo3].format
+  origin: store_manual
+  basis: NAACCR v26 item [522] Histologic Type ICD-O-3; four-digit shape only.
+  status: draft
+- element: fields[disease_setting].allowable_values
+  origin: model_authored
+  basis: no external source; local normalization needed to preserve decision-time disease setting.
+  status: draft
+- element: fields[larc_status].allowable_values
+  origin: model_authored
+  basis: no external source; local operationalization of the ASCO LARC population remains clinically reviewable.
+  status: draft
+- element: fields[metastatic_status].allowable_values
+  origin: model_authored
+  basis: no external source; local temporal normalization separates diagnosis from recurrence.
+  status: draft
+- element: fields[resectability_status].allowable_values
+  origin: model_authored
+  basis: no external source; local review state for a concept absent from STORE.
+  status: draft
+- element: fields[line_of_therapy].allowable_values
+  origin: model_authored
+  basis: no external source; local longitudinal treatment-line normalization.
+  status: draft
+- element: fields[primary_tumor_sidedness].allowable_values
+  origin: model_authored
+  basis: no external source; local mapping preserves ambiguous segments pending clinical approval.
+  status: draft
+- element: fields[clinical_t].format
+  origin: model_authored
+  basis: no external source; candidate syntax requires reconciliation with the licensed AJCC edition and existing stage spec.
+  status: draft
+- element: fields[clinical_n].format
+  origin: model_authored
+  basis: no external source; candidate syntax requires reconciliation with the licensed AJCC edition and existing stage spec.
+  status: draft
+- element: fields[multidisciplinary_review].allowable_values
+  origin: model_authored
+  basis: no external source; local documentation-state normalization.
+  status: draft
+- element: proof_obligation.for_negative.required_coverage
+  origin: model_authored
+  basis: no external source; project-specific evidence coverage requirement.
+  status: draft
+- element: proof_obligation.for_negative.required_keywords
+  origin: model_authored
+  basis: no external source; unmeasured candidate search vocabulary.
+  status: draft

@@ -1,0 +1,109 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.prior_systemic_therapy
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.prior_systemic_therapy
+contract_kind: chart_extraction
+label: Prior systemic therapy exposure
+roles:
+- eligibility
+- timing
+temporal_meaning: before_indexed_line
+field_contract:
+  name: prior_systemic_therapy
+  type: string
+  allowable_values:
+  - none
+  - adjuvant_only
+  - one_metastatic_line
+  - two_or_more_metastatic_lines
+  - outside_history_incomplete
+  - unknown
+  nullable: true
+  description: Prior exposure before the indexed decision; supports but does not by itself define line.
+registry_mapping:
+  standard: none
+  item_name: none
+  item_number: none
+  xml_id: none
+  effective_years: none
+evidence_coverage:
+  registry_to_rule:
+    semantic: absent
+    temporal: misaligned
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: none
+    transformation_id: null
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: CoC STORE 2026 / NAACCR v26 first-course treatment items plus source-specific CRC treatment guidelines
+  items:
+  - Date 1st Crs RX CoC [1270]
+  - RX Summ--Treatment Status [1285]
+  - RX Date Chemo [1220]
+  - RX Summ--Chemo [1390]
+  - RX Date BRM [1240]
+  - RX Summ--BRM [1410]
+  - RX Date Systemic [3230]
+  - RX Date Radiation [1210]
+  - RX Date Rad Ended [3220]
+  - RX Summ--Surg/Rad Seq [1380]
+  - RX Summ--Systemic/Sur Seq [1639]
+  source_refs:
+  - COC.STORE.2026
+  - ASCO.LARC.2024
+  - ASCO.MCRC.2022
+  - ESMO.MCRC.2026
+question: What is the Prior systemic therapy exposure for the indexed CRC tumor or decision at before_indexed_line?
+applicability_guard:
+  disease: colorectal_carcinoma
+  distinguish_first_course_from_later_course: true
+  do_not_infer_agent_from_registry_summary: true
+evidence_contract:
+  establishing_source_documents:
+  - oncology_timeline
+  - administration
+  - outside_records
+  excluded_sources:
+  - registry_first_course_only_as_complete_history
+  positive_witness: A tumor-linked source appropriate to before_indexed_line establishes prior_systemic_therapy.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - immunotherapy
+    - Prior
+    - systemic
+    statement: Incomplete outside history prevents a confident line count.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Incomplete outside history prevents a confident line count.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish prior_systemic_therapy.
+  SPEC_INSUFFICIENT: The requested meaning of prior_systemic_therapy is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.STORE_CHART.systemic_treatment
+  output_field: prior_systemic_therapy
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[prior_systemic_therapy].allowable_values
+  origin: model_authored
+  basis: no external source; local longitudinal exposure normalization.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: bf122d5d1b390f28cc65d469771b3ad785dfd3105712a6a9f780f827720e0b74

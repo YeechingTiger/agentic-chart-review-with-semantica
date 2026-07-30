@@ -1,0 +1,1877 @@
+schema_version: '2.0'
+category: colon_adjuvant
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 24
+rules:
+- candidate_id: EC20-RISK-01
+  parent_recommendation_id: EC20-RISK-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Risk assessment recommendation 1
+  category: colon_adjuvant
+  title: Discuss adjuvant options
+  core_or_supplemental: core
+  source_context:
+    eligibility: Resected localized colon cancer
+    action: Discuss recurrence benefit and toxicity
+    timing: Before adjuvant decision
+    exceptions: None
+    predicate_logic: adjuvant_decision => patient_discussion
+  requirements:
+    eligibility:
+      expression: Resected localized colon cancer
+      variables:
+      - crc.colon_recurrence_risk.at_adjuvant_decision
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_recurrence_risk.at_adjuvant_decision
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Discuss recurrence benefit and toxicity
+      variables:
+      - crc.colon_adjuvant.risk_assessment_documented
+      - crc.decision.adjuvant_benefit_discussed
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision.adjuvant_benefit_discussed
+        - variable: crc.colon_adjuvant.risk_assessment_documented
+    timing:
+      expression: Before adjuvant decision
+      variables:
+      - crc.colon_adjuvant.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables:
+      - crc.decision.adjuvant_toxicity_discussed
+      - crc.patient_preference
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision.adjuvant_toxicity_discussed
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.risk_assessment_documented
+  - crc.colon_recurrence_risk.at_adjuvant_decision
+  - crc.decision.adjuvant_benefit_discussed
+  - crc.decision.adjuvant_toxicity_discussed
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.patient_preference
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-RISK-02
+  parent_recommendation_id: EC20-RISK-R02
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Risk assessment recommendation 2
+  category: colon_adjuvant
+  title: Core recurrence-risk variables
+  core_or_supplemental: core
+  source_context:
+    eligibility: Resected colon cancer
+    action: Integrate TNM, MMR or MSI, and at least 12 examined nodes
+    timing: Adjuvant risk assessment
+    exceptions: None
+    predicate_logic: risk_assessment => TNM AND MMR_MSI AND node_count
+  requirements:
+    eligibility:
+      expression: Resected colon cancer
+      variables:
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Integrate TNM, MMR or MSI, and at least 12 examined nodes
+      variables:
+      - crc.colon_adjuvant.risk_assessment_documented
+      - crc.colon_stage.pathologic_n.resection
+      - crc.colon_stage.pathologic_stage_group.resection
+      - crc.colon_stage.pathologic_t.resection
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.pathology.regional_nodes_examined_count.resection
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.colon_stage.pathologic_t.resection
+        - variable: crc.colon_stage.pathologic_n.resection
+        - variable: crc.colon_stage.pathologic_stage_group.resection
+        - variable: crc.pathology.regional_nodes_examined_count.resection
+        - variable: crc.colon_adjuvant.risk_assessment_documented
+    timing:
+      expression: Adjuvant risk assessment
+      variables:
+      - crc.colon_adjuvant.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.risk_assessment_documented
+  - crc.colon_stage.pathologic_n.resection
+  - crc.colon_stage.pathologic_stage_group.resection
+  - crc.colon_stage.pathologic_t.resection
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.pathology.regional_nodes_examined_count.resection
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-RISK-03
+  parent_recommendation_id: EC20-RISK-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Risk assessment recommendation 3
+  category: colon_adjuvant
+  title: Additional stage-II risk variables
+  core_or_supplemental: core
+  source_context:
+    eligibility: Stage II colon cancer
+    action: Assess histology, grade, LVI, PNI, lymphoid response, margins, and CEA
+    timing: Before adjuvant decision
+    exceptions: None
+    predicate_logic: stage_II => assess_minor_risk_set
+  requirements:
+    eligibility:
+      expression: Stage II colon cancer
+      variables:
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Assess histology, grade, LVI, PNI, lymphoid response, margins, and CEA
+      variables:
+      - crc.cea.value_at_adjuvant_decision
+      - crc.colon_adjuvant.risk_assessment_documented
+      - crc.pathology.grade.resection
+      - crc.pathology.histology.resection
+      - crc.pathology.lymphoid_response.resection
+      - crc.pathology.lymphovascular_invasion.resection
+      - crc.pathology.perineural_invasion.resection
+      - crc.pathology.resection_margin_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.pathology.histology.resection
+        - variable: crc.pathology.grade.resection
+        - variable: crc.pathology.lymphovascular_invasion.resection
+        - variable: crc.pathology.perineural_invasion.resection
+        - variable: crc.pathology.lymphoid_response.resection
+        - variable: crc.pathology.resection_margin_status
+        - variable: crc.cea.value_at_adjuvant_decision
+        - variable: crc.colon_adjuvant.risk_assessment_documented
+    timing:
+      expression: Before adjuvant decision
+      variables:
+      - crc.colon_adjuvant.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.cea.value_at_adjuvant_decision
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.risk_assessment_documented
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.pathology.grade.resection
+  - crc.pathology.histology.resection
+  - crc.pathology.lymphoid_response.resection
+  - crc.pathology.lymphovascular_invasion.resection
+  - crc.pathology.perineural_invasion.resection
+  - crc.pathology.resection_margin_status
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-RISK-04
+  parent_recommendation_id: EC20-RISK-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Risk assessment recommendation 4
+  category: colon_adjuvant
+  title: Age is not a standalone adjuvant criterion
+  core_or_supplemental: core
+  source_context:
+    eligibility: Older adult considered for adjuvant therapy
+    action: Integrate biology, life expectancy, comorbidity, and toxicity
+    timing: At treatment selection
+    exceptions: Do not use age alone
+    predicate_logic: older_patient => multidomain_assessment; not_age_alone
+  requirements:
+    eligibility:
+      expression: Older adult considered for adjuvant therapy
+      variables:
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Integrate biology, life expectancy, comorbidity, and toxicity
+      variables:
+      - crc.colon_adjuvant.risk_assessment_documented
+      - crc.comorbidity_constraints
+      - crc.estimated_life_expectancy
+      - crc.treatment_toxicity_risk_at_decision
+      - crc.tumor_biology.at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.tumor_biology.at_adjuvant_decision
+        - variable: crc.estimated_life_expectancy
+        - variable: crc.comorbidity_constraints
+        - variable: crc.treatment_toxicity_risk_at_decision
+        - variable: crc.colon_adjuvant.risk_assessment_documented
+    timing:
+      expression: At treatment selection
+      variables:
+      - crc.colon_adjuvant.decision_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+    exceptions:
+      expression: Do not use age alone
+      variables:
+      - crc.age_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.age_at_decision
+  required_variables:
+  - crc.age_at_decision
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.risk_assessment_documented
+  - crc.comorbidity_constraints
+  - crc.estimated_life_expectancy
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.treatment_toxicity_risk_at_decision
+  - crc.tumor_biology.at_adjuvant_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-ADJ-III-01
+  parent_recommendation_id: EC20-ADJ-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Stage III adjuvant recommendation 1
+  category: colon_adjuvant
+  title: Oxaliplatin-fluoropyrimidine for stage III
+  core_or_supplemental: core
+  source_context:
+    eligibility: Resected stage III colon cancer
+    action: Use fluoropyrimidine plus oxaliplatin
+    timing: Adjuvant
+    exceptions: Fitness and contraindications
+    predicate_logic: stage_III AND fit => FP_oxaliplatin
+  requirements:
+    eligibility:
+      expression: Resected stage III colon cancer
+      variables:
+      - crc.colon_stage.pathologic_stage_group.resection
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_stage.pathologic_stage_group.resection
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Use fluoropyrimidine plus oxaliplatin
+      variables:
+      - crc.colon_adjuvant.regimen
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.regimen
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Adjuvant
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: Fitness and contraindications
+      variables:
+      - crc.dpd_status.before_fluoropyrimidine
+      - crc.oxaliplatin_fitness_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.oxaliplatin_fitness_at_decision
+        - variable: crc.dpd_status.before_fluoropyrimidine
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.regimen
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_stage.pathologic_stage_group.resection
+  - crc.dpd_status.before_fluoropyrimidine
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.oxaliplatin_fitness_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_DPD_IMPLEMENTATION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-ADJ-III-02
+  parent_recommendation_id: EC20-ADJ-R02
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Stage III adjuvant recommendation 2
+  category: colon_adjuvant
+  title: CAPOX or FOLFOX duration choice
+  core_or_supplemental: core
+  source_context:
+    eligibility: Stage III receiving oxaliplatin doublet
+    action: Select CAPOX three or six months or FOLFOX six months
+    timing: Adjuvant course
+    exceptions: Risk and comorbidity
+    predicate_logic: stage_III => CAPOX_3_6 OR FOLFOX_6
+  requirements:
+    eligibility:
+      expression: Stage III receiving oxaliplatin doublet
+      variables:
+      - crc.colon_stage.pathologic_n.resection
+      - crc.colon_stage.pathologic_t.resection
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.colon_stage.pathologic_t.resection
+        - variable: crc.colon_stage.pathologic_n.resection
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Select CAPOX three or six months or FOLFOX six months
+      variables:
+      - crc.colon_adjuvant.regimen
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.regimen
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Adjuvant course
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.planned_or_delivered_duration_months
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.planned_or_delivered_duration_months
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: Risk and comorbidity
+      variables:
+      - crc.comorbidity_constraints
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.comorbidity_constraints
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.planned_or_delivered_duration_months
+  - crc.colon_adjuvant.regimen
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_stage.pathologic_n.resection
+  - crc.colon_stage.pathologic_t.resection
+  - crc.comorbidity_constraints
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-ADJ-III-03
+  parent_recommendation_id: EC20-ADJ-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Stage III risk-duration recommendation
+  category: colon_adjuvant
+  title: Risk-adjusted duration option
+  core_or_supplemental: core
+  source_context:
+    eligibility: Stage III stratified by T and N
+    action: T1-3N1 may receive CAPOX three months; T4 or N2 CAPOX six months; FOLFOX six months
+    timing: Adjuvant course
+    exceptions: Post-hoc evidence caveat
+    predicate_logic: lowrisk_III=>CAPOX3; highrisk_III=>CAPOX6; FOLFOX=>6
+  requirements:
+    eligibility:
+      expression: Stage III stratified by T and N
+      variables:
+      - crc.colon_stage.pathologic_n.resection
+      - crc.colon_stage.pathologic_t.resection
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_stage.pathologic_t.resection
+        - variable: crc.colon_stage.pathologic_n.resection
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: T1-3N1 may receive CAPOX three months; T4 or N2 CAPOX six months; FOLFOX six months
+      variables:
+      - crc.colon_adjuvant.regimen
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.regimen
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Adjuvant course
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.planned_or_delivered_duration_months
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.planned_or_delivered_duration_months
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: Post-hoc evidence caveat
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.planned_or_delivered_duration_months
+  - crc.colon_adjuvant.regimen
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_stage.pathologic_n.resection
+  - crc.colon_stage.pathologic_t.resection
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-ADJ-III-04
+  parent_recommendation_id: EC20-ADJ-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Stage III oxaliplatin-ineligible recommendation
+  category: colon_adjuvant
+  title: Fluoropyrimidine alone when oxaliplatin unsuitable
+  core_or_supplemental: core
+  source_context:
+    eligibility: Stage III unfit for or intolerant of oxaliplatin
+    action: Use capecitabine or LV5FU2 for six months
+    timing: Adjuvant
+    exceptions: Fluoropyrimidine contraindication
+    predicate_logic: oxaliplatin_unfit => capecitabine6 OR LV5FU2_6
+  requirements:
+    eligibility:
+      expression: Stage III unfit for or intolerant of oxaliplatin
+      variables:
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Use capecitabine or LV5FU2 for six months
+      variables:
+      - crc.colon_adjuvant.regimen
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.regimen
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Adjuvant
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.planned_or_delivered_duration_months
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.planned_or_delivered_duration_months
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: Fluoropyrimidine contraindication
+      variables:
+      - crc.dpd_status.before_fluoropyrimidine
+      - crc.patient.oxaliplatin_intolerance
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.patient.oxaliplatin_intolerance
+        - variable: crc.dpd_status.before_fluoropyrimidine
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.planned_or_delivered_duration_months
+  - crc.colon_adjuvant.regimen
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.dpd_status.before_fluoropyrimidine
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.patient.oxaliplatin_intolerance
+  computability:
+    status: partially_specified
+    blockers:
+    - B_DPD_IMPLEMENTATION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-ADJ-II-LOW-01
+  parent_recommendation_id: EC20-ADJ-R05
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Stage II low-risk recommendation
+  category: colon_adjuvant
+  title: Observation for low-risk stage II
+  core_or_supplemental: core
+  source_context:
+    eligibility: Low-risk stage II colon cancer
+    action: Use follow-up without routine adjuvant therapy
+    timing: Postoperative
+    exceptions: None
+    predicate_logic: stage_II AND low_risk => followup
+  requirements:
+    eligibility:
+      expression: Low-risk stage II colon cancer
+      variables:
+      - crc.colon_stage.pathologic_t.resection
+      - crc.colon_stage_ii.high_risk_factors
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      - crc.mmr_ihc_integrated_status
+      - crc.pathology.regional_nodes_examined_count.resection
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_stage.pathologic_t.resection
+        - variable: crc.pathology.regional_nodes_examined_count.resection
+        - variable: crc.colon_stage_ii.high_risk_factors
+        - variable: crc.mmr_ihc_integrated_status
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Use follow-up without routine adjuvant therapy
+      variables:
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Postoperative
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_stage.pathologic_t.resection
+  - crc.colon_stage_ii.high_risk_factors
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.pathology.regional_nodes_examined_count.resection
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-ADJ-II-INT-01
+  parent_recommendation_id: EC20-ADJ-R06
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Stage II intermediate-risk recommendation
+  category: colon_adjuvant
+  title: Fluoropyrimidine for selected intermediate-risk stage II
+  core_or_supplemental: core
+  source_context:
+    eligibility: pMMR or MSS with one non-major risk factor
+    action: May use six months fluoropyrimidine
+    timing: Adjuvant
+    exceptions: pT4 and fewer than 12 nodes are major factors
+    predicate_logic: stage_II AND pMMR_MSS AND one_minor_factor => may_FP6
+  requirements:
+    eligibility:
+      expression: pMMR or MSS with one non-major risk factor
+      variables:
+      - crc.colon_stage.pathologic_t.resection
+      - crc.colon_stage_ii.minor_risk_factors
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.pathology.regional_nodes_examined_count.resection
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.colon_stage.pathologic_t.resection
+        - variable: crc.pathology.regional_nodes_examined_count.resection
+        - variable: crc.colon_stage_ii.minor_risk_factors
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: May use six months fluoropyrimidine
+      variables:
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Adjuvant
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: pT4 and fewer than 12 nodes are major factors
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_stage.pathologic_t.resection
+  - crc.colon_stage_ii.minor_risk_factors
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.pathology.regional_nodes_examined_count.resection
+  computability:
+    status: partially_specified
+    blockers:
+    - B_DPD_IMPLEMENTATION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-ADJ-II-HIGH-OX-01
+  parent_recommendation_id: EC20-ADJ-R07
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Stage II high-risk oxaliplatin recommendation
+  category: colon_adjuvant
+  title: Consider oxaliplatin for high-risk stage II
+  core_or_supplemental: core
+  source_context:
+    eligibility: pT4, fewer than 12 nodes, or multiple minor factors
+    action: May add oxaliplatin
+    timing: Adjuvant
+    exceptions: MMR or MSI does not automatically exclude this high-risk branch
+    predicate_logic: pT4 OR nodes_lt_12 OR multiple_minor => may_add_oxaliplatin
+  requirements:
+    eligibility:
+      expression: pT4, fewer than 12 nodes, or multiple minor factors
+      variables:
+      - crc.colon_stage.pathologic_t.resection
+      - crc.colon_stage_ii.high_risk_factor_count
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.pathology.regional_nodes_examined_count.resection
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.colon_stage.pathologic_t.resection
+        - variable: crc.pathology.regional_nodes_examined_count.resection
+        - variable: crc.colon_stage_ii.high_risk_factor_count
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: May add oxaliplatin
+      variables:
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Adjuvant
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: MMR or MSI does not automatically exclude this high-risk branch
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_stage.pathologic_t.resection
+  - crc.colon_stage_ii.high_risk_factor_count
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.pathology.regional_nodes_examined_count.resection
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-ADJ-II-HIGH-DUR-01
+  parent_recommendation_id: EC20-ADJ-R08
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Stage II high-risk duration recommendation
+  category: colon_adjuvant
+  title: High-risk stage-II doublet duration
+  core_or_supplemental: core
+  source_context:
+    eligibility: High-risk stage II with oxaliplatin doublet selected
+    action: May use CAPOX three months; do not equate FOLFOX three with six months
+    timing: Adjuvant course
+    exceptions: Post-hoc evidence caveat
+    predicate_logic: highrisk_II AND CAPOX=>may_3; FOLFOX3!=FOLFOX6
+  requirements:
+    eligibility:
+      expression: High-risk stage II with oxaliplatin doublet selected
+      variables:
+      - crc.colon_adjuvant.risk_group
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.risk_group
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: May use CAPOX three months; do not equate FOLFOX three with six months
+      variables:
+      - crc.colon_adjuvant.regimen
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.regimen
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Adjuvant course
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.planned_or_delivered_duration_months
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.planned_or_delivered_duration_months
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: Post-hoc evidence caveat
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.planned_or_delivered_duration_months
+  - crc.colon_adjuvant.regimen
+  - crc.colon_adjuvant.risk_group
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: EC20-ADJ-TIME-01
+  parent_recommendation_id: EC20-ADJ-R09
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_colon_2020
+  source_anchor: Adjuvant timing recommendation
+  category: colon_adjuvant
+  title: Start adjuvant therapy promptly
+  core_or_supplemental: core
+  source_context:
+    eligibility: Adjuvant therapy indicated after resection
+    action: Start as soon as possible
+    timing: Ideally within eight weeks
+    exceptions: Clinical recovery and contraindications
+    predicate_logic: adjuvant_indicated => start_days <= 56 ideally
+  requirements:
+    eligibility:
+      expression: Adjuvant therapy indicated after resection
+      variables:
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Start as soon as possible
+      variables:
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Ideally within eight weeks
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.start_date
+      - crc.colon_surgery.primary_resection_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_surgery.primary_resection_date
+        - variable: crc.colon_adjuvant.start_date
+        - variable: crc.colon_adjuvant.decision_date
+    exceptions:
+      expression: Clinical recovery and contraindications
+      variables:
+      - crc.colon_adjuvant.start_delay_reason
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.start_delay_reason
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.start_delay_reason
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_surgery.primary_resection_date
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-S2-1.1
+  parent_recommendation_id: ASCO22-S2-R1.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_stage2_colon_2022
+  source_anchor: Recommendation 1.1
+  category: colon_adjuvant
+  title: No routine adjuvant therapy for all stage II
+  core_or_supplemental: core
+  source_context:
+    eligibility: Resected stage II colon cancer
+    action: Do not routinely offer adjuvant chemotherapy
+    timing: Postoperative
+    exceptions: High-risk branches in later recommendations
+    predicate_logic: stage_II AND no_highrisk_exception => no_routine_ACT
+  requirements:
+    eligibility:
+      expression: Resected stage II colon cancer
+      variables:
+      - crc.colon_stage.pathologic_stage_group.resection
+      - crc.colon_stage.pathologic_t.resection
+      - crc.colon_stage_ii.high_risk_factors
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_stage.pathologic_stage_group.resection
+        - variable: crc.colon_stage.pathologic_t.resection
+        - variable: crc.colon_stage_ii.high_risk_factors
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Do not routinely offer adjuvant chemotherapy
+      variables:
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Postoperative
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: High-risk branches in later recommendations
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_stage.pathologic_stage_group.resection
+  - crc.colon_stage.pathologic_t.resection
+  - crc.colon_stage_ii.high_risk_factors
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-S2-1.2
+  parent_recommendation_id: ASCO22-S2-R1.2
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_stage2_colon_2022
+  source_anchor: Recommendation 1.2
+  category: colon_adjuvant
+  title: No routine therapy for low-risk stage IIA
+  core_or_supplemental: core
+  source_context:
+    eligibility: T3, at least 12 nodes, no PNI, LVI, poor grade, obstruction, perforation, or BD3
+    action: Do not routinely offer adjuvant therapy
+    timing: Postoperative
+    exceptions: Age alone is not an exception
+    predicate_logic: all_lowrisk_features => no_routine_ACT
+  requirements:
+    eligibility:
+      expression: T3, at least 12 nodes, no PNI, LVI, poor grade, obstruction, perforation, or BD3
+      variables:
+      - crc.colon_presentation.obstruction
+      - crc.colon_presentation.perforation
+      - crc.colon_stage.pathologic_t.resection
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      - crc.pathology.grade.resection
+      - crc.pathology.lymphovascular_invasion.resection
+      - crc.pathology.perineural_invasion.resection
+      - crc.pathology.regional_nodes_examined_count.resection
+      - crc.pathology.tumor_budding_grade.resection
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_stage.pathologic_t.resection
+        - variable: crc.pathology.regional_nodes_examined_count.resection
+        - variable: crc.pathology.perineural_invasion.resection
+        - variable: crc.pathology.lymphovascular_invasion.resection
+        - variable: crc.pathology.grade.resection
+        - variable: crc.colon_presentation.obstruction
+        - variable: crc.colon_presentation.perforation
+        - variable: crc.pathology.tumor_budding_grade.resection
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Do not routinely offer adjuvant therapy
+      variables:
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Postoperative
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: Age alone is not an exception
+      variables:
+      - crc.age_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.age_at_decision
+  required_variables:
+  - crc.age_at_decision
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_presentation.obstruction
+  - crc.colon_presentation.perforation
+  - crc.colon_stage.pathologic_t.resection
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.pathology.grade.resection
+  - crc.pathology.lymphovascular_invasion.resection
+  - crc.pathology.perineural_invasion.resection
+  - crc.pathology.regional_nodes_examined_count.resection
+  - crc.pathology.tumor_budding_grade.resection
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-S2-1.3
+  parent_recommendation_id: ASCO22-S2-R1.3
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_stage2_colon_2022
+  source_anchor: Recommendation 1.3
+  category: colon_adjuvant
+  title: Offer therapy for T4 stage II
+  core_or_supplemental: core
+  source_context:
+    eligibility: Stage IIB or IIC with T4
+    action: Offer adjuvant chemotherapy with benefit-harm discussion
+    timing: Postoperative
+    exceptions: Patient fitness and preference
+    predicate_logic: stage_II AND T4 => offer_ACT_and_SDM
+  requirements:
+    eligibility:
+      expression: Stage IIB or IIC with T4
+      variables:
+      - crc.colon_stage.pathologic_stage_group.resection
+      - crc.colon_stage.pathologic_t.resection
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_stage.pathologic_stage_group.resection
+        - variable: crc.colon_stage.pathologic_t.resection
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Offer adjuvant chemotherapy with benefit-harm discussion
+      variables:
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      - crc.decision.benefit_harm_discussion_documented
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision.benefit_harm_discussion_documented
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Postoperative
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: Patient fitness and preference
+      variables:
+      - crc.comorbidity_constraints
+      - crc.patient_preference
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.comorbidity_constraints
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_stage.pathologic_stage_group.resection
+  - crc.colon_stage.pathologic_t.resection
+  - crc.comorbidity_constraints
+  - crc.decision.benefit_harm_discussion_documented
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.patient_preference
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-S2-1.4
+  parent_recommendation_id: ASCO22-S2-R1.4
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_stage2_colon_2022
+  source_anchor: Recommendation 1.4
+  category: colon_adjuvant
+  title: May offer therapy for T3 with high-risk factor
+  core_or_supplemental: core
+  source_context:
+    eligibility: T3 plus fewer than 12 nodes, PNI, LVI, poor grade, obstruction, perforation, or BD3
+    action: May offer adjuvant therapy through shared decision making
+    timing: Postoperative
+    exceptions: Factor count and ctDNA uncertainty
+    predicate_logic: T3 AND any_highrisk_factor => may_ACT
+  requirements:
+    eligibility:
+      expression: T3 plus fewer than 12 nodes, PNI, LVI, poor grade, obstruction, perforation, or BD3
+      variables:
+      - crc.colon_presentation.obstruction
+      - crc.colon_presentation.perforation
+      - crc.ctdna.status_at_adjuvant_decision
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      - crc.pathology.grade.resection
+      - crc.pathology.lymphovascular_invasion.resection
+      - crc.pathology.perineural_invasion.resection
+      - crc.pathology.regional_nodes_examined_count.resection
+      - crc.pathology.tumor_budding_grade.resection
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.pathology.regional_nodes_examined_count.resection
+        - variable: crc.pathology.perineural_invasion.resection
+        - variable: crc.pathology.lymphovascular_invasion.resection
+        - variable: crc.pathology.grade.resection
+        - variable: crc.colon_presentation.obstruction
+        - variable: crc.colon_presentation.perforation
+        - variable: crc.pathology.tumor_budding_grade.resection
+        - variable: crc.ctdna.status_at_adjuvant_decision
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: May offer adjuvant therapy through shared decision making
+      variables:
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Postoperative
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: Factor count and ctDNA uncertainty
+      variables:
+      - crc.patient_preference
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_presentation.obstruction
+  - crc.colon_presentation.perforation
+  - crc.ctdna.status_at_adjuvant_decision
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.pathology.grade.resection
+  - crc.pathology.lymphovascular_invasion.resection
+  - crc.pathology.perineural_invasion.resection
+  - crc.pathology.regional_nodes_examined_count.resection
+  - crc.pathology.tumor_budding_grade.resection
+  - crc.patient_preference
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-S2-2.1a
+  parent_recommendation_id: ASCO22-S2-R2.1
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: asco_stage2_colon_2022
+  source_anchor: Recommendation 2.1 fluoropyrimidine branch
+  category: colon_adjuvant
+  title: No fluoropyrimidine monotherapy in dMMR or MSI-H stage II
+  core_or_supplemental: core
+  source_context:
+    eligibility: Stage II dMMR or MSI-H
+    action: Do not use fluoropyrimidine monotherapy
+    timing: Adjuvant selection
+    exceptions: High-risk oxaliplatin branch may apply
+    predicate_logic: dMMR OR MSI_H => not_FP_monotherapy
+  requirements:
+    eligibility:
+      expression: Stage II dMMR or MSI-H
+      variables:
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Do not use fluoropyrimidine monotherapy
+      variables:
+      - crc.colon_adjuvant.regimen
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.regimen
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Adjuvant selection
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: High-risk oxaliplatin branch may apply
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.regimen
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-S2-2.1b
+  parent_recommendation_id: ASCO22-S2-R2.1
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: asco_stage2_colon_2022
+  source_anchor: Recommendation 2.1 high-risk branch
+  category: colon_adjuvant
+  title: Oxaliplatin-containing therapy for selected high-risk dMMR stage II
+  core_or_supplemental: core
+  source_context:
+    eligibility: dMMR or MSI-H with T4 or other high-risk feature and therapy selected
+    action: Use an oxaliplatin-containing regimen
+    timing: Adjuvant
+    exceptions: Poor differentiation alone is not high risk in dMMR
+    predicate_logic: dMMR_MSIH AND highrisk AND ACT_selected => oxaliplatin_regimen
+  requirements:
+    eligibility:
+      expression: dMMR or MSI-H with T4 or other high-risk feature and therapy selected
+      variables:
+      - crc.colon_stage.pathologic_t.resection
+      - crc.colon_stage_ii.high_risk_factors
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.pathology.grade.resection
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.colon_stage.pathologic_t.resection
+        - variable: crc.colon_stage_ii.high_risk_factors
+        - variable: crc.pathology.grade.resection
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Use an oxaliplatin-containing regimen
+      variables:
+      - crc.colon_adjuvant.regimen
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.regimen
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Adjuvant
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: Poor differentiation alone is not high risk in dMMR
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.regimen
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_stage.pathologic_t.resection
+  - crc.colon_stage_ii.high_risk_factors
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.pathology.grade.resection
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-S2-3.1a
+  parent_recommendation_id: ASCO22-S2-R3.1
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: asco_stage2_colon_2022
+  source_anchor: Recommendation 3.1 general branch
+  category: colon_adjuvant
+  title: No routine oxaliplatin addition in high-risk stage II
+  core_or_supplemental: core
+  source_context:
+    eligibility: High-risk stage II
+    action: Do not routinely add oxaliplatin; use shared decision making
+    timing: Adjuvant selection
+    exceptions: Selected dMMR high-risk branch
+    predicate_logic: highrisk_stage_II => no_routine_oxaliplatin
+  requirements:
+    eligibility:
+      expression: High-risk stage II
+      variables:
+      - crc.colon_stage_ii.high_risk_factors
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_stage_ii.high_risk_factors
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Do not routinely add oxaliplatin; use shared decision making
+      variables:
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Adjuvant selection
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: Selected dMMR high-risk branch
+      variables:
+      - crc.decision.oxaliplatin_benefit_discussed
+      - crc.patient.oxaliplatin_neuropathy_risk_at_decision
+      - crc.patient_preference
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision.oxaliplatin_benefit_discussed
+        - variable: crc.patient.oxaliplatin_neuropathy_risk_at_decision
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_stage_ii.high_risk_factors
+  - crc.decision.oxaliplatin_benefit_discussed
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.patient.oxaliplatin_neuropathy_risk_at_decision
+  - crc.patient_preference
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-S2-3.1b
+  parent_recommendation_id: ASCO22-S2-R3.1
+  related_parent_recommendation_ids: []
+  candidate_kind: executable_branch
+  source_id: asco_stage2_colon_2022
+  source_anchor: Recommendation 3.1 dMMR branch
+  category: colon_adjuvant
+  title: Oxaliplatin when treating high-risk dMMR stage II
+  core_or_supplemental: core
+  source_context:
+    eligibility: High-risk dMMR or MSI-H and adjuvant therapy selected
+    action: Use oxaliplatin-containing therapy
+    timing: Adjuvant
+    exceptions: None beyond treatment fitness
+    predicate_logic: highrisk AND dMMR_MSIH AND ACT_selected => oxaliplatin_regimen
+  requirements:
+    eligibility:
+      expression: High-risk dMMR or MSI-H and adjuvant therapy selected
+      variables:
+      - crc.colon_stage_ii.high_risk_factors
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.colon_stage_ii.high_risk_factors
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Use oxaliplatin-containing therapy
+      variables:
+      - crc.colon_adjuvant.regimen
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.regimen
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Adjuvant
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: None beyond treatment fitness
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.regimen
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_stage_ii.high_risk_factors
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-S2-4.1
+  parent_recommendation_id: ASCO22-S2-R4.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_stage2_colon_2022
+  source_anchor: Recommendation 4.1
+  category: colon_adjuvant
+  title: Three- or six-month doublet duration
+  core_or_supplemental: core
+  source_context:
+    eligibility: Stage II with oxaliplatin doublet selected
+    action: Choose CAPOX or FOLFOX for three or six months through shared decision making
+    timing: Adjuvant course
+    exceptions: Balance benefit and neuropathy
+    predicate_logic: doublet_selected => CAPOX_or_FOLFOX AND duration_3_or_6
+  requirements:
+    eligibility:
+      expression: Stage II with oxaliplatin doublet selected
+      variables:
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Choose CAPOX or FOLFOX for three or six months through shared decision making
+      variables:
+      - crc.colon_adjuvant.regimen
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.regimen
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Adjuvant course
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.planned_or_delivered_duration_months
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.planned_or_delivered_duration_months
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: Balance benefit and neuropathy
+      variables:
+      - crc.patient.oxaliplatin_neuropathy_risk_at_decision
+      - crc.patient_preference
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.patient.oxaliplatin_neuropathy_risk_at_decision
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.planned_or_delivered_duration_months
+  - crc.colon_adjuvant.regimen
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.patient.oxaliplatin_neuropathy_risk_at_decision
+  - crc.patient_preference
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO19-S3-DUR-01
+  parent_recommendation_id: ASCO19-S3-R1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_stage3_duration_2019
+  source_anchor: High-risk duration recommendation
+  category: colon_adjuvant
+  title: Six months for high-risk stage III
+  core_or_supplemental: core
+  source_context:
+    eligibility: Stage III with T4 and or N2
+    action: Use six months oxaliplatin plus fluoropyrimidine
+    timing: Adjuvant
+    exceptions: Treatment fitness
+    predicate_logic: T4 OR N2 => duration_6_months
+  requirements:
+    eligibility:
+      expression: Stage III with T4 and or N2
+      variables:
+      - crc.colon_stage.pathologic_n.resection
+      - crc.colon_stage.pathologic_t.resection
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: any_of
+        operands:
+        - variable: crc.colon_stage.pathologic_t.resection
+        - variable: crc.colon_stage.pathologic_n.resection
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Use six months oxaliplatin plus fluoropyrimidine
+      variables:
+      - crc.colon_adjuvant.regimen
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.regimen
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Adjuvant
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.planned_or_delivered_duration_months
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.planned_or_delivered_duration_months
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: Treatment fitness
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.planned_or_delivered_duration_months
+  - crc.colon_adjuvant.regimen
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_stage.pathologic_n.resection
+  - crc.colon_stage.pathologic_t.resection
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO19-S3-DUR-02
+  parent_recommendation_id: ASCO19-S3-R2
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_stage3_duration_2019
+  source_anchor: Low-risk duration recommendation
+  category: colon_adjuvant
+  title: Three or six months for low-risk stage III
+  core_or_supplemental: core
+  source_context:
+    eligibility: Stage III with T1-3 and N1
+    action: Use three or six months after shared decision making
+    timing: Adjuvant
+    exceptions: Regimen-specific evidence and toxicity
+    predicate_logic: T1_3 AND N1 => duration_3_or_6
+  requirements:
+    eligibility:
+      expression: Stage III with T1-3 and N1
+      variables:
+      - crc.colon_stage.pathologic_n.resection
+      - crc.colon_stage.pathologic_t.resection
+      - crc.localized_colon.resected_status_at_adjuvant_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_stage.pathologic_t.resection
+        - variable: crc.colon_stage.pathologic_n.resection
+        - variable: crc.localized_colon.resected_status_at_adjuvant_decision
+    action:
+      expression: Use three or six months after shared decision making
+      variables:
+      - crc.colon_adjuvant.regimen
+      - crc.colon_adjuvant.therapy_plan_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.regimen
+        - variable: crc.colon_adjuvant.therapy_plan_at_decision
+    timing:
+      expression: Adjuvant
+      variables:
+      - crc.colon_adjuvant.decision_date
+      - crc.colon_adjuvant.planned_or_delivered_duration_months
+      - crc.colon_adjuvant.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.planned_or_delivered_duration_months
+        - variable: crc.colon_adjuvant.decision_date
+        - variable: crc.colon_adjuvant.start_date
+    exceptions:
+      expression: Regimen-specific evidence and toxicity
+      variables:
+      - crc.patient.oxaliplatin_neuropathy_risk_at_decision
+      - crc.patient_preference
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.patient.oxaliplatin_neuropathy_risk_at_decision
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.colon_adjuvant.decision_date
+  - crc.colon_adjuvant.planned_or_delivered_duration_months
+  - crc.colon_adjuvant.regimen
+  - crc.colon_adjuvant.start_date
+  - crc.colon_adjuvant.therapy_plan_at_decision
+  - crc.colon_stage.pathologic_n.resection
+  - crc.colon_stage.pathologic_t.resection
+  - crc.localized_colon.resected_status_at_adjuvant_decision
+  - crc.patient.oxaliplatin_neuropathy_risk_at_decision
+  - crc.patient_preference
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

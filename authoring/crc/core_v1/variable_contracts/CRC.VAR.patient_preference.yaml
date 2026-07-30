@@ -1,0 +1,98 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.patient_preference
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.patient_preference
+contract_kind: canonical_extraction_with_lossy_registry_projection
+label: Patient preference for indexed option
+roles:
+- exceptions
+temporal_meaning: latest_before_indexed_action
+field_contract:
+  name: patient_preference
+  type: string
+  allowable_values:
+  - accepts
+  - declines
+  - prefers_alternative
+  - undecided
+  - not_documented
+  - not_applicable
+  nullable: true
+  description: Preference for the indexed option after a documented discussion.
+registry_mapping:
+  standard: NAACCR_v26
+  item_name: Coarse refusal codes within treatment summaries
+  item_number: 1390/1410/1430
+  xml_id: multiple_items
+  effective_years: varies
+evidence_coverage:
+  registry_to_rule:
+    semantic: coarsened
+    temporal: conditional
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: coarsened
+    transformation_id: PENDING_VERSIONED_PROJECTION
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: Rule-required local clinical context; not represented by a single STORE item
+  items:
+  - ASCO LARC 2024 general note and recommendation qualifiers
+  - ASCO mCRC 2022 qualifying statements
+  source_refs:
+  - ASCO.LARC.2024
+  - ASCO.MCRC.2022
+  - ESMO.MCRC.2026
+question: What is the Patient preference for indexed option for the indexed CRC tumor or decision at latest_before_indexed_action?
+applicability_guard:
+  indexed_rule_decision_required: true
+  decision_date_required: true
+evidence_contract:
+  establishing_source_documents:
+  - shared_decision_note
+  - consent
+  - refusal
+  - oncology
+  excluded_sources:
+  - clinician_choice_as_patient_preference
+  positive_witness: A tumor-linked source appropriate to latest_before_indexed_action establishes patient_preference.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - preference
+    - Patient
+    - for
+    statement: Not documented, undecided, declines and prefers an alternative are distinct.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Not documented, undecided, declines and prefers an alternative are distinct.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish patient_preference.
+  SPEC_INSUFFICIENT: The requested meaning of patient_preference is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CHART.decision_exceptions
+  output_field: patient_preference
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[patient_preference].allowable_values
+  origin: model_authored
+  basis: no external source; local decision-specific preference states.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 40c3fbd0d6454e57e2b4844726b255dab2b63f947181458cce5f5dff10892035

@@ -1,0 +1,406 @@
+schema_version: "1.0"
+bundle_id: CRC.CORE.MOLECULAR_TREATMENT.v1
+clinical_use: NOT_FOR_CLINICAL_USE
+data_profile:
+  status: NOT_ASSESSED
+  profile_id:
+  dataset_snapshot:
+  note: "No local linked CRC registry/chart extract was profiled; every data row remains NOT_ASSESSED."
+guideline_denominator:
+  core_formal_recommendations: 218
+  core_nonformal_source_units: 37
+  core_scoped_source_units: 255
+  core_executable_candidates: 275
+  supplemental_or_adjacent_formal_recommendations: 5
+  supplemental_or_adjacent_executable_candidates: 5
+  structured_seed_rules: 12
+  predicate_ast_normalized_rules: 280
+  normalization_status: full_universe_authoring_normalized_runtime_materialization_pending
+  full_universe_concept_inventory: intake/variable_concept_inventory.yaml
+full_normalization:
+  normalized_rules: 280
+  rule_categories: 39
+  distinct_source_concepts: 568
+  candidate_scoped_concepts_bound: 568
+  canonical_variables: 576
+  variable_contracts: 576
+  registry_projection_contracts: 9
+  evidence_block_root_status:
+    unresolved: 82
+    explicit_no_source_requirement: 51
+    empty_conjunctions: 0
+  variable_contract_structure:
+    with_boundary_cases: 576
+    with_per_enforced_element_provenance: 576
+    conformant_runtime_specs: 0
+  source_slice_crosswalk: complete
+  source_register_documents_without_hash: 19
+  mapping_level_counts:
+    registry_direct: 4
+    registry_coarsened: 9
+    derived: 7
+    chart_extension: 533
+    outside_current_sources: 23
+  execution_groups:
+    planned: 8
+    runtime_materialized: 0
+  store_structural_rule_coverage:
+    denominator: 280
+    full: 0
+    partial: 0
+    none: 280
+  local_schema_component_reach:
+    denominator: 280
+    partial: 97
+    none: 183
+    reportability: component_only_not_rule_coverage
+  observed_crc_availability: NOT_ASSESSED
+  detail: normalization/gap_assessment.yaml
+summary:
+  scope: structured_seed_runtime_layer
+  candidate_rules: 12
+  required_variables: 68
+  registry_direct: 8
+  registry_coarsened: 13
+  derived: 2
+  chart_extension: 45
+  conformant_candidates: 0
+  needs_revision: 68
+  current_project_production_specs_passing_native_provenance_load: 0
+  current_project_production_specs_checked: 5
+  data_profiled_variables: 0
+  rule_category_counts:
+    hereditary_risk_workup: 1
+    locally_advanced_rectal_treatment: 3
+    metastatic_systemic_treatment: 4
+    molecular_testing: 4
+  gap_class_counts:
+    CLINICAL_REVIEW_PENDING: 68
+    DATA_NOT_PROFILED: 68
+    NO_REGISTRY_FIELD: 45
+    REGISTRAR_REVIEW_PENDING: 21
+    REGISTRY_TOO_COARSE: 15
+    RUNTIME_OPERATOR_MISSING: 5
+    SOURCE_VERSION_UNBOUND: 5
+    SPEC_NONCONFORMANT: 68
+templates:
+  direct_runtime_blocked: &direct_runtime_blocked
+    registry_coverage: direct
+    spec_coverage: candidate_needs_revision
+    data_coverage: NOT_ASSESSED
+    gap_classes: [SPEC_NONCONFORMANT, RUNTIME_OPERATOR_MISSING, DATA_NOT_PROFILED, CLINICAL_REVIEW_PENDING, REGISTRAR_REVIEW_PENDING]
+    severity: blocking
+    remediation: "Implement and test a document-category coverage operator for the molecular proof obligation, obtain registrar/clinical sign-off, then profile the linked field."
+  direct_blocked: &direct_blocked
+    registry_coverage: direct
+    spec_coverage: candidate_needs_revision
+    data_coverage: NOT_ASSESSED
+    gap_classes: [SPEC_NONCONFORMANT, DATA_NOT_PROFILED, CLINICAL_REVIEW_PENDING, REGISTRAR_REVIEW_PENDING]
+    severity: blocking
+    remediation: "Resolve the production spec/provenance owner and versioned domain, then profile the linked field."
+  coarsened: &coarsened
+    registry_coverage: coarsened
+    spec_coverage: candidate_needs_revision
+    data_coverage: NOT_ASSESSED
+    gap_classes: [REGISTRY_TOO_COARSE, SPEC_NONCONFORMANT, DATA_NOT_PROFILED, CLINICAL_REVIEW_PENDING, REGISTRAR_REVIEW_PENDING]
+    severity: blocking
+    remediation: "Keep the registry projection for agreement, complete the chart extension for rule semantics, review it, and profile both layers."
+  chart_blocking: &chart_blocking
+    registry_coverage: none
+    spec_coverage: candidate_needs_revision
+    data_coverage: NOT_ASSESSED
+    gap_classes: [NO_REGISTRY_FIELD, SPEC_NONCONFORMANT, DATA_NOT_PROFILED, CLINICAL_REVIEW_PENDING]
+    severity: blocking
+    remediation: "Review and test the chart extraction contract, then profile qualifying document types and missingness."
+  derived_blocking: &derived_blocking
+    registry_coverage: deterministic_or_clinical_derivation
+    spec_coverage: candidate_needs_revision
+    data_coverage: NOT_ASSESSED
+    gap_classes: [REGISTRY_TOO_COARSE, SPEC_NONCONFORMANT, RUNTIME_OPERATOR_MISSING, DATA_NOT_PROFILED, CLINICAL_REVIEW_PENDING]
+    severity: blocking
+    remediation: "Approve a versioned derivation with edge cases, implement it in runtime, and profile its inputs."
+  source_blocked: &source_blocked
+    registry_coverage: none
+    spec_coverage: candidate_needs_revision
+    data_coverage: NOT_ASSESSED
+    gap_classes: [SOURCE_VERSION_UNBOUND, NO_REGISTRY_FIELD, SPEC_NONCONFORMANT, DATA_NOT_PROFILED, CLINICAL_REVIEW_PENDING]
+    severity: blocking
+    remediation: "Bind the authorized NCCN hereditary snapshot/locator, review the rule, then validate the chart extension."
+variable_coverage:
+  - <<: *direct_blocked
+    variable_id: crc.primary_site
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MOL.EXTENDED_RAS_BEFORE_ANTIEGFR.v1, requirement_roles: [eligibility]}, {rule_id: CRC.RECT.MMR_BEFORE_TREATMENT.v1, requirement_roles: [eligibility]}, {rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [eligibility]}]
+
+  - <<: *direct_blocked
+    variable_id: crc.histology
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [eligibility]}, {rule_id: CRC.RECT.MMR_BEFORE_TREATMENT.v1, requirement_roles: [eligibility]}, {rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [eligibility]}]
+
+  - <<: *coarsened
+    variable_id: crc.disease_setting
+    rule_uses: [{rule_id: CRC.MOL.EXTENDED_RAS_BEFORE_ANTIEGFR.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.MSIH_FIRST_LINE_ASCO2022.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.BRAF_POST_LINE_ASCO2022.v1, requirement_roles: [eligibility]}]
+
+  - <<: *derived_blocking
+    variable_id: crc.larc_status
+    rule_uses: [{rule_id: CRC.RECT.MMR_BEFORE_TREATMENT.v1, requirement_roles: [eligibility]}, {rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [eligibility]}, {rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [eligibility]}, {rule_id: CRC.RECT.DMMR_ICI_INITIAL.v1, requirement_roles: [eligibility]}]
+
+  - <<: *coarsened
+    variable_id: crc.metastatic_status
+    rule_uses: [{rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [eligibility]}, {rule_id: CRC.RECT.DMMR_ICI_INITIAL.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.resectability_status
+    rule_uses: [{rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.line_of_therapy
+    rule_uses: [{rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.MSIH_FIRST_LINE_ASCO2022.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.BRAF_POST_LINE_ASCO2022.v1, requirement_roles: [eligibility]}]
+
+  - <<: *derived_blocking
+    variable_id: crc.primary_tumor_sidedness
+    rule_uses: [{rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [eligibility]}]
+
+  - <<: *direct_blocked
+    variable_id: crc.clinical_t
+    rule_uses: [{rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [action]}, {rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [eligibility]}]
+
+  - <<: *direct_blocked
+    variable_id: crc.clinical_n
+    rule_uses: [{rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [action]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.multidisciplinary_review
+    rule_uses: [{rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [eligibility]}]
+
+  - <<: *direct_runtime_blocked
+    variable_id: crc.kras_status
+    gap_classes: [SOURCE_VERSION_UNBOUND, SPEC_NONCONFORMANT, RUNTIME_OPERATOR_MISSING, DATA_NOT_PROFILED, CLINICAL_REVIEW_PENDING, REGISTRAR_REVIEW_PENDING]
+    remediation: "Bind the current replacement/update for CAP 2017, implement molecular document-category coverage, obtain review, then profile NAACCR item 3866."
+    rule_uses: [{rule_id: CRC.MOL.EXTENDED_RAS_BEFORE_ANTIEGFR.v1, requirement_roles: [action]}, {rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [eligibility]}]
+
+  - <<: *direct_runtime_blocked
+    variable_id: crc.nras_status
+    gap_classes: [SOURCE_VERSION_UNBOUND, SPEC_NONCONFORMANT, RUNTIME_OPERATOR_MISSING, DATA_NOT_PROFILED, CLINICAL_REVIEW_PENDING, REGISTRAR_REVIEW_PENDING]
+    remediation: "Bind the current replacement/update for CAP 2017, implement molecular document-category coverage, obtain review, then profile NAACCR item 3941."
+    rule_uses: [{rule_id: CRC.MOL.EXTENDED_RAS_BEFORE_ANTIEGFR.v1, requirement_roles: [action]}, {rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [eligibility]}]
+
+  - <<: *direct_runtime_blocked
+    variable_id: crc.braf_v600e_status
+    rule_uses: [{rule_id: CRC.MOL.MLH1_LOSS_LYNCH_REFLEX.v1, requirement_roles: [action]}, {rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.BRAF_POST_LINE_ASCO2022.v1, requirement_roles: [eligibility]}]
+
+  - <<: *coarsened
+    variable_id: crc.msi_status
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [action]}, {rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [eligibility]}, {rule_id: CRC.RECT.MMR_BEFORE_TREATMENT.v1, requirement_roles: [action]}, {rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [eligibility]}, {rule_id: CRC.RECT.DMMR_ICI_INITIAL.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.MSIH_FIRST_LINE_ASCO2022.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.BRAF_POST_LINE_ASCO2022.v1, requirement_roles: [exceptions]}]
+
+  - <<: *coarsened
+    variable_id: crc.mmr_ihc_integrated_status
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [action]}, {rule_id: CRC.MOL.MLH1_LOSS_LYNCH_REFLEX.v1, requirement_roles: [eligibility]}, {rule_id: CRC.RECT.MMR_BEFORE_TREATMENT.v1, requirement_roles: [action]}, {rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [eligibility]}, {rule_id: CRC.RECT.DMMR_ICI_INITIAL.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.MSIH_FIRST_LINE_ASCO2022.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.BRAF_POST_LINE_ASCO2022.v1, requirement_roles: [exceptions]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.mmr_mlh1
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [action]}, {rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MOL.MLH1_LOSS_LYNCH_REFLEX.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.mmr_pms2
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [action]}, {rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MOL.MLH1_LOSS_LYNCH_REFLEX.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.mmr_msh2
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [action]}, {rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.mmr_msh6
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [action]}, {rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.molecular_assay_method
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [action]}, {rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [action]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.molecular_assay_validation_status
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [action]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.molecular_qc_status
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [action]}, {rule_id: CRC.MOL.EXTENDED_RAS_BEFORE_ANTIEGFR.v1, requirement_roles: [exceptions]}, {rule_id: CRC.RECT.MMR_BEFORE_TREATMENT.v1, requirement_roles: [exceptions]}, {rule_id: CRC.RECT.DMMR_ICI_INITIAL.v1, requirement_roles: [eligibility]}, {rule_id: CRC.MCRC.MSIH_FIRST_LINE_ASCO2022.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.molecular_specimen_id
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [action]}, {rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [exceptions]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.molecular_specimen_date
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [timing]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.molecular_result_date
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [timing]}, {rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [timing]}, {rule_id: CRC.MOL.EXTENDED_RAS_BEFORE_ANTIEGFR.v1, requirement_roles: [timing]}, {rule_id: CRC.MOL.MLH1_LOSS_LYNCH_REFLEX.v1, requirement_roles: [timing]}, {rule_id: CRC.RECT.MMR_BEFORE_TREATMENT.v1, requirement_roles: [timing]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.mmr_msi_discordance_status
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [exceptions]}, {rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.mmr_subclonal_loss
+    rule_uses: [{rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.molecular_peer_review_status
+    rule_uses: [{rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [action]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.molecular_repeat_test_result
+    rule_uses: [{rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [action]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.molecular_final_interpretation
+    rule_uses: [{rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [action]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.trial_context
+    rule_uses: [{rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [exceptions]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.expanded_ras_coverage
+    gap_classes: [SOURCE_VERSION_UNBOUND, NO_REGISTRY_FIELD, SPEC_NONCONFORMANT, DATA_NOT_PROFILED, CLINICAL_REVIEW_PENDING]
+    remediation: "Bind the current replacement/update for CAP 2017, then review and test exact exon/codon coverage extraction against molecular reports."
+    rule_uses: [{rule_id: CRC.MOL.EXTENDED_RAS_BEFORE_ANTIEGFR.v1, requirement_roles: [action]}, {rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.mlh1_promoter_methylation_status
+    rule_uses: [{rule_id: CRC.MOL.MLH1_LOSS_LYNCH_REFLEX.v1, requirement_roles: [action]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.lynch_risk_communication
+    rule_uses: [{rule_id: CRC.MOL.MLH1_LOSS_LYNCH_REFLEX.v1, requirement_roles: [action]}]
+
+  - <<: *source_blocked
+    variable_id: crc.genetics_referral_status
+    rule_uses: [{rule_id: CRC.MOL.MLH1_LOSS_LYNCH_REFLEX.v1, requirement_roles: [timing]}]
+
+  - <<: *source_blocked
+    variable_id: crc.germline_result
+    rule_uses: [{rule_id: CRC.MOL.MLH1_LOSS_LYNCH_REFLEX.v1, requirement_roles: [exceptions]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.rectal_mri_protocol
+    rule_uses: [{rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [action]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.rectal_mri_quality
+    rule_uses: [{rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [exceptions]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.pelvic_mri_date
+    rule_uses: [{rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [timing]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.rectal_tumor_height
+    rule_uses: [{rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [action]}, {rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.sphincter_relation
+    rule_uses: [{rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [action]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.extramural_depth_mm
+    rule_uses: [{rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [action]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.mrf_status
+    rule_uses: [{rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [action]}, {rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.emvi_status
+    rule_uses: [{rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [action]}, {rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.mri_tumor_deposits
+    rule_uses: [{rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [action]}, {rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.intersphincteric_plane_status
+    rule_uses: [{rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [action]}, {rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.ici_plan
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.anti_egfr_plan
+    rule_uses: [{rule_id: CRC.MOL.EXTENDED_RAS_BEFORE_ANTIEGFR.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.anti_egfr_start_date
+    rule_uses: [{rule_id: CRC.MOL.EXTENDED_RAS_BEFORE_ANTIEGFR.v1, requirement_roles: [timing]}]
+
+  - <<: *coarsened
+    variable_id: crc.ici_start_date
+    rule_uses: [{rule_id: CRC.MOL.MMR_ICI_METHOD.v1, requirement_roles: [timing]}, {rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1, requirement_roles: [timing]}, {rule_id: CRC.RECT.DMMR_ICI_INITIAL.v1, requirement_roles: [action]}, {rule_id: CRC.MCRC.MSIH_FIRST_LINE_ASCO2022.v1, requirement_roles: [timing]}]
+
+  - <<: *coarsened
+    variable_id: crc.systemic_therapy_start_date
+    rule_uses: [{rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [timing]}, {rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [timing]}, {rule_id: CRC.MCRC.BRAF_POST_LINE_ASCO2022.v1, requirement_roles: [timing]}]
+
+  - <<: *direct_blocked
+    variable_id: crc.treatment_start_date
+    rule_uses: [{rule_id: CRC.RECT.MMR_BEFORE_TREATMENT.v1, requirement_roles: [timing]}, {rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1, requirement_roles: [timing]}, {rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [timing]}, {rule_id: CRC.RECT.DMMR_ICI_INITIAL.v1, requirement_roles: [timing]}]
+
+  - <<: *coarsened
+    variable_id: crc.systemic_regimen
+    rule_uses: [{rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [action]}, {rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [action]}, {rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [action]}, {rule_id: CRC.MCRC.BRAF_POST_LINE_ASCO2022.v1, requirement_roles: [action]}]
+
+  - <<: *coarsened
+    variable_id: crc.systemic_regimen_intensity
+    rule_uses: [{rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [action]}, {rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [action]}]
+
+  - <<: *coarsened
+    variable_id: crc.radiation_type
+    rule_uses: [{rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [action]}]
+
+  - <<: *coarsened
+    variable_id: crc.treatment_sequence
+    rule_uses: [{rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [action]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.ici_agent
+    rule_uses: [{rule_id: CRC.RECT.DMMR_ICI_INITIAL.v1, requirement_roles: [action]}, {rule_id: CRC.MCRC.MSIH_FIRST_LINE_ASCO2022.v1, requirement_roles: [action]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.biologic_agent
+    rule_uses: [{rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [action]}, {rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [action]}, {rule_id: CRC.MCRC.BRAF_POST_LINE_ASCO2022.v1, requirement_roles: [action]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.prior_systemic_therapy
+    rule_uses: [{rule_id: CRC.RECT.DMMR_ICI_INITIAL.v1, requirement_roles: [timing]}, {rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [timing]}, {rule_id: CRC.MCRC.MSIH_FIRST_LINE_ASCO2022.v1, requirement_roles: [timing]}, {rule_id: CRC.MCRC.BRAF_POST_LINE_ASCO2022.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.prior_braf_egfr_targeted_therapy
+    rule_uses: [{rule_id: CRC.MCRC.BRAF_POST_LINE_ASCO2022.v1, requirement_roles: [exceptions]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.progression_date
+    rule_uses: [{rule_id: CRC.MCRC.BRAF_POST_LINE_ASCO2022.v1, requirement_roles: [eligibility]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.ecog_performance_status
+    rule_uses: [{rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [exceptions]}, {rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [exceptions]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.organ_function_constraints
+    rule_uses: [{rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [exceptions]}]
+
+  - <<: *chart_blocking
+    variable_id: crc.comorbidity_constraints
+    rule_uses: [{rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [exceptions]}, {rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [exceptions]}]
+
+  - <<: *coarsened
+    variable_id: crc.treatment_contraindication
+    rule_uses: [{rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [exceptions]}, {rule_id: CRC.RECT.DMMR_ICI_INITIAL.v1, requirement_roles: [exceptions]}, {rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [exceptions]}]
+
+  - <<: *coarsened
+    variable_id: crc.ici_contraindication
+    rule_uses: [{rule_id: CRC.RECT.DMMR_ICI_INITIAL.v1, requirement_roles: [exceptions]}, {rule_id: CRC.MCRC.MSIH_FIRST_LINE_ASCO2022.v1, requirement_roles: [exceptions]}]
+
+  - <<: *coarsened
+    variable_id: crc.patient_preference
+    rule_uses: [{rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1, requirement_roles: [exceptions]}, {rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1, requirement_roles: [exceptions]}, {rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1, requirement_roles: [exceptions]}]

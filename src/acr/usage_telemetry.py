@@ -1,9 +1,7 @@
-"""Token and cost accounting, wired to whichever client the runtime happens to use.
+"""Optional token/cost callback wiring for model clients.
 
-SEPARATE FROM EITHER RUNTIME ON PURPOSE. This was defined inside `deep_runner`, so the module
-that owns the audit wiring was one of the two things being audited — and `agent.py` had to
-import a legacy runtime to record its own spend. It has no framework dependency, so it does
-not belong behind one.
+This is separate from both the extraction runtime and the post-run Audit plane. It has no
+framework dependency and only supplies optional client callbacks.
 
 Two plumbing paths for one ledger: `sitecustomize` hooks LiteLLM for the LangGraph arm, and
 `lc_callback` hooks LangChain callbacks for the hooks arm, both emitting the same JSON rows so

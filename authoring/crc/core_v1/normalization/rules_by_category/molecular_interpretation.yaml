@@ -1,0 +1,382 @@
+schema_version: '2.0'
+category: molecular_interpretation
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 5
+rules:
+- candidate_id: CAP22-MMR-002
+  parent_recommendation_id: CAP22-REC5
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: cap_mmr_msi_2022
+  source_anchor: Recommendation 5
+  category: molecular_interpretation
+  title: TMB is not a dMMR surrogate
+  core_or_supplemental: core
+  source_context:
+    eligibility: Cancer considered for ICI based on dMMR
+    action: Do not use TMB as a surrogate for dMMR
+    timing: During biomarker interpretation
+    exceptions: None
+    predicate_logic: not(TMB => dMMR)
+  requirements:
+    eligibility:
+      expression: Cancer considered for ICI based on dMMR
+      variables:
+      - crc.ici_plan
+      - crc.tmb_assay_panel
+      - crc.tmb_unit
+      - crc.tmb_value
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ici_plan
+        - variable: crc.tmb_assay_panel
+        - variable: crc.tmb_unit
+        - variable: crc.tmb_value
+    action:
+      expression: Do not use TMB as a surrogate for dMMR
+      variables:
+      - crc.direct_mmr_msi_assay_status
+      - crc.ici_biomarker_basis
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.direct_mmr_msi_assay_status
+        - variable: crc.ici_biomarker_basis
+    timing:
+      expression: During biomarker interpretation
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: During biomarker interpretation
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.direct_mmr_msi_assay_status
+  - crc.ici_biomarker_basis
+  - crc.ici_plan
+  - crc.tmb_assay_panel
+  - crc.tmb_unit
+  - crc.tmb_value
+  computability:
+    status: partially_specified
+    blockers:
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: CAP22-MMR-005
+  parent_recommendation_id: CAP22-GPS2
+  related_parent_recommendation_ids: []
+  candidate_kind: good_practice
+  source_id: cap_mmr_msi_2022
+  source_anchor: Good Practice Statement 2 discordance branch
+  category: molecular_interpretation
+  title: Handle discordant MMR and MSI results
+  core_or_supplemental: core
+  source_context:
+    eligibility: Discordant IHC, PCR, or NGS results
+    action: Treat evidence of deficiency as ICI-positive while reviewing for interpretive error
+    timing: Before final eligibility determination
+    exceptions: Preserve every raw result and complete review
+    predicate_logic: any_deficiency => eligible AND discordance_review
+  requirements:
+    eligibility:
+      expression: Discordant IHC, PCR, or NGS results
+      variables:
+      - crc.mmr_ihc_integrated_status
+      - crc.mmr_msi_discordance_status
+      - crc.msi_ngs_result
+      - crc.msi_pcr_result
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mmr_ihc_integrated_status
+        - variable: crc.mmr_msi_discordance_status
+        - variable: crc.msi_ngs_result
+        - variable: crc.msi_pcr_result
+    action:
+      expression: Treat evidence of deficiency as ICI-positive while reviewing for interpretive error
+      variables:
+      - crc.mmr_msi_interpretive_rereview_status
+      - crc.molecular_final_interpretation
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mmr_msi_interpretive_rereview_status
+        - variable: crc.molecular_final_interpretation
+    timing:
+      expression: Before final eligibility determination
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before final eligibility determination
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Preserve every raw result and complete review
+      variables:
+      - crc.mmr_msi_interpretive_rereview_status
+      - crc.molecular_final_interpretation
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mmr_msi_interpretive_rereview_status
+        - variable: crc.molecular_final_interpretation
+  required_variables:
+  - crc.mmr_ihc_integrated_status
+  - crc.mmr_msi_discordance_status
+  - crc.mmr_msi_interpretive_rereview_status
+  - crc.molecular_final_interpretation
+  - crc.msi_ngs_result
+  - crc.msi_pcr_result
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HUMAN_REVIEW
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO-SGT-05
+  parent_recommendation_id: ASCO-SGT-PCO1.4
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_somatic_genomic_2022
+  source_anchor: PCO 1.4
+  category: molecular_interpretation
+  title: Variant-level actionability evidence
+  core_or_supplemental: core
+  source_context:
+    eligibility: Genomic result considered actionable
+    action: Require functional impact and clinical efficacy evidence for the exact variant-drug pair
+    timing: Before treatment action
+    exceptions: VUS and gene-level generalization are insufficient
+    predicate_logic: functional_support AND clinical_efficacy => actionable
+  requirements:
+    eligibility:
+      expression: Genomic result considered actionable
+      variables:
+      - crc.molecular_disease_context
+      - crc.molecular_variant_hgvs
+      - crc.molecular_variant_pathogenicity
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_disease_context
+        - variable: crc.molecular_variant_hgvs
+        - variable: crc.molecular_variant_pathogenicity
+    action:
+      expression: Require functional impact and clinical efficacy evidence for the exact variant-drug pair
+      variables:
+      - crc.molecular_clinical_evidence
+      - crc.molecular_functional_evidence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_clinical_evidence
+        - variable: crc.molecular_functional_evidence
+    timing:
+      expression: Before treatment action
+      variables:
+      - crc.molecular_knowledgebase_version
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_knowledgebase_version
+    exceptions:
+      expression: VUS and gene-level generalization are insufficient
+      variables:
+      - crc.molecular_variant_pathogenicity
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_variant_pathogenicity
+  required_variables:
+  - crc.molecular_clinical_evidence
+  - crc.molecular_disease_context
+  - crc.molecular_functional_evidence
+  - crc.molecular_knowledgebase_version
+  - crc.molecular_variant_hgvs
+  - crc.molecular_variant_pathogenicity
+  computability:
+    status: not_computable
+    blockers:
+    - B_ASSAY_DEFINITION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: SITC23-CRC-02
+  parent_recommendation_id: SITC23-CRC-R2
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: sitc_gi_2023_crc_guards
+  source_anchor: CRC panel recommendation PD-L1
+  category: molecular_interpretation
+  title: PD-L1 does not select CRC immunotherapy
+  core_or_supplemental: supplemental
+  source_context:
+    eligibility: CRC checkpoint-inhibitor decision
+    action: Do not use PD-L1 to select therapy
+    timing: Biomarker interpretation
+    exceptions: None
+    predicate_logic: CRC => not_use_PDL1_for_ICI
+  requirements:
+    eligibility:
+      expression: CRC checkpoint-inhibitor decision
+      variables:
+      - crc.ici_plan
+      - crc.tumor_type
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ici_plan
+        - variable: crc.tumor_type
+    action:
+      expression: Do not use PD-L1 to select therapy
+      variables:
+      - crc.ici_biomarker_basis
+      - crc.pdl1_assay
+      - crc.pdl1_cps
+      - crc.pdl1_tps
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ici_biomarker_basis
+        - variable: crc.pdl1_assay
+        - variable: crc.pdl1_cps
+        - variable: crc.pdl1_tps
+    timing:
+      expression: Biomarker interpretation
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Biomarker interpretation
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.ici_biomarker_basis
+  - crc.ici_plan
+  - crc.pdl1_assay
+  - crc.pdl1_cps
+  - crc.pdl1_tps
+  - crc.tumor_type
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SITC_LIVING
+    - B_SUPPLEMENT_ONLY
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: SITC23-CRC-03
+  parent_recommendation_id: SITC23-CRC-R3
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: sitc_gi_2023_crc_guards
+  source_anchor: CRC panel recommendation supported ICI biomarkers
+  category: molecular_interpretation
+  title: Supported CRC immunotherapy biomarkers
+  core_or_supplemental: supplemental
+  source_context:
+    eligibility: CRC checkpoint-inhibitor biomarker evaluation
+    action: Use dMMR or MSI-H, or pathogenic POLE-POLD1 with ultramutated phenotype
+    timing: Before ICI
+    exceptions: VUS or mutation without phenotype is insufficient
+    predicate_logic: dMMR OR MSI_H OR (pathogenic_POLE_POLD1 AND ultramutated) => supported
+  requirements:
+    eligibility:
+      expression: CRC checkpoint-inhibitor biomarker evaluation
+      variables:
+      - crc.ici_plan
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ici_plan
+    action:
+      expression: Use dMMR or MSI-H, or pathogenic POLE-POLD1 with ultramutated phenotype
+      variables:
+      - crc.ici_biomarker_eligibility
+      - crc.mmr_ihc_integrated_status
+      - crc.molecular_variant_gene
+      - crc.molecular_variant_hgvs
+      - crc.molecular_variant_pathogenicity
+      - crc.msi_status
+      - crc.pole_pold1_proofreading_domain_status
+      - crc.tmb_value
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ici_biomarker_eligibility
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+          - op: all_of
+            operands:
+            - variable: crc.molecular_variant_gene
+            - variable: crc.molecular_variant_hgvs
+            - variable: crc.molecular_variant_pathogenicity
+            - variable: crc.pole_pold1_proofreading_domain_status
+            - variable: crc.tmb_value
+    timing:
+      expression: Before ICI
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before ICI
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: VUS or mutation without phenotype is insufficient
+      variables:
+      - crc.molecular_variant_pathogenicity
+      - crc.pole_pold1_proofreading_domain_status
+      - crc.tmb_value
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_variant_pathogenicity
+        - variable: crc.pole_pold1_proofreading_domain_status
+        - variable: crc.tmb_value
+  required_variables:
+  - crc.ici_biomarker_eligibility
+  - crc.ici_plan
+  - crc.mmr_ihc_integrated_status
+  - crc.molecular_variant_gene
+  - crc.molecular_variant_hgvs
+  - crc.molecular_variant_pathogenicity
+  - crc.msi_status
+  - crc.pole_pold1_proofreading_domain_status
+  - crc.tmb_value
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SITC_LIVING
+    - B_SUPPLEMENT_ONLY
+    - B_ASSAY_DEFINITION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

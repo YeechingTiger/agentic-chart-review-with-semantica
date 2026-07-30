@@ -1,0 +1,87 @@
+schema_version: '2.0'
+category: lung_metastasis_local
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 1
+rules:
+- candidate_id: E26-LOCAL-16
+  parent_recommendation_id: E26-LOCAL-R16
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Lung OMD recommendation
+  category: lung_metastasis_local
+  title: Ablation or SBRT as alternatives for lung OMD
+  core_or_supplemental: core
+  source_context:
+    eligibility: Lung-only or oligometastatic lung disease
+    action: Use ablation or SBRT as alternatives to resection when appropriate
+    timing: Local-treatment planning
+    exceptions: Size, number, location, lung reserve, and comorbidity
+    predicate_logic: lung_OMD AND selected => ablation OR SBRT
+  requirements:
+    eligibility:
+      expression: Lung-only or oligometastatic lung disease
+      variables:
+      - crc.lung_metastasis_resectability_at_decision
+      - crc.metastatic_lesion_count_at_decision
+      - crc.metastatic_lesion_location_at_decision
+      - crc.metastatic_lesion_size_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.pulmonary_reserve_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastatic_lesion_size_at_decision
+        - variable: crc.metastatic_lesion_count_at_decision
+        - variable: crc.metastatic_lesion_location_at_decision
+        - variable: crc.pulmonary_reserve_at_decision
+        - variable: crc.lung_metastasis_resectability_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use ablation or SBRT as alternatives to resection when appropriate
+      variables:
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        variable: crc.local_treatment_at_decision
+    timing:
+      expression: Local-treatment planning
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Size, number, location, lung reserve, and comorbidity
+      variables:
+      - crc.comorbidity_constraints
+      evidence_logic:
+        variable: crc.comorbidity_constraints
+  required_variables:
+  - crc.comorbidity_constraints
+  - crc.decision_date
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.lung_metastasis_resectability_at_decision
+  - crc.metastatic_lesion_count_at_decision
+  - crc.metastatic_lesion_location_at_decision
+  - crc.metastatic_lesion_size_at_decision
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.pulmonary_reserve_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

@@ -1,0 +1,102 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.progression_date
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.progression_date
+contract_kind: chart_extraction
+label: Qualifying progression date
+roles:
+- eligibility
+temporal_meaning: progression_on_qualifying_prior_line
+field_contract:
+  name: progression_date
+  type: string
+  format: \d{4}(?:\d{2}(?:\d{2})?)?
+  nullable: true
+  description: Date of progression qualifying the next-line decision; not the same as first-recurrence date.
+registry_mapping:
+  standard: NAACCR_v26
+  item_name: Recurrence Date--1st is not equivalent
+  item_number: '1860'
+  xml_id: recurrenceDate1st
+  effective_years: facility_followup
+evidence_coverage:
+  registry_to_rule:
+    semantic: absent
+    temporal: misaligned
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: coarsened
+    transformation_id: PENDING_VERSIONED_PROJECTION
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: CoC STORE 2026 / NAACCR v26 first-course treatment items plus source-specific CRC treatment guidelines
+  items:
+  - Date 1st Crs RX CoC [1270]
+  - RX Summ--Treatment Status [1285]
+  - RX Date Chemo [1220]
+  - RX Summ--Chemo [1390]
+  - RX Date BRM [1240]
+  - RX Summ--BRM [1410]
+  - RX Date Systemic [3230]
+  - RX Date Radiation [1210]
+  - RX Date Rad Ended [3220]
+  - RX Summ--Surg/Rad Seq [1380]
+  - RX Summ--Systemic/Sur Seq [1639]
+  source_refs:
+  - COC.STORE.2026
+  - ASCO.LARC.2024
+  - ASCO.MCRC.2022
+  - ESMO.MCRC.2026
+question: What is the Qualifying progression date for the indexed CRC tumor or decision at progression_on_qualifying_prior_line?
+applicability_guard:
+  disease: colorectal_carcinoma
+  distinguish_first_course_from_later_course: true
+  do_not_infer_agent_from_registry_summary: true
+evidence_contract:
+  establishing_source_documents:
+  - imaging
+  - oncology_response_assessment
+  - pathology
+  excluded_sources:
+  - first_recurrence_date_without_regimen_link
+  positive_witness: A tumor-linked source appropriate to progression_on_qualifying_prior_line establishes progression_date.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - immunotherapy
+    - progression
+    - Qualifying
+    statement: Recurrence and progression on a specified regimen are different events.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Recurrence and progression on a specified regimen are different events.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish progression_date.
+  SPEC_INSUFFICIENT: The requested meaning of progression_date is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.STORE_CHART.systemic_treatment
+  output_field: progression_date
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[progression_date].format
+  origin: model_authored
+  basis: no external source; partial-date syntax for indexed progression.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 86096f60d2622bd442c9020850b81d6ad30ad3e38e75fbf2649a44c2023f51df

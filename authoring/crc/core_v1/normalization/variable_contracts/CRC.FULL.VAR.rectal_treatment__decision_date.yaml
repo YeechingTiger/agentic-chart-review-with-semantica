@@ -1,0 +1,248 @@
+contract_schema_version: '2.0'
+contract_id: CRC.FULL.VAR.rectal_treatment__decision_date
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.rectal_treatment.decision_date
+label: rectal treatment / decision date
+roles:
+- timing
+datatype: date
+value_domain: &id001
+  kind: iso_date
+  format: YYYY-MM-DD
+temporal_meaning: At the candidate-specific decision or event time; exact anchor must be retained by the rule use.
+mapping_level: chart_extension
+registry_mapping:
+  standard: none
+  status: no_verified_mapping
+question: What is the rectal treatment / decision date for the indexed CRC tumor, test, treatment, or decision at At the candidate-specific
+  decision or event time; exact anchor must be retained by the rule use.?
+applicability_guard:
+  disease: colorectal_cancer
+  rule_uses:
+  - ASCO24-LARC-1.1
+  - ASCO24-LARC-1.2
+  - ASCO24-LARC-1.3
+  - ASCO24-LARC-2.1
+  - ASCO24-LARC-2.2
+  - ASCO24-LARC-3.1
+  - ASCO24-LARC-4.1
+  - ASCO24-LARC-6.1
+  - ASTRO25-KQ1-01
+  - ASTRO25-KQ1-02
+  - ASTRO25-KQ1-03
+  - ASTRO25-KQ1-04
+  - ASTRO25-KQ1-06
+  - ASTRO25-KQ1-08
+  - ASTRO25-KQ1-09
+  - ASTRO25-KQ2-01
+  - ASTRO25-KQ2-02
+  - ASTRO25-KQ2-03
+  - ASTRO25-KQ2-04
+  - ASTRO25-KQ2-05
+  - ASTRO25-KQ2-06
+  - ASTRO25-KQ2-07
+  - ASTRO25-KQ2-08a
+  - ASTRO25-KQ2-08b
+  - ASTRO25-KQ3-03
+  - ASTRO25-KQ3-04
+  - ASTRO25-KQ3-05
+  - ER25-ASSESS-01
+  - ER25-ASSESS-02
+  - ER25-ASSESS-03
+  - ER25-ASSESS-04
+  - ER25-ASSESS-05
+  - ER25-ASSESS-06
+  - ER25-ASSESS-07
+  - ER25-ASSESS-08
+  - ER25-MOL-01
+  - ER25-MOL-02
+  - ER25-TX-01
+  - ER25-TX-02
+  - ER25-TX-05
+  - ER25-TX-06
+  - ER25-TX-07
+  - ER25-TX-08
+  - ER25-TX-09
+  - ER25-TX-10
+  - ER25-TX-11
+  - ER25-TX-12
+  - ER25-TX-13
+  - ER25-TX-14
+  - ER25-TX-15
+  - ER25-TX-16
+  - ER25-TX-17
+  - ER25-TX-18
+  - ER25-TX-19
+  - ER25-TX-20
+  - ER25-TX-22
+field_contract:
+  name: rectal_treatment__decision_date
+  type: date
+  nullable: true
+  value_domain: *id001
+  description: rectal treatment / decision date
+evidence_contract:
+  establishing_source_documents: &id002
+  - source-specific establishing document class pending review
+  excluded_sources: &id003
+  - problem-list carry-forward or unanchored summary alone
+  positive_witness: A tumor- and time-linked source owned by the relevant clinical discipline explicitly establishes crc.rectal_treatment.decision_date.
+  negative_or_unknown_proof:
+    mode: candidate_review_required
+    required_coverage:
+    - Review every available establishing document class in the indexed rule window.
+    statement: Distinguish not documented, not assessed, not applicable, and indeterminate where clinically meaningful.
+  conflict_policy: Retain conflicting citations; prefer the indexed primary source and timepoint. Abstain when source precedence
+    does not resolve the conflict.
+proof_obligation:
+  for_positive: At least one tumor- and time-linked establishing source explicitly supports crc.rectal_treatment.decision_date;
+    copied or unanchored mentions are insufficient.
+  for_negative_or_unknown:
+    mode: candidate_review_required
+    required_document_classes: *id002
+    excluded_document_classes: *id003
+    runtime_enforcement: not_materialized
+missingness_semantics: Distinguish not documented, not assessed, not applicable, and indeterminate where clinically meaningful.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish the variable.
+  SPEC_INSUFFICIENT: The candidate contract does not cover this evidence pattern or timepoint.
+boundary_cases:
+- case_id: wrong_tumor_or_timepoint
+  input: rectal treatment / decision date is documented only for another tumor, specimen, line, or later decision.
+  expected: Do not back-project; return EVIDENCE_INSUFFICIENT for the indexed use.
+- case_id: conflicting_establishing_sources
+  input: Two admissible indexed sources disagree and precedence does not resolve them.
+  expected: Retain both citations and abstain EVIDENCE_INSUFFICIENT.
+- case_id: mention_without_establishing_source
+  input: Only a copied problem-list or unanchored summary mention is available.
+  expected: Do not emit a positive value.
+- case_id: registry_projection_is_coarser
+  input: A registry value exists but omits a distinction required by this variable.
+  expected: Keep the registry value as a validation projection only; do not infer the detailed canonical value.
+execution_binding:
+  execution_group_id: CRC.FULL.chart_misc
+  output_field: rectal_treatment__decision_date
+  runtime_status: planned_not_materialized
+source_concepts: []
+conformance:
+  verdict: needs_revision
+  issues:
+  - full-universe generated contract requires clinical and evidence-owner review
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+provenance:
+- element: roles
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: datatype
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: value_domain
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: temporal_meaning
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: mapping_level
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: registry_mapping
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: question
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: applicability_guard
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: field_contract.name
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: field_contract.type
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: field_contract.nullable
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: field_contract.value_domain
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: evidence_contract.establishing_source_documents
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: evidence_contract.excluded_sources
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: evidence_contract.positive_witness
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: evidence_contract.negative_or_unknown_proof
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: evidence_contract.conflict_policy
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: proof_obligation
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: missingness_semantics
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: abstention
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: boundary_cases
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+- element: execution_binding
+  origin: model_authored
+  basis: No external source directly specifies this executable element; generated from the candidate rule/variable normalization
+    and requires named review.
+  status: review_pending
+contract_hash: 855c4207265eddbffcf8b6d8f846708189d69f67f1c25a852803cdb626b3eb2f

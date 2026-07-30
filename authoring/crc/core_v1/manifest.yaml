@@ -1,0 +1,94 @@
+schema_version: "1.0"
+bundle_id: CRC.CORE.MOLECULAR_TREATMENT.v1
+disease: colorectal_carcinoma
+focus:
+  - treatment_relevant_molecular_testing
+  - molecularly_selected_systemic_treatment
+  - locally_advanced_rectal_treatment_selection
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+generated_on: "2026-07-27"
+jurisdiction:
+  primary: United_States
+  cross_check: Europe
+care_settings:
+  - pathology_and_molecular_laboratory
+  - multidisciplinary_outpatient_oncology
+  - colorectal_surgery
+  - radiation_oncology
+  - inpatient_or_outpatient_systemic_therapy
+case_boundary:
+  included_primary_sites: ["C180", "C182-C189", "C199", "C209"]
+  excluded_or_separate_schemas:
+    - "C181 appendix"
+    - "neuroendocrine tumor schemas"
+    - "gastrointestinal stromal tumor schemas"
+  diagnosis_years: "2018+ for registry mapping; source-specific clinical rules retain their own effective periods"
+guideline_denominator:
+  core_formal_recommendations: 218
+  core_nonformal_source_units: 37
+  core_scoped_source_units: 255
+  core_executable_candidates: 275
+  supplemental_or_adjacent_formal_recommendations: 5
+  supplemental_or_adjacent_executable_candidates: 5
+  total_executable_candidates: 280
+  nccn_candidates_reconstructed: 0
+structured_seed_rule_count: 12
+predicate_ast_normalized_count: 280
+predicate_ast_unresolved_block_count: 82
+canonical_variable_count: 576
+variable_contract_count: 576
+registry_projection_contract_count: 9
+variable_use_coverage_row_count: 2406
+rule_category_count: 39
+planned_full_universe_execution_group_count: 8
+source_slice_crosswalk_status: complete
+source_register_documents_without_hash: 19
+normalization_status: full_universe_authoring_normalized_runtime_materialization_pending
+deferred_development:
+  - clinical and registrar review of full-universe rules, definitions, mappings, and conflicts
+  - materialize and validate the eight planned full-universe execution groups
+  - enforce positive witness strata and per-field establishes semantics in the runtime gate
+  - bind and profile a compatible immutable tumor-level CRC dataset
+  - detailed non-concordance reason taxonomy
+source_files:
+  source_register: source_register.yaml
+  source_denominator: intake/source_denominator.yaml
+  rule_universe: intake/rule_universe.yaml
+  variable_concept_inventory: intake/variable_concept_inventory.yaml
+  variable_concept_inventory_builder: intake/build_variable_concept_inventory.py
+  rules: candidate_rules.yaml
+  variables: variable_inventory.yaml
+  variable_contracts: variable_contracts
+  variable_index: variable_index.yaml
+  execution_groups: execution_groups.yaml
+  materialized_specs: materialized_specs
+  execution_manifest: execution_manifest.yaml
+  variable_spec_examples: variable_spec_examples.yaml
+  normalized_rules: normalization/normalized_rules.yaml
+  rules_by_category: normalization/rules_by_category
+  full_canonical_variables: normalization/canonical_variables.yaml
+  full_concept_bindings: normalization/concept_bindings.yaml
+  full_registry_projections: normalization/registry_projections.yaml
+  full_variable_contracts: normalization/variable_contracts
+  full_execution_group_plan: normalization/execution_group_plan.yaml
+  full_evidence_coverage: normalization/evidence_coverage.yaml
+  full_gap_assessment: normalization/gap_assessment.yaml
+  full_normalization_manifest: normalization/manifest.yaml
+  full_normalization_validator: normalization/validate_full_normalization.py
+  universe_evidence_coverage: guideline_universe_evidence_coverage.yaml
+  gaps: gap_assessment.yaml
+  reviewer_view: gap_assessment.md
+data_profile:
+  status: NOT_ASSESSED
+  profile_id:
+  note: >
+    No CRC linked-data snapshot was identified and profiled during authoring. Registry
+    standard availability and actual linked-data availability are intentionally separate.
+promotion_requirements:
+  - exact source version, retrieval date, license, and document hash
+  - oncologist review of each rule and conflict disposition
+  - molecular pathologist review of assay and discordance rules
+  - registrar review of every STORE/NAACCR mapping
+  - native runtime loading and boundary tests for every extraction spec
+  - immutable linked-data profile ID before any data-coverage claim

@@ -1,7 +1,7 @@
 """The linter has to fail on the specs we shipped, or it is decoration.
 
-Every test below is written against a fault that is either live in `specs/` today or was live
-in this repository's history. Two of them are load-bearing:
+Every test below is written against a fault that is either still live in `specs/` today or
+was live in this repository's history. Two of them are load-bearing:
 
   * `format: CCYYMMDD` COMPILES. It is a valid Python regex that matches exactly one string,
     the literal "CCYYMMDD", so `check_field_formats` rejects every date STORE.390 and
@@ -16,6 +16,7 @@ corpus, an answer key, or a model.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -55,12 +56,15 @@ def test_registry_notation_is_flagged_even_though_it_compiles():
     assert "CCYYMMDD" in found[0].message
 
 
-def test_both_shipped_date_specs_are_caught_today():
-    """Named in the brief, and the reason the linter exists. If this test ever passes by the
-    specs being fixed, delete it — do not weaken it."""
+def test_both_shipped_date_specs_now_use_working_patterns():
+    """The historical CCYYMMDD defect stays fixed in both specs."""
     for path, field in ((DIAG, "date_of_initial_diagnosis"), (RECUR, "recurrence_date")):
-        found = checks(speclint.lint_spec(load_spec(path)), speclint.F1)
-        assert any(field in f.where for f in found), f"{path.name}: {field} not flagged"
+        spec = load_spec(path)
+        found = checks(speclint.lint_spec(spec), speclint.F1)
+        assert not any(field in f.where for f in found), f"{path.name}: {field} is still broken"
+        declared = next(f for f in spec.fields if f.name == field)
+        assert re.fullmatch(declared.format, "20100499")
+        assert not re.fullmatch(declared.format, "CCYYMMDD")
 
 
 def test_an_uncompilable_format_is_flagged():
@@ -175,6 +179,12 @@ def test_a_spec_that_declares_itself_unanswerable_is_a_note_not_a_failure():
     assert checks(fs, speclint.F5, speclint.NOTE)
 
 
+def test_every_required_answer_check_search_is_presented_as_a_hint():
+    """The gate must not demand a search the model was never told to perform."""
+    notes = checks(speclint.lint_spec(load_spec(SHB)), speclint.F9, speclint.NOTE)
+    assert not [f for f in notes if "demands a search" in f.message]
+
+
 # --------------------------------------------------------- F6 formal: abstention totality
 def test_a_boundary_answer_in_no_value_space_is_flagged():
     s = mkspec(fields=[{"name": "a", "allowable_values": ["1", "2"]}],
@@ -189,11 +199,10 @@ def test_an_abstention_answer_is_inside_the_outcome_space():
     assert not checks(speclint.lint_spec(s), speclint.F6)
 
 
-def test_the_stage_spec_boundary_answer_T4_is_in_no_field():
-    """Live: `answer: "T4"` carries no c/p prefix, so no field in the spec can hold it —
-    inside the one spec that exists to stop the c/p categories being conflated."""
+def test_the_stage_spec_boundary_answer_carries_the_clinical_prefix():
+    """The historical bare `T4` answer is now representable as clinical_t=cT4."""
     found = checks(speclint.lint_spec(load_spec(STAGE)), speclint.F6)
-    assert any("T4" in f.message for f in found)
+    assert not any("T4" in f.message for f in found)
 
 
 # ------------------------------------------------------------- F7 formal: conflict matrix
@@ -367,9 +376,9 @@ def test_the_linter_is_not_a_no_op_on_what_we_shipped():
 
 
 def test_the_cli_exits_non_zero_on_a_tier1_failure():
-    r = runner.invoke(app, ["spec", "lint", str(DIAG)])
+    r = runner.invoke(app, ["spec", "lint", str(STAGE)])
     assert r.exit_code != 0
-    assert "CCYYMMDD" in r.stdout
+    assert "UNDECLARED CONFLICT" in r.stdout
 
 
 def test_the_cli_lints_a_directory_and_prints_the_gate_table():
@@ -392,3 +401,49 @@ def test_the_chooser_table_prices_a_bound_the_caller_supplies():
     plain = speclint.render_report([load_spec(SHB)], corpus=None, answer_key=None,
                                    tier3_enabled=False)
     assert "0.05" not in plain
+
+
+# ------------------------------------- F10 formal: raw local type names in a Task Contract
+def test_a_stratum_selecting_by_local_type_name_substring_is_reported():
+    """The placement violation is visible offline; no corpus is needed to see it.
+
+    `T2 dead_doc_types` cannot catch this. A token that selects SOMETHING is not dead, and
+    "Pathology" selects 3,849 Surgical-Pathology-Documents in this corpus -- while missing the
+    1,285 Non-Gyn-Cyto-FNA and 881 FN-Aspirate-Report documents that carry the same diagnosis,
+    and matching Speech-Language-Pathology-Note. A stratum can be simultaneously non-empty and
+    wrong, which is why this is its own check.
+    """
+    s = mkspec(fields=[{"name": "a", "allowable_values": ["1"]}],
+               evidence_rules={"counts_as_evidence": ["anything"]},
+               proof_obligation={"for_negative": {"strata": [
+                   {"name": "can_establish", "policy": "exhaustive",
+                    "match": {"doc_type_matches": ["Pathology", "Cytology"]},
+                    "establishes": ["a"]},
+                   {"name": "rest", "policy": "validate_by_sampling",
+                    "match": {"rest": True}, "establishes": []}]}})
+    found = checks(speclint.lint_spec(s), speclint.F10)
+    assert found, "a raw local type-name substring list must be reported"
+    assert "Task Contract" in found[0].message
+    assert "site-mapping" in found[0].message or "Site Mapping" in found[0].message
+
+
+def test_a_means_stratum_and_a_rest_stratum_are_not_reported():
+    """`means:` prose is the repair, and `rest: true` never named a local type at all."""
+    s = mkspec(fields=[{"name": "a", "allowable_values": ["1"]}],
+               evidence_rules={"counts_as_evidence": ["anything"]},
+               proof_obligation={"for_negative": {"strata": [
+                   {"name": "can_establish", "policy": "exhaustive", "establishes": ["a"],
+                    "means": "a report in which a pathologist states a diagnosis from tissue"},
+                   {"name": "rest", "policy": "validate_by_sampling",
+                    "match": {"rest": True}, "establishes": []}]}})
+    assert not checks(speclint.lint_spec(s), speclint.F10)
+
+
+def test_every_shipped_spec_that_still_uses_substrings_is_named_by_the_lint():
+    """Four specs still carry the retired expression. The lint is how that stays visible
+    until each one has a Site Mapping built for it, instead of being silently wrong."""
+    from acr.spec import load_specs
+    offenders = {sid for sid, sp in load_specs(ROOT / "specs").items()
+                 if checks(speclint.lint_spec(sp), speclint.F10)}
+    assert "STORE.400_522_523.site_histology_behavior" in offenders
+    assert "STORE.700_880.stage" in offenders

@@ -1,0 +1,48 @@
+profile_schema_version: "1.0"
+profile_id: R6249_LUNG_SCHEMA_2026-07-25
+profile_status: measured_schema_non_crc
+clinical_use: NOT_FOR_CLINICAL_USE
+dataset:
+  name: RDRP-6249 Lung Cancer Registry linked extract
+  snapshot_date: "2026-07-25"
+  disease: lung_cancer
+  case_unit: patient_after_last_row_deduplication
+  source_rows_selected: 8894
+  compatibility_with_crc: SCHEMA_ONLY_NON_CRC
+  compatibility_note: >
+    This profile exposes the current local registry schema and aggregate completeness, but
+    it cannot establish observed CRC availability or CRC rule coverage. In addition, 3,917
+    patients originally had multiple registry rows and the build retained the last row per
+    PERSON_ID, so this is not a tumor-record profile.
+linked_chart:
+  patients_with_any_note: 1788
+  fraction_with_any_note: 0.201
+  patients_with_any_omop_table: 1790
+  fraction_with_any_omop_table: 0.201
+registry_schema:
+  column_count: 15
+  fields:
+    - {source_field: PERSON_ID, nonblank_n: 8894, nonblank_fraction: 1.0, role: linkage_only}
+    - {source_field: DATE_OF_INITIAL_DIAGNOSIS, nonblank_n: 8863, nonblank_fraction: 0.996515, canonical_candidates: [crc.diagnosis_date]}
+    - {source_field: ICDO_SITE_CODE, nonblank_n: 8894, nonblank_fraction: 1.0, canonical_candidates: [crc.primary_site]}
+    - {source_field: ICDO_HISTOLOGY_CODE, nonblank_n: 8886, nonblank_fraction: 0.999101, canonical_candidates: [crc.histology]}
+    - {source_field: HISTOLOGY_DESCRIPTION, nonblank_n: 8873, nonblank_fraction: 0.997639, role: registry_text_description}
+    - {source_field: CLASS_OF_CASE, nonblank_n: 8890, nonblank_fraction: 0.99955, canonical_candidates: [crc.class_of_case]}
+    - {source_field: DATE_OF_FIRST_CONTACT, nonblank_n: 8890, nonblank_fraction: 0.99955, canonical_candidates: [crc.date_of_first_contact]}
+    - {source_field: VITAL_STATUS, nonblank_n: 8894, nonblank_fraction: 1.0, canonical_candidates: [crc.vital_status]}
+    - {source_field: T_CLASS_CLINICAL, nonblank_n: 8338, nonblank_fraction: 0.937486, canonical_candidates: [crc.clinical_t]}
+    - {source_field: N_CLASS_CLINICAL, nonblank_n: 8456, nonblank_fraction: 0.950753, canonical_candidates: [crc.clinical_n]}
+    - {source_field: M_CLASS_CLINICAL, nonblank_n: 8637, nonblank_fraction: 0.971104, canonical_candidates: [crc.clinical_m]}
+    - {source_field: STAGE_GROUPING_CLINICAL, nonblank_n: 8866, nonblank_fraction: 0.996852, canonical_candidates: [crc.clinical_stage_group]}
+    - {source_field: DATE_OF_FIRST_RECURRENCE, nonblank_n: 453, nonblank_fraction: 0.050933, canonical_candidates: [crc.first_recurrence_date]}
+    - {source_field: TYPE_OF_FIRST_RECURRENCE, nonblank_n: 8894, nonblank_fraction: 1.0, canonical_candidates: [crc.first_recurrence_type]}
+    - {source_field: REGISTRY_MATCH, nonblank_n: 8894, nonblank_fraction: 1.0, role: linkage_flag}
+semantic_quality_findings:
+  - "Nonblank is not informative: unknown/not-applicable registry codes require separate accounting."
+  - "Clinical T/N/M and stage strings contain mixed case and at least one cross-prefix value; domain validation is required before agreement scoring."
+  - "TYPE_OF_FIRST_RECURRENCE is always nonblank but includes large unknown/no-recurrence categories, so 100% presence is not 100% recurrence evidence."
+  - "No molecular-testing or treatment column is present in this local registry extract."
+crc_observed_availability:
+  status: NOT_ASSESSED
+  reason: incompatible_disease_and_patient_level_deduplication
+

@@ -5,6 +5,17 @@ under an implementation that simply waved through every truncated record; SYN001
 stops that. SYN0009 and SYN0010 alone would pass under an implementation that guessed; the
 point is that they are indistinguishable, so the pair is the test.
 """
+
+# The calls below pass `enforce=True`. `evaluate_gate` is ADVISORY by default as of 2026-07-30:
+# it still counts strata, samples and residual bounds identically, but routes its sentences to
+# `advisories` instead of `missing` so they inform the model rather than refuse its answer.
+# "Have I looked at enough of this chart?" is a clinical judgement and now lives in
+# `skills/coverage-judgement/SKILL.md`; measured over every recorded trace, coverage obligations
+# produced ~150 answer rejections and 27 of them refused a tuple that was exactly the registry's.
+#
+# These tests are about the ARITHMETIC, which is unchanged and still worth pinning: a bound that
+# clears its cap only by inheriting a stale sampling frame is anti-conservative whether or not
+# anybody is refused over it. `enforce=True` is how a test reaches the refusal wording.
 from __future__ import annotations
 
 import json
@@ -45,6 +56,7 @@ def _run(pid: str):
          StratumResult("cannot_establish", 280, sampled=25, sample_hits=0,
                        elusion_upper=clopper_pearson_upper(0, 25))],
         windows,
+        enforce=True,
     )
     return gt, summary, gate, obs_end
 
@@ -180,7 +192,7 @@ def test_the_honest_run_earns_the_bound_it_reports():
     r = _stratum(cov, "may_mention")
     assert (r.misses, r.misses_sampled, r.miss_sample_hits) == (112, N_DRAWN, 0)
     assert r.elusion_upper == pytest.approx(0.1129, abs=1e-4)
-    assert evaluate_gate(GATE, cov.stratum_results()).verdict == "PASS"
+    assert evaluate_gate(GATE, cov.stratum_results(), enforce=True).verdict == "PASS"
     assert GATE["max_elusion_upper"] == 0.12, "the cap this whole scenario turns on"
 
 
@@ -211,7 +223,7 @@ def test_one_added_term_invalidates_the_draws_that_left_the_frame():
         "the bound was inherited across a frame revision instead of being recomputed"
     )
 
-    g = evaluate_gate(GATE, cov.stratum_results())
+    g = evaluate_gate(GATE, cov.stratum_results(), enforce=True)
     assert g.verdict == "FAIL", (
         "a gate PASS on an inherited bound is anti-conservative: the reported bound clears "
         "the 0.12 cap and the earned bound misses it fourfold"
@@ -240,7 +252,7 @@ def test_the_revision_forces_replacement_draws_until_n_is_restored():
 
     r = _stratum(cov, "may_mention")
     assert r.misses_sampled == N_DRAWN and r.elusion_upper == pytest.approx(0.1129, abs=1e-4)
-    assert evaluate_gate(GATE, cov.stratum_results()).verdict == "PASS", (
+    assert evaluate_gate(GATE, cov.stratum_results(), enforce=True).verdict == "PASS", (
         "restoring n must be a way OUT — an obligation no work discharges is not a gate"
     )
 
@@ -269,7 +281,7 @@ def test_a_run_that_cannot_restore_n_does_not_pass():
     assert cov.pending_samples().get("may_mention") is None, "there is nothing left to draw"
     assert r.elusion_upper == pytest.approx(0.4507, abs=1e-3)
 
-    g = evaluate_gate(GATE, cov.stratum_results())
+    g = evaluate_gate(GATE, cov.stratum_results(), enforce=True)
     assert g.verdict == "FAIL"
     assert any("elusion upper bound" in m for m in g.missing), g.missing
 

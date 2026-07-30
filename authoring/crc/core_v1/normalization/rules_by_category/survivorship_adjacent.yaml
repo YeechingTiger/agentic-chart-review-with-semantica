@@ -1,0 +1,91 @@
+schema_version: '2.0'
+category: survivorship_adjacent
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 1
+rules:
+- candidate_id: EC26-EXERCISE-01
+  parent_recommendation_id: EC26-EXERCISE-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: adjacent
+  source_id: esmo_colon_exercise_2026
+  source_anchor: Structured exercise recommendation
+  category: survivorship_adjacent
+  title: Structured exercise after adjuvant treatment
+  core_or_supplemental: adjacent
+  source_context:
+    eligibility: Resected stage III or high-risk II, completed adjuvant two to six months earlier, ECOG 0-1, physically able
+    action: Inform about survival evidence and encourage individualized structured exercise
+    timing: Post-adjuvant
+    exceptions: Preference, comorbidity, infrastructure, and financial toxicity
+    predicate_logic: eligible_survivor => inform_and_encourage_exercise
+  requirements:
+    eligibility:
+      expression: Resected stage III or high-risk II, completed adjuvant two to six months earlier, ECOG 0-1, physically able
+      variables:
+      - crc.ecog_performance_status
+      - crc.localized_colon.resected_status_at_survivorship_decision
+      - crc.rectal_stage.clinical_stage_group.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_stage.clinical_stage_group.pretreatment
+        - variable: crc.ecog_performance_status
+        - variable: crc.localized_colon.resected_status_at_survivorship_decision
+    action:
+      expression: Inform about survival evidence and encourage individualized structured exercise
+      variables:
+      - crc.survivorship.structured_exercise_counseling
+      - crc.survivorship.structured_exercise_plan
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.survivorship.structured_exercise_counseling
+        - variable: crc.survivorship.structured_exercise_plan
+    timing:
+      expression: Post-adjuvant
+      variables:
+      - crc.colon_adjuvant.end_date
+      - crc.survivorship.exercise_counseling_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.colon_adjuvant.end_date
+        - variable: crc.survivorship.exercise_counseling_date
+    exceptions:
+      expression: Preference, comorbidity, infrastructure, and financial toxicity
+      variables:
+      - crc.comorbidity_constraints
+      - crc.patient.financial_toxicity_at_decision
+      - crc.patient_preference
+      - crc.survivorship.exercise_program_access
+      - crc.survivorship.physical_ability_for_exercise
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.survivorship.physical_ability_for_exercise
+        - variable: crc.patient_preference
+        - variable: crc.comorbidity_constraints
+        - variable: crc.survivorship.exercise_program_access
+        - variable: crc.patient.financial_toxicity_at_decision
+  required_variables:
+  - crc.colon_adjuvant.end_date
+  - crc.comorbidity_constraints
+  - crc.ecog_performance_status
+  - crc.localized_colon.resected_status_at_survivorship_decision
+  - crc.patient.financial_toxicity_at_decision
+  - crc.patient_preference
+  - crc.rectal_stage.clinical_stage_group.pretreatment
+  - crc.survivorship.exercise_counseling_date
+  - crc.survivorship.exercise_program_access
+  - crc.survivorship.physical_ability_for_exercise
+  - crc.survivorship.structured_exercise_counseling
+  - crc.survivorship.structured_exercise_plan
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

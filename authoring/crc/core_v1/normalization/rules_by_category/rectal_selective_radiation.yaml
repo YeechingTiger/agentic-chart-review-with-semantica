@@ -1,0 +1,95 @@
+schema_version: '2.0'
+category: rectal_selective_radiation
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 1
+rules:
+- candidate_id: ASTRO25-KQ1-04
+  parent_recommendation_id: ASTRO25-KQ1-R4
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ1 recommendation 4
+  category: rectal_selective_radiation
+  title: Omit RT after favorable chemotherapy response in lower-risk disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: cT2 or cT3a-b, above 5 cm, fewer than four enlarged nodes, mrCRM at least 2 mm, no mrEMVI, and favorable
+      response
+    action: May omit RT
+    timing: After neoadjuvant chemotherapy response assessment
+    exceptions: Favorable response needs imaging and endoscopy
+    predicate_logic: all_lower_risk AND favorable_response => may_omit_RT
+  requirements:
+    eligibility:
+      expression: cT2 or cT3a-b, above 5 cm, fewer than four enlarged nodes, mrCRM at least 2 mm, no mrEMVI, and favorable
+        response
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_anatomy.anal_verge_distance_cm.pretreatment
+      - crc.rectal_mri.emvi_status.pretreatment
+      - crc.rectal_mri.enlarged_regional_node_count.pretreatment
+      - crc.rectal_mri.mrf_distance_mm.pretreatment
+      - crc.rectal_response.endoscopy_category.post_neoadjuvant
+      - crc.rectal_response.imaging_category.post_neoadjuvant
+      - crc.rectal_stage.clinical_t.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_stage.clinical_t.pretreatment
+        - variable: crc.rectal_anatomy.anal_verge_distance_cm.pretreatment
+        - variable: crc.rectal_mri.enlarged_regional_node_count.pretreatment
+        - variable: crc.rectal_mri.mrf_distance_mm.pretreatment
+        - variable: crc.rectal_mri.emvi_status.pretreatment
+        - variable: crc.rectal_response.imaging_category.post_neoadjuvant
+        - variable: crc.rectal_response.endoscopy_category.post_neoadjuvant
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: May omit RT
+      variables:
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: After neoadjuvant chemotherapy response assessment
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Favorable response needs imaging and endoscopy
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_anatomy.anal_verge_distance_cm.pretreatment
+  - crc.rectal_mri.emvi_status.pretreatment
+  - crc.rectal_mri.enlarged_regional_node_count.pretreatment
+  - crc.rectal_mri.mrf_distance_mm.pretreatment
+  - crc.rectal_response.endoscopy_category.post_neoadjuvant
+  - crc.rectal_response.imaging_category.post_neoadjuvant
+  - crc.rectal_stage.clinical_t.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

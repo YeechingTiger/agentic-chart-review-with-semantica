@@ -143,35 +143,13 @@ def _registry_notation_fields() -> list[tuple[str, str]]:
 
 
 @skip_no_proof_obligations
-def test_the_skill_names_the_specs_that_carry_the_defect_and_no_others():
-    """Both directions, because both failure modes are real.
-
-    Unnamed: the skill teaches the rule with no evidence that it has ever been broken here,
-    and the reader files it under pedantry. Named-but-fixed: the skill cites a bug that is no
-    longer in the tree, and the next reader who checks stops believing the rest of it.
-    """
+def test_the_skill_records_the_fixed_defect_as_history_not_current_state():
+    """Worked examples must not claim the repaired CCYYMMDD defect is still live."""
     broken = _registry_notation_fields()
-    assert broken, (
-        "no spec declares registry notation as a format any more -- if STORE.390 and "
-        "STORE.1860_1880 were fixed, the skill's worked example is now a historical claim "
-        "and must say so"
-    )
+    assert broken == []
     text = _all_text()
-    for stem, fieldname in broken:
-        item = stem.split(".")[1]                       # 390, 1860_1880, 400_522_523 ...
-        assert item in text, f"{stem}.{fieldname} carries the defect and the skill omits it"
-
-    named = {m for m in re.findall(r"STORE\.([0-9_]+)", text)}
-    still_broken = {s.split(".")[1] for s, _ in broken}
-    for item in named & {p.stem.split(".")[1] for p in SPEC_PATHS}:
-        if item in still_broken:
-            continue
-        near = [ln for ln in text.splitlines()
-                if f"STORE.{item}" in ln and "CCYYMMDD" in ln]
-        assert not near, (
-            f"the skill still cites STORE.{item} as carrying the CCYYMMDD defect, but its "
-            f"formats are now real patterns"
-        )
+    assert "historical defect" in text.lower()
+    assert "still live" not in text.lower()
 
 
 @skip_no_proof_obligations

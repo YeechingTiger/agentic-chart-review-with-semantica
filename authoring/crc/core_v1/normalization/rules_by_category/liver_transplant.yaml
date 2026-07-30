@@ -1,0 +1,129 @@
+schema_version: '2.0'
+category: liver_transplant
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 1
+rules:
+- candidate_id: E26-LOCAL-14
+  parent_recommendation_id: E26-LOCAL-R14
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Liver transplant recommendation
+  category: liver_transplant
+  title: Strict liver-transplant selection
+  core_or_supplemental: core
+  source_context:
+    eligibility: Permanent unresectable liver-only disease, BRAF-WT, CEA under 80, control at least three months within three
+      lines, never extrahepatic, primary resected, ECOG under 2, age 18-65
+    action: Consider liver transplant under organ policy
+    timing: After sustained disease control
+    exceptions: Every condition and local organ policy required
+    predicate_logic: all_strict_transplant_criteria => consider_transplant
+  requirements:
+    eligibility:
+      expression: Permanent unresectable liver-only disease, BRAF-WT, CEA under 80, control at least three months within three
+        lines, never extrahepatic, primary resected, ECOG under 2, age 18-65
+      variables:
+      - crc.age_at_decision
+      - crc.braf_v600e_status
+      - crc.cea_at_decision
+      - crc.ecog_performance_status
+      - crc.extrahepatic_disease_ever_before_decision
+      - crc.liver_metastasis_resectability_at_decision
+      - crc.liver_only_metastatic_disease_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.primary_tumor_resection_before_decision
+      - crc.prior_systemic_line_count_at_decision
+      - crc.transplant_organ_policy_eligibility_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.liver_only_metastatic_disease_at_decision
+        - variable: crc.liver_metastasis_resectability_at_decision
+        - variable: crc.braf_v600e_status
+        - variable: crc.cea_at_decision
+        - variable: crc.prior_systemic_line_count_at_decision
+        - variable: crc.extrahepatic_disease_ever_before_decision
+        - variable: crc.primary_tumor_resection_before_decision
+        - variable: crc.ecog_performance_status
+        - variable: crc.age_at_decision
+        - variable: crc.transplant_organ_policy_eligibility_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Consider liver transplant under organ policy
+      variables:
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        variable: crc.local_treatment_at_decision
+    timing:
+      expression: After sustained disease control
+      variables:
+      - crc.decision_date
+      - crc.disease_control_duration_before_decision
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.disease_control_duration_before_decision
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Every condition and local organ policy required
+      variables:
+      - crc.age_at_decision
+      - crc.braf_v600e_status
+      - crc.cea_at_decision
+      - crc.disease_control_duration_before_decision
+      - crc.ecog_performance_status
+      - crc.extrahepatic_disease_ever_before_decision
+      - crc.liver_metastasis_resectability_at_decision
+      - crc.liver_only_metastatic_disease_at_decision
+      - crc.primary_tumor_resection_before_decision
+      - crc.prior_systemic_line_count_at_decision
+      - crc.transplant_organ_policy_eligibility_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.liver_only_metastatic_disease_at_decision
+        - variable: crc.liver_metastasis_resectability_at_decision
+        - variable: crc.braf_v600e_status
+        - variable: crc.cea_at_decision
+        - variable: crc.disease_control_duration_before_decision
+        - variable: crc.prior_systemic_line_count_at_decision
+        - variable: crc.extrahepatic_disease_ever_before_decision
+        - variable: crc.primary_tumor_resection_before_decision
+        - variable: crc.ecog_performance_status
+        - variable: crc.age_at_decision
+        - variable: crc.transplant_organ_policy_eligibility_at_decision
+  required_variables:
+  - crc.age_at_decision
+  - crc.braf_v600e_status
+  - crc.cea_at_decision
+  - crc.decision_date
+  - crc.disease_control_duration_before_decision
+  - crc.ecog_performance_status
+  - crc.extrahepatic_disease_ever_before_decision
+  - crc.liver_metastasis_resectability_at_decision
+  - crc.liver_only_metastatic_disease_at_decision
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.primary_tumor_resection_before_decision
+  - crc.prior_systemic_line_count_at_decision
+  - crc.transplant_organ_policy_eligibility_at_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

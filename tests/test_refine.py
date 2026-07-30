@@ -14,6 +14,33 @@ Every fixture below is fabricated. No corpus is read, no model is called, and th
 seam is a canned stub — a test that reached a model would be spending money to assert a
 control-flow property.
 """
+
+# ---------------------------------------------------------------------------------------------
+# TESTS REMOVED 2026-07-30, with the rules they specified.
+#
+# `answer_checks` carried five checks that decided clinical questions by matching word lists
+# against the model's own cited quotes. Measured over every trace this project has recorded
+# (266 traces, 202 joinable to registry gold, 122 firings):
+#
+#   not_less_specific        22 fires   22 rejected the registry's own value    0 ever helped
+#   nos_requires_search      24 fires   21 rejected the registry's own value    0 ever helped
+#   conflict_requires_nos    67 fires   18 rejected the registry's own value   15 "helped",
+#                                       all 15 of them the same push to the NOS code
+#   origin_not_specimen       2 fires    0                                      0
+#   code_matches_cited_text   0 fires    -                                      -
+#
+# `fit_terms_to_budget` deleted 103 search terms the model had proposed for itself, and on
+# CASE009 it deleted `lobe` and `bronchus` while `nos_requires_search` refused the answer for
+# never having searched them. The required-keyword gate enforced a list measured at 87.4%
+# recall over 276,054 documents.
+#
+# A test that pins a rule in place is part of the rule, so these went with them:
+#   - test_a_mechanical_rule_gets_a_real_number_by_replay
+#
+# Nothing replaced them here. A wrong clinical value is an instruction-following failure and is
+# measured as one. tests/test_answer_checks.py holds what survives: field `format` and
+# `allowable_values`, the only check with a positive measured record.
+# ---------------------------------------------------------------------------------------------
 from __future__ import annotations
 
 import dataclasses
@@ -294,19 +321,6 @@ CHECK = {"field": "histology", "kind": "not_less_specific", "nos_values": ["8046
 
 def coded(cid, quote, value="8046"):
     return R.CodedCase(cid, {"histology": value}, ({"quote": quote, "supports": "histology"},))
-
-
-def test_a_mechanical_rule_gets_a_real_number_by_replay():
-    """Computable offline, and computed with the same code the run uses — a blast radius
-    measured by a reimplementation would be measuring the reimplementation."""
-    cases = [coded("SYN0001", "favor squamous cell carcinoma"),
-             coded("SYN0002", "favor squamous, stains pending"),
-             coded("SYN0003", "adenocarcinoma, well differentiated"),
-             coded("SYN0004", "favor squamous", value="8070")]
-    br = R.blast_radius_for("answer_check_rule", mechanism="answer_check",
-                            candidate=CHECK, existing=[], cases=cases)
-    assert br.computable and br.n_cases_examined == 4
-    assert br.n_cases_changed == 2  # SYN0003 is not NOS-contradicted; SYN0004 is not coded NOS
 
 
 def test_a_keyword_is_priced_by_grep():

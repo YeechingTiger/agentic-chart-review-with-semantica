@@ -1,0 +1,612 @@
+schema_version: '2.0'
+category: rectal_radiation
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 8
+rules:
+- candidate_id: ASCO24-LARC-4.1
+  parent_recommendation_id: ASCO24-LARC-R4.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_larc_2024
+  source_anchor: Recommendation 4.1
+  category: rectal_radiation
+  title: Prefer long-course CRT within TNT
+  core_or_supplemental: core
+  source_context:
+    eligibility: TNT includes radiation
+    action: Prefer long-course CRT; short-course RT remains viable by circumstances and goals
+    timing: TNT planning
+    exceptions: Patient and disease circumstances
+    predicate_logic: TNT_with_RT => prefer_LC_CRT; may_SCRT
+  requirements:
+    eligibility:
+      expression: TNT includes radiation
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Prefer long-course CRT; short-course RT remains viable by circumstances and goals
+      variables:
+      - crc.rectal_radiation.course_type
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.course_type
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: TNT planning
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Patient and disease circumstances
+      variables:
+      - crc.patient_preference
+      - crc.rectal_anatomy.rt_relevant_features.pretreatment
+      - crc.rectal_treatment.goal
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.goal
+        - variable: crc.rectal_anatomy.rt_relevant_features.pretreatment
+        - variable: crc.patient_preference
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.patient_preference
+  - crc.rectal_anatomy.rt_relevant_features.pretreatment
+  - crc.rectal_radiation.course_type
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.goal
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ1-03
+  parent_recommendation_id: ASTRO25-KQ1-R3
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ1 recommendation 3
+  category: rectal_radiation
+  title: Neoadjuvant RT for stage II or III
+  core_or_supplemental: core
+  source_context:
+    eligibility: Stage II or III rectal cancer
+    action: Use neoadjuvant radiation
+    timing: Preoperative
+    exceptions: Lower-risk omission branches
+    predicate_logic: stage_II_III AND not_omission_candidate => neoadjuvant_RT
+  requirements:
+    eligibility:
+      expression: Stage II or III rectal cancer
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_radiation.omission_eligibility
+      - crc.rectal_risk.high_risk_features.pretreatment
+      - crc.rectal_stage.clinical_stage_group.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_stage.clinical_stage_group.pretreatment
+        - variable: crc.rectal_risk.high_risk_features.pretreatment
+        - variable: crc.rectal_radiation.omission_eligibility
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use neoadjuvant radiation
+      variables:
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Preoperative
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Lower-risk omission branches
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.omission_eligibility
+  - crc.rectal_risk.high_risk_features.pretreatment
+  - crc.rectal_stage.clinical_stage_group.pretreatment
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ1-08
+  parent_recommendation_id: ASTRO25-KQ1-R8
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ1 recommendation 8
+  category: rectal_radiation
+  title: Prefer preoperative over postoperative RT
+  core_or_supplemental: core
+  source_context:
+    eligibility: Radiation indicated
+    action: Deliver preoperatively rather than postoperatively
+    timing: Before surgery
+    exceptions: Unanticipated postoperative indication
+    predicate_logic: RT_indicated => preop_preferred
+  requirements:
+    eligibility:
+      expression: Radiation indicated
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_radiation.indication
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.indication
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Deliver preoperatively rather than postoperatively
+      variables:
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Before surgery
+      variables:
+      - crc.rectal_radiation.timing_relative_to_surgery
+      - crc.rectal_surgery.definitive_surgery_date
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_surgery.definitive_surgery_date
+        - variable: crc.rectal_radiation.timing_relative_to_surgery
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Unanticipated postoperative indication
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.indication
+  - crc.rectal_radiation.timing_relative_to_surgery
+  - crc.rectal_surgery.definitive_surgery_date
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ2-01
+  parent_recommendation_id: ASTRO25-KQ2-R1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ2 recommendation 1
+  category: rectal_radiation
+  title: Conventional CRT dose and radiosensitizer
+  core_or_supplemental: core
+  source_context:
+    eligibility: Conventional neoadjuvant RT selected
+    action: Use 5000 to 5600 cGy in 25 to 31 fractions with capecitabine or continuous 5-FU
+    timing: Neoadjuvant
+    exceptions: Above 5040 mainly for possible NOM
+    predicate_logic: conventional_RT => dose_fraction_range AND concurrent_FP
+  requirements:
+    eligibility:
+      expression: Conventional neoadjuvant RT selected
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_treatment.nonoperative_management_goal
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.nonoperative_management_goal
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use 5000 to 5600 cGy in 25 to 31 fractions with capecitabine or continuous 5-FU
+      variables:
+      - crc.rectal_radiation.fraction_count
+      - crc.rectal_radiation.radiosensitizer
+      - crc.rectal_radiation.total_dose_cgy
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.total_dose_cgy
+        - variable: crc.rectal_radiation.fraction_count
+        - variable: crc.rectal_radiation.radiosensitizer
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Neoadjuvant
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Above 5040 mainly for possible NOM
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.fraction_count
+  - crc.rectal_radiation.radiosensitizer
+  - crc.rectal_radiation.total_dose_cgy
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.nonoperative_management_goal
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_DPD_IMPLEMENTATION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ2-02
+  parent_recommendation_id: ASTRO25-KQ2-R2
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ2 recommendation 2
+  category: rectal_radiation
+  title: Short-course RT dose
+  core_or_supplemental: core
+  source_context:
+    eligibility: Short-course RT selected
+    action: Use 2500 cGy in five fractions without concurrent chemotherapy
+    timing: Neoadjuvant
+    exceptions: None
+    predicate_logic: SCRT => 2500_cGy_5 AND no_concurrent_chemo
+  requirements:
+    eligibility:
+      expression: Short-course RT selected
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use 2500 cGy in five fractions without concurrent chemotherapy
+      variables:
+      - crc.rectal_radiation.concurrent_systemic_therapy
+      - crc.rectal_radiation.fraction_count
+      - crc.rectal_radiation.total_dose_cgy
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.total_dose_cgy
+        - variable: crc.rectal_radiation.fraction_count
+        - variable: crc.rectal_radiation.concurrent_systemic_therapy
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Neoadjuvant
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: No source-stated requirement in this block.
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.concurrent_systemic_therapy
+  - crc.rectal_radiation.fraction_count
+  - crc.rectal_radiation.total_dose_cgy
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ2-03
+  parent_recommendation_id: ASTRO25-KQ2-R3
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ2 recommendation 3
+  category: rectal_radiation
+  title: Allowed CRT radiosensitizers
+  core_or_supplemental: core
+  source_context:
+    eligibility: Concurrent chemoradiation
+    action: Use only continuous 5-FU or capecitabine as radiosensitizer
+    timing: During RT
+    exceptions: Fluoropyrimidine contraindication changes pathway
+    predicate_logic: CRT => 5FU OR capecitabine
+  requirements:
+    eligibility:
+      expression: Concurrent chemoradiation
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use only continuous 5-FU or capecitabine as radiosensitizer
+      variables:
+      - crc.rectal_radiation.radiosensitizer
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.radiosensitizer
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: During RT
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Fluoropyrimidine contraindication changes pathway
+      variables:
+      - crc.dpd_status.before_fluoropyrimidine
+      - crc.treatment_contraindication
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.dpd_status.before_fluoropyrimidine
+        - variable: crc.treatment_contraindication
+  required_variables:
+  - crc.dpd_status.before_fluoropyrimidine
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.radiosensitizer
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  - crc.treatment_contraindication
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_DPD_IMPLEMENTATION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ3-03
+  parent_recommendation_id: ASTRO25-KQ3-R3
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ3 recommendation 3
+  category: rectal_radiation
+  title: CRT dose for NOM pathway
+  core_or_supplemental: core
+  source_context:
+    eligibility: NOM pursued after RT
+    action: Use 5000 to 5600 cGy in 25 to 31 fractions with concurrent chemotherapy
+    timing: Neoadjuvant
+    exceptions: Fluoropyrimidine contraindication
+    predicate_logic: NOM_RT => dose_fraction_range AND concurrent_chemo
+  requirements:
+    eligibility:
+      expression: NOM pursued after RT
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use 5000 to 5600 cGy in 25 to 31 fractions with concurrent chemotherapy
+      variables:
+      - crc.rectal_radiation.fraction_count
+      - crc.rectal_radiation.radiosensitizer
+      - crc.rectal_radiation.total_dose_cgy
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.total_dose_cgy
+        - variable: crc.rectal_radiation.fraction_count
+        - variable: crc.rectal_radiation.radiosensitizer
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Neoadjuvant
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Fluoropyrimidine contraindication
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.fraction_count
+  - crc.rectal_radiation.radiosensitizer
+  - crc.rectal_radiation.total_dose_cgy
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_DPD_IMPLEMENTATION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ3-04
+  parent_recommendation_id: ASTRO25-KQ3-R4
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ3 recommendation 4
+  category: rectal_radiation
+  title: CRT dose for local-excision pathway
+  core_or_supplemental: core
+  source_context:
+    eligibility: Local excision planned after RT
+    action: Use 5000 to 5040 cGy in 25 to 28 fractions with concurrent chemotherapy
+    timing: Neoadjuvant
+    exceptions: Fluoropyrimidine contraindication
+    predicate_logic: LE_after_RT => specified_CRT
+  requirements:
+    eligibility:
+      expression: Local excision planned after RT
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use 5000 to 5040 cGy in 25 to 28 fractions with concurrent chemotherapy
+      variables:
+      - crc.rectal_radiation.fraction_count
+      - crc.rectal_radiation.radiosensitizer
+      - crc.rectal_radiation.total_dose_cgy
+      - crc.rectal_surgery.local_excision_plan
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_radiation.total_dose_cgy
+        - variable: crc.rectal_radiation.fraction_count
+        - variable: crc.rectal_radiation.radiosensitizer
+        - variable: crc.rectal_surgery.local_excision_plan
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Neoadjuvant
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Fluoropyrimidine contraindication
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_radiation.fraction_count
+  - crc.rectal_radiation.radiosensitizer
+  - crc.rectal_radiation.total_dose_cgy
+  - crc.rectal_surgery.local_excision_plan
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_DPD_IMPLEMENTATION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

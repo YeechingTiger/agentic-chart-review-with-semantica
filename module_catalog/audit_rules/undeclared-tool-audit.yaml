@@ -1,0 +1,14 @@
+schema: acr.module_asset/1
+module_id: undeclared-tool-audit
+version: 1.0.0
+kind: AUDIT_RULE
+runner: CODE
+inputs: [trajectory, application_events]
+output_schema: acr.audit_report/1
+implementation: audit.undeclared_tool.v1
+truth_modes: [BLIND]
+capabilities: []
+maximum_authority: QUARANTINE_RESULT
+description: Detect tools absent from the declared run tool bundle.
+owner: platform-governance
+tags: [audit, tools]

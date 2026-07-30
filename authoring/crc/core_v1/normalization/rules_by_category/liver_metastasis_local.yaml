@@ -1,0 +1,662 @@
+schema_version: '2.0'
+category: liver_metastasis_local
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 8
+rules:
+- candidate_id: E26-LOCAL-11
+  parent_recommendation_id: E26-LOCAL-R11
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Liver local recommendation 1
+  category: liver_metastasis_local
+  title: Thermal ablation for small liver metastases
+  core_or_supplemental: core
+  source_context:
+    eligibility: Colorectal liver metastasis under 3 cm
+    action: Prefer thermal ablation over resection when appropriate
+    timing: Local-treatment planning
+    exceptions: Location and technical feasibility
+    predicate_logic: CRLM_size_lt_3 AND ablatable => thermal_ablation
+  requirements:
+    eligibility:
+      expression: Colorectal liver metastasis under 3 cm
+      variables:
+      - crc.liver_metastasis_resectability_at_decision
+      - crc.metastasis_ablatability_at_decision
+      - crc.metastatic_lesion_location_at_decision
+      - crc.metastatic_lesion_size_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastatic_lesion_size_at_decision
+        - variable: crc.metastatic_lesion_location_at_decision
+        - variable: crc.metastasis_ablatability_at_decision
+        - variable: crc.liver_metastasis_resectability_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Prefer thermal ablation over resection when appropriate
+      variables:
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        variable: crc.local_treatment_at_decision
+    timing:
+      expression: Local-treatment planning
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Location and technical feasibility
+      variables:
+      - crc.liver_metastasis_resectability_at_decision
+      - crc.metastasis_ablatability_at_decision
+      - crc.metastatic_lesion_location_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastatic_lesion_location_at_decision
+        - variable: crc.metastasis_ablatability_at_decision
+        - variable: crc.liver_metastasis_resectability_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.liver_metastasis_resectability_at_decision
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastasis_ablatability_at_decision
+  - crc.metastatic_lesion_location_at_decision
+  - crc.metastatic_lesion_size_at_decision
+  - crc.metastatic_status
+  - crc.primary_site
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-LOCAL-12
+  parent_recommendation_id: E26-LOCAL-R12
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Liver local recommendation 2
+  category: liver_metastasis_local
+  title: SBRT or brachytherapy for nonresectable nonablatable liver lesions
+  core_or_supplemental: core
+  source_context:
+    eligibility: Liver metastasis not resectable or thermally ablatable
+    action: Use SBRT or high-dose brachytherapy
+    timing: Local salvage or definitive care
+    exceptions: Technical and organ constraints
+    predicate_logic: not_resectable AND not_thermal => SBRT OR brachytherapy
+  requirements:
+    eligibility:
+      expression: Liver metastasis not resectable or thermally ablatable
+      variables:
+      - crc.liver_metastasis_resectability_at_decision
+      - crc.metastasis_ablatability_at_decision
+      - crc.metastatic_lesion_location_at_decision
+      - crc.metastatic_lesion_size_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.liver_metastasis_resectability_at_decision
+        - variable: crc.metastasis_ablatability_at_decision
+        - variable: crc.metastatic_lesion_size_at_decision
+        - variable: crc.metastatic_lesion_location_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use SBRT or high-dose brachytherapy
+      variables:
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        variable: crc.local_treatment_at_decision
+    timing:
+      expression: Local salvage or definitive care
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Technical and organ constraints
+      variables:
+      - crc.liver_metastasis_resectability_at_decision
+      - crc.local_therapy_organ_constraints_at_decision
+      - crc.metastasis_ablatability_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastasis_ablatability_at_decision
+        - variable: crc.liver_metastasis_resectability_at_decision
+        - variable: crc.local_therapy_organ_constraints_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.liver_metastasis_resectability_at_decision
+  - crc.local_therapy_organ_constraints_at_decision
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastasis_ablatability_at_decision
+  - crc.metastatic_lesion_location_at_decision
+  - crc.metastatic_lesion_size_at_decision
+  - crc.metastatic_status
+  - crc.primary_site
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-LOCAL-13
+  parent_recommendation_id: E26-LOCAL-R13
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Liver recurrence recommendation
+  category: liver_metastasis_local
+  title: Repeat local therapy for liver recurrence
+  core_or_supplemental: core
+  source_context:
+    eligibility: Recurrence after liver resection or ablation
+    action: Use repeat resection or ablation when feasible
+    timing: At recurrence
+    exceptions: Feasibility and biology
+    predicate_logic: liver_recurrence AND feasible => repeat_resection OR ablation
+  requirements:
+    eligibility:
+      expression: Recurrence after liver resection or ablation
+      variables:
+      - crc.liver_metastasis_resectability_at_decision
+      - crc.metastasis_ablatability_at_decision
+      - crc.metastatic_lesion_count_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastatic_lesion_count_at_decision
+        - variable: crc.liver_metastasis_resectability_at_decision
+        - variable: crc.metastasis_ablatability_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use repeat resection or ablation when feasible
+      variables:
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        variable: crc.local_treatment_at_decision
+    timing:
+      expression: At recurrence
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      - crc.metastatic_recurrence_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastatic_recurrence_date
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Feasibility and biology
+      variables:
+      - crc.liver_metastasis_resectability_at_decision
+      - crc.metastasis_ablatability_at_decision
+      - crc.unresolved.metastatic_biology
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastasis_ablatability_at_decision
+        - variable: crc.liver_metastasis_resectability_at_decision
+        - variable: crc.unresolved.metastatic_biology
+  required_variables:
+  - crc.decision_date
+  - crc.liver_metastasis_resectability_at_decision
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastasis_ablatability_at_decision
+  - crc.metastatic_lesion_count_at_decision
+  - crc.metastatic_recurrence_date
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.unresolved.metastatic_biology
+  computability:
+    status: not_computable
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    - UNRESOLVED_NORMALIZED_VARIABLE:crc.unresolved.metastatic_biology
+    unresolved_source_concepts: []
+    unresolved_variable_ids:
+    - crc.unresolved.metastatic_biology
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-LOCAL-15
+  parent_recommendation_id: E26-LOCAL-R15
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Liver-dominant intraarterial recommendation
+  category: liver_metastasis_local
+  title: Intraarterial treatment for liver-dominant disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Liver-dominant mCRC in salvage or intensification context
+    action: Consider TACE, TARE, SIRT, or HAI
+    timing: Selected later-line or intensification setting
+    exceptions: Center expertise and modality-specific eligibility
+    predicate_logic: liver_dominant_selected => TACE OR TARE OR SIRT OR HAI
+  requirements:
+    eligibility:
+      expression: Liver-dominant mCRC in salvage or intensification context
+      variables:
+      - crc.extrahepatic_disease_at_decision
+      - crc.liver_dominant_disease_at_decision
+      - crc.liver_function_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.prior_systemic_line_count_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.liver_dominant_disease_at_decision
+        - variable: crc.prior_systemic_line_count_at_decision
+        - variable: crc.liver_function_at_decision
+        - variable: crc.extrahepatic_disease_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Consider TACE, TARE, SIRT, or HAI
+      variables:
+      - crc.liver_directed_therapy_at_decision
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.liver_directed_therapy_at_decision
+        - variable: crc.local_treatment_at_decision
+    timing:
+      expression: Selected later-line or intensification setting
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Center expertise and modality-specific eligibility
+      variables:
+      - crc.liver_function_at_decision
+      - crc.treatment_center_expertise
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.treatment_center_expertise
+        - variable: crc.liver_function_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.extrahepatic_disease_at_decision
+  - crc.liver_directed_therapy_at_decision
+  - crc.liver_dominant_disease_at_decision
+  - crc.liver_function_at_decision
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.prior_systemic_line_count_at_decision
+  - crc.treatment_center_expertise
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-LOCAL-06
+  parent_recommendation_id: ASCO22-LOCAL-R6.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_mcrc_2022_local
+  source_anchor: Recommendation 6.1
+  category: liver_metastasis_local
+  title: SBRT after systemic therapy for unresectable liver OMD
+  core_or_supplemental: core
+  source_context:
+    eligibility: Liver oligometastases after systemic therapy and not a resection candidate
+    action: May use SBRT
+    timing: After systemic therapy
+    exceptions: Radiation feasibility
+    predicate_logic: liver_OMD AND post_systemic AND unresectable => may_SBRT
+  requirements:
+    eligibility:
+      expression: Liver oligometastases after systemic therapy and not a resection candidate
+      variables:
+      - crc.liver_metastasis_burden_at_decision
+      - crc.liver_metastasis_resectability_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.prior_systemic_therapy_before_local_decision
+      - crc.treatment_response_before_local_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.liver_metastasis_burden_at_decision
+        - variable: crc.prior_systemic_therapy_before_local_decision
+        - variable: crc.treatment_response_before_local_decision
+        - variable: crc.liver_metastasis_resectability_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: May use SBRT
+      variables:
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        variable: crc.local_treatment_at_decision
+    timing:
+      expression: After systemic therapy
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Radiation feasibility
+      variables:
+      - crc.radiation_feasibility_at_decision
+      evidence_logic:
+        variable: crc.radiation_feasibility_at_decision
+  required_variables:
+  - crc.decision_date
+  - crc.liver_metastasis_burden_at_decision
+  - crc.liver_metastasis_resectability_at_decision
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.prior_systemic_therapy_before_local_decision
+  - crc.radiation_feasibility_at_decision
+  - crc.treatment_response_before_local_decision
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-LOCAL-07
+  parent_recommendation_id: ASCO22-LOCAL-R6.2
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_mcrc_2022_local
+  source_anchor: Recommendation 6.2
+  category: liver_metastasis_local
+  title: No routine SIRT for liver metastases
+  core_or_supplemental: core
+  source_context:
+    eligibility: Unilobar or bilobar colorectal liver metastases
+    action: Do not routinely use SIRT
+    timing: Liver-directed treatment decision
+    exceptions: Individual selected context is not a routine rule
+    predicate_logic: liver_metastases => not_routine_SIRT
+  requirements:
+    eligibility:
+      expression: Unilobar or bilobar colorectal liver metastases
+      variables:
+      - crc.line_of_therapy
+      - crc.liver_metastasis_distribution_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.liver_metastasis_distribution_at_decision
+        - variable: crc.line_of_therapy
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Do not routinely use SIRT
+      variables:
+      - crc.local_treatment_at_decision
+      - crc.sirt_event
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.sirt_event
+        - variable: crc.local_treatment_at_decision
+    timing:
+      expression: Liver-directed treatment decision
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Individual selected context is not a routine rule
+      variables:
+      - crc.treatment_selection_rationale
+      evidence_logic:
+        variable: crc.treatment_selection_rationale
+  required_variables:
+  - crc.decision_date
+  - crc.line_of_therapy
+  - crc.liver_metastasis_distribution_at_decision
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.sirt_event
+  - crc.treatment_selection_rationale
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-LOCAL-09
+  parent_recommendation_id: ASCO22-LOCAL-R7.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_mcrc_2022_local
+  source_anchor: Recommendation 7.1
+  category: liver_metastasis_local
+  title: Surgery with or without perioperative chemotherapy
+  core_or_supplemental: core
+  source_context:
+    eligibility: Potentially curative resection candidate for liver metastases
+    action: Offer surgery with or without perioperative chemotherapy
+    timing: Curative-intent sequence
+    exceptions: MDT and shared decision making
+    predicate_logic: curative_liver_resection_candidate => surgery_alone OR periop_chemo_surgery
+  requirements:
+    eligibility:
+      expression: Potentially curative resection candidate for liver metastases
+      variables:
+      - crc.liver_metastasis_resectability_at_decision
+      - crc.local_treatment_intent_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.liver_metastasis_resectability_at_decision
+        - variable: crc.local_treatment_intent_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Offer surgery with or without perioperative chemotherapy
+      variables:
+      - crc.local_treatment_at_decision
+      - crc.systemic_regimen
+      - crc.treatment_sequence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.systemic_regimen
+        - variable: crc.treatment_sequence
+        - variable: crc.local_treatment_at_decision
+    timing:
+      expression: Curative-intent sequence
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: MDT and shared decision making
+      variables:
+      - crc.multidisciplinary_review
+      - crc.shared_decision_discussion
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.multidisciplinary_review
+        - variable: crc.shared_decision_discussion
+  required_variables:
+  - crc.decision_date
+  - crc.liver_metastasis_resectability_at_decision
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.local_treatment_intent_at_decision
+  - crc.metastatic_status
+  - crc.multidisciplinary_review
+  - crc.primary_site
+  - crc.shared_decision_discussion
+  - crc.systemic_regimen
+  - crc.treatment_sequence
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO22-LOCAL-10
+  parent_recommendation_id: ASCO22-LOCAL-R7.1
+  related_parent_recommendation_ids: []
+  candidate_kind: operational_qualifier
+  source_id: asco_mcrc_2022_local
+  source_anchor: Recommendation 7.1 burden qualifier
+  category: liver_metastasis_local
+  title: Favor perioperative chemotherapy with larger or more numerous lesions
+  core_or_supplemental: core
+  source_context:
+    eligibility: Resectable liver metastases with greater number or larger tumors
+    action: More strongly consider perioperative chemotherapy through SDM
+    timing: Before surgery
+    exceptions: Not an absolute threshold rule
+    predicate_logic: greater_number OR larger_size => favor_periop_chemo
+  requirements:
+    eligibility:
+      expression: Resectable liver metastases with greater number or larger tumors
+      variables:
+      - crc.metastatic_lesion_count_at_decision
+      - crc.metastatic_lesion_size_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.shared_decision_discussion
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastatic_lesion_count_at_decision
+        - variable: crc.metastatic_lesion_size_at_decision
+        - variable: crc.shared_decision_discussion
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: More strongly consider perioperative chemotherapy through SDM
+      variables:
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        variable: crc.local_treatment_at_decision
+    timing:
+      expression: Before surgery
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Not an absolute threshold rule
+      variables:
+      - crc.patient_preference
+      evidence_logic:
+        variable: crc.patient_preference
+  required_variables:
+  - crc.decision_date
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastatic_lesion_count_at_decision
+  - crc.metastatic_lesion_size_at_decision
+  - crc.metastatic_status
+  - crc.patient_preference
+  - crc.primary_site
+  - crc.shared_decision_discussion
+  computability:
+    status: partially_specified
+    blockers:
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

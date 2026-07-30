@@ -1,47 +1,76 @@
-"""Deterministic checks on a submitted answer.
+"""Format and value-domain checks on a submitted answer. NOTHING CLINICAL.
 
-The decision rules are already in the prompt — `as_prompt_block()` renders every one of
-them — and the model still broke two of them on real charts. So this is not a prompting
-gap, and another paragraph of instruction is not the fix. Where a rule can be decided
-mechanically, decide it mechanically and reject through the same loop the coverage gate
-already uses; the run traces show the agent revises correctly when it is told what is
-wrong (`rejections: 2` on the synthetic control, then a pass).
+WHAT WAS HERE, AND WHY IT IS GONE
+---------------------------------
+This module used to carry five checks that decided clinical questions by matching word lists
+against the model's own cited quotes: `not_less_specific`, `nos_requires_search`,
+`conflict_requires_nos`, `origin_not_specimen`, `code_matches_cited_text`. Each was added
+after a real chart went wrong, each was argued for in a long comment, and every one of them
+was measured on 2026-07-30 over every trace this project has ever recorded -- 266 traces, 219
+manifests, 202 traces joinable to registry gold, 122 recorded firings:
 
-Observed failures this exists to catch, both on 2026-07-26:
+    rule                       fires   rejected the registry's own value   ever helped
+    not_less_specific             22                    22  (100%)                   0
+    nos_requires_search           24                    21  ( 88%)                   0
+    conflict_requires_nos         67                    18  ( 27%)                  15
+    origin_not_specimen            2                     0                           0
+    code_matches_cited_text        0                     -                           -
 
-  P05  coded primary_site C340 (main bronchus) — the BIOPSY site. The report
-                    said "Bronchus, distal right main mass, biopsy" and, in the same
-                    document, "5 x 6 cm right hilar mass ... obstructing RUL". Rule 1 of
-                    the spec: "the site of ORIGIN, not the site of a biopsy".
+Net across all five: 58 firings destroyed a correct value, 21 preceded a correct one, 39 did
+nothing. Counted at the level of a whole submission, 60 of 254 recorded rejections (24%)
+refused a tuple that was EXACTLY the registry's, and 12 runs held the exact registry answer
+in hand and shipped something else -- 8 of those 12 shipped nothing at all.
 
-  P05  coded histology 8046 (NSCLC, NOS) when the pathology read "favor
-                    squamous cell carcinoma" and the phrase "squamous cell carcinoma"
-                    appeared 12 times. The spec's conflict rule says take the MORE
-                    specific reading; it took the less specific one.
+The three that never helped once need no further argument. The other two are worth recording
+precisely, because both looked defensible right up to the measurement:
 
-  P03  coded primary_site C349 (lung NOS) when "right upper lobe" was
-                    documented across seven note types. Not caught here by accident: a NOS
-                    code is a positive claim that the subsite is unknown, and that claim is
-                    falsifiable against the record.
+`conflict_requires_nos` appeared to break even at 15 helps against 18 harms. It did not. All
+15 helps were the same event -- a push to C349 -- because "or code <nos_value>" is the only
+remedy its message offers. Its single mechanism is retreat to NOS, and NOS is the registry's
+answer for 9.6% of this corpus while C341 alone is 52.7%. It never once helped a run reach a
+specific subsite. A rule whose only move pays off at the base rate of the value it moves
+toward is a biased coin, not a check.
 
-NO CLINICAL KNOWLEDGE LIVES IN THIS FILE. Which values are "NOS", and which phrases
-contradict them, are declared per criterion in the spec under `answer_checks`. That keeps
-the checker reusable across criteria and sites, and keeps the oncology in the place a
-domain expert can review it.
+`origin_not_specimen` fired twice and the model resubmitted the identical value both times.
+That is not a check; it is a round trip.
 
-EVERY REJECTION NAMES ITS RULE. `check_answer` returned bare strings, so the fact of which
-check fired — known here, for certain, with no model in the loop — was thrown away one line
-after it was computed. §6b's optimizer then has to infer from a message which spec rule was
-in play, and a loop that infers attribution from outcomes rewrites text that was never at
-fault. `check_answer_detail` returns `Violation`s carrying the rule id, the coded value, the
-declared phrase that fired and the quote it fired on; `check_answer` is now a one-line
-projection of it, because two implementations of one check is how they drift apart.
+There was also a contradiction between rules that no single rule could show. On CASE009 of the
+planning ablation the runtime dropped `lobe` and `bronchus` from the plan for budget
+(`fit_terms_to_budget`), and `nos_requires_search` then refused the answer because the run
+"never searched for ['lobe', 'bronchus']". One rule punished the model for not running a term
+another rule had deleted. That run submitted the registry-correct C341 five times, was
+refused five times, and shipped C349.
+
+THE RULE THIS MODULE NOW FOLLOWS
+--------------------------------
+A wrong clinical value is an instruction-following problem and belongs in the instruction, or
+in the evaluation that measures instruction-following. It does not belong in a word list in
+code. Word lists do not generalise: every one above was written from one chart and then
+applied to every chart, and the measurement above is what that costs.
+
+What survives is the one check with a positive record and no clinical content: the `format`
+and `allowable_values` a spec already declares per field. Measured over the same traces, 7
+firings, 0 that refused a registry value, 6 that preceded the registry answer. It rejects
+`C3412` and `C3432` -- codes that are not codes -- and it decides that without knowing any
+oncology.
+
+Two things about it are still wrong and are NOT fixed here, because both are additions rather
+than deletions:
+
+  - 4 of its 7 useful firings rejected `C34.9`, `C34.11`, `C34.2` -- the punctuated form
+    ICD-O-3 itself writes. That is a notation difference and should be normalised, not
+    refused; the round trip is the check's fault, not the model's.
+  - `\\d{4}` cannot tell a real morphology from a well-formed invented one. Validity needs a
+    code table. A shape regex is not a code table and should stop being described as one.
+
+EVERY REJECTION STILL NAMES ITS RULE. `Violation` carries the rule id, the coded value and
+the trigger, so `acr.trace` can attribute a rejection without inferring it from a message.
+That machinery was never the problem and it is what made the measurement above possible.
 """
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Iterable
 
 from .spec import _answer_check_key
 
@@ -50,74 +79,18 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "")).strip().lower()
 
 
-# ------------------------------------------------------------------------------- negation
-# `_norm` does not strip hyphens, so "non-small cell carcinoma" CONTAINS "small cell", and a
-# plain `phrase in blob` test reads a negation as its opposite. This is not hypothetical: on
-# the ten-patient real batch of 2026-07-28 a run coded histology 8046 -- the registry's answer
-# -- citing "poorly differentiated non-small cell carcinoma". `not_less_specific` listed
-# "small cell" in `contradicted_by`, matched it inside "non-small cell", declared 8046
-# contradicted by the record, and refused the correct answer. The agent then coded 8070 and
-# that was accepted. A check meant to stop an answer being vaguer than the record made it
-# wrong instead.
-#
-# TWO HALVES, AND ONLY ONE IS MEASURED.
-#
-# `non-` / `non ` immediately before the phrase is exact: the phrase is the tail of its own
-# negation, there is no window to guess at, and it is the form that actually fired. That half
-# is measured on n=1.
-#
-# The phrase list below is NOT measured. It is the small set of negations that are unambiguous
-# in a pathology line, kept deliberately short because the failure mode of over-reaching is
-# the mirror of the bug being fixed: mark a real mention as negated and a genuinely specific
-# record passes as NOS. Bare "no" is excluded for that reason -- "there is no doubt this is
-# adenocarcinoma" is not a negation of adenocarcinoma, and "Accession No." is not a negation
-# of anything. Whether these six are the right six on a few hundred charts is unknown.
-_NEGATIONS = ("no evidence of", "no evidence for", "negative for", "not consistent with",
-              "rule out", "ruled out")
-
-#: How far back a negation reaches. A guess, bounded by a sentence break below.
-_NEGATION_WINDOW = 40
-
-
-def _occurs_unnegated(phrase: str, blob: str) -> bool:
-    """True when `phrase` appears in `blob` at least once with no negation in front of it.
-
-    PER OCCURRENCE, not per blob: "no adenocarcinoma in the left lobe; adenocarcinoma present
-    on the right" mentions it twice and the second one counts. Collapsing to "the blob contains
-    a negation somewhere" would let one negated sentence excuse the whole citation.
-    """
-    p = _norm(phrase)
-    if not p:
-        return False
-    for m in re.finditer(re.escape(p), blob):
-        before = blob[:m.start()]
-        if re.search(r"non[\s-]*$", before):        # "non-small cell" negates "small cell"
-            continue
-        # A sentence boundary ends a negation's reach: "negative for small cell. Adenocarcinoma
-        # is present" must not read as negating the adenocarcinoma.
-        tail = re.split(r"[.;:\n]", before[-_NEGATION_WINDOW:])[-1]
-        if any(n in tail for n in _NEGATIONS):
-            continue
-        return True
-    return False
-
-
-#: THE KINDS `check_answer_detail` DISPATCHES ON, named here so a spec can be refused for
-#: declaring one that does not exist. The dispatch is an if/elif chain over `chk["kind"]` with
-#: no final `else`, so a misspelled kind -- `code_matches_cited_txt` -- matched nothing, raised
-#: nothing, and silently disabled the check. A spec author would see the rule in the YAML, the
-#: rule id in the manifest's `rule_catalog`, and zero rejections, which is indistinguishable
-#: from a check that looked and found nothing. `acr.spec.bind_provenance` reads this list.
+#: THE KINDS `check_answer_detail` DISPATCHES ON. Deliberately empty.
 #:
-#: Keep it in step with the chain below. A kind added to one and not the other is the same
-#: two-copies-drift this file's rule-id comment warns about.
-ANSWER_CHECK_KINDS: frozenset[str] = frozenset({
-    "not_less_specific",
-    "nos_requires_search",
-    "conflict_requires_nos",
-    "origin_not_specimen",
-    "code_matches_cited_text",
-})
+#: `acr.spec.bind_provenance` reads this set and REFUSES to load a spec that declares an
+#: answer_check kind nothing implements. Emptying it therefore does more than delete code: a
+#: spec that still carries an `answer_checks:` block now fails to load instead of quietly
+#: declaring rules that no longer run. That is the intended behaviour -- a check listed in
+#: YAML, visible in `rule_catalog`, and never firing is indistinguishable from a check that
+#: looked and found nothing, which is the failure mode this set was introduced to prevent.
+#:
+#: Re-adding a kind here means re-adding a word list. Before doing that, read the measurement
+#: in the module docstring: five kinds, 122 firings, 58 correct values destroyed.
+ANSWER_CHECK_KINDS: frozenset[str] = frozenset()
 
 
 # --------------------------------------------------------------------------- rule identity
@@ -126,18 +99,15 @@ ANSWER_CHECK_KINDS: frozenset[str] = frozenset({
 # failure as two ledgers counting one run: they agree until they do not, nothing raises, and
 # an attribution ends up pointing at a rule nobody can find.
 
-def answer_check_rule_id(chk: Any, position: int | None = None) -> str:
+def answer_check_rule_id(chk, position: int | None = None) -> str:
     """`answer_check.<field>.<kind>[.<first nos value>]`, from the check's CONTENT.
 
-    Reuses `spec._answer_check_key` — the identity the provenance channel and `specview`
-    already use — so a rejection recorded in a trace names the same string a sign-off names.
-    Content, not position, because inserting a check at the top of the list would otherwise
-    silently re-point every recorded attribution below it at a different rule.
+    Retained although no kind is implemented: traces recorded before the clinical checks were
+    removed name these ids, and `acr.attribution` still has to resolve them. Minting ids and
+    running checks were always separate jobs.
     """
     if isinstance(chk, dict):
         return f"answer_check.{_answer_check_key(chk)}"
-    # A malformed entry still needs an id, or its rejections become unattributable. Position
-    # is the only handle left, and it is marked as such.
     return f"answer_check.unparsed#{position if position is not None else 0}"
 
 
@@ -150,10 +120,13 @@ def field_rule_id(kind: str, name: str) -> str:
 class Violation:
     """One rejection, with everything needed to attribute it without re-reading the run.
 
-    `trigger` and `quote` are the two facts an optimizer needs and a message alone loses:
-    which declared phrase fired, and the text it fired on. Without them "the answer
-    contradicts the specification's decision rules" is a verdict with no subject, and the
-    reflection model is left to guess which of nine `contradicted_by` phrases was involved.
+    Field order and defaults are UNCHANGED by the removal of the clinical checks. `acr.trace`
+    constructs and serialises these, older traces carry them, and `acr.attribution` reads them,
+    so the shape is a recorded format rather than an internal convenience.
+
+    `trigger` and `quote` are set by nothing that survives -- the format checks put the pattern
+    in `trigger` and leave `quote` empty -- but they stay in the shape because a trace written
+    before 2026-07-30 has them populated and must still deserialise.
     """
 
     rule_id: str
@@ -177,255 +150,24 @@ class Violation:
         return d
 
 
-def _evidence_for(field: str, evidence: Iterable[dict]) -> list[dict]:
-    """All cited evidence. The `field` argument is accepted and deliberately ignored.
+def check_answer(checks, value: dict, evidence, searched=()) -> list[str]:
+    """Always empty. No clinical answer_check kind is implemented -- see the module docstring.
 
-    An earlier version narrowed to items whose free-text `supports` label contained the
-    field name. That silently defeated the whole check, and it did so on the first live
-    run: the agent labelled its three quotes
-
-        "Histology and malignant behaviour: ..."                      <- matched
-        "Final pathology diagnosis and specimen site: ..."            <- missed
-        "Final pathologic diagnosis establishes morphology and ..."   <- missed
-
-    so `histology` scoping kept exactly one quote — about an electronic signature — and
-    the answer passed while coding 8046 over a report that said "favor squamous cell
-    carcinoma". Substring-matching a model-authored label is the same mistake as
-    substring-matching a note type, and it fails the same way.
-
-    The question these checks ask is ledger-wide anyway: does ANYTHING the agent chose to
-    cite contradict the value it coded? Narrowing can only lose evidence, never add it, and
-    a false pass here is worse than a false rejection — a rejection costs one more step,
-    a false pass ships a wrong code with a validated stamp on it.
+    Kept as a published signature because `refine.blast_radius` scores a candidate rule by
+    running the answer through it, and the honest answer to "what would this word list have
+    changed" is now "nothing, because word lists are no longer applied".
     """
-    return list(evidence)
-
-
-def _first_quote_containing(items: list[dict], needle: str) -> tuple[int, str]:
-    """Which cited quote actually fired the rule. (-1, "") when no single item did."""
-    n = _norm(needle)
-    for i, e in enumerate(items):
-        if n and n in _norm(e.get("quote")):
-            return i, str(e.get("quote") or "")
-    return -1, ""
-
-
-def check_answer(checks: list[dict], value: dict, evidence: list[dict],
-                 searched: Iterable[str] = ()) -> list[str]:
-    """The messages only. Kept as the published signature — `graph`, `refine.blast_radius`
-    and a dozen tests call it — with `check_answer_detail` underneath for anything that needs
-    to know WHICH rule spoke."""
     return [v.message for v in check_answer_detail(checks, value, evidence, searched)]
 
 
-def _fields_with_conflicting_evidence(checks: list[dict] | None,
-                                      evidence: list[dict]) -> set[str]:
-    """Fields whose CITED evidence names two or more mutually exclusive alternatives.
+def check_answer_detail(checks, value: dict, evidence, searched=()) -> list[Violation]:
+    """Always empty. See `ANSWER_CHECK_KINDS` and the module docstring.
 
-    Read off the `conflict_requires_nos` declarations, so the exclusive sets live in the spec
-    and not in code. Independent of what was coded: this answers "what can the record
-    support", which has to be settled before asking "is this code too vague", or the two
-    checks can demand opposite things at once.
+    Not deleted outright because `answer_gate.gate_answer` composes it with the format checks
+    and `acr.trace` records the composed result; a caller that has to branch on whether the
+    function exists is worse than a function that truthfully returns nothing.
     """
-    out: set[str] = set()
-    for chk in checks or []:
-        if chk.get("kind") != "conflict_requires_nos":
-            continue
-        field = chk.get("field")
-        groups = [g for g in (chk.get("mutually_exclusive") or []) if g]
-        if not field or len(groups) < 2:
-            continue
-        blob = " ".join(_norm(e.get("quote")) for e in _evidence_for(field, evidence))
-        if sum(1 for g in groups if any(_occurs_unnegated(a, blob) for a in g)) > 1:
-            out.add(field)
-    return out
-
-
-def check_answer_detail(checks: list[dict], value: dict, evidence: list[dict],
-                        searched: Iterable[str] = ()) -> list[Violation]:
-    """Return a list of `Violation`s; empty means the answer passes.
-
-    Check kinds:
-
-      not_less_specific   The coded value is a catch-all/NOS code, but the cited evidence
-                          contains a phrase implying something more specific. Coding NOS is
-                          an assertion that the specific value is unknown, so a contradicting
-                          phrase in the record falsifies it.
-
-      origin_not_specimen Every piece of evidence offered for this field is a specimen or
-                          biopsy header. That locates where tissue was taken from, which is
-                          not the same claim as where the tumour arose.
-
-      conflict_requires_nos
-                          The cited evidence names TWO OR MORE mutually exclusive members of
-                          one set, and the answer picked one of them without saying why the
-                          other is wrong. This is the mirror image of `not_less_specific` and
-                          it needed its own kind: that check protects against coding NOS when
-                          the record is specific, and nothing protected against coding
-                          specific when the record disagrees with itself. Measured on a real
-                          chart — an operative note said the lesion was "coming and arising
-                          from the right middle lobe" while the pathology header read "Lung,
-                          right lower lobe", both quoted in the SAME answer, and the run coded
-                          C342 and passed the gate. The registry coded C349. A coder who
-                          cannot tell which lobe codes the NOS value; an agent that quietly
-                          picks the first one it read is not abstracting, it is guessing.
-    """
-    out: list[Violation] = []
-    # WHICH FIELDS THE RECORD CONTRADICTS ITSELF ABOUT, computed before any check runs.
-    #
-    # `not_less_specific` and `conflict_requires_nos` were a TRAP with two jaws, and it closed
-    # on a real chart. Patient with registry truth C349 (lung NOS): the agent coded C349,
-    # `not_less_specific` refused it because the cited evidence mentioned a lobe; the agent
-    # coded C348, `conflict_requires_nos` refused THAT because the evidence named three
-    # mutually exclusive lobes. No value satisfies both. It resubmitted 24 times and burned the
-    # whole call budget, and the answer it was refused first — C349 — was the right one.
-    #
-    # The rule that was wrong is `not_less_specific`. It reads "a lobe appears in the cited
-    # text" as "the subsite is known". Three conflicting lobes are not a known subsite; they
-    # are the exact situation an NOS code exists to express, and the registrar coded it that
-    # way. So a field whose evidence is self-contradicting is EXEMPT from not_less_specific:
-    # you may not be told to be more specific than the record can support.
-    conflicted = _fields_with_conflicting_evidence(checks, evidence)
-    for pos, chk in enumerate(checks or [], start=1):
-        field = chk.get("field")
-        if not field:
-            continue
-        coded = str(value.get(field) or "").strip()
-        if not coded:
-            continue
-        items = _evidence_for(field, evidence)
-        blob = " ".join(_norm(e.get("quote")) for e in items)
-        kind = chk.get("kind", "not_less_specific")
-        rid = answer_check_rule_id(chk, pos)
-        if kind == "not_less_specific" and field in conflicted:
-            continue
-
-        if kind == "not_less_specific":
-            if coded not in (chk.get("nos_values") or []):
-                continue
-            found = [p for p in (chk.get("contradicted_by") or [])
-                     if _occurs_unnegated(p, blob)]
-            if found:
-                idx, quote = _first_quote_containing(items, found[0])
-                out.append(Violation(
-                    rule_id=rid, rule_kind=kind, field=field, coded_value=coded,
-                    trigger=found[0], quote=quote, evidence_index=idx,
-                    message=(
-                        f"{field}={coded} is a not-otherwise-specified value, but the evidence "
-                        f"you cited contains {found[:4]}. A NOS code asserts the specific value "
-                        f"is unknown; the record contradicts that. "
-                        + (chk.get("message") or "Code the more specific value, or cite why it "
-                                                 "does not apply."))))
-
-        elif kind == "nos_requires_search":
-            # A not-otherwise-specified code is a NEGATIVE CLAIM: "the specific value is not
-            # documented". This project's whole position is that a negative needs proof the
-            # agent looked, so apply it at field granularity too — otherwise NOS is the free
-            # escape hatch that abstention is explicitly not allowed to be.
-            #
-            # This is the only check that can catch patient P03. It coded C349
-            # citing pathology that said just "Right lung", while "right upper lobe" sat in
-            # seven other note types. Nothing in the cited ledger contradicted C349, so
-            # `not_less_specific` passed it — the failure was never looking, and looking is
-            # exactly what `searched_terms` records.
-            if coded not in (chk.get("nos_values") or []):
-                continue
-            done = {_norm(t) for t in searched}
-            need = [t for t in (chk.get("required_searches") or [])
-                    if not any(_norm(t) in d for d in done)]
-            if need:
-                out.append(Violation(
-                    rule_id=rid, rule_kind=kind, field=field, coded_value=coded,
-                    # The trigger here is an ABSENCE — the searches never run — so there is
-                    # no quote to point at, and recording one would be inventing a witness.
-                    trigger=", ".join(need), quote="", evidence_index=-1,
-                    message=(
-                        f"{field}={coded} claims the specific value is not documented, but you "
-                        f"never searched for {need}. Search those terms; if they genuinely return "
-                        f"nothing, {coded} is then supported. "
-                        + (chk.get("message") or ""))))
-
-        elif kind == "conflict_requires_nos":
-            nos = str(chk.get("nos_value") or "").strip()
-            groups = [g for g in (chk.get("mutually_exclusive") or []) if g]
-            if not nos or len(groups) < 2 or coded == nos:
-                # Already coded NOS: the answer has conceded the conflict, which is the whole
-                # remedy. Firing here would reject the correct answer.
-                continue
-            # Which groups the CITED evidence names. Deliberately over the cited quotes only,
-            # never over the chart: a check that reads documents the answer did not cite is
-            # asking the agent to defend text it never saw.
-            present = [(g, next(a for a in g if _occurs_unnegated(a, blob)))
-                       for g in groups if any(_occurs_unnegated(a, blob) for a in g)]
-            if len(present) > 1:
-                names = [alias for _, alias in present]
-                idx, quote = _first_quote_containing(items, names[0])
-                out.append(Violation(
-                    rule_id=rid, rule_kind=kind, field=field, coded_value=coded,
-                    trigger=", ".join(names), quote=quote, evidence_index=idx,
-                    message=(
-                        f"the evidence you cited for {field} names {names}, which cannot all "
-                        f"be true of one tumour, and you coded {coded} anyway without saying "
-                        f"why the others are wrong. Either cite the statement that settles it "
-                        f"— which document is describing the origin and which is describing a "
-                        f"specimen, a second site or an error — or code {nos}. "
-                        + (chk.get("message") or ""))))
-
-        elif kind == "origin_not_specimen":
-            markers = [_norm(m) for m in (chk.get("specimen_markers") or [])]
-            if not markers or not items:
-                continue
-            per_item = [any(m in _norm(e.get("quote")) for m in markers) for e in items]
-            if per_item and all(per_item):
-                hit = next((m for m in markers if m in _norm(items[0].get("quote"))), "")
-                out.append(Violation(
-                    rule_id=rid, rule_kind=kind, field=field, coded_value=coded,
-                    trigger=hit, quote=str(items[0].get("quote") or ""), evidence_index=0,
-                    message=(
-                        f"every quote you cited for {field} is a specimen/biopsy header. That "
-                        f"establishes where tissue was taken, not where the tumour arose. "
-                        + (chk.get("message") or "Cite a statement of the site of ORIGIN."))))
-
-        elif kind == "code_matches_cited_text":
-            # DOES THE CODE NAME WHAT THE EVIDENCE NAMES? Every other check here asks whether
-            # the code is too vague, or whether the citation is the wrong KIND of document.
-            # None of them compares the code to the words in the quote, and on 2026-07-28 that
-            # let a run through whose cited evidence said "left lower lobe" nine times and
-            # "LLL" once, whose own reasoning said "the primary site is the left lower lobe of
-            # lung", and which coded C342 -- middle lobe. Zero answer_checks fired. It was not
-            # a retrieval failure and not a judgement call: the prose and the code disagreed,
-            # and nothing looked. (The left lung has no middle lobe, so C342 was also
-            # anatomically impossible, but this check does not need to know that.)
-            wordings = {str(c): [str(w) for w in (ws or [])]
-                        for c, ws in (chk.get("code_wordings") or {}).items()}
-            nos = str(chk.get("nos_value") or "").strip()
-            if not wordings or coded == nos or coded not in wordings:
-                # An unlisted code is out of scope, not a violation: this check knows about the
-                # subsites the spec chose to enumerate and must not judge the ones it does not.
-                continue
-            mine = [w for w in wordings[coded] if _occurs_unnegated(w, blob)]
-            if mine:
-                continue
-            others = sorted({c for c, ws in wordings.items() if c != coded
-                             and any(_occurs_unnegated(w, blob) for w in ws)})
-            if not others:
-                # The evidence names no enumerated subsite at all. That is `not_less_specific`'s
-                # and `nos_requires_search`'s question, not this one -- firing here would refuse
-                # the same answer twice for two different stated reasons.
-                continue
-            named = sorted({w for c in others for w in wordings[c] if _occurs_unnegated(w, blob)})
-            idx, quote = _first_quote_containing(items, named[0])
-            out.append(Violation(
-                rule_id=rid, rule_kind=kind, field=field, coded_value=coded,
-                trigger=named[0], quote=quote, evidence_index=idx,
-                message=(
-                    f"{field}={coded} is not what your own cited evidence names. None of "
-                    f"{wordings[coded]} appears in the text you quoted; {named} does, which is "
-                    f"{' or '.join(others)}. Either code what the evidence says, or cite the "
-                    f"statement that makes {coded} the origin anyway"
-                    + (f", or code {nos} if the record cannot settle it. " if nos else ". ")
-                    + (chk.get("message") or ""))))
-    return out
+    return []
 
 
 def check_field_formats(fields, value: dict) -> list[str]:
@@ -436,14 +178,18 @@ def check_field_formats(fields, value: dict) -> list[str]:
 def check_field_formats_detail(fields, value: dict) -> list[Violation]:
     """Enforce the `format` and `allowable_values` the spec already declares per field.
 
-    These were rendered into the prompt and never checked. On 2026-07-26 a deepagents run
-    submitted primary_site="C3412" -- four digits where the spec declares C\\d{3} -- and it
-    passed the gate, stamped as validated, with zero rejections. A malformed code is not a
-    judgement call the model is entitled to make; it is a contract violation, decidable
-    without any clinical knowledge, and it should never have reached a human.
+    The one surviving check, and the only one with a positive measured record: 7 firings over
+    every recorded trace, 0 refusals of a registry value, 6 that preceded the registry answer.
+    It rejected `C3412` and `C3432` -- four digits where the spec declares `C\\d{3}` -- which
+    a run had previously shipped stamped as validated with zero rejections.
 
-    Unlike answer_checks this needs no spec configuration: the constraints are already in
-    `fields`. It is always on, for every criterion, at no authoring cost.
+    It contains no clinical knowledge. It compares a submitted string against a pattern the
+    spec author wrote, which is a contract, not a judgement about a tumour. That is the line
+    this module now holds: shape and value domain here, everything clinical in the instruction
+    and in the evaluation that measures whether the instruction was followed.
+
+    Needs no spec configuration -- the constraints are already in `fields` -- so it is always
+    on, for every criterion, at no authoring cost.
     """
     out: list[Violation] = []
     for f in fields or []:

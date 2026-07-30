@@ -16,6 +16,17 @@ EVIDENCE_INSUFFICIENT, and for a patient whose ground truth IS EVIDENCE_INSUFFIC
 completely inert agent scores correct. That is why SYN0002 is judged on the path it took,
 not on its final label — see test_ablation_needs_a_found_case.
 """
+
+# The calls below pass `enforce=True`. `evaluate_gate` is ADVISORY by default as of 2026-07-30:
+# it still counts strata, samples and residual bounds identically, but routes its sentences to
+# `advisories` instead of `missing` so they inform the model rather than refuse its answer.
+# "Have I looked at enough of this chart?" is a clinical judgement and now lives in
+# `skills/coverage-judgement/SKILL.md`; measured over every recorded trace, coverage obligations
+# produced ~150 answer rejections and 27 of them refused a tuple that was exactly the registry's.
+#
+# These tests are about the ARITHMETIC, which is unchanged and still worth pinning: a bound that
+# clears its cap only by inheriting a stale sampling frame is anti-conservative whether or not
+# anybody is refused over it. `enforce=True` is how a test reaches the refusal wording.
 from __future__ import annotations
 
 from pathlib import Path
@@ -43,7 +54,7 @@ def test_a_gate_on_an_untouched_chart_must_refuse():
     led = _fresh_ledger(spec)
     gate_spec = (spec.proof_obligation.for_negative or {}).get("gate") or {}
 
-    g = evaluate_gate(gate_spec, led.stratum_results())
+    g = evaluate_gate(gate_spec, led.stratum_results(), enforce=True)
     assert g.verdict == "FAIL", "a gate that passes an untouched chart is checking nothing"
     assert g.missing
 
@@ -76,11 +87,11 @@ def test_exclusion_declaration_is_overturned_by_a_single_hit():
     drawn = led.pending_samples()["cannot_establish"]
     for d in drawn:
         led.record_sample_verdict("cannot_establish", d.note_id, relevant=False)
-    clean = evaluate_gate({"exclusion_validated": True}, led.stratum_results())
+    clean = evaluate_gate({"exclusion_validated": True}, led.stratum_results(), enforce=True)
     assert clean.checks["exclusion_validated"] is True
 
     led.record_sample_verdict("cannot_establish", drawn[0].note_id, relevant=True)
-    dirty = evaluate_gate({"exclusion_validated": True}, led.stratum_results())
+    dirty = evaluate_gate({"exclusion_validated": True}, led.stratum_results(), enforce=True)
     assert dirty.checks["exclusion_validated"] is False
     assert any("promote" in m for m in dirty.missing), (
         "a falsified exclusion must say what to do next, not merely fail"
@@ -100,11 +111,11 @@ def test_an_overturned_exclusion_is_marked_TERMINAL_not_merely_failing():
     drawn = led.pending_samples()["cannot_establish"]
     for d in drawn:
         led.record_sample_verdict("cannot_establish", d.note_id, relevant=False)
-    clean = evaluate_gate({"exclusion_validated": True}, led.stratum_results())
+    clean = evaluate_gate({"exclusion_validated": True}, led.stratum_results(), enforce=True)
     assert clean.terminal == [], "a clean sample owes nothing and forecloses nothing"
 
     led.record_sample_verdict("cannot_establish", drawn[0].note_id, relevant=True)
-    dirty = evaluate_gate({"exclusion_validated": True}, led.stratum_results())
+    dirty = evaluate_gate({"exclusion_validated": True}, led.stratum_results(), enforce=True)
     assert dirty.terminal, "a hit in the exclusion sample can never be undone in this run"
     assert set(dirty.terminal) <= set(dirty.missing), (
         "terminal is a SUBSET of missing — the reader still needs to see what failed")
@@ -138,7 +149,7 @@ def test_an_over_cap_elusion_bound_is_NEVER_terminal():
 
     only = [s for s in led.stratum_results() if s.name == "cannot_establish"]
     assert only[0].replacement_draws_required == 0, "precondition: the sampler is finished here"
-    g = evaluate_gate({"max_elusion_upper": cap}, only)
+    g = evaluate_gate({"max_elusion_upper": cap}, only, enforce=True)
     over = [m for m in g.missing if "elusion upper bound" in m]
     assert over, f"one hit in {len(drawn)} draws must exceed the {cap} cap"
     assert not [t for t in g.terminal if "elusion upper bound" in t], (
@@ -210,7 +221,7 @@ def test_zero_searches_does_not_validate_the_keyword_list():
     )
 
     gate_spec = (spec.proof_obligation.for_negative or {}).get("gate") or {}
-    g = evaluate_gate(gate_spec, led.stratum_results())
+    g = evaluate_gate(gate_spec, led.stratum_results(), enforce=True)
     assert g.checks["required_keywords_all_searched"] is False
     assert g.checks["keyword_list_validated"] is False
     assert g.verdict == "FAIL"

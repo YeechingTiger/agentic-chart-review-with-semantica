@@ -1,0 +1,250 @@
+schema_version: '2.0'
+category: rectal_immunotherapy
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 3
+rules:
+- candidate_id: ER25-TX-22
+  parent_recommendation_id: ER25-TX-R21
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: dMMR immunotherapy recommendation
+  category: rectal_immunotherapy
+  title: Dostarlimab for localized dMMR or MSI-H rectal cancer
+  core_or_supplemental: core
+  source_context:
+    eligibility: Locally advanced dMMR or MSI-H in any rectal third
+    action: Use dostarlimab for six months
+    timing: Initial treatment
+    exceptions: Off-label in the source context and jurisdiction dependent
+    predicate_logic: LARC AND (dMMR OR MSI_H) => dostarlimab_6m
+  requirements:
+    eligibility:
+      expression: Locally advanced dMMR or MSI-H in any rectal third
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.rectal_anatomy.third.pretreatment
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.rectal_anatomy.third.pretreatment
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use dostarlimab for six months
+      variables:
+      - crc.rectal_immunotherapy.agent
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_immunotherapy.agent
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Initial treatment
+      variables:
+      - crc.rectal_neoadjuvant.systemic_duration_months
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_neoadjuvant.systemic_duration_months
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Off-label in the source context and jurisdiction dependent
+      variables:
+      - crc.regulatory_jurisdiction
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.regulatory_jurisdiction
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.rectal_anatomy.third.pretreatment
+  - crc.rectal_immunotherapy.agent
+  - crc.rectal_neoadjuvant.systemic_duration_months
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  - crc.regulatory_jurisdiction
+  computability:
+    status: partially_specified
+    blockers:
+    - B_OFF_LABEL
+    - B_DYNAMIC_LABEL
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO24-LARC-6.1
+  parent_recommendation_id: ASCO24-LARC-R6.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_larc_2024
+  source_anchor: Recommendation 6.1
+  category: rectal_immunotherapy
+  title: Immunotherapy for MSI-H or dMMR LARC
+  core_or_supplemental: core
+  source_context:
+    eligibility: MSI-H or dMMR LARC
+    action: Use immunotherapy
+    timing: Initial neoadjuvant treatment
+    exceptions: Agent and label require current review
+    predicate_logic: LARC AND (MSI_H OR dMMR) => immunotherapy
+  requirements:
+    eligibility:
+      expression: MSI-H or dMMR LARC
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Use immunotherapy
+      variables:
+      - crc.rectal_immunotherapy.agent
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_immunotherapy.agent
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: Initial neoadjuvant treatment
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Agent and label require current review
+      variables:
+      - crc.regulatory_jurisdiction
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.regulatory_jurisdiction
+  required_variables:
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.rectal_immunotherapy.agent
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  - crc.regulatory_jurisdiction
+  computability:
+    status: partially_specified
+    blockers:
+    - B_DYNAMIC_LABEL
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ1-09
+  parent_recommendation_id: ASTRO25-KQ1-R9
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ1 recommendation 9
+  category: rectal_immunotherapy
+  title: Omit RT after immunotherapy cCR
+  core_or_supplemental: core
+  source_context:
+    eligibility: dMMR or MSI-H with cCR after upfront checkpoint inhibitor
+    action: Omit neoadjuvant RT
+    timing: After cCR confirmation
+    exceptions: Persistent disease follows salvage pathway
+    predicate_logic: dMMR_MSIH AND cCR_after_ICI => omit_RT
+  requirements:
+    eligibility:
+      expression: dMMR or MSI-H with cCR after upfront checkpoint inhibitor
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.rectal_response.overall_category.post_neoadjuvant
+      evidence_logic:
+        op: all_of
+        operands:
+        - op: any_of
+          operands:
+          - variable: crc.mmr_ihc_integrated_status
+          - variable: crc.msi_status
+        - variable: crc.rectal_response.overall_category.post_neoadjuvant
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Omit neoadjuvant RT
+      variables:
+      - crc.rectal_immunotherapy.agent
+      - crc.rectal_treatment.planned_pathway_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_immunotherapy.agent
+        - variable: crc.rectal_treatment.planned_pathway_at_decision
+    timing:
+      expression: After cCR confirmation
+      variables:
+      - crc.rectal_treatment.decision_date
+      - crc.rectal_treatment.start_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_treatment.decision_date
+        - variable: crc.rectal_treatment.start_date
+    exceptions:
+      expression: Persistent disease follows salvage pathway
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.mmr_ihc_integrated_status
+  - crc.msi_status
+  - crc.rectal_immunotherapy.agent
+  - crc.rectal_response.overall_category.post_neoadjuvant
+  - crc.rectal_treatment.decision_date
+  - crc.rectal_treatment.planned_pathway_at_decision
+  - crc.rectal_treatment.start_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - B_DYNAMIC_LABEL
+    - B_SOURCE_CONFLICT
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

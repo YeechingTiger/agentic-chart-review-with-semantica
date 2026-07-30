@@ -9,8 +9,11 @@ authors = [{ name = "Xing He" }]
 keywords = ["ehr", "chart-review", "clinical-nlp", "agents", "langgraph", "litellm"]
 
 dependencies = [
+    "deepagents>=0.6.12,<0.7",
+    "langchain>=1.3.11,<2",
+    "langchain-openai>=1.4.1,<2",
     "litellm>=1.55",
-    "langgraph>=0.2.60",
+    "langgraph>=1.2.5,<1.3",
     "pydantic>=2.9",
     "pyyaml>=6.0",
     "typer>=0.15",

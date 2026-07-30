@@ -625,6 +625,21 @@ class ExtractionSpec(BaseModel):
     special_codes_not_mar: list[Any] = Field(default_factory=list)
     boundary_cases: list[Any] = Field(default_factory=list)
     search_hints: list[str] = Field(default_factory=list)
+    #: Which ICD-O-3 code table this variable codes into, by name in `codes/` — e.g.
+    #: `icdo3_lung`. A TASK CONTRACT declaration: which code system a value belongs to is part
+    #: of what the answer means, and it is not the runtime's guess to make.
+    #:
+    #: ADVISORY, not enforced. The table is rendered into the prompt so the model codes into a
+    #: domain it can see rather than one it half-remembers, and read by the evaluators so an
+    #: out-of-domain code is counted. Nothing refuses an answer over it — see
+    #: `docs/DETERMINISTIC_RULES_REMOVED.md`, where five checks that did refuse over content
+    #: destroyed a correct value 58 times against 21 helps.
+    #:
+    #: It carries no provenance record for the same reason: `provenance` is per ENFORCED element,
+    #: and this changes what the model is shown, not what the gate decides. The table's own
+    #: `source_authority` carries its provenance, and says it was recalled by a model rather than
+    #: transcribed.
+    value_domain: str = ""
     applicability_guard: dict[str, Any] = Field(default_factory=dict)
     agent_policy: str = ""
     downstream_warning: list[str] = Field(default_factory=list)
@@ -785,8 +800,18 @@ class ExtractionSpec(BaseModel):
         }
 
     # ---------------------------------------------------------------- prompting
-    def as_prompt_block(self) -> str:
-        """Render the spec for the model. Ordering matters: rules before examples."""
+    def as_prompt_block(self, *, view: str = "full") -> str:
+        """Render the spec for the model. Ordering matters: rules before examples.
+
+        ``clinical_contract`` deliberately withholds retrieval implementation:
+        task-specific keywords, raw document-type requirements, and coverage work lists.
+        It keeps the semantics of positive/negative answers. Runtime profiles may reveal a
+        separately versioned retrieval or coverage asset later without changing the clinical
+        contract the model was asked to apply.
+        """
+        if view not in {"full", "clinical_contract"}:
+            raise ValueError(f"unknown prompt view {view!r}")
+        include_retrieval = view == "full"
         L: list[str] = [f"# EXTRACTION SPECIFICATION  ({self.spec_id} v{self.spec_version})", ""]
         L += [f"QUESTION: {self.question}", ""]
         if self.data_source == "outside_notes":
@@ -835,13 +860,13 @@ class ExtractionSpec(BaseModel):
             L.append("")
         L.append("PROOF OBLIGATION:")
         L.append(f"  positive answer: {self.proof_obligation.for_positive}")
-        if self.proof_obligation.required_coverage:
+        if include_retrieval and self.proof_obligation.required_coverage:
             L.append("  BEFORE you may answer negative/absent you MUST have done all of:")
             for r in self.proof_obligation.required_coverage:
                 L.append(f"    - {r}")
-        if self.proof_obligation.required_keywords:
+        if include_retrieval and self.proof_obligation.required_keywords:
             L.append(f"  required searches: {', '.join(self.proof_obligation.required_keywords)}")
-        if self.proof_obligation.required_doc_types:
+        if include_retrieval and self.proof_obligation.required_doc_types:
             L.append(f"  document types that must be reviewed: {', '.join(self.proof_obligation.required_doc_types)}")
         st = self.proof_obligation.for_negative.get("statement") if self.proof_obligation.for_negative else None
         if st:
@@ -856,7 +881,7 @@ class ExtractionSpec(BaseModel):
             for b in self.boundary_cases:
                 L.append(f"  - {json.dumps(b, ensure_ascii=False) if isinstance(b, dict) else b}")
             L.append("")
-        if self.search_hints:
+        if include_retrieval and self.search_hints:
             L += ["SEARCH HINTS (suggestions, not a required path):",
                   "  " + ", ".join(self.search_hints), ""]
         return "\n".join(L)
@@ -882,6 +907,14 @@ def load_spec(path: str | Path) -> ExtractionSpec:
     data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     spec = ExtractionSpec.model_validate(data)
     bind_provenance(spec)
+    if spec.value_domain:
+        # FAIL CLOSED ON A TYPO. A declared table that does not exist would otherwise render an
+        # empty value domain into the prompt, and the run would look exactly like one that had
+        # been given the codes. Same reason `acr.skills` raises on a missing skill: a supplier of
+        # guidance that silently supplies none is worse than one that is absent, because the
+        # manifest reports that it was supplied.
+        from .icdo3 import load_table
+        load_table(spec.value_domain)
     return spec
 
 

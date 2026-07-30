@@ -23,6 +23,41 @@ beside a computed rejection, indistinguishable one function call downstream.
 No chart text and no real identifier appears anywhere here. The quotes are written for these
 tests; the only real documents are the synthetic SYN000x charts already in the tree.
 """
+
+# ---------------------------------------------------------------------------------------------
+# TESTS REMOVED 2026-07-30, with the rules they specified.
+#
+# `answer_checks` carried five checks that decided clinical questions by matching word lists
+# against the model's own cited quotes. Measured over every trace this project has recorded
+# (266 traces, 202 joinable to registry gold, 122 firings):
+#
+#   not_less_specific        22 fires   22 rejected the registry's own value    0 ever helped
+#   nos_requires_search      24 fires   21 rejected the registry's own value    0 ever helped
+#   conflict_requires_nos    67 fires   18 rejected the registry's own value   15 "helped",
+#                                       all 15 of them the same push to the NOS code
+#   origin_not_specimen       2 fires    0                                      0
+#   code_matches_cited_text   0 fires    -                                      -
+#
+# `fit_terms_to_budget` deleted 103 search terms the model had proposed for itself, and on
+# CASE009 it deleted `lobe` and `bronchus` while `nos_requires_search` refused the answer for
+# never having searched them. The required-keyword gate enforced a list measured at 87.4%
+# recall over 276,054 documents.
+#
+# A test that pins a rule in place is part of the rule, so these went with them:
+#   - test_a_check_that_fires_on_an_absence_records_no_quote
+#   - test_a_content_identity_is_preferred_to_a_position_where_the_spec_has_one
+#   - test_a_rejection_names_the_rule_the_value_and_the_quote_that_fired_it
+#   - test_a_specific_code_is_still_refused_when_the_record_conflicts
+#   - test_inserting_a_rule_above_an_answer_check_does_not_re_point_its_id
+#   - test_one_documented_lobe_still_forbids_the_nos_code
+#   - test_the_exemption_is_driven_by_the_spec_and_not_by_code
+#   - test_the_shipped_spec_carries_the_check_and_refuses_the_real_answer
+#   - test_two_lobes_in_one_answer_cannot_be_coded_as_one_of_them
+#
+# Nothing replaced them here. A wrong clinical value is an instruction-following failure and is
+# measured as one. tests/test_answer_checks.py holds what survives: field `format` and
+# `allowable_values`, the only check with a positive measured record.
+# ---------------------------------------------------------------------------------------------
 from __future__ import annotations
 
 import json
@@ -46,6 +81,22 @@ from acr.trace import (MAX_KEPT_UNRECOGNISED, PROV_DETERMINISTIC, PROV_SELF_REPO
 ROOT = Path(__file__).resolve().parents[1]
 SHB = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
 ALL_SPECS = sorted((ROOT / "specs").rglob("*.yaml"))
+
+
+def test_tracer_serializes_concurrent_event_sequence_and_file_order(tmp_path):
+    """Parallel tool completions still produce one analysis-ready application log."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    tracer = Tracer.create(tmp_path, "parallel")
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(lambda value: tracer.emit("tool", value=value), range(80)))
+
+    rows = [
+        json.loads(line)
+        for line in tracer.path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert [row["seq"] for row in rows] == list(range(80))
+    assert [row["seq"] for row in tracer.events] == list(range(80))
 
 
 def _spec():
@@ -80,30 +131,6 @@ def test_the_same_rule_gets_the_same_id_across_runs_of_the_same_spec_version():
         first = [(r.rule_id, r.text_sha) for r in rule_catalog(spec)]
         second = [(r.rule_id, r.text_sha) for r in rule_catalog(load_spec(path))]
         assert first == second, path.name
-
-
-def test_a_content_identity_is_preferred_to_a_position_where_the_spec_has_one():
-    """answer_checks and strata already have content identities — `_answer_check_key` and the
-    stratum name — and the catalog reuses them instead of minting a second scheme. Two id
-    schemes for one rule is the two-ledger failure: they agree until they do not."""
-    ids = {r.rule_id for r in rule_catalog(_spec())}
-    assert "answer_check.primary_site.not_less_specific.C349" in ids
-    assert "evidence_rule.stratum.can_establish.establishes" in ids
-    # ...and the enforced-provenance channel names the same rules by the same key.
-    idx = rule_index(_spec())
-    assert (idx["answer_check.primary_site.not_less_specific.C349"].enforced_path
-            == "answer_checks[primary_site.not_less_specific.C349]")
-
-
-def test_inserting_a_rule_above_an_answer_check_does_not_re_point_its_id():
-    """The reason answer_checks are content-keyed rather than positional. A positional id
-    would silently transfer every recorded rejection to the newly inserted rule."""
-    spec = _spec()
-    before = rule_index(spec)["answer_check.histology.not_less_specific.8000"]
-    spec.answer_checks = [{"field": "zzz", "kind": "not_less_specific",
-                           "nos_values": ["0"]}] + list(spec.answer_checks)
-    after = rule_index(spec)["answer_check.histology.not_less_specific.8000"]
-    assert before.text_sha == after.text_sha
 
 
 def test_a_positional_id_carries_a_fingerprint_so_a_moved_position_is_detectable():
@@ -180,22 +207,6 @@ def _ev(quote: str, note_id: str = "N1", supports: str = "primary_site") -> list
              "stance": "supports"}]
 
 
-def test_a_rejection_names_the_rule_the_value_and_the_quote_that_fired_it():
-    """"the answer contradicts the specification's decision rules" is a verdict with no
-    subject. The checker knew which of nine declared phrases matched, in which quote — and
-    threw it away one line after computing it."""
-    spec = _spec()
-    ev = _ev("CT chest: mass in the right upper lobe with hilar adenopathy")
-    v = check_answer_detail(spec.answer_checks, {"primary_site": "C349"}, ev,
-                            searched=["lobe", "bronchus"])
-    assert len(v) == 1
-    assert v[0].rule_id == "answer_check.primary_site.not_less_specific.C349"
-    assert v[0].coded_value == "C349"
-    assert v[0].trigger == "upper lobe"
-    assert "right upper lobe" in v[0].quote
-    assert v[0].evidence_index == 0
-
-
 def test_the_message_only_form_is_a_projection_of_the_attributed_one():
     """Two implementations of one check drift; then a rejection and its attribution disagree
     and nothing raises."""
@@ -216,17 +227,6 @@ def test_a_format_rejection_is_attributed_to_the_field_rule_not_to_a_decision_ru
     v = check_field_formats_detail(_spec().fields, {"primary_site": "C3412"})
     assert [x.rule_id for x in v] == ["field_format.primary_site"]
     assert v[0].rule_kind == "field_format"
-
-
-def test_a_check_that_fires_on_an_absence_records_no_quote():
-    """`nos_requires_search` fires because searches were never run. Attaching a quote would
-    be inventing a witness for a rule whose trigger is that nothing was looked at."""
-    spec = _spec()
-    v = [x for x in check_answer_detail(spec.answer_checks, {"primary_site": "C349"},
-                                        _ev("right lung, no further detail"), searched=[])
-         if x.rule_kind == "nos_requires_search"]
-    assert v and v[0].quote == "" and v[0].evidence_index == -1
-    assert "lobe" in v[0].trigger
 
 
 def test_the_repeat_count_separates_a_loop_from_three_unrelated_rejections(tmp_path):
@@ -578,19 +578,36 @@ def test_the_trace_carries_the_catalog_so_an_id_is_readable_after_the_spec_moves
     assert entry["text"] and entry["text_sha"]
 
 
-def test_a_rejected_run_records_which_rule_rejected_it_and_how_often(tmp_path):
-    """The end-to-end version of the case this was built for: a value the spec's own checks
-    refuse, submitted repeatedly, with the attribution surviving into the manifest."""
+def test_a_shape_miss_is_recorded_against_its_rule_without_refusing_the_answer(tmp_path):
+    """RECORDED, NOT REFUSED, as of 2026-07-30.
+
+    `field_format` was the last check in `gate_answer` that judged the CONTENT of an answer, and
+    it is gone: the constraint is already in the prompt (`as_prompt_block` renders every field's
+    `format` and `allowable_values`, and STORE.400's own description says "no decimal point"), so
+    a model that writes `C3412` against it has failed to follow an instruction rather than been
+    under-informed. Four of that check's six useful firings rejected `C34.9`/`C34.11`/`C34.2` --
+    the punctuated form ICD-O-3 itself writes -- so it was largely creating the round trips it
+    then resolved.
+
+    What must survive is the MEASUREMENT: the trace still records which declared shape the answer
+    missed, so the eval plane can count instruction-following failures instead of a gate silently
+    absorbing them.
+    """
     _, result, manifest, trace = _run(
         tmp_path, {"primary_site": "C3412", "histology": "8140", "behavior": "3"},
-        "rules_applied: decision_rule.1", "attr-rejected")
-    att = manifest["rule_attribution"]["deterministic"]
-    assert att["rejected_by"] == ["field_format.primary_site"]
-    assert att["rejections_by_rule"]["field_format.primary_site"] >= 2
-    assert att["rejection_loops"] == ["field_format.primary_site"], \
-        "the same rejection twice running is the signal that indicts the MESSAGE"
-    assert result["gate_validated"] is False
-    assert [e for e in trace if e["kind"] == "rule_rejection"]
+        "rules_applied: decision_rule.1", "attr-shape-recorded")
+
+    misses = [e for e in trace if e["kind"] == "answer_shape_miss"]
+    assert misses, "the shape miss must still reach the trace"
+    assert "field_format.primary_site" in misses[0]["rules"]
+    assert misses[0]["refused"] is False
+
+    # Its OWN event kind, deliberately. `rule_rejection` and the consecutive-rejection streak
+    # counter are accounting about refusals; recording an accepted answer there would make the
+    # manifest report a rejection that never happened.
+    assert not [e for e in trace if e["kind"] == "rule_rejection"], (
+        "nothing refuses over a field shape any more")
+    assert result["gate_validated"] is True, "the answer stands"
 
 
 def test_the_agent_is_shown_the_identifiers_before_it_is_asked_to_cite_them(tmp_path):
@@ -641,15 +658,6 @@ def _two_lobes():
              "supports": "primary_site", "stance": "supports"}]
 
 
-def test_two_lobes_in_one_answer_cannot_be_coded_as_one_of_them():
-    v = check_answer_detail(CONFLICT_CHECK, {"primary_site": "C342"}, _two_lobes())
-    assert len(v) == 1, "the real failing answer must be refused"
-    assert v[0].rule_id == "answer_check.primary_site.conflict_requires_nos.C349"
-    assert v[0].coded_value == "C342"
-    assert "middle lobe" in v[0].trigger and "lower lobe" in v[0].trigger
-    assert v[0].quote, "a refusal has to point at the text that fired it"
-
-
 def test_conceding_the_conflict_is_the_remedy_and_is_not_refused():
     """C349 IS the answer this check asks for; firing on it would reject the fix."""
     assert check_answer_detail(CONFLICT_CHECK, {"primary_site": "C349"}, _two_lobes()) == []
@@ -667,33 +675,6 @@ def test_the_check_reads_only_what_the_answer_cited():
     assert check_answer_detail(CONFLICT_CHECK, {"primary_site": "C342"}, ev) == []
 
 
-def test_the_shipped_spec_carries_the_check_and_refuses_the_real_answer():
-    """A check that exists only in a test fixture has never been in front of a run."""
-    from acr.spec import load_spec
-    spec = load_spec("specs/STORE.400_522_523.site_histology_behavior.yaml")
-    kinds = [c.get("kind") for c in spec.answer_checks]
-    assert "conflict_requires_nos" in kinds
-    v = check_answer_detail(spec.answer_checks, {"primary_site": "C342"}, _two_lobes())
-    assert any(x.rule_kind == "conflict_requires_nos" for x in v)
-
-
-# --------------------------------------------------- the two checks were a trap with two jaws
-# Measured on a real 40-document chart whose registry truth is C349 (lung NOS). The agent
-# coded C349; `not_less_specific` refused it because the cited evidence mentioned a lobe. It
-# coded C348; `conflict_requires_nos` refused THAT because the evidence named three mutually
-# exclusive lobes. No value satisfied both, so it resubmitted 24 times, burned the whole call
-# budget and returned nothing — and the answer refused first was the correct one.
-#
-# `conflict_requires_nos` was added the same day, by me, which is how the second jaw arrived.
-
-THREE_LOBES = [
-    {"field": "primary_site", "quote": "mass in the right upper lobe", "supports": "primary_site"},
-    {"field": "primary_site", "quote": "lesion in the middle lobe", "supports": "primary_site"},
-    {"field": "primary_site", "quote": 'Lung, right lower lobe "excision"', "supports": "primary_site"}]
-ONE_LOBE = [
-    {"field": "primary_site", "quote": "mass in the right upper lobe", "supports": "primary_site"}]
-
-
 def _site_checks():
     from acr.spec import load_spec
     return load_spec("specs/STORE.400_522_523.site_histology_behavior.yaml").answer_checks
@@ -706,28 +687,15 @@ def _kinds(ev, code):
     return sorted({x.rule_kind for x in v})
 
 
-def test_self_contradicting_evidence_leaves_nos_reachable():
-    """The trap: some value has to be admissible, or the loop cannot terminate."""
-    assert _kinds(THREE_LOBES, "C349") == [], "NOS must be allowed when the record conflicts"
-    admissible = [c for c in ("C349", "C348", "C341", "C342", "C343") if not _kinds(THREE_LOBES, c)]
-    assert admissible, "every candidate refused is a deadlock, not a check"
+# REMOVED 2026-07-30 with the checks it was about: `test_self_contradicting_evidence_leaves_nos
+# _reachable`. It asserted that at least one primary_site code remained admissible when the
+# cited evidence named three mutually exclusive lobes -- the deadlock `not_less_specific` and
+# `conflict_requires_nos` could put a run into, where NOS was refused for being too vague and
+# every specific code was refused for conflicting with the record. One real run resubmitted 24
+# times into that trap and burned its whole call budget, and the value it was refused first was
+# the registry's answer.
+#
+# With both checks gone the property is vacuous: nothing refuses any code, so every candidate is
+# admissible and the assertion cannot fail for any reason connected to what it was testing.
 
 
-def test_a_specific_code_is_still_refused_when_the_record_conflicts():
-    assert _kinds(THREE_LOBES, "C341") == ["conflict_requires_nos"]
-    assert _kinds(THREE_LOBES, "C348") == ["conflict_requires_nos"]
-
-
-def test_one_documented_lobe_still_forbids_the_nos_code():
-    """The exemption is for CONFLICT, not for any mention. P03's failure must stay caught."""
-    assert _kinds(ONE_LOBE, "C349") == ["not_less_specific"]
-    assert _kinds(ONE_LOBE, "C341") == []
-
-
-def test_the_exemption_is_driven_by_the_spec_and_not_by_code():
-    """Drop the conflict declaration and not_less_specific fires again — the exclusive sets
-    live in the spec, so no clinical judgement moved into answer_checks.py."""
-    without = [c for c in _site_checks() if c.get("kind") != "conflict_requires_nos"]
-    v = check_answer_detail(without, {"primary_site": "C349", "histology": "8070",
-                                      "behavior": "3"}, THREE_LOBES, searched=["lobe", "bronchus"])
-    assert [x.rule_kind for x in v] == ["not_less_specific"]

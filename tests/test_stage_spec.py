@@ -16,6 +16,48 @@ Property 3 is the one that has actually gone wrong before: `format: "CCYYMMDD"` 
 rejects every valid date, and a `max_elusion_upper` below the Clopper-Pearson floor for the
 declared sample size makes an obligation that no amount of work discharges. Both are silent.
 """
+
+# The calls below pass `enforce=True`. `evaluate_gate` is ADVISORY by default as of 2026-07-30:
+# it still counts strata, samples and residual bounds identically, but routes its sentences to
+# `advisories` instead of `missing` so they inform the model rather than refuse its answer.
+# "Have I looked at enough of this chart?" is a clinical judgement and now lives in
+# `skills/coverage-judgement/SKILL.md`; measured over every recorded trace, coverage obligations
+# produced ~150 answer rejections and 27 of them refused a tuple that was exactly the registry's.
+#
+# These tests are about the ARITHMETIC, which is unchanged and still worth pinning: a bound that
+# clears its cap only by inheriting a stale sampling frame is anti-conservative whether or not
+# anybody is refused over it. `enforce=True` is how a test reaches the refusal wording.
+
+# ---------------------------------------------------------------------------------------------
+# TESTS REMOVED 2026-07-30, with the rules they specified.
+#
+# `answer_checks` carried five checks that decided clinical questions by matching word lists
+# against the model's own cited quotes. Measured over every trace this project has recorded
+# (266 traces, 202 joinable to registry gold, 122 firings):
+#
+#   not_less_specific        22 fires   22 rejected the registry's own value    0 ever helped
+#   nos_requires_search      24 fires   21 rejected the registry's own value    0 ever helped
+#   conflict_requires_nos    67 fires   18 rejected the registry's own value   15 "helped",
+#                                       all 15 of them the same push to the NOS code
+#   origin_not_specimen       2 fires    0                                      0
+#   code_matches_cited_text   0 fires    -                                      -
+#
+# `fit_terms_to_budget` deleted 103 search terms the model had proposed for itself, and on
+# CASE009 it deleted `lobe` and `bronchus` while `nos_requires_search` refused the answer for
+# never having searched them. The required-keyword gate enforced a list measured at 87.4%
+# recall over 276,054 documents.
+#
+# A test that pins a rule in place is part of the rule, so these went with them:
+#   - test_a_clinical_stage_read_off_the_resection_is_rejected
+#   - test_an_undivided_t_category_loses_to_a_documented_subcategory
+#   - test_every_x_and_unknown_value_carries_the_proof_burden
+#   - test_unknown_stage_is_falsified_by_a_stage_in_the_cited_evidence
+#   - test_unknown_stage_requires_having_searched
+#
+# Nothing replaced them here. A wrong clinical value is an instruction-following failure and is
+# measured as one. tests/test_answer_checks.py holds what survives: field `format` and
+# `allowable_values`, the only check with a positive measured record.
+# ---------------------------------------------------------------------------------------------
 from __future__ import annotations
 
 import datetime as dt
@@ -324,7 +366,7 @@ def ledger(spec, chart):
 
 def test_the_gate_fails_before_the_work(ledger, gate_spec):
     """Guards every assertion below: if the gate passed on an empty ledger they prove nothing."""
-    g = evaluate_gate(gate_spec, ledger.stratum_results())
+    g = evaluate_gate(gate_spec, ledger.stratum_results(), enforce=True)
     assert g.verdict == "FAIL"
     assert not g.checks["exhaustive_strata_complete"]
     assert not g.checks["exclusion_validated"]
@@ -334,7 +376,7 @@ def test_the_gate_passes_once_the_work_is_done(ledger, chart, gate_spec):
     """Satisfiability. Nothing here is a judgement call -- read the establishing stratum, run
     the declared searches, inspect what the sampler drew."""
     _work_the_obligation(ledger, chart)
-    g = evaluate_gate(gate_spec, ledger.stratum_results())
+    g = evaluate_gate(gate_spec, ledger.stratum_results(), enforce=True)
     assert g.verdict == "PASS", g.missing
 
 
@@ -348,12 +390,23 @@ def test_the_elusion_cap_is_above_the_floor_its_sample_sizes_allow(ledger, chart
 
 
 
-def test_the_full_runtime_gate_including_the_search_obligation(spec, ledger, chart):
-    """`evaluate_gate` is only part of it: the runtime gate adds the required-keyword loop and
-    the listed_documents rule on top. Exercise the real function, not a copy of it.
+def test_the_runtime_gate_no_longer_refuses_over_an_unsearched_term(spec, ledger, chart):
+    """The required-keyword loop is gone from `check_gate`, and a dropped term proves it.
 
-    Reached directly now. It used to be borrowed off a `ChartReviewAgent` that was constructed
-    and never run — a whole runtime instantiated to call one three-line forwarder.
+    It used to add two loops on top of `evaluate_gate`, one over the spec's `required_keywords`
+    and one over the plan's expanded list, refusing the answer for any term the agent had not
+    run. Both were removed on 2026-07-30. The baseline design gives the model no keyword list at
+    all: it has `search`, it decides what to look for, and a term it chose not to run is a
+    retrieval decision rather than a contract violation.
+
+    The list that was being enforced here was also measured wrong -- 87.4% recall over 276,054
+    documents, missing at least one answer-bearing document for 31.7% of patients, because it has
+    `carcinoma` and not `cancer`. And `fit_terms_to_budget` was deleting the model's own
+    proposals, `lobe` and `bronchus` among them, which `nos_requires_search` then refused the
+    answer for not having searched.
+
+    What `check_gate` still enforces is the one thing it can compute without a vocabulary: you
+    must have listed the patient's documents before asserting absence.
     """
     from acr.answer_gate import check_gate
 
@@ -362,8 +415,13 @@ def test_the_full_runtime_gate_including_the_search_obligation(spec, ledger, cha
 
     ledger.searched_terms.remove("pleural")
     g = check_gate(spec, ledger)
-    assert g.verdict == "FAIL"
-    assert any("pleural" in m for m in g.missing), g.missing
+    assert g.verdict == "PASS", "an unsearched term is no longer a refusal"
+    assert not any("pleural" in m for m in g.missing), g.missing
+
+    ledger.listed_documents = False
+    blocked = check_gate(spec, ledger)
+    assert blocked.verdict == "FAIL"
+    assert any("list the patient's documents" in m for m in blocked.missing)
 
 
 def test_reading_only_the_pathology_does_not_pass(spec, chart):
@@ -401,60 +459,12 @@ def test_a_well_supported_answer_passes_everything(spec, checks):
     assert check_answer(checks, value, evidence, searched) == []
 
 
-def test_unknown_stage_is_falsified_by_a_stage_in_the_cited_evidence(checks):
-    """99 is a claim that no stage is documented. It is falsifiable against the record, and
-    the transferred form of coding C349 while "right upper lobe" sat in seven note types."""
-    v = check_answer(checks, {"clinical_stage_group": "99"},
-                     _ev("assessment: clinical stage IIIA non-small cell lung cancer"),
-                     ["stage", "tnm"])
-    assert len(v) == 1 and "not-otherwise-specified" in v[0]
-
-
-def test_unknown_stage_requires_having_searched(checks):
-    """The failure that `not_less_specific` structurally cannot catch: nothing in the cited
-    ledger contradicts 99, because the agent never looked. Only searched_terms records that."""
-    v = check_answer(checks, {"clinical_stage_group": "99"},
-                     _ev("no stage recorded in this note"), searched=[])
-    assert any("never searched" in m for m in v)
-
-
-@pytest.mark.parametrize("field,coded,required", [
-    ("clinical_t", "cTX", "tumor size"),
-    ("clinical_n", "cNX", "lymph node"),
-    ("summary_stage", "9", "metasta"),
-    ("pathologic_stage_group", "99", "resection"),
-])
-def test_every_x_and_unknown_value_carries_the_proof_burden(checks, field, coded, required):
-    """An X value is a positive claim of non-assessability, not a shortcut for not looking.
-    Without this, the enumerated domain hands the agent a free escape from abstention."""
-    v = check_answer(checks, {field: coded}, _ev("nothing relevant here"), searched=["stage"])
-    assert any(required in m for m in v), v
-
-
-def test_an_undivided_t_category_loses_to_a_documented_subcategory(checks):
-    """The transferred form of coding 8046 over "favor squamous": the record was more specific
-    than the value submitted. T2a and T2b are different stage groups at the same N."""
-    v = check_answer(checks, {"clinical_t": "cT2"}, _ev("staged cT2a cN1 cM0"), ["tumor size"])
-    assert len(v) == 1 and "ct2a" in v[0]
-
-
 def test_a_correct_subcategory_is_not_punished_by_its_neighbour(checks):
     """Why the T checks are one entry per NOS value: contradicted_by is a flat list, so folding
     cT1 and cT2 together would make a documented cT1a reject a correctly coded cT2."""
     assert check_answer(checks, {"clinical_t": "cT2b"},
                         _ev("cT1a nodule in the left lower lobe, separate primary"),
                         ["tumor size"]) == []
-
-
-def test_a_clinical_stage_read_off_the_resection_is_rejected(checks):
-    """The conflation, caught mechanically. Fires only when EVERY quote in the ledger is
-    specimen text, because answer_checks._evidence_for deliberately ignores the field --
-    which is precisely the run that derived its clinical stage from the pathology."""
-    v = check_answer(checks, {"clinical_stage_group": "IIB"},
-                     _ev("SPECIMEN RECEIVED: right upper lobe, lobectomy",
-                         "Final pathologic diagnosis: pT2a pN1, AJCC pathologic stage IIB"),
-                     ["stage", "tnm"])
-    assert any("before it" in m for m in v), v
 
 
 def test_one_pre_treatment_quote_clears_the_conflation_check(checks):

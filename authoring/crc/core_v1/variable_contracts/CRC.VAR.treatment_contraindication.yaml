@@ -1,0 +1,96 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.treatment_contraindication
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.treatment_contraindication
+contract_kind: canonical_extraction_with_lossy_registry_projection
+label: Contraindication to indexed treatment
+roles:
+- exceptions
+temporal_meaning: at_indexed_decision
+field_contract:
+  name: treatment_contraindication
+  type: string
+  allowable_values:
+  - present
+  - absent_explicit
+  - not_assessed
+  - unknown
+  nullable: true
+  description: Contraindication to the indexed action; exact reason remains in evidence.
+registry_mapping:
+  standard: NAACCR_v26
+  item_name: Coarse no-treatment reasons within treatment summary items
+  item_number: 1390/1410/1430
+  xml_id: multiple_items
+  effective_years: varies
+evidence_coverage:
+  registry_to_rule:
+    semantic: coarsened
+    temporal: conditional
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: coarsened
+    transformation_id: PENDING_VERSIONED_PROJECTION
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: Rule-required local clinical context; not represented by a single STORE item
+  items:
+  - ASCO LARC 2024 general note and recommendation qualifiers
+  - ASCO mCRC 2022 qualifying statements
+  source_refs:
+  - ASCO.LARC.2024
+  - ASCO.MCRC.2022
+  - ESMO.MCRC.2026
+question: What is the Contraindication to indexed treatment for the indexed CRC tumor or decision at at_indexed_decision?
+applicability_guard:
+  indexed_rule_decision_required: true
+  decision_date_required: true
+evidence_contract:
+  establishing_source_documents:
+  - oncology
+  - consent
+  - pharmacy
+  - specialty_assessment
+  excluded_sources:
+  - nonreceipt_alone
+  positive_witness: A tumor-linked source appropriate to at_indexed_decision establishes treatment_contraindication.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - contraindication
+    - Coarse
+    - no-treatment
+    statement: Only explicit absence supports absent_explicit; silence is unknown/not assessed.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Only explicit absence supports absent_explicit; silence is unknown/not assessed.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish treatment_contraindication.
+  SPEC_INSUFFICIENT: The requested meaning of treatment_contraindication is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CHART.decision_exceptions
+  output_field: treatment_contraindication
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[treatment_contraindication].allowable_values
+  origin: model_authored
+  basis: no external source; local explicit/unknown contraindication states.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 98807e1743fac4205f2c5ce6387467464ad579ea6927c43bfc4fa1736dcb692e

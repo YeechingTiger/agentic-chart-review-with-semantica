@@ -63,14 +63,9 @@ TOOL_SCHEMAS: list[dict] = [
         },
         ["note_id"],
     ),
-    _tool(
-        "read_section",
-        "Read one named section of a document (e.g. IMPRESSION, FINAL DIAGNOSIS, "
-        "ASSESSMENT AND PLAN). Much cheaper than reading the whole note. Call with an empty "
-        "section to list the sections available.",
-        {"note_id": {"type": "string"}, "section": {"type": "string"}},
-        ["note_id"],
-    ),
+    # `read_section` removed: it addressed headings through an ALL-CAPS regex that reached
+    # `FINAL DIAGNOSIS` in 2.3% of the documents containing it and `ADDENDUM` in 0 of 2,401.
+    # Use `search_notes` for the offset, then `read_document` with that offset.
     _tool(
         "read_documents_batch",
         "Read MANY documents in one step. Use this for runtime-drawn validation samples: the "
@@ -133,6 +128,36 @@ TOOL_SCHEMAS: list[dict] = [
                                  "description": "SPEC_INSUFFICIENT only: which output "
                                                 "fields it fails to cover. Omit if the "
                                                 "whole answer is affected."},
+            # THE ANCHOR, DECLARED. Siblings of `value` and deliberately not inside it: there
+            # is no registry gold for either, so putting them in `value` would enter them into
+            # `field_disagreements` and score the model against a truth that does not exist.
+            #
+            # Why they are asked for at all. The spec's question says "for the tumour being
+            # reported" and nothing resolves WHICH tumour. Measured consequence: three runs
+            # answered about the wrong neoplasm -- one coded a sigmoid colon hyperplastic polyp
+            # in a lung-cancer chart, two picked the wrong lung lesion where the chart
+            # documented an upper-lobe and a middle-lobe mass. In none of those cases could the
+            # trace distinguish "did not notice the other lesion" from "noticed it and judged it
+            # not the primary" from "the one-row-per-patient gold cannot express two tumours".
+            # Enumeration makes those three look different.
+            "lesions_considered": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "every distinct neoplasm or mass this chart documents, one entry each, with "
+                    "its site/laterality and the note_id that names it. One entry when the "
+                    "chart documents one tumour. This is what you looked at, not what you "
+                    "answered."),
+            },
+            "reported_lesion": {
+                "type": "string",
+                "description": (
+                    "which entry in lesions_considered this answer is about, and why each other "
+                    "entry is not the reportable primary -- metastasis, second primary, prior "
+                    "resected tumour, benign finding, or the same tumour described twice. If "
+                    "two entries cannot be resolved into one reportable tumour, say so here "
+                    "rather than picking one silently."),
+            },
         },
         ["status", "reasoning"],
     ),
@@ -290,21 +315,11 @@ class Toolbox:
                          "total_chars": r["total_chars"], "text": r["text"]})
         return {"n_read": len(docs), "unknown_note_ids": unknown, "documents": docs}
 
-    def _t_read_section(self, note_id: str, section: str = "") -> dict:
-        if note_id not in self.chart._docs:
-            return self._unknown_note(note_id)
-        if not section:
-            return {"note_id": note_id, "available_sections": self.chart.sections(note_id)}
-        r = self.chart.read_section(note_id, section)
-        if "error" in r:
-            # Same distinction as UNKNOWN_DOC_TYPE, one level down: a section name that does
-            # not exist is not the same as a section that exists and is empty.
-            r["error"] = "UNKNOWN_SECTION"
-            r["message"] = ("That section name is not present in this document. This is not "
-                            "evidence of anything; pick one of available_sections.")
-        else:
-            self.coverage.note_section(note_id, r["section"], r.get("doc_type", ""))
-        return r
+    # `_t_read_section` is gone with `SECTION_RE`. See the note in `acr.corpus`: the regex it
+    # ran on could address `FINAL DIAGNOSIS` in 2.3% of the documents that contain it and
+    # `ADDENDUM` in none of the 2,401 that do, and with no section argument it handed the model
+    # an `available_sections` list with the final diagnosis missing from it. `search` returns
+    # offsets and `read` takes them, which reaches the same text without a heading vocabulary.
 
     def _t_timeline(self, doc_type_contains=None, limit: int = 200) -> dict:
         bad = self._resolve_doc_type(doc_type_contains)
@@ -329,11 +344,19 @@ class Toolbox:
 
     def _t_submit_answer(self, status: str, reasoning: str, value: dict | None = None,
                          spec_section: str = "", spec_quote: str = "",
-                         uncovered_fields: list | None = None) -> dict:
+                         uncovered_fields: list | None = None,
+                         lesions_considered: list | None = None,
+                         reported_lesion: str = "") -> dict:
         # The SPEC_INSUFFICIENT fields are carried verbatim and judged by the gate, not here.
         # A toolbox that quietly dropped them would make the gate's rejection unanswerable:
         # the agent would supply a section, be told it supplied none, and have no way to win.
         self.submitted = {"status": status, "value": value or {}, "reasoning": reasoning,
                           "spec_section": spec_section, "spec_quote": spec_quote,
-                          "uncovered_fields": list(uncovered_fields or [])}
+                          "uncovered_fields": list(uncovered_fields or []),
+                          # Carried verbatim, never validated here. Nothing refuses an answer
+                          # over these -- they are a record of the anchor the model chose, and
+                          # `len(lesions_considered) > 1` is the signal that the gold row for
+                          # this patient may not be able to express the answer at all.
+                          "lesions_considered": [str(x) for x in (lesions_considered or [])],
+                          "reported_lesion": str(reported_lesion or "")}
         return {"received": True, "status": status, "note": "pending validation"}

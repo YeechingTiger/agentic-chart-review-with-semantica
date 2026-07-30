@@ -1,0 +1,861 @@
+schema_version: "1.0"
+bundle_id: CRC.CORE.MOLECULAR_TREATMENT.v1
+clinical_use: NOT_FOR_CLINICAL_USE
+templates:
+  candidate_rule: &candidate_rule
+    fact_status:
+      source_context: explicit_guideline_fact
+      rule_projection: local_operationalization
+    review_status: pending
+  explicit_source_fact: &explicit_source_fact
+    fact_status: explicit_guideline_fact
+  inferred_source_fact: &inferred_source_fact
+    fact_status: inferred_from_guideline
+  source_not_extracted: &source_not_extracted
+    fact_status: source_not_extracted
+rules:
+  - <<: *candidate_rule
+    rule_id: CRC.MOL.MMR_ICI_METHOD.v1
+    category: molecular_testing
+    title: Establish MMR/MSI with an appropriate validated method before an ICI eligibility decision
+    authoring_status: source_faithful_candidate
+    clinical_use: NOT_FOR_CLINICAL_USE
+    source_refs:
+      - <<: *explicit_source_fact
+        source_id: CAP.MMR_MSI_ICI.2022
+        anchor: "Recommendation 1"
+        recommendation_type: strong_recommendation
+        evidence_quality: source_reported_limited_or_low
+        strength: strong
+        paraphrase: >
+          For a CRC patient being considered for immune checkpoint inhibitor therapy on
+          the basis of an MMR defect, use MMR IHC and/or MSI PCR; a properly validated
+          MSI-NGS approach can be used when equivalence to established methods is shown.
+      - <<: *explicit_source_fact
+        source_id: ASCO.CAP_MMR_MSI_ENDORSEMENT.2023
+        anchor: "ASCO endorsement of CAP Recommendation 1"
+        recommendation_type: endorsement
+        evidence_quality: as_endorsed
+        strength: as_endorsed
+        paraphrase: ASCO endorses the CAP/AMP/Fight CRC testing guidance with qualifying statements.
+    context:
+      site: [colon, rectum]
+      histology: [carcinoma]
+      disease_setting: ICI_eligibility_assessment
+      stage: any_when_ICI_is_under_consideration
+      line_of_therapy: before_ICI_decision
+      molecular_state: [unknown_before_testing]
+      exclusions: [not_being_considered_for_ICI_on_MMR_basis]
+    requirements:
+      eligibility:
+        expression: CRC and an ICI eligibility decision based on MMR/MSI is under consideration.
+        variables: [crc.primary_site, crc.histology, crc.ici_plan]
+      action:
+        expression: A valid MMR-IHC and/or MSI assay establishes an interpretable integrated result.
+        variables:
+          - crc.mmr_ihc_integrated_status
+          - crc.mmr_mlh1
+          - crc.mmr_pms2
+          - crc.mmr_msh2
+          - crc.mmr_msh6
+          - crc.msi_status
+          - crc.molecular_assay_method
+          - crc.molecular_assay_validation_status
+          - crc.molecular_qc_status
+          - crc.molecular_specimen_id
+      timing:
+        expression: The result is available before the ICI treatment decision/start.
+        variables: [crc.molecular_specimen_date, crc.molecular_result_date, crc.ici_start_date]
+      exceptions:
+        expression: Indeterminate, discordant or failed results route to the separate MMR/MSI QA rule.
+        variables: [crc.mmr_msi_discordance_status]
+    required_variables:
+      - crc.primary_site
+      - crc.histology
+      - crc.ici_plan
+      - crc.mmr_ihc_integrated_status
+      - crc.mmr_mlh1
+      - crc.mmr_pms2
+      - crc.mmr_msh2
+      - crc.mmr_msh6
+      - crc.msi_status
+      - crc.molecular_assay_method
+      - crc.molecular_assay_validation_status
+      - crc.molecular_qc_status
+      - crc.molecular_specimen_id
+      - crc.molecular_specimen_date
+      - crc.molecular_result_date
+      - crc.ici_start_date
+      - crc.mmr_msi_discordance_status
+    computability:
+      status: partially_specified
+      blockers:
+        - laboratory validation and QC evidence are not represented in STORE
+        - source-specific assay equivalence requires molecular-pathology review
+        - native runtime does not yet adjudicate discordant multimethod results
+    conflict_group:
+    reviewer_requirements: [molecular_pathologist, medical_oncologist]
+
+  - <<: *candidate_rule
+    rule_id: CRC.MOL.MMR_MSI_DISCORDANCE.v1
+    category: molecular_testing
+    title: Preserve and resolve discordant, indeterminate, or subclonal MMR/MSI evidence
+    authoring_status: source_faithful_candidate
+    clinical_use: NOT_FOR_CLINICAL_USE
+    source_refs:
+      - <<: *explicit_source_fact
+        source_id: CAP.MMR_MSI_ICI.2022
+        anchor: "Good Practice Statements 1-3"
+        recommendation_type: good_practice_statement
+        evidence_quality: not_graded_as_recommendation
+        strength: good_practice
+        paraphrase: >
+          Review discordant results for interpretation error, retain the discordance if it
+          persists, repeat indeterminate testing with another method or block, and preserve
+          subclonal-loss context rather than collapsing all evidence into one Boolean.
+    context:
+      site: [colon, rectum]
+      histology: [carcinoma]
+      disease_setting: MMR_MSI_result_resolution_for_ICI
+      stage: any
+      line_of_therapy: before_final_ICI_eligibility_interpretation
+      molecular_state: [discordant, indeterminate, subclonal_loss]
+      exclusions: [fully_concordant_interpretable_result]
+    requirements:
+      eligibility:
+        expression: At least two methods disagree, a result is indeterminate, or IHC shows subclonal loss.
+        variables:
+          - crc.mmr_mlh1
+          - crc.mmr_pms2
+          - crc.mmr_msh2
+          - crc.mmr_msh6
+          - crc.msi_status
+          - crc.mmr_msi_discordance_status
+          - crc.mmr_subclonal_loss
+      action:
+        expression: Review, repeat or use an alternate method and retain a final interpretation with the raw evidence.
+        variables:
+          - crc.molecular_assay_method
+          - crc.molecular_peer_review_status
+          - crc.molecular_repeat_test_result
+          - crc.molecular_final_interpretation
+      timing:
+        expression: Resolution occurs before the final ICI eligibility decision when clinically feasible.
+        variables: [crc.molecular_result_date, crc.ici_start_date]
+      exceptions:
+        expression: Trial-specific subclonal workflows must retain the trial context and sampled region.
+        variables: [crc.trial_context, crc.molecular_specimen_id]
+    required_variables:
+      - crc.mmr_mlh1
+      - crc.mmr_pms2
+      - crc.mmr_msh2
+      - crc.mmr_msh6
+      - crc.msi_status
+      - crc.mmr_msi_discordance_status
+      - crc.mmr_subclonal_loss
+      - crc.molecular_assay_method
+      - crc.molecular_peer_review_status
+      - crc.molecular_repeat_test_result
+      - crc.molecular_final_interpretation
+      - crc.molecular_result_date
+      - crc.ici_start_date
+      - crc.trial_context
+      - crc.molecular_specimen_id
+    computability:
+      status: partially_specified
+      blockers:
+        - STORE MSI item collapses MMR and MSI and cannot preserve multimethod discordance
+        - sampled block/region and peer-review workflow require chart/laboratory extensions
+        - final ICI eligibility remains a pathology/oncology interpretation
+    conflict_group:
+    reviewer_requirements: [molecular_pathologist]
+
+  - <<: *candidate_rule
+    rule_id: CRC.MOL.EXTENDED_RAS_BEFORE_ANTIEGFR.v1
+    category: molecular_testing
+    title: Complete expanded KRAS and NRAS testing before anti-EGFR therapy
+    authoring_status: source_faithful_candidate
+    clinical_use: NOT_FOR_CLINICAL_USE
+    source_refs:
+      - <<: *explicit_source_fact
+        source_id: CAP.CRC_BIOMARKERS.2017
+        anchor: "Guideline Statement 1"
+        recommendation_type: recommendation
+        evidence_quality: source_reported
+        strength: recommendation
+        paraphrase: >
+          A CRC patient being considered for anti-EGFR therapy should have expanded KRAS
+          and NRAS analysis covering the source-specified exon 2, 3, and 4 codons.
+    context:
+      site: [colon, rectum]
+      histology: [carcinoma]
+      disease_setting: anti_EGFR_treatment_consideration
+      stage: typically_advanced_or_metastatic
+      line_of_therapy: before_anti_EGFR
+      molecular_state: [RAS_unknown_before_testing]
+      exclusions: [anti_EGFR_not_under_consideration]
+    requirements:
+      eligibility:
+        expression: Anti-EGFR therapy is planned or actively being considered for CRC.
+        variables: [crc.primary_site, crc.disease_setting, crc.anti_egfr_plan]
+      action:
+        expression: KRAS and NRAS results are available and assay coverage satisfies the expanded-RAS definition.
+        variables: [crc.kras_status, crc.nras_status, crc.expanded_ras_coverage]
+      timing:
+        expression: Complete results precede anti-EGFR initiation.
+        variables: [crc.molecular_result_date, crc.anti_egfr_start_date]
+      exceptions:
+        expression: An invalid, incomplete, or failed assay is not equivalent to RAS wild type.
+        variables: [crc.molecular_qc_status]
+    required_variables:
+      - crc.primary_site
+      - crc.disease_setting
+      - crc.anti_egfr_plan
+      - crc.kras_status
+      - crc.nras_status
+      - crc.expanded_ras_coverage
+      - crc.molecular_result_date
+      - crc.anti_egfr_start_date
+      - crc.molecular_qc_status
+    computability:
+      status: partially_specified
+      blockers:
+        - KRAS and NRAS SSDIs do not prove complete exon/codon assay coverage
+        - CAP 2017 is under update and requires a current-source check before promotion
+    conflict_group:
+    reviewer_requirements: [molecular_pathologist, medical_oncologist]
+
+  - <<: *candidate_rule
+    rule_id: CRC.MOL.MLH1_LOSS_LYNCH_REFLEX.v1
+    category: hereditary_risk_workup
+    title: Use BRAF V600E context in an MLH1-loss CRC Lynch-risk workup
+    authoring_status: partially_blocked_candidate
+    clinical_use: NOT_FOR_CLINICAL_USE
+    source_refs:
+      - <<: *explicit_source_fact
+        source_id: CAP.CRC_BIOMARKERS.2017
+        anchor: "Guideline Statements 2b and 3"
+        recommendation_type: recommendation
+        evidence_quality: source_reported
+        strength: recommendation
+        paraphrase: >
+          In a dMMR CRC with MLH1 loss, BRAF V600 analysis can inform Lynch risk; a detected
+          BRAF mutation favors sporadic pathogenesis, while a negative result does not exclude Lynch syndrome.
+      - <<: *explicit_source_fact
+        source_id: CAP.MMR_MSI_ICI.2022
+        anchor: "Recommendation 6"
+        recommendation_type: strong_recommendation
+        evidence_quality: source_reported
+        strength: strong
+        paraphrase: Communicate an MMR-deficiency pattern consistent with Lynch risk to the treating clinician.
+      - <<: *source_not_extracted
+        source_id: NCCN.HEREDITARY_CRC.CURRENT
+        anchor: "authorized recommendation locator pending"
+        recommendation_type: licensed_dependency_pending
+        evidence_quality: not_extracted
+        strength: not_extracted
+        paraphrase: The current referral and germline-testing pathway remains intentionally unextracted.
+    context:
+      site: [colon, rectum]
+      histology: [carcinoma]
+      disease_setting: Lynch_risk_triage
+      stage: any
+      line_of_therapy: not_applicable
+      molecular_state: [dMMR_with_MLH1_loss]
+      exclusions: [MMR_proficient, isolated_non_MLH1_loss_pattern]
+    requirements:
+      eligibility:
+        expression: An integrated dMMR result includes loss of MLH1, with the full IHC pattern retained.
+        variables: [crc.mmr_ihc_integrated_status, crc.mmr_mlh1, crc.mmr_pms2]
+      action:
+        expression: BRAF V600E and any MLH1 methylation result are retained and Lynch-risk communication is documented.
+        variables:
+          - crc.braf_v600e_status
+          - crc.mlh1_promoter_methylation_status
+          - crc.lynch_risk_communication
+      timing:
+        expression: Communication and referral status are recorded after the abnormal tumor result.
+        variables: [crc.molecular_result_date, crc.genetics_referral_status]
+      exceptions:
+        expression: BRAF wild type does not exclude Lynch syndrome; final referral/germline logic awaits licensed guidance.
+        variables: [crc.germline_result]
+    required_variables:
+      - crc.mmr_ihc_integrated_status
+      - crc.mmr_mlh1
+      - crc.mmr_pms2
+      - crc.braf_v600e_status
+      - crc.mlh1_promoter_methylation_status
+      - crc.lynch_risk_communication
+      - crc.molecular_result_date
+      - crc.genetics_referral_status
+      - crc.germline_result
+    computability:
+      status: partially_specified
+      blockers:
+        - current NCCN hereditary guideline snapshot and locator are unavailable
+        - STORE lacks MLH1 methylation, communication, referral and germline-result fields
+    conflict_group:
+    reviewer_requirements: [molecular_pathologist, genetics_specialist]
+
+  - <<: *candidate_rule
+    rule_id: CRC.RECT.MMR_BEFORE_TREATMENT.v1
+    category: molecular_testing
+    title: Assess MMR/MSI before starting treatment for locally advanced rectal cancer
+    authoring_status: source_faithful_candidate
+    clinical_use: NOT_FOR_CLINICAL_USE
+    source_refs:
+      - <<: *explicit_source_fact
+        source_id: ASCO.LARC.2024
+        anchor: "Recommendation 1.1"
+        recommendation_type: good_practice_statement
+        evidence_quality: not_graded
+        strength: good_practice
+        paraphrase: Assess MSI or MMR status before treatment begins in locally advanced rectal cancer.
+    context:
+      site: [rectum]
+      histology: [adenocarcinoma]
+      disease_setting: locally_advanced
+      stage: stage_II_or_III_working_definition
+      line_of_therapy: pretreatment
+      molecular_state: [unknown_before_testing]
+      exclusions: [not_locally_advanced_rectal_cancer]
+    requirements:
+      eligibility:
+        expression: The tumor is locally advanced rectal adenocarcinoma.
+        variables: [crc.primary_site, crc.histology, crc.larc_status]
+      action:
+        expression: An interpretable MMR or MSI assessment is documented.
+        variables: [crc.mmr_ihc_integrated_status, crc.msi_status]
+      timing:
+        expression: The molecular result precedes commencement of treatment.
+        variables: [crc.molecular_result_date, crc.treatment_start_date]
+      exceptions:
+        expression: No source-stated routine exception; failed/indeterminate testing remains unevaluable rather than negative.
+        variables: [crc.molecular_qc_status]
+    required_variables:
+      - crc.primary_site
+      - crc.histology
+      - crc.larc_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.molecular_result_date
+      - crc.treatment_start_date
+      - crc.molecular_qc_status
+    computability:
+      status: partially_specified
+      blockers:
+        - larc_status requires a reviewed operational definition
+        - registry MSI item has no result date and collapses MMR/MSI
+    conflict_group:
+    reviewer_requirements: [medical_oncologist, radiation_oncologist]
+
+  - <<: *candidate_rule
+    rule_id: CRC.RECT.MRI_BEFORE_TREATMENT.v1
+    category: locally_advanced_rectal_treatment
+    title: Obtain and report dedicated high-resolution pelvic MRI risk features before LARC treatment
+    authoring_status: source_faithful_candidate
+    clinical_use: NOT_FOR_CLINICAL_USE
+    source_refs:
+      - <<: *explicit_source_fact
+        source_id: ASCO.LARC.2024
+        anchor: "Recommendations 1.2 and 1.3"
+        recommendation_type: good_practice_statement
+        evidence_quality: not_graded
+        strength: good_practice
+        paraphrase: >
+          Before treatment, use a high-resolution dedicated rectal MRI and a standardized
+          report covering tumor relation to the anal verge/sphincter, nodes, MRF, EMVI and tumor deposits.
+    context:
+      site: [rectum]
+      histology: [adenocarcinoma]
+      disease_setting: locally_advanced
+      stage: stage_II_or_III_working_definition
+      line_of_therapy: pretreatment
+      molecular_state: [any]
+      exclusions: [not_locally_advanced_rectal_cancer]
+    requirements:
+      eligibility:
+        expression: The tumor is locally advanced rectal adenocarcinoma.
+        variables: [crc.primary_site, crc.histology, crc.larc_status]
+      action:
+        expression: A dedicated MRI establishes the required anatomy and recurrence-risk features.
+        variables:
+          - crc.rectal_mri_protocol
+          - crc.rectal_tumor_height
+          - crc.sphincter_relation
+          - crc.clinical_t
+          - crc.clinical_n
+          - crc.extramural_depth_mm
+          - crc.mrf_status
+          - crc.emvi_status
+          - crc.mri_tumor_deposits
+          - crc.intersphincteric_plane_status
+      timing:
+        expression: MRI occurs before the first cancer-directed treatment.
+        variables: [crc.pelvic_mri_date, crc.treatment_start_date]
+      exceptions:
+        expression: A nondedicated or technically inadequate MRI does not establish an adequate negative risk assessment.
+        variables: [crc.rectal_mri_quality]
+    required_variables:
+      - crc.primary_site
+      - crc.histology
+      - crc.larc_status
+      - crc.rectal_mri_protocol
+      - crc.rectal_tumor_height
+      - crc.sphincter_relation
+      - crc.clinical_t
+      - crc.clinical_n
+      - crc.extramural_depth_mm
+      - crc.mrf_status
+      - crc.emvi_status
+      - crc.mri_tumor_deposits
+      - crc.intersphincteric_plane_status
+      - crc.pelvic_mri_date
+      - crc.treatment_start_date
+      - crc.rectal_mri_quality
+    computability:
+      status: partially_specified
+      blockers:
+        - most MRI risk variables are not represented in STORE
+        - institutional radiology terminology and quality criteria require review
+    conflict_group:
+    reviewer_requirements: [gastrointestinal_radiologist, colorectal_surgeon]
+
+  - <<: *candidate_rule
+    rule_id: CRC.RECT.TNT_HIGH_RISK_PMMR.v1
+    category: locally_advanced_rectal_treatment
+    title: Offer initial TNT for pMMR/MSS LARC with low-rectal location or specified high-risk MRI features
+    authoring_status: source_faithful_candidate
+    clinical_use: NOT_FOR_CLINICAL_USE
+    source_refs:
+      - <<: *explicit_source_fact
+        source_id: ASCO.LARC.2024
+        anchor: "Recommendation 2.1"
+        recommendation_type: recommendation
+        evidence_quality: moderate_to_high
+        strength: strong
+        paraphrase: >
+          Offer TNT initially for pMMR/MSS LARC in the lower rectum and/or with T4,
+          EMVI, MRI tumor deposits, threatened MRF, or threatened intersphincteric plane.
+    context:
+      site: [rectum]
+      histology: [adenocarcinoma]
+      disease_setting: locally_advanced_nonmetastatic
+      stage: LARC_with_low_rectum_or_specified_high_risk_feature
+      line_of_therapy: initial
+      molecular_state: [pMMR, MSS]
+      exclusions: [MSI_H_or_dMMR, distant_metastatic_disease]
+    requirements:
+      eligibility:
+        expression: pMMR/MSS LARC has low-rectal location or at least one source-specified high-risk feature.
+        variables:
+          - crc.larc_status
+          - crc.mmr_ihc_integrated_status
+          - crc.msi_status
+          - crc.rectal_tumor_height
+          - crc.clinical_t
+          - crc.emvi_status
+          - crc.mri_tumor_deposits
+          - crc.mrf_status
+          - crc.intersphincteric_plane_status
+          - crc.metastatic_status
+      action:
+        expression: A TNT regimen is offered/initiated as the initial treatment strategy.
+        variables: [crc.systemic_regimen, crc.radiation_type, crc.treatment_sequence]
+      timing:
+        expression: TNT is the initial cancer-directed strategy.
+        variables: [crc.treatment_start_date]
+      exceptions:
+        expression: Fitness, comorbidity, contraindication and patient preference must remain explicit.
+        variables:
+          - crc.ecog_performance_status
+          - crc.comorbidity_constraints
+          - crc.treatment_contraindication
+          - crc.patient_preference
+    required_variables:
+      - crc.larc_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.rectal_tumor_height
+      - crc.clinical_t
+      - crc.emvi_status
+      - crc.mri_tumor_deposits
+      - crc.mrf_status
+      - crc.intersphincteric_plane_status
+      - crc.metastatic_status
+      - crc.systemic_regimen
+      - crc.radiation_type
+      - crc.treatment_sequence
+      - crc.treatment_start_date
+      - crc.ecog_performance_status
+      - crc.comorbidity_constraints
+      - crc.treatment_contraindication
+      - crc.patient_preference
+    computability:
+      status: partially_specified
+      blockers:
+        - low-rectum operational threshold requires local clinical definition
+        - STORE does not preserve regimen, TNT intent, sequence or most source-stated exceptions
+        - a strong recommendation still requires clinical review of individual contraindications
+    conflict_group: RECTAL_HIGH_RISK_DEFINITION
+    reviewer_requirements: [medical_oncologist, radiation_oncologist, colorectal_surgeon]
+
+  - <<: *candidate_rule
+    rule_id: CRC.RECT.DMMR_ICI_INITIAL.v1
+    category: locally_advanced_rectal_treatment
+    title: Use an immunotherapy strategy for MSI-H/dMMR locally advanced rectal cancer
+    authoring_status: source_faithful_candidate
+    clinical_use: NOT_FOR_CLINICAL_USE
+    source_refs:
+      - <<: *explicit_source_fact
+        source_id: ASCO.LARC.2024
+        anchor: "Recommendation 6.1"
+        recommendation_type: recommendation
+        evidence_quality: low
+        strength: strong
+        paraphrase: >
+          Immunotherapy is recommended for MSI-H/dMMR LARC; if immunotherapy is
+          contraindicated, use the pMMR/MSS treatment options described elsewhere in the guideline.
+    context:
+      site: [rectum]
+      histology: [adenocarcinoma]
+      disease_setting: locally_advanced_nonmetastatic
+      stage: LARC
+      line_of_therapy: initial
+      molecular_state: [MSI_H, dMMR]
+      exclusions: [distant_metastatic_disease]
+    requirements:
+      eligibility:
+        expression: Nonmetastatic LARC has a valid MSI-H/dMMR result.
+        variables:
+          - crc.larc_status
+          - crc.metastatic_status
+          - crc.mmr_ihc_integrated_status
+          - crc.msi_status
+          - crc.molecular_qc_status
+      action:
+        expression: An immune checkpoint inhibitor strategy is selected and initiated.
+        variables: [crc.ici_agent, crc.ici_start_date]
+      timing:
+        expression: Immunotherapy is used as the initial treatment strategy.
+        variables: [crc.prior_systemic_therapy, crc.treatment_start_date]
+      exceptions:
+        expression: If ICI is contraindicated, preserve the reason and route to pMMR/MSS treatment options.
+        variables: [crc.ici_contraindication, crc.treatment_contraindication]
+    required_variables:
+      - crc.larc_status
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.molecular_qc_status
+      - crc.ici_agent
+      - crc.ici_start_date
+      - crc.prior_systemic_therapy
+      - crc.treatment_start_date
+      - crc.ici_contraindication
+      - crc.treatment_contraindication
+    computability:
+      status: partially_specified
+      blockers:
+        - specific current agent/duration requires ESMO/NCCN/regulatory reconciliation
+        - STORE does not preserve agent, treatment line or contraindication detail
+    conflict_group: RECTAL_DMMR_CURRENT_REALIZATION
+    reviewer_requirements: [medical_oncologist, colorectal_surgeon]
+
+  - <<: *candidate_rule
+    rule_id: CRC.MCRC.PMMR_FIRST_LINE_BACKBONE.v1
+    category: metastatic_systemic_treatment
+    title: Use a doublet backbone for most untreated unresectable pMMR/MSS mCRC and reserve triplet for selected patients
+    authoring_status: source_specific_candidate
+    clinical_use: NOT_FOR_CLINICAL_USE
+    source_refs:
+      - <<: *explicit_source_fact
+        source_id: ASCO.MCRC.2022
+        anchor: "Recommendations 1.1 and 1.2"
+        recommendation_type: evidence_based_recommendations
+        evidence_quality: moderate
+        strength: strong_for_doublet_weak_for_triplet
+        paraphrase: >
+          Offer a fluoropyrimidine/oxaliplatin or fluoropyrimidine/irinotecan doublet to
+          most untreated unresectable pMMR/MSS mCRC patients; a triplet may be offered to selected patients.
+      - <<: *inferred_source_fact
+        source_id: ESMO.MCRC.2026
+        anchor: "current first-line algorithms; conflict review pending"
+        recommendation_type: current_cross_check
+        evidence_quality: not_normalized_in_this_bundle
+        strength: not_normalized_in_this_bundle
+        paraphrase: Current ESMO guidance must be reconciled before a unified active rule is created.
+    context:
+      site: [colon, rectum]
+      histology: [adenocarcinoma]
+      disease_setting: initially_unresectable_metastatic
+      stage: M1_or_metastatic_recurrence
+      line_of_therapy: first_line
+      molecular_state: [pMMR, MSS]
+      exclusions: [MSI_H_or_dMMR, resectable_metastatic_strategy]
+    requirements:
+      eligibility:
+        expression: Untreated pMMR/MSS mCRC is initially unresectable and systemic treatment is appropriate.
+        variables:
+          - crc.disease_setting
+          - crc.line_of_therapy
+          - crc.resectability_status
+          - crc.multidisciplinary_review
+          - crc.mmr_ihc_integrated_status
+          - crc.msi_status
+      action:
+        expression: A doublet is used, or triplet selection is explicitly supported by clinical context.
+        variables: [crc.systemic_regimen, crc.systemic_regimen_intensity, crc.biologic_agent]
+      timing:
+        expression: The regimen is first-line, accounting for prior adjuvant exposure and interval.
+        variables: [crc.prior_systemic_therapy, crc.systemic_therapy_start_date]
+      exceptions:
+        expression: Fitness, organ function, comorbidity and preference are explicit.
+        variables:
+          - crc.ecog_performance_status
+          - crc.organ_function_constraints
+          - crc.comorbidity_constraints
+          - crc.patient_preference
+    required_variables:
+      - crc.disease_setting
+      - crc.line_of_therapy
+      - crc.resectability_status
+      - crc.multidisciplinary_review
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.systemic_regimen
+      - crc.systemic_regimen_intensity
+      - crc.biologic_agent
+      - crc.prior_systemic_therapy
+      - crc.systemic_therapy_start_date
+      - crc.ecog_performance_status
+      - crc.organ_function_constraints
+      - crc.comorbidity_constraints
+      - crc.patient_preference
+    computability:
+      status: partially_specified
+      blockers:
+        - current ASCO/ESMO/licensed NCCN reconciliation is incomplete
+        - selected-for-triplet is preference- and fitness-sensitive
+        - STORE systemic treatment is too coarse for backbone, intensity and line
+    conflict_group: MCRC_FIRST_LINE_CURRENT
+    reviewer_requirements: [medical_oncologist]
+
+  - <<: *candidate_rule
+    rule_id: CRC.MCRC.MSIH_FIRST_LINE_ASCO2022.v1
+    category: metastatic_systemic_treatment
+    title: ASCO 2022 source-specific first-line pembrolizumab rule for MSI-H/dMMR mCRC
+    authoring_status: blocked_current_conflict
+    clinical_use: NOT_FOR_CLINICAL_USE
+    source_refs:
+      - <<: *explicit_source_fact
+        source_id: ASCO.MCRC.2022
+        anchor: "Recommendation 2.1"
+        recommendation_type: evidence_based_recommendation
+        evidence_quality: moderate
+        strength: strong
+        paraphrase: Offer pembrolizumab first line to a treatment-naive MSI-H/dMMR mCRC patient.
+      - <<: *inferred_source_fact
+        source_id: ESMO.MCRC.2026
+        anchor: "current first-line MSI-H/dMMR algorithm"
+        recommendation_type: current_conflicting_guidance
+        evidence_quality: not_projected_in_this_bundle
+        strength: not_projected_in_this_bundle
+        paraphrase: >
+          ESMO 2026 incorporates a newer first-line dual-checkpoint strategy, so the ASCO
+          2022 rule cannot silently stand for the current universal treatment pathway.
+    context:
+      site: [colon, rectum]
+      histology: [adenocarcinoma]
+      disease_setting: metastatic
+      stage: M1_or_metastatic_recurrence
+      line_of_therapy: first_line
+      molecular_state: [MSI_H, dMMR]
+      exclusions: [previous_mCRC_systemic_line]
+    requirements:
+      eligibility:
+        expression: Treatment-naive mCRC has a valid MSI-H/dMMR result.
+        variables:
+          - crc.disease_setting
+          - crc.line_of_therapy
+          - crc.mmr_ihc_integrated_status
+          - crc.msi_status
+          - crc.molecular_qc_status
+      action:
+        expression: Pembrolizumab is selected under the ASCO 2022 source-specific rule.
+        variables: [crc.ici_agent]
+      timing:
+        expression: ICI is initiated as first-line metastatic treatment.
+        variables: [crc.prior_systemic_therapy, crc.ici_start_date]
+      exceptions:
+        expression: Preserve ICI contraindication and do not adjudicate the current preferred regimen until sources are reconciled.
+        variables: [crc.ici_contraindication]
+    required_variables:
+      - crc.disease_setting
+      - crc.line_of_therapy
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.molecular_qc_status
+      - crc.ici_agent
+      - crc.prior_systemic_therapy
+      - crc.ici_start_date
+      - crc.ici_contraindication
+    computability:
+      status: partially_specified
+      blockers:
+        - ASCO 2022 and ESMO 2026 differ on the current first-line realization
+        - licensed NCCN and current US regulatory adapter are not bound
+    conflict_group: MCRC_MSIH_FIRST_LINE
+    reviewer_requirements: [medical_oncologist, clinical_pharmacist]
+
+  - <<: *candidate_rule
+    rule_id: CRC.MCRC.RAS_SIDEDNESS_ASCO2022.v1
+    category: metastatic_systemic_treatment
+    title: ASCO 2022 source-specific RAS/sidedness first-line anti-EGFR rule
+    authoring_status: blocked_current_conflict
+    clinical_use: NOT_FOR_CLINICAL_USE
+    source_refs:
+      - <<: *explicit_source_fact
+        source_id: ASCO.MCRC.2022
+        anchor: "Recommendation 3.1 and qualifying statements"
+        recommendation_type: evidence_based_recommendation
+        evidence_quality: moderate
+        strength: strong
+        paraphrase: >
+          For treatment-naive pMMR/MSS expanded-RAS-wild-type mCRC, offer anti-EGFR plus
+          doublet chemotherapy for left-sided disease; do not routinely use first-line anti-EGFR
+          for right-sided disease under this source-specific recommendation.
+      - <<: *inferred_source_fact
+        source_id: ESMO.MCRC.2026
+        anchor: "current first-line RAS/BRAF/location algorithm"
+        recommendation_type: current_conflicting_guidance
+        evidence_quality: not_projected_in_this_bundle
+        strength: not_projected_in_this_bundle
+        paraphrase: Current ESMO selection differs, including BRAF and selected right-sided context.
+    context:
+      site: [colon, rectum]
+      histology: [adenocarcinoma]
+      disease_setting: metastatic
+      stage: M1_or_metastatic_recurrence
+      line_of_therapy: first_line
+      molecular_state: [pMMR_or_MSS, expanded_RAS_wild_type]
+      exclusions: [RAS_mutant, incomplete_RAS_coverage]
+    requirements:
+      eligibility:
+        expression: Treatment-naive pMMR/MSS mCRC has complete expanded-RAS wild-type testing and known primary sidedness.
+        variables:
+          - crc.disease_setting
+          - crc.line_of_therapy
+          - crc.mmr_ihc_integrated_status
+          - crc.msi_status
+          - crc.kras_status
+          - crc.nras_status
+          - crc.expanded_ras_coverage
+          - crc.primary_tumor_sidedness
+          - crc.braf_v600e_status
+      action:
+        expression: The selected biologic/backbone is evaluated against the ASCO 2022 sidedness branch.
+        variables: [crc.biologic_agent, crc.systemic_regimen, crc.systemic_regimen_intensity]
+      timing:
+        expression: The biologic and chemotherapy are first-line metastatic treatment.
+        variables: [crc.systemic_therapy_start_date]
+      exceptions:
+        expression: A unified current rule remains blocked because source families differ.
+        variables: [crc.treatment_contraindication, crc.patient_preference]
+    required_variables:
+      - crc.disease_setting
+      - crc.line_of_therapy
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+      - crc.kras_status
+      - crc.nras_status
+      - crc.expanded_ras_coverage
+      - crc.primary_tumor_sidedness
+      - crc.braf_v600e_status
+      - crc.biologic_agent
+      - crc.systemic_regimen
+      - crc.systemic_regimen_intensity
+      - crc.systemic_therapy_start_date
+      - crc.treatment_contraindication
+      - crc.patient_preference
+    computability:
+      status: partially_specified
+      blockers:
+        - ASCO 2022 and ESMO 2026 differ on current molecular/location selection
+        - registry RAS summary does not prove expanded wild-type coverage
+        - regimen/biologic/line are not represented with adequate detail in STORE
+    conflict_group: MCRC_RAS_SIDEDNESS_FIRST_LINE
+    reviewer_requirements: [medical_oncologist, molecular_pathologist]
+
+  - <<: *candidate_rule
+    rule_id: CRC.MCRC.BRAF_POST_LINE_ASCO2022.v1
+    category: metastatic_systemic_treatment
+    title: ASCO 2022 source-specific encorafenib plus cetuximab rule after prior therapy
+    authoring_status: blocked_current_conflict
+    clinical_use: NOT_FOR_CLINICAL_USE
+    source_refs:
+      - <<: *explicit_source_fact
+        source_id: ASCO.MCRC.2022
+        anchor: "Recommendation 4.1"
+        recommendation_type: evidence_based_recommendation
+        evidence_quality: moderate
+        strength: strong
+        paraphrase: >
+          Offer encorafenib plus cetuximab to BRAF V600E mCRC after progression on at least
+          one prior line under the ASCO 2022 source-specific recommendation.
+      - <<: *inferred_source_fact
+        source_id: ESMO.MCRC.2026
+        anchor: "current BRAF V600E first-line and later-line algorithms"
+        recommendation_type: current_conflicting_guidance
+        evidence_quality: not_projected_in_this_bundle
+        strength: not_projected_in_this_bundle
+        paraphrase: Current ESMO pathways include newer first-line BRAF-directed treatment.
+    context:
+      site: [colon, rectum]
+      histology: [adenocarcinoma]
+      disease_setting: metastatic
+      stage: M1_or_metastatic_recurrence
+      line_of_therapy: second_or_later
+      molecular_state: [BRAF_V600E]
+      exclusions: [BRAF_non_V600E, no_prior_metastatic_line_under_ASCO2022]
+    requirements:
+      eligibility:
+        expression: BRAF V600E mCRC progressed after at least one prior metastatic line under ASCO 2022.
+        variables:
+          - crc.disease_setting
+          - crc.braf_v600e_status
+          - crc.line_of_therapy
+          - crc.prior_systemic_therapy
+          - crc.progression_date
+      action:
+        expression: Encorafenib plus cetuximab is selected.
+        variables: [crc.systemic_regimen, crc.biologic_agent]
+      timing:
+        expression: The combination starts after the qualifying prior-line progression.
+        variables: [crc.systemic_therapy_start_date]
+      exceptions:
+        expression: Current first-line pathways and prior BRAF/EGFR exposure require versioned adjudication.
+        variables:
+          - crc.prior_braf_egfr_targeted_therapy
+          - crc.mmr_ihc_integrated_status
+          - crc.msi_status
+    required_variables:
+      - crc.disease_setting
+      - crc.braf_v600e_status
+      - crc.line_of_therapy
+      - crc.prior_systemic_therapy
+      - crc.progression_date
+      - crc.systemic_regimen
+      - crc.biologic_agent
+      - crc.systemic_therapy_start_date
+      - crc.prior_braf_egfr_targeted_therapy
+      - crc.mmr_ihc_integrated_status
+      - crc.msi_status
+    computability:
+      status: partially_specified
+      blockers:
+        - ASCO 2022 prior-line placement conflicts with newer first-line pathways
+        - licensed NCCN and current US regulatory adapter are not bound
+        - STORE lacks exact drug combination, treatment line, progression and prior exposure
+    conflict_group: MCRC_BRAF_LINE_OF_THERAPY
+    reviewer_requirements: [medical_oncologist, clinical_pharmacist]

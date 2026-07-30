@@ -64,8 +64,14 @@ def test_an_unvalidated_negative_carries_no_coverage_claim():
 
 def test_every_negative_declares_a_basis_that_exists():
     fin = inspect.getsource(A.run_chart_review)
-    assert 'termination = "RUNTIME_ERROR" if crashed else "BUDGET_EXHAUSTED"' in fin, (
-        "a crash and a spent budget must not be filed under one word")
+    assert 'termination = "RUNTIME_ERROR"' in fin
+    assert 'termination = "REJECTION_LOOP"' in fin
+    assert 'termination = "SPEND_LIMIT"' in fin
+    assert 'termination = "EXPANSION_LIMIT"' in fin
+    assert 'termination = "MODEL_CALL_LIMIT"' in fin
+    assert 'termination = "STOPPED_WITHOUT_ANSWER"' in fin
+    assert 'termination = "BUDGET_EXHAUSTED"' not in fin, (
+        "distinct runtime stop conditions must not be collapsed into one word")
     assert "attach_coverage_claim" in fin
     assert NO_COVERAGE_CLAIM in fin or "NO_COVERAGE_CLAIM" in fin
 

@@ -1,0 +1,75 @@
+schema_version: '2.0'
+category: clinical_trial
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 1
+rules:
+- candidate_id: ASCO-SGT-13
+  parent_recommendation_id: ASCO-SGT-PCO4.2
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_somatic_genomic_2022
+  source_anchor: PCO 4.2
+  category: clinical_trial
+  title: Clinical trial for actionable alteration without approved match
+  core_or_supplemental: core
+  source_context:
+    eligibility: Actionable alteration with no approved matched therapy
+    action: Compare standard options then encourage a clinical trial
+    timing: At treatment selection
+    exceptions: Trial feasibility and access
+    predicate_logic: actionable AND no_approved_match => trial_after_SOC_review
+  requirements:
+    eligibility:
+      expression: Actionable alteration with no approved matched therapy
+      variables:
+      - crc.molecular_evidence_level
+      - crc.molecular_variant_hgvs
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_evidence_level
+        - variable: crc.molecular_variant_hgvs
+    action:
+      expression: Compare standard options then encourage a clinical trial
+      variables:
+      - crc.standard_treatment_options
+      - crc.trial_referral_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.standard_treatment_options
+        - variable: crc.trial_referral_status
+    timing:
+      expression: At treatment selection
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: At treatment selection
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Trial feasibility and access
+      variables:
+      - crc.genomic_testing_access_constraint
+      - crc.trial_availability
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genomic_testing_access_constraint
+        - variable: crc.trial_availability
+  required_variables:
+  - crc.genomic_testing_access_constraint
+  - crc.molecular_evidence_level
+  - crc.molecular_variant_hgvs
+  - crc.standard_treatment_options
+  - crc.trial_availability
+  - crc.trial_referral_status
+  computability:
+    status: not_computable
+    blockers:
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

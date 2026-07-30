@@ -1,0 +1,96 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.organ_function_constraints
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.organ_function_constraints
+contract_kind: chart_extraction
+label: Material organ-function constraint
+roles:
+- exceptions
+temporal_meaning: at_indexed_decision
+field_contract:
+  name: organ_function_constraints
+  type: string
+  allowable_values:
+  - none_material_documented
+  - material_constraint
+  - not_assessed
+  - unknown
+  nullable: true
+  description: High-level decision relevance; exact organ/lab thresholds require a treatment-specific extension.
+registry_mapping:
+  standard: none
+  item_name: none
+  item_number: none
+  xml_id: none
+  effective_years: none
+evidence_coverage:
+  registry_to_rule:
+    semantic: absent
+    temporal: misaligned
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: none
+    transformation_id: null
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: Rule-required local clinical context; not represented by a single STORE item
+  items:
+  - ASCO LARC 2024 general note and recommendation qualifiers
+  - ASCO mCRC 2022 qualifying statements
+  source_refs:
+  - ASCO.LARC.2024
+  - ASCO.MCRC.2022
+  - ESMO.MCRC.2026
+question: What is the Material organ-function constraint for the indexed CRC tumor or decision at at_indexed_decision?
+applicability_guard:
+  indexed_rule_decision_required: true
+  decision_date_required: true
+evidence_contract:
+  establishing_source_documents:
+  - oncology
+  - labs
+  - pharmacy
+  - specialty_assessment
+  excluded_sources:
+  - old_lab_without_decision_link
+  positive_witness: A tumor-linked source appropriate to at_indexed_decision establishes organ_function_constraints.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - organ_function
+    - Material
+    - organ-function
+    statement: Not assessed, unknown and explicitly no material constraint are different.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Not assessed, unknown and explicitly no material constraint are different.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish organ_function_constraints.
+  SPEC_INSUFFICIENT: The requested meaning of organ_function_constraints is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CHART.decision_exceptions
+  output_field: organ_function_constraints
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[organ_function_constraints].allowable_values
+  origin: model_authored
+  basis: no external source; high-level local decision context.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 5b03ae4f8e162e3afc922c490367824efdf7eab600c30627eec8588e4b2114b9

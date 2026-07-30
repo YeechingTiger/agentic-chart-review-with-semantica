@@ -1,0 +1,97 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.molecular_repeat_test_result
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.molecular_repeat_test_result
+contract_kind: chart_extraction
+label: Repeat or alternate molecular test outcome
+roles:
+- action
+temporal_meaning: after_indexed_problem_result
+field_contract:
+  name: molecular_repeat_test_result
+  type: string
+  allowable_values:
+  - supports_deficiency
+  - supports_proficiency
+  - remains_discordant
+  - indeterminate
+  - not_performed
+  - not_documented
+  nullable: true
+  description: Normalized outcome of repeat/alternate testing; raw method/specimen remains in evidence.
+registry_mapping:
+  standard: none
+  item_name: none
+  item_number: none
+  xml_id: none
+  effective_years: none
+evidence_coverage:
+  registry_to_rule:
+    semantic: absent
+    temporal: misaligned
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: none
+    transformation_id: null
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: CAP/AMP/Fight CRC 2022 MMR/MSI guideline plus ASCP/CAP/AMP/ASCO 2017 CRC biomarker guideline
+  items:
+  - CAP 2022 Recommendation 1 and Good Practice Statements 1-3
+  - CAP 2017 Statements 1, 2b, 3, 9-21
+  source_refs:
+  - CAP.MMR_MSI_ICI.2022
+  - ASCO.CAP_MMR_MSI_ENDORSEMENT.2023
+  - CAP.CRC_BIOMARKERS.2017
+question: What is the Repeat or alternate molecular test outcome for the indexed CRC tumor or decision at after_indexed_problem_result?
+applicability_guard:
+  disease: colorectal_carcinoma
+  tumor_identity_required: true
+  do_not_merge_specimens: true
+evidence_contract:
+  establishing_source_documents:
+  - repeat_molecular_report
+  - pathology_addendum
+  excluded_sources:
+  - plan_to_repeat_without_result
+  positive_witness: A tumor-linked source appropriate to after_indexed_problem_result establishes molecular_repeat_test_result.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - Repeat
+    - alternate
+    - molecular
+    statement: Planned repeat is not a completed repeat result.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Planned repeat is not a completed repeat result.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish molecular_repeat_test_result.
+  SPEC_INSUFFICIENT: The requested meaning of molecular_repeat_test_result is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CHART.molecular_detail
+  output_field: molecular_repeat_test_result
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[molecular_repeat_test_result].allowable_values
+  origin: model_authored
+  basis: no external source; local repeat-test outcome normalization.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 0ce3c1ad6a1ef006d028ec3651183fdff63079c54a08c711eb7c5c604ec7e496

@@ -1,0 +1,91 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.molecular_result_date
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.molecular_result_date
+contract_kind: chart_extraction
+label: Molecular final result date
+roles:
+- timing
+temporal_meaning: final_report_availability
+field_contract:
+  name: molecular_result_date
+  type: string
+  format: \d{4}(?:\d{2}(?:\d{2})?)?
+  nullable: true
+  description: Final result/report date with documented precision only.
+registry_mapping:
+  standard: none
+  item_name: none
+  item_number: none
+  xml_id: none
+  effective_years: none
+evidence_coverage:
+  registry_to_rule:
+    semantic: absent
+    temporal: misaligned
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: none
+    transformation_id: null
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: CAP/AMP/Fight CRC 2022 MMR/MSI guideline plus ASCP/CAP/AMP/ASCO 2017 CRC biomarker guideline
+  items:
+  - CAP 2022 Recommendation 1 and Good Practice Statements 1-3
+  - CAP 2017 Statements 1, 2b, 3, 9-21
+  source_refs:
+  - CAP.MMR_MSI_ICI.2022
+  - ASCO.CAP_MMR_MSI_ENDORSEMENT.2023
+  - CAP.CRC_BIOMARKERS.2017
+question: What is the Molecular final result date for the indexed CRC tumor or decision at final_report_availability?
+applicability_guard:
+  disease: colorectal_carcinoma
+  tumor_identity_required: true
+  do_not_merge_specimens: true
+evidence_contract:
+  establishing_source_documents:
+  - final_molecular_report
+  excluded_sources:
+  - specimen_date_substitution
+  - order_date_substitution
+  positive_witness: A tumor-linked source appropriate to final_report_availability establishes molecular_result_date.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - Molecular
+    - final
+    - none
+    statement: Preserve documented precision; null does not imply result was unavailable before treatment.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Preserve documented precision; null does not imply result was unavailable before treatment.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish molecular_result_date.
+  SPEC_INSUFFICIENT: The requested meaning of molecular_result_date is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CHART.molecular_detail
+  output_field: molecular_result_date
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[molecular_result_date].format
+  origin: model_authored
+  basis: no external source; partial-date syntax preserving source precision.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 193170bdae47d3104466654889195779f0593981ff39ccba980efe475344c59c

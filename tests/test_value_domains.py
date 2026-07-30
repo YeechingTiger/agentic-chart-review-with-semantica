@@ -90,8 +90,34 @@ def test_fabricated_note_id_is_rejected_with_the_domain(tb):
     assert "do not construct one" in out["message"]
 
 
-def test_unknown_section_is_distinguished_from_an_empty_one(tb):
-    docs, _ = tb.chart.list_documents(doc_type_contains="Progress-Note", limit=1)
-    out, _ = tb.dispatch("read_section", {"note_id": docs[0].note_id, "section": "HISTOLOGY"})
-    assert out["error"] == "UNKNOWN_SECTION"
-    assert out["available_sections"], "hand back the domain so the retry can succeed"
+# REMOVED 2026-07-30 with `read_section` itself: `test_unknown_section_is_distinguished_from_an
+# _empty_one`. It asserted that an unknown section name came back with `available_sections` so a
+# retry could succeed -- and that list was the defect. `SECTION_RE` required an ALL-CAPS line
+# with nothing after the colon, so over the 12,221 diagnosis-bearing documents in this corpus it
+# could address `FINAL DIAGNOSIS` in 170 of the 7,390 that contain it (2.3%) and `ADDENDUM` in 0
+# of 2,401. The domain this test insisted on handing back was therefore a list with the final
+# diagnosis missing from it, in 97.7% of documents.
+#
+# The replacement needs no vocabulary and is asserted below: `search_notes` returns the offset
+# of every hit and `read_document` takes an offset.
+def test_search_offsets_are_the_addressing_scheme_that_replaced_section_names(tb):
+    """search -> offset -> read is the whole replacement, and it needs no heading vocabulary.
+
+    The term is taken FROM the document rather than assumed, because this synthetic fixture is
+    part of how the regex survived so long: it writes ALL-CAPS headings (`CLINICAL HISTORY:`,
+    `FINDINGS:`) that `SECTION_RE` matched perfectly, while the real corpus writes
+    `Final Diagnosis:` 2,807 times and the regex admitted none of it.
+    """
+    docs, _ = tb.chart.list_documents(limit=1)
+    text = tb.chart.read(docs[0].note_id, 0, 4000)["text"]
+    term = next(w for w in text.split() if len(w) > 5 and w.isalpha())
+
+    out, _ = tb.dispatch("search_notes", {"query": term, "max_hits": 5})
+    assert out["n_hits"] >= 1, f"{term!r} was taken from the document, so it must be findable"
+    hit = out["hits"][0]
+    assert {"note_id", "doc_type", "date", "start", "end", "snippet"} <= set(hit)
+
+    read, _ = tb.dispatch("read_document", {"note_id": hit["note_id"],
+                                            "offset": hit["start"], "limit": 200})
+    assert term.lower() in read["text"].lower(), "the offset must land on the hit"
+    assert read["total_chars"] > 0, "every read reports length, so `truncated` is computable"

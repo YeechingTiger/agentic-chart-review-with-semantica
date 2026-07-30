@@ -1,0 +1,162 @@
+schema_version: '2.0'
+category: rectal_surveillance
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 2
+rules:
+- candidate_id: ER25-NOM-04
+  parent_recommendation_id: ER25-NOM-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_rectal_2025
+  source_anchor: NOM surveillance recommendation
+  category: rectal_surveillance
+  title: Watch-and-wait surveillance schedule
+  core_or_supplemental: core
+  source_context:
+    eligibility: Patient managed with watch-and-wait
+    action: MRI, endoscopy, and DRE every three months for two years then every six months; CT chest and abdomen every six
+      months for two years then annually
+    timing: Longitudinal
+    exceptions: Clinical escalation as needed
+    predicate_logic: WW => local_schedule AND systemic_schedule
+  requirements:
+    eligibility:
+      expression: Patient managed with watch-and-wait
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_surveillance.dre_event_dates
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_surveillance.dre_event_dates
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: MRI, endoscopy, and DRE every three months for two years then every six months; CT chest and abdomen every
+        six months for two years then annually
+      variables:
+      - crc.rectal_surveillance.completed_events
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_surveillance.completed_events
+    timing:
+      expression: Longitudinal
+      variables:
+      - crc.rectal_nom.start_date
+      - crc.rectal_surveillance.ct_event_dates
+      - crc.rectal_surveillance.endoscopy_event_dates
+      - crc.rectal_surveillance.mri_event_dates
+      - crc.rectal_surveillance.year_from_nom_start
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_surveillance.mri_event_dates
+        - variable: crc.rectal_surveillance.endoscopy_event_dates
+        - variable: crc.rectal_surveillance.ct_event_dates
+        - variable: crc.rectal_surveillance.year_from_nom_start
+        - variable: crc.rectal_nom.start_date
+    exceptions:
+      expression: Clinical escalation as needed
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_nom.start_date
+  - crc.rectal_surveillance.completed_events
+  - crc.rectal_surveillance.ct_event_dates
+  - crc.rectal_surveillance.dre_event_dates
+  - crc.rectal_surveillance.endoscopy_event_dates
+  - crc.rectal_surveillance.mri_event_dates
+  - crc.rectal_surveillance.year_from_nom_start
+  computability:
+    status: partially_specified
+    blockers:
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASTRO25-KQ3-07
+  parent_recommendation_id: ASTRO25-KQ3-R7
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: astro_rectal_2025
+  source_anchor: KQ3 recommendation 7
+  category: rectal_surveillance
+  title: Five-year NOM or local-excision surveillance
+  core_or_supplemental: core
+  source_context:
+    eligibility: NOM or local excision after RT
+    action: Apply endoscopy-DRE, pelvic MRI, and CT chest-abdomen-pelvis schedules for at least five years
+    timing: Risk-adapted intervals stated by source
+    exceptions: Clinical escalation
+    predicate_logic: NOM_or_LE => all_surveillance_modalities_for_ge_5y
+  requirements:
+    eligibility:
+      expression: NOM or local excision after RT
+      variables:
+      - crc.localized_rectal.disease_status_at_decision
+      - crc.rectal_surveillance.dre_event_dates
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_surveillance.dre_event_dates
+        - variable: crc.localized_rectal.disease_status_at_decision
+    action:
+      expression: Apply endoscopy-DRE, pelvic MRI, and CT chest-abdomen-pelvis schedules for at least five years
+      variables:
+      - crc.rectal_surveillance.completed_events
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_surveillance.completed_events
+    timing:
+      expression: Risk-adapted intervals stated by source
+      variables:
+      - crc.rectal_nom.start_date
+      - crc.rectal_surveillance.ct_event_dates
+      - crc.rectal_surveillance.endoscopy_event_dates
+      - crc.rectal_surveillance.mri_event_dates
+      - crc.rectal_surveillance.year_from_nom_start
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.rectal_surveillance.endoscopy_event_dates
+        - variable: crc.rectal_surveillance.mri_event_dates
+        - variable: crc.rectal_surveillance.ct_event_dates
+        - variable: crc.rectal_surveillance.year_from_nom_start
+        - variable: crc.rectal_nom.start_date
+    exceptions:
+      expression: Clinical escalation
+      variables:
+      - crc.documented_reason_for_deviation_at_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.documented_reason_for_deviation_at_decision
+  required_variables:
+  - crc.documented_reason_for_deviation_at_decision
+  - crc.localized_rectal.disease_status_at_decision
+  - crc.rectal_nom.start_date
+  - crc.rectal_surveillance.completed_events
+  - crc.rectal_surveillance.ct_event_dates
+  - crc.rectal_surveillance.dre_event_dates
+  - crc.rectal_surveillance.endoscopy_event_dates
+  - crc.rectal_surveillance.mri_event_dates
+  - crc.rectal_surveillance.year_from_nom_start
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASTRO_VERSION
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_variables: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

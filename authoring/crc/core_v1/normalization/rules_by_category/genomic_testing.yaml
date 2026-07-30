@@ -1,0 +1,654 @@
+schema_version: '2.0'
+category: genomic_testing
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 9
+rules:
+- candidate_id: ASCO-SGT-01
+  parent_recommendation_id: ASCO-SGT-PCO1.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_somatic_genomic_2022
+  source_anchor: PCO 1.1
+  category: genomic_testing
+  title: Genomic testing for approved biomarker-linked care
+  core_or_supplemental: core
+  source_context:
+    eligibility: Advanced solid tumor with adequate performance status and an approved biomarker-linked therapy or genomic
+      exclusion
+    action: Perform genomic testing
+    timing: Before linked treatment selection
+    exceptions: Account for stage, PS, comorbidity, and life expectancy
+    predicate_logic: advanced AND adequate_PS AND (approved_link OR genomic_exclusion) => test
+  requirements:
+    eligibility:
+      expression: Advanced solid tumor with adequate performance status and an approved biomarker-linked therapy or genomic
+        exclusion
+      variables:
+      - crc.candidate_biomarker_linked_therapy
+      - crc.ecog_performance_status
+      - crc.estimated_life_expectancy
+      - crc.regulatory_approval_date
+      - crc.regulatory_jurisdiction
+      - crc.stage_group
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.candidate_biomarker_linked_therapy
+        - variable: crc.ecog_performance_status
+        - variable: crc.estimated_life_expectancy
+        - variable: crc.regulatory_approval_date
+        - variable: crc.regulatory_jurisdiction
+        - variable: crc.stage_group
+    action:
+      expression: Perform genomic testing
+      variables:
+      - crc.genomic_test_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genomic_test_status
+    timing:
+      expression: Before linked treatment selection
+      variables:
+      - crc.regulatory_approval_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.regulatory_approval_date
+    exceptions:
+      expression: Account for stage, PS, comorbidity, and life expectancy
+      variables:
+      - crc.ecog_performance_status
+      - crc.estimated_life_expectancy
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ecog_performance_status
+        - variable: crc.estimated_life_expectancy
+  required_variables:
+  - crc.candidate_biomarker_linked_therapy
+  - crc.ecog_performance_status
+  - crc.estimated_life_expectancy
+  - crc.genomic_test_status
+  - crc.regulatory_approval_date
+  - crc.regulatory_jurisdiction
+  - crc.stage_group
+  computability:
+    status: not_computable
+    blockers:
+    - B_DYNAMIC_LABEL
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO-SGT-02
+  parent_recommendation_id: ASCO-SGT-PCO1.2.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_somatic_genomic_2022
+  source_anchor: PCO 1.2.1
+  category: genomic_testing
+  title: Prefer multigene sequencing for linked therapy
+  core_or_supplemental: core
+  source_context:
+    eligibility: Eligible for an approved biomarker-linked therapy
+    action: Prefer multigene genomic sequencing
+    timing: At testing selection
+    exceptions: Cost, tissue, and availability are individualized
+    predicate_logic: approved_link => prefer_multigene
+  requirements:
+    eligibility:
+      expression: Eligible for an approved biomarker-linked therapy
+      variables:
+      - crc.biomarker_linked_therapy_eligibility
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.biomarker_linked_therapy_eligibility
+    action:
+      expression: Prefer multigene genomic sequencing
+      variables:
+      - crc.genomic_panel_content
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genomic_panel_content
+    timing:
+      expression: At testing selection
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: At testing selection
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Cost, tissue, and availability are individualized
+      variables:
+      - crc.genomic_testing_access_constraint
+      - crc.genomic_testing_cost_constraint
+      - crc.tissue_available_for_testing
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genomic_testing_access_constraint
+        - variable: crc.genomic_testing_cost_constraint
+        - variable: crc.tissue_available_for_testing
+  required_variables:
+  - crc.biomarker_linked_therapy_eligibility
+  - crc.genomic_panel_content
+  - crc.genomic_testing_access_constraint
+  - crc.genomic_testing_cost_constraint
+  - crc.tissue_available_for_testing
+  computability:
+    status: not_computable
+    blockers:
+    - B_DYNAMIC_LABEL
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO-SGT-03
+  parent_recommendation_id: ASCO-SGT-PCO1.2.2
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_somatic_genomic_2022
+  source_anchor: PCO 1.2.2
+  category: genomic_testing
+  title: Multigene panel when multiple approved biomarkers exist
+  core_or_supplemental: core
+  source_context:
+    eligibility: Disease has more than one approved genomic biomarker
+    action: Use a multigene panel
+    timing: At testing selection
+    exceptions: None stated
+    predicate_logic: approved_biomarker_count > 1 => multigene_panel
+  requirements:
+    eligibility:
+      expression: Disease has more than one approved genomic biomarker
+      variables:
+      - crc.approved_biomarker_set
+      - crc.regulatory_approval_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.approved_biomarker_set
+        - variable: crc.regulatory_approval_date
+    action:
+      expression: Use a multigene panel
+      variables:
+      - crc.genomic_panel_coverage
+      - crc.genomic_test_status
+      - crc.genomic_variant_classes
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genomic_panel_coverage
+        - variable: crc.genomic_test_status
+        - variable: crc.genomic_variant_classes
+    timing:
+      expression: At testing selection
+      variables:
+      - crc.regulatory_approval_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.regulatory_approval_date
+    exceptions:
+      expression: None stated
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.approved_biomarker_set
+  - crc.genomic_panel_coverage
+  - crc.genomic_test_status
+  - crc.genomic_variant_classes
+  - crc.regulatory_approval_date
+  computability:
+    status: not_computable
+    blockers:
+    - B_DYNAMIC_LABEL
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO-SGT-08
+  parent_recommendation_id: ASCO-SGT-PCO2.2
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_somatic_genomic_2022
+  source_anchor: PCO 2.2
+  category: genomic_testing
+  title: Validated TMB measurement
+  core_or_supplemental: core
+  source_context:
+    eligibility: TMB may affect an ICI decision
+    action: Use a validated large multigene TMB panel or whole-exome sequencing
+    timing: Before interpreting TMB
+    exceptions: TMB is not a dMMR surrogate and TMB-high alone is insufficient in MSS CRC
+    predicate_logic: TMB_relevant => validated_large_panel OR WES
+  requirements:
+    eligibility:
+      expression: TMB may affect an ICI decision
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: DENOMINATOR_VARIABLES_INCOMPLETE
+        expression: TMB may affect an ICI decision
+      evidence_requirement_status: unresolved
+    action:
+      expression: Use a validated large multigene TMB panel or whole-exome sequencing
+      variables:
+      - crc.tmb_germline_filtering_method
+      - crc.tmb_high_cutoff
+      - crc.tmb_panel_territory
+      - crc.tmb_unit
+      - crc.tmb_value
+      - crc.tmb_variants_counted
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.tmb_germline_filtering_method
+        - variable: crc.tmb_high_cutoff
+        - variable: crc.tmb_panel_territory
+        - variable: crc.tmb_unit
+        - variable: crc.tmb_value
+        - variable: crc.tmb_variants_counted
+    timing:
+      expression: Before interpreting TMB
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before interpreting TMB
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: TMB is not a dMMR surrogate and TMB-high alone is insufficient in MSS CRC
+      variables:
+      - crc.tmb_unit
+      - crc.tmb_value
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.tmb_unit
+        - variable: crc.tmb_value
+  required_variables:
+  - crc.tmb_germline_filtering_method
+  - crc.tmb_high_cutoff
+  - crc.tmb_panel_territory
+  - crc.tmb_unit
+  - crc.tmb_value
+  - crc.tmb_variants_counted
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASSAY_DEFINITION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - DENOMINATOR_VARIABLES_INCOMPLETE
+    - TEMPORAL_ANCHOR_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO-SGT-09
+  parent_recommendation_id: ASCO-SGT-PCO3.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_somatic_genomic_2022
+  source_anchor: PCO 3.1
+  category: genomic_testing
+  title: Fusion testing for approved disease-specific therapy
+  core_or_supplemental: core
+  source_context:
+    eligibility: Advanced tumor with a disease-specific approved fusion therapy
+    action: Perform fusion testing
+    timing: Before treatment selection
+    exceptions: Approval and jurisdiction dependent
+    predicate_logic: approved_fusion_therapy => fusion_test
+  requirements:
+    eligibility:
+      expression: Advanced tumor with a disease-specific approved fusion therapy
+      variables:
+      - crc.molecular_variant_gene
+      - crc.regulatory_jurisdiction
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_variant_gene
+        - variable: crc.regulatory_jurisdiction
+    action:
+      expression: Perform fusion testing
+      variables:
+      - crc.fusion_in_frame_status
+      - crc.fusion_partner
+      - crc.fusion_test_status
+      - crc.molecular_assay_method
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.fusion_in_frame_status
+        - variable: crc.fusion_partner
+        - variable: crc.fusion_test_status
+        - variable: crc.molecular_assay_method
+    timing:
+      expression: Before treatment selection
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before treatment selection
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Approval and jurisdiction dependent
+      variables:
+      - crc.regulatory_jurisdiction
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.regulatory_jurisdiction
+  required_variables:
+  - crc.fusion_in_frame_status
+  - crc.fusion_partner
+  - crc.fusion_test_status
+  - crc.molecular_assay_method
+  - crc.molecular_variant_gene
+  - crc.regulatory_jurisdiction
+  computability:
+    status: not_computable
+    blockers:
+    - B_DYNAMIC_LABEL
+    - B_ASSAY_DEFINITION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO-SGT-10
+  parent_recommendation_id: ASCO-SGT-PCO3.2.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_somatic_genomic_2022
+  source_anchor: PCO 3.2.1
+  category: genomic_testing
+  title: NTRK fusion testing for TRK-inhibitor candidacy
+  core_or_supplemental: core
+  source_context:
+    eligibility: Advanced tumor potentially eligible for TRK inhibitor
+    action: Test NTRK1, NTRK2, and NTRK3 fusions
+    timing: Before TRK therapy
+    exceptions: Mutation or expression is not a fusion
+    predicate_logic: TRK_candidate => NTRK1_2_3_fusion_test
+  requirements:
+    eligibility:
+      expression: Advanced tumor potentially eligible for TRK inhibitor
+      variables:
+      - crc.ntrk_gene
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.ntrk_gene
+    action:
+      expression: Test NTRK1, NTRK2, and NTRK3 fusions
+      variables:
+      - crc.fusion_assay_nucleic_acid
+      - crc.fusion_confirmation_status
+      - crc.fusion_in_frame_status
+      - crc.fusion_partner
+      - crc.fusion_test_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.fusion_assay_nucleic_acid
+        - variable: crc.fusion_confirmation_status
+        - variable: crc.fusion_in_frame_status
+        - variable: crc.fusion_partner
+        - variable: crc.fusion_test_status
+    timing:
+      expression: Before TRK therapy
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before TRK therapy
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Mutation or expression is not a fusion
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Mutation or expression is not a fusion
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.fusion_assay_nucleic_acid
+  - crc.fusion_confirmation_status
+  - crc.fusion_in_frame_status
+  - crc.fusion_partner
+  - crc.fusion_test_status
+  - crc.ntrk_gene
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASSAY_DEFINITION
+    - B_DYNAMIC_LABEL
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO-SGT-11
+  parent_recommendation_id: ASCO-SGT-PCO3.2.2
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_somatic_genomic_2022
+  source_anchor: PCO 3.2.2
+  category: genomic_testing
+  title: Fusion reflex after driver-negative DNA panel
+  core_or_supplemental: core
+  source_context:
+    eligibility: Large DNA panel finds no oncogenic driver
+    action: Test for other fusions
+    timing: After driver-negative result
+    exceptions: Assay must detect the relevant fusion classes
+    predicate_logic: large_DNA_panel AND no_driver => fusion_test
+  requirements:
+    eligibility:
+      expression: Large DNA panel finds no oncogenic driver
+      variables:
+      - crc.genomic_driver_result
+      - crc.genomic_panel_content
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genomic_driver_result
+        - variable: crc.genomic_panel_content
+    action:
+      expression: Test for other fusions
+      variables:
+      - crc.fusion_assay
+      - crc.fusion_test_status
+      - crc.rna_quality
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.fusion_assay
+        - variable: crc.fusion_test_status
+        - variable: crc.rna_quality
+    timing:
+      expression: After driver-negative result
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: After driver-negative result
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: Assay must detect the relevant fusion classes
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Assay must detect the relevant fusion classes
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.fusion_assay
+  - crc.fusion_test_status
+  - crc.genomic_driver_result
+  - crc.genomic_panel_content
+  - crc.rna_quality
+  computability:
+    status: partially_specified
+    blockers:
+    - B_ASSAY_DEFINITION
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: ASCO-SGT-12
+  parent_recommendation_id: ASCO-SGT-PCO4.1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_somatic_genomic_2022
+  source_anchor: PCO 4.1
+  category: genomic_testing
+  title: Tumor-agnostic testing when no disease-specific therapy exists
+  core_or_supplemental: core
+  source_context:
+    eligibility: Advanced tumor without disease-specific approved genomic therapy
+    action: Consider genomic testing for tumor-agnostic targets
+    timing: At treatment planning
+    exceptions: CRC now often has disease-specific options, so the trigger is dynamic
+    predicate_logic: no_disease_specific_approved_option => consider_panel
+  requirements:
+    eligibility:
+      expression: Advanced tumor without disease-specific approved genomic therapy
+      variables:
+      - crc.disease_specific_genomic_options
+      - crc.ecog_performance_status
+      - crc.regulatory_approval_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.disease_specific_genomic_options
+        - variable: crc.ecog_performance_status
+        - variable: crc.regulatory_approval_date
+    action:
+      expression: Consider genomic testing for tumor-agnostic targets
+      variables:
+      - crc.genomic_test_status
+      - crc.tumor_agnostic_biomarker_set
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genomic_test_status
+        - variable: crc.tumor_agnostic_biomarker_set
+    timing:
+      expression: At treatment planning
+      variables:
+      - crc.regulatory_approval_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.regulatory_approval_date
+    exceptions:
+      expression: CRC now often has disease-specific options, so the trigger is dynamic
+      variables:
+      - crc.regulatory_approval_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.regulatory_approval_date
+  required_variables:
+  - crc.disease_specific_genomic_options
+  - crc.ecog_performance_status
+  - crc.genomic_test_status
+  - crc.regulatory_approval_date
+  - crc.tumor_agnostic_biomarker_set
+  computability:
+    status: not_computable
+    blockers:
+    - B_DYNAMIC_LABEL
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: SITC23-CRC-01
+  parent_recommendation_id: SITC23-CRC-R1
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: sitc_gi_2023_crc_guards
+  source_anchor: CRC panel recommendation NGS
+  category: genomic_testing
+  title: Tumor NGS in mCRC
+  core_or_supplemental: supplemental
+  source_context:
+    eligibility: Metastatic colorectal cancer
+    action: Perform tumor-tissue NGS
+    timing: Diagnosis or treatment planning
+    exceptions: Plasma substitution not specified here
+    predicate_logic: mCRC => tumor_NGS
+  requirements:
+    eligibility:
+      expression: Metastatic colorectal cancer
+      variables:
+      - crc.metastatic_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastatic_status
+    action:
+      expression: Perform tumor-tissue NGS
+      variables:
+      - crc.genomic_panel_content
+      - crc.genomic_test_status
+      - crc.genomic_variant_classes
+      - crc.molecular_specimen_id
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.genomic_panel_content
+        - variable: crc.genomic_test_status
+        - variable: crc.genomic_variant_classes
+        - variable: crc.molecular_specimen_id
+    timing:
+      expression: Diagnosis or treatment planning
+      variables:
+      - crc.tumor_ngs_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.tumor_ngs_date
+    exceptions:
+      expression: Plasma substitution not specified here
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: EXCEPTION_MODEL_MISSING
+        expression: Plasma substitution not specified here
+      evidence_requirement_status: unresolved
+  required_variables:
+  - crc.genomic_panel_content
+  - crc.genomic_test_status
+  - crc.genomic_variant_classes
+  - crc.metastatic_status
+  - crc.molecular_specimen_id
+  - crc.tumor_ngs_date
+  computability:
+    status: partially_specified
+    blockers:
+    - B_SITC_LIVING
+    - B_SUPPLEMENT_ONLY
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - EXCEPTION_MODEL_MISSING
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

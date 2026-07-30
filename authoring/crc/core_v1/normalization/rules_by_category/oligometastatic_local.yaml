@@ -1,0 +1,513 @@
+schema_version: '2.0'
+category: oligometastatic_local
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 6
+rules:
+- candidate_id: E26-LOCAL-01
+  parent_recommendation_id: E26-LOCAL-R01
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Local treatment recommendation 1
+  category: oligometastatic_local
+  title: MDT for oligometastatic disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Oligometastatic disease
+    action: Review in MDT
+    timing: Before treatment
+    exceptions: None
+    predicate_logic: OMD => MDT
+  requirements:
+    eligibility:
+      expression: Oligometastatic disease
+      variables:
+      - crc.metastatic_lesion_count_at_decision
+      - crc.metastatic_sites_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastatic_sites_at_decision
+        - variable: crc.metastatic_lesion_count_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Review in MDT
+      variables:
+      - crc.local_treatment_at_decision
+      - crc.mdt_recommendation
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mdt_recommendation
+        - variable: crc.local_treatment_at_decision
+    timing:
+      expression: Before treatment
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      - crc.mdt_review_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.mdt_review_date
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.decision_date
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.mdt_recommendation
+  - crc.mdt_review_date
+  - crc.metastatic_lesion_count_at_decision
+  - crc.metastatic_sites_at_decision
+  - crc.metastatic_status
+  - crc.primary_site
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-LOCAL-03
+  parent_recommendation_id: E26-LOCAL-R03
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Local treatment recommendation 3
+  category: oligometastatic_local
+  title: Upfront local treatment for favorable easy OMD
+  core_or_supplemental: core
+  source_context:
+    eligibility: Easily resectable or ablatable OMD with favorable biology
+    action: Use upfront resection or ablation
+    timing: Initial treatment
+    exceptions: Adverse biology branch
+    predicate_logic: easy_local AND favorable => upfront_local
+  requirements:
+    eligibility:
+      expression: Easily resectable or ablatable OMD with favorable biology
+      variables:
+      - crc.metastasis_ablatability_at_decision
+      - crc.metastatic_lesion_count_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.resectability_status
+      - crc.unresolved.metastatic_biology
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.resectability_status
+        - variable: crc.metastasis_ablatability_at_decision
+        - variable: crc.unresolved.metastatic_biology
+        - variable: crc.metastatic_lesion_count_at_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use upfront resection or ablation
+      variables:
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        variable: crc.local_treatment_at_decision
+    timing:
+      expression: Initial treatment
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Adverse biology branch
+      variables:
+      - crc.unresolved.metastatic_biology
+      evidence_logic:
+        variable: crc.unresolved.metastatic_biology
+  required_variables:
+  - crc.decision_date
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastasis_ablatability_at_decision
+  - crc.metastatic_lesion_count_at_decision
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.resectability_status
+  - crc.unresolved.metastatic_biology
+  computability:
+    status: not_computable
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    - UNRESOLVED_SOURCE_CONCEPT:biology
+    unresolved_source_concepts:
+    - biology
+    unresolved_variable_ids:
+    - crc.unresolved.metastatic_biology
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-LOCAL-04
+  parent_recommendation_id: E26-LOCAL-R04
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Local treatment recommendation 4
+  category: oligometastatic_local
+  title: Systemic induction before difficult or adverse OMD
+  core_or_supplemental: core
+  source_context:
+    eligibility: Not easily treatable OMD or at least one poor prognostic factor
+    action: Give systemic therapy then local treatment if feasible
+    timing: Eight to twelve weeks induction
+    exceptions: Progression or persistent infeasibility
+    predicate_logic: difficult_local OR poor_factor => systemic_8_12w_then_reassess
+  requirements:
+    eligibility:
+      expression: Not easily treatable OMD or at least one poor prognostic factor
+      variables:
+      - crc.local_treatment_feasibility_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.resectability_reassessment_event
+      - crc.treatment_response_before_local_decision
+      - crc.unresolved.oligometastatic_prognostic_factor_set
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.local_treatment_feasibility_at_decision
+        - variable: crc.unresolved.oligometastatic_prognostic_factor_set
+        - variable: crc.treatment_response_before_local_decision
+        - variable: crc.resectability_reassessment_event
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Give systemic therapy then local treatment if feasible
+      variables:
+      - crc.local_treatment_at_decision
+      - crc.systemic_regimen
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.systemic_regimen
+        - variable: crc.local_treatment_at_decision
+    timing:
+      expression: Eight to twelve weeks induction
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Progression or persistent infeasibility
+      variables:
+      - crc.local_treatment_feasibility_at_decision
+      - crc.treatment_response_before_local_decision
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.local_treatment_feasibility_at_decision
+        - variable: crc.treatment_response_before_local_decision
+  required_variables:
+  - crc.decision_date
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.local_treatment_feasibility_at_decision
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.resectability_reassessment_event
+  - crc.systemic_regimen
+  - crc.treatment_response_before_local_decision
+  - crc.unresolved.oligometastatic_prognostic_factor_set
+  computability:
+    status: not_computable
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    - UNRESOLVED_SOURCE_CONCEPT:prognostic_factors
+    unresolved_source_concepts:
+    - prognostic_factors
+    unresolved_variable_ids:
+    - crc.unresolved.oligometastatic_prognostic_factor_set
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-LOCAL-05
+  parent_recommendation_id: E26-LOCAL-R05
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Local treatment recommendation 5
+  category: oligometastatic_local
+  title: OMD selection-variable set
+  core_or_supplemental: core
+  source_context:
+    eligibility: OMD local-treatment decision
+    action: Assess organs, lesion number, score, timing, BRAF, MMR, CEA, and primary-node status
+    timing: Before MDT decision
+    exceptions: None
+    predicate_logic: OMD_decision => full_selection_set
+  requirements:
+    eligibility:
+      expression: OMD local-treatment decision
+      variables:
+      - crc.braf_v600e_status
+      - crc.cea_at_decision
+      - crc.metastasis_timing
+      - crc.metastatic_lesion_count_at_decision
+      - crc.metastatic_sites_at_decision
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.primary_site
+      - crc.primary_tumor_nodal_status
+      - crc.unresolved.oligometastatic_clinical_score
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.metastatic_sites_at_decision
+        - variable: crc.metastatic_lesion_count_at_decision
+        - variable: crc.unresolved.oligometastatic_clinical_score
+        - variable: crc.metastasis_timing
+        - variable: crc.braf_v600e_status
+        - variable: crc.mmr_ihc_integrated_status
+        - variable: crc.cea_at_decision
+        - variable: crc.primary_tumor_nodal_status
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Assess organs, lesion number, score, timing, BRAF, MMR, CEA, and primary-node status
+      variables:
+      - crc.local_treatment_at_decision
+      evidence_logic:
+        variable: crc.local_treatment_at_decision
+    timing:
+      expression: Before MDT decision
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: None
+      variables: []
+      evidence_logic:
+        op: constant
+        value: true
+        meaning: no_source_stated_evidence_requirement
+      evidence_requirement_status: no_source_stated_evidence_requirement
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.cea_at_decision
+  - crc.decision_date
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastasis_timing
+  - crc.metastatic_lesion_count_at_decision
+  - crc.metastatic_sites_at_decision
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.primary_site
+  - crc.primary_tumor_nodal_status
+  - crc.unresolved.oligometastatic_clinical_score
+  computability:
+    status: not_computable
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    - UNRESOLVED_SOURCE_CONCEPT:clinical_score
+    unresolved_source_concepts:
+    - clinical_score
+    unresolved_variable_ids:
+    - crc.unresolved.oligometastatic_clinical_score
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-LOCAL-06
+  parent_recommendation_id: E26-LOCAL-R06
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Local treatment recommendation 6
+  category: oligometastatic_local
+  title: Local treatment remains possible in BRAF V600E or dMMR
+  core_or_supplemental: core
+  source_context:
+    eligibility: Resectable BRAF V600E and or dMMR OMD
+    action: Do not exclude local treatment; generally start systemic therapy
+    timing: Initial sequence
+    exceptions: MDT selection
+    predicate_logic: resectable AND (BRAF_V600E OR dMMR) => local_possible AND generally_systemic_first
+  requirements:
+    eligibility:
+      expression: Resectable BRAF V600E and or dMMR OMD
+      variables:
+      - crc.braf_v600e_status
+      - crc.metastatic_status
+      - crc.mmr_ihc_integrated_status
+      - crc.primary_site
+      - crc.resectability_status
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.braf_v600e_status
+        - variable: crc.mmr_ihc_integrated_status
+        - variable: crc.resectability_status
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Do not exclude local treatment; generally start systemic therapy
+      variables:
+      - crc.local_treatment_at_decision
+      - crc.treatment_sequence
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.treatment_sequence
+        - variable: crc.local_treatment_at_decision
+    timing:
+      expression: Initial sequence
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: MDT selection
+      variables:
+      - crc.multidisciplinary_review
+      evidence_logic:
+        variable: crc.multidisciplinary_review
+  required_variables:
+  - crc.braf_v600e_status
+  - crc.decision_date
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastatic_status
+  - crc.mmr_ihc_integrated_status
+  - crc.multidisciplinary_review
+  - crc.primary_site
+  - crc.resectability_status
+  - crc.treatment_sequence
+  computability:
+    status: partially_specified
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_HUMAN_REVIEW
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    unresolved_source_concepts: []
+    unresolved_variable_ids: []
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE
+- candidate_id: E26-LOCAL-07
+  parent_recommendation_id: E26-LOCAL-R07
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: esmo_mcrc_2026_staging_local
+  source_anchor: Local treatment recommendation 7
+  category: oligometastatic_local
+  title: Systemic therapy for multiple adverse factors
+  core_or_supplemental: core
+  source_context:
+    eligibility: OMD with multiple adverse factors
+    action: Use best available systemic therapy including targeted therapy
+    timing: Before reconsidering local care
+    exceptions: Biomarker and label constraints
+    predicate_logic: multiple_adverse => best_systemic_including_targeted
+  requirements:
+    eligibility:
+      expression: OMD with multiple adverse factors
+      variables:
+      - crc.adverse_prognostic_factor_count_at_decision
+      - crc.metastatic_status
+      - crc.primary_site
+      - crc.treatment_response_before_local_decision
+      - crc.unresolved.adverse_biomarker_set
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.adverse_prognostic_factor_count_at_decision
+        - variable: crc.unresolved.adverse_biomarker_set
+        - variable: crc.treatment_response_before_local_decision
+        - variable: crc.primary_site
+        - variable: crc.metastatic_status
+    action:
+      expression: Use best available systemic therapy including targeted therapy
+      variables:
+      - crc.local_treatment_at_decision
+      - crc.systemic_regimen
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.systemic_regimen
+        - variable: crc.local_treatment_at_decision
+    timing:
+      expression: Before reconsidering local care
+      variables:
+      - crc.decision_date
+      - crc.local_treatment_date
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.decision_date
+        - variable: crc.local_treatment_date
+    exceptions:
+      expression: Biomarker and label constraints
+      variables:
+      - crc.unresolved.adverse_biomarker_set
+      evidence_logic:
+        variable: crc.unresolved.adverse_biomarker_set
+  required_variables:
+  - crc.adverse_prognostic_factor_count_at_decision
+  - crc.decision_date
+  - crc.local_treatment_at_decision
+  - crc.local_treatment_date
+  - crc.metastatic_status
+  - crc.primary_site
+  - crc.systemic_regimen
+  - crc.treatment_response_before_local_decision
+  - crc.unresolved.adverse_biomarker_set
+  computability:
+    status: not_computable
+    blockers:
+    - B_COPYRIGHT_PARAPHRASE
+    - B_DYNAMIC_LABEL
+    - VARIABLE_CONTRACTS_PENDING
+    - CLINICAL_REVIEW_PENDING
+    - TEMPORAL_VALIDATION_PENDING
+    - UNRESOLVED_SOURCE_CONCEPT:biomarkers
+    unresolved_source_concepts:
+    - biomarkers
+    unresolved_variable_ids:
+    - crc.unresolved.adverse_biomarker_set
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

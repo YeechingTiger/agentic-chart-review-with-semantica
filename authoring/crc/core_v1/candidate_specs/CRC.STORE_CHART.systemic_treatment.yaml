@@ -1,0 +1,275 @@
+spec_id: CRC.STORE_CHART.systemic_treatment
+spec_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+source_authority:
+  document: "CoC STORE 2026 / NAACCR v26 first-course treatment items plus source-specific CRC treatment guidelines"
+  items:
+    - "Date 1st Crs RX CoC [1270]"
+    - "RX Summ--Treatment Status [1285]"
+    - "RX Date Chemo [1220]"
+    - "RX Summ--Chemo [1390]"
+    - "RX Date BRM [1240]"
+    - "RX Summ--BRM [1410]"
+    - "RX Date Systemic [3230]"
+    - "RX Date Radiation [1210]"
+    - "RX Date Rad Ended [3220]"
+    - "RX Summ--Surg/Rad Seq [1380]"
+    - "RX Summ--Systemic/Sur Seq [1639]"
+  source_refs:
+    - COC.STORE.2026
+    - ASCO.LARC.2024
+    - ASCO.MCRC.2022
+    - ESMO.MCRC.2026
+data_source: notes
+question: >
+  What first-course registry treatment summary and what longitudinal regimen, agent,
+  line-supporting history, dates, sequence, plans, and progression are documented for this CRC decision?
+applicability_guard:
+  disease: colorectal_carcinoma
+  distinguish_first_course_from_later_course: true
+  do_not_infer_agent_from_registry_summary: true
+fields:
+  - name: treatment_start_date
+    type: string
+    format: "\\d{4}(?:\\d{2}(?:\\d{2})?)?"
+    nullable: true
+    description: "CoC first-course treatment date projection [1270]; may also reflect a documented decision not to treat under STORE rules."
+  - name: treatment_status_registry_code
+    type: string
+    allowable_values: ["0", "1", "2", "9"]
+    nullable: true
+    description: "NAACCR item 1285 summary treatment status."
+  - name: systemic_therapy_start_date
+    type: string
+    format: "\\d{4}(?:\\d{2}(?:\\d{2})?)?"
+    nullable: true
+    description: "Earliest first-course systemic therapy date [3230], not necessarily the indexed later-line date."
+  - name: chemotherapy_start_date
+    type: string
+    format: "\\d{4}(?:\\d{2}(?:\\d{2})?)?"
+    nullable: true
+    description: "First-course chemotherapy start date [1220]."
+  - name: chemotherapy_registry_code
+    type: string
+    allowable_values: ["00", "01", "02", "03", "82", "85", "86", "87", "88", "99"]
+    nullable: true
+    description: "NAACCR item 1390; none/agent count or coarse non-treatment reason, not a regimen identity."
+  - name: immunotherapy_start_date
+    type: string
+    format: "\\d{4}(?:\\d{2}(?:\\d{2})?)?"
+    nullable: true
+    description: "First-course immunotherapy/BRM date [1240]."
+  - name: immunotherapy_registry_code
+    type: string
+    allowable_values: ["00", "01", "82", "85", "86", "87", "88", "99"]
+    nullable: true
+    description: "NAACCR item 1410; whether immunotherapy occurred/coarse reason, not an agent or combination."
+  - name: radiation_start_date
+    type: string
+    format: "\\d{4}(?:\\d{2}(?:\\d{2})?)?"
+    nullable: true
+    description: "First-course radiation start date [1210]."
+  - name: radiation_end_date
+    type: string
+    format: "\\d{4}(?:\\d{2}(?:\\d{2})?)?"
+    nullable: true
+    description: "First-course radiation end date [3220] when available."
+  - name: ici_plan
+    type: string
+    allowable_values: [planned, under_consideration, not_planned, contraindicated, unknown]
+    nullable: true
+    description: "Decision state before ICI initiation; separate from actual administration."
+  - name: anti_egfr_plan
+    type: string
+    allowable_values: [planned, under_consideration, not_planned, contraindicated, unknown]
+    nullable: true
+    description: "Decision state before cetuximab/panitumumab initiation."
+  - name: anti_egfr_start_date
+    type: string
+    format: "\\d{4}(?:\\d{2}(?:\\d{2})?)?"
+    nullable: true
+    description: "First administration date of the indexed anti-EGFR agent; no dedicated STORE field."
+  - name: systemic_regimen
+    type: string
+    format: ".+"
+    nullable: true
+    description: "Normalized regimen name plus verbatim evidence; no exact regimen field exists in STORE."
+  - name: systemic_regimen_intensity
+    type: string
+    allowable_values: [single_agent, doublet, triplet, targeted_combination, immunotherapy_single, immunotherapy_doublet, other, unknown]
+    nullable: true
+    description: "Treatment composition for the indexed line, not the coarse registry agent-count code."
+  - name: radiation_type
+    type: string
+    allowable_values: [long_course_CRT, short_course_RT, other_radiation, no_radiation, unknown]
+    nullable: true
+    description: "CRC treatment-strategy abstraction; validate from radiation plan/summary, not modality code alone."
+  - name: treatment_sequence
+    type: string
+    allowable_values: [systemic_then_radiation, radiation_then_systemic, concurrent_CRT, surgery_then_systemic, systemic_then_surgery, other, indeterminate]
+    nullable: true
+    description: "Indexed clinical sequence; STORE items 1380/1639 provide only coarse first-course projections."
+  - name: ici_agent
+    type: string
+    allowable_values: [pembrolizumab, nivolumab, nivolumab_ipilimumab, dostarlimab, other, none, unknown]
+    nullable: true
+    description: "Actual indexed immune checkpoint agent/combination; STORE item 1410 does not retain it."
+  - name: biologic_agent
+    type: string
+    allowable_values: [none, bevacizumab, cetuximab, panitumumab, encorafenib_plus_cetuximab, other, unknown]
+    nullable: true
+    description: "Indexed biologic/targeted component; exact agent is outside STORE treatment summaries."
+  - name: prior_systemic_therapy
+    type: string
+    allowable_values: [none, adjuvant_only, one_metastatic_line, two_or_more_metastatic_lines, outside_history_incomplete, unknown]
+    nullable: true
+    description: "Prior exposure before the indexed decision; supports but does not by itself define line."
+  - name: prior_braf_egfr_targeted_therapy
+    type: string
+    allowable_values: [present, absent, unknown, not_applicable]
+    nullable: true
+    description: "Prior BRAF/EGFR-targeted exposure before the indexed BRAF rule."
+  - name: progression_date
+    type: string
+    format: "\\d{4}(?:\\d{2}(?:\\d{2})?)?"
+    nullable: true
+    description: "Date of progression qualifying the next-line decision; not the same as first-recurrence date."
+decision_rule:
+  - "First-course registry fields and longitudinal treatment facts are parallel outputs, never substitutes."
+  - "The chemotherapy and immunotherapy registry codes do not identify a regimen, agent, intent, line, dose, cycle, completion, or progression."
+  - "A plan is not administration. Preserve planned/considered/contraindicated separately from start date and registry receipt."
+  - "Treatment sequence is derived only from dated indexed events and source context; coarse STORE sequence is retained as a separate projection."
+  - "Every date preserves source precision; no missing month/day is imputed."
+evidence_rules:
+  counts_as_evidence:
+    - "Medication administration/infusion records, oncology treatment plan, pharmacy plan, radiation treatment summary, operative timeline, and explicit progression assessment."
+    - "Registrar-relevant first-course documentation from all facilities for the registry projection."
+  does_not_count:
+    - "A drug mentioned in a future-options list as administered treatment."
+    - "A treatment plan without administration as a start date."
+    - "Registry chemotherapy/immunotherapy summary as proof of exact drug or line."
+    - "First recurrence date as a proxy for progression on a particular regimen."
+conflict_rules:
+  - if: "plan and administration conflict"
+    then: "administration establishes treatment received; retain the plan as decision context"
+  - if: "registry summary and chart regimen disagree"
+    then: "retain both layers and flag registry agreement failure; do not overwrite either"
+  - if: "outside treatment is referenced but dates/regimen are incomplete"
+    then: "prior_systemic_therapy=outside_history_incomplete and do not infer first line"
+proof_obligation:
+  for_positive: "Dated administration and source-specific treatment documentation establish the indexed detail; STORE projections follow first-course coding rules."
+  for_negative:
+    mode: stratified_exclusion
+    required_coverage:
+      - "Review treatment plans, administrations, pharmacy/radiation summaries and outside-treatment history relevant to the indexed line."
+    required_keywords: [FOLFOX, FOLFIRI, immunotherapy, cetuximab, progression]
+    statement: >
+      No treatment/agent/prior exposure is an absence claim. A plan-only record, incomplete
+      outside history, or missing administration evidence requires abstention or an explicit unknown state.
+abstention:
+  EVIDENCE_INSUFFICIENT: "The indexed treatment line, administration, sequence or prior exposure is not established."
+  SPEC_INSUFFICIENT: "The question requires dose/cycle/toxicity/intent detail or a drug not represented in this candidate domain."
+boundary_cases:
+  - case: "Pembrolizumab is recommended but no administration is documented"
+    result: "ici_plan=planned; immunotherapy_start_date remains null; do not code treatment received"
+  - case: "Registry code 03 says multi-agent chemotherapy but chart regimen is unavailable"
+    result: "retain chemotherapy_registry_code=03 and systemic_regimen null/unknown"
+  - case: "Adjuvant FOLFOX years earlier, now untreated metastatic recurrence"
+    result: "prior_systemic_therapy=adjuvant_only; metastatic line may still be first if the rule definition supports it"
+search_hints: [FOLFOX, FOLFIRI, immunotherapy, cetuximab, progression, CAPOX, FOLFOXIRI, pembrolizumab, nivolumab, panitumumab, bevacizumab, encorafenib, radiation]
+downstream_warning:
+  - "Drug names, line, sequence and progression require a longitudinal chart spec and cannot be validated solely against STORE."
+provenance:
+  - element: "fields[treatment_start_date].format"
+    origin: model_authored
+    basis: "no external source; partial-date implementation for CoC STORE item [1270]."
+    status: draft
+  - element: "fields[treatment_status_registry_code].allowable_values"
+    origin: store_manual
+    basis: "NAACCR v26 item [1285] RX Summ--Treatment Status allowable values."
+    status: draft
+  - element: "fields[systemic_therapy_start_date].format"
+    origin: model_authored
+    basis: "no external source; partial-date implementation for NAACCR item [3230]."
+    status: draft
+  - element: "fields[chemotherapy_start_date].format"
+    origin: model_authored
+    basis: "no external source; partial-date implementation for NAACCR item [1220]."
+    status: draft
+  - element: "fields[chemotherapy_registry_code].allowable_values"
+    origin: store_manual
+    basis: "NAACCR v26 item [1390] RX Summ--Chemo allowable values."
+    status: draft
+  - element: "fields[immunotherapy_start_date].format"
+    origin: model_authored
+    basis: "no external source; partial-date implementation for NAACCR item [1240]."
+    status: draft
+  - element: "fields[immunotherapy_registry_code].allowable_values"
+    origin: store_manual
+    basis: "NAACCR v26 item [1410] RX Summ--BRM allowable values."
+    status: draft
+  - element: "fields[radiation_start_date].format"
+    origin: model_authored
+    basis: "no external source; partial-date implementation for NAACCR item [1210]."
+    status: draft
+  - element: "fields[radiation_end_date].format"
+    origin: model_authored
+    basis: "no external source; partial-date implementation for NAACCR item [3220]."
+    status: draft
+  - element: "fields[ici_plan].allowable_values"
+    origin: model_authored
+    basis: "no external source; local decision-state normalization."
+    status: draft
+  - element: "fields[anti_egfr_plan].allowable_values"
+    origin: model_authored
+    basis: "no external source; local decision-state normalization."
+    status: draft
+  - element: "fields[anti_egfr_start_date].format"
+    origin: model_authored
+    basis: "no external source; partial-date syntax for a chart-extension event."
+    status: draft
+  - element: "fields[systemic_regimen].format"
+    origin: model_authored
+    basis: "no external source; nonempty candidate regimen representation pending terminology binding."
+    status: draft
+  - element: "fields[systemic_regimen_intensity].allowable_values"
+    origin: model_authored
+    basis: "no external source; local composition normalization."
+    status: draft
+  - element: "fields[radiation_type].allowable_values"
+    origin: model_authored
+    basis: "no external source; CRC strategy-level radiation normalization."
+    status: draft
+  - element: "fields[treatment_sequence].allowable_values"
+    origin: model_authored
+    basis: "no external source; local indexed sequence normalization beyond STORE items [1380] and [1639]."
+    status: draft
+  - element: "fields[ici_agent].allowable_values"
+    origin: model_authored
+    basis: "no external source; intentionally limited candidate drug domain requiring versioned terminology."
+    status: draft
+  - element: "fields[biologic_agent].allowable_values"
+    origin: model_authored
+    basis: "no external source; intentionally limited candidate biologic domain requiring versioned terminology."
+    status: draft
+  - element: "fields[prior_systemic_therapy].allowable_values"
+    origin: model_authored
+    basis: "no external source; local longitudinal exposure normalization."
+    status: draft
+  - element: "fields[prior_braf_egfr_targeted_therapy].allowable_values"
+    origin: model_authored
+    basis: "no external source; local prior-exposure state."
+    status: draft
+  - element: "fields[progression_date].format"
+    origin: model_authored
+    basis: "no external source; partial-date syntax for indexed progression."
+    status: draft
+  - element: proof_obligation.for_negative.required_coverage
+    origin: model_authored
+    basis: "no external source; project-specific longitudinal coverage requirement."
+    status: draft
+  - element: proof_obligation.for_negative.required_keywords
+    origin: model_authored
+    basis: "no external source; unmeasured candidate search vocabulary."
+    status: draft

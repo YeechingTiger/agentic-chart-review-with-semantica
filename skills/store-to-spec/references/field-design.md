@@ -104,7 +104,8 @@ mechanically decidable from the cited evidence.
 ### Four traps, all of which have bitten
 
 - **Registry notation is not a pattern.** `format: "CCYYMMDD"` accepts exactly one string:
-  `CCYYMMDD`. Still live in `STORE.390` and `STORE.1860_1880`.
+  `CCYYMMDD`. This historical defect shipped in `STORE.390` and `STORE.1860_1880`; both now
+  carry executable full-match patterns instead.
 - **YAML eats the backslash.** `format: "C\d{3}"` in double quotes is a `ScannerError` and the
   whole spec fails to load. Write `"C\\d{3}"`, or single-quote it, or leave it plain
   (`format: C\d{3}`, as the ablation spec does). The loud failure is the good case here; the

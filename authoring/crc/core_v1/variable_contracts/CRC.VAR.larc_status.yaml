@@ -1,0 +1,110 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.larc_status
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.larc_status
+contract_kind: derivation
+label: Locally advanced rectal cancer status
+roles:
+- eligibility
+temporal_meaning: pretreatment
+field_contract:
+  name: larc_status
+  type: string
+  allowable_values:
+  - 'yes'
+  - 'no'
+  - indeterminate
+  - not_applicable
+  nullable: true
+  description: Locally advanced rectal cancer status under a locally reviewed operational definition.
+registry_mapping:
+  standard: none
+  item_name: none
+  item_number: none
+  xml_id: none
+  effective_years: none
+evidence_coverage:
+  registry_to_rule:
+    semantic: absent
+    temporal: conditional
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: none
+    transformation_id: null
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: CoC STORE 2026 and NAACCR v26, with rule-specific ASCO context
+  items:
+  - Primary Site [400]
+  - Histologic Type ICD-O-3 [522]
+  - AJCC TNM Clin T [1001]
+  - AJCC TNM Clin N [1002]
+  source_refs:
+  - COC.STORE.2026
+  - NAACCR.SSDI.3_3
+  - ASCO.LARC.2024
+  - ASCO.MCRC.2022
+question: What is the Locally advanced rectal cancer status for the indexed CRC tumor or decision at pretreatment?
+applicability_guard:
+  primary_sites:
+  - C180
+  - C182-C189
+  - C199
+  - C209
+  exclude_schemas:
+  - appendix
+  - NET
+  - GIST
+  - sarcoma
+  - Kaposi
+  rule_time_required: true
+evidence_contract:
+  establishing_source_documents:
+  - pelvic_mri
+  - endoscopy
+  - pathology
+  - oncology
+  - tumor_board
+  excluded_sources:
+  - stage_group_without_local_definition
+  positive_witness: A tumor-linked source appropriate to pretreatment establishes larc_status.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - rectal
+    - Locally
+    - advanced
+    statement: Indeterminate remains distinct from no.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Indeterminate remains distinct from no.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish larc_status.
+  SPEC_INSUFFICIENT: The requested meaning of larc_status is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CANDIDATE.disease_context
+  output_field: larc_status
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[larc_status].allowable_values
+  origin: model_authored
+  basis: no external source; local operationalization of the ASCO LARC population remains clinically reviewable.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 57c77e3f32bd6ae45f0e5902a73bfbbe1b15c8bd2226a54a7ea37d0c39cb5beb

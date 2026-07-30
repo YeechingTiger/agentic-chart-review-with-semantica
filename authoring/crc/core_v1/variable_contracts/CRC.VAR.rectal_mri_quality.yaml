@@ -1,0 +1,93 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.rectal_mri_quality
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.rectal_mri_quality
+contract_kind: chart_extraction
+label: Rectal MRI adequacy
+roles:
+- exceptions
+temporal_meaning: pretreatment
+field_contract:
+  name: rectal_mri_quality
+  type: string
+  allowable_values:
+  - adequate
+  - limited_but_interpretable
+  - inadequate
+  - not_documented
+  nullable: true
+  description: Technical/report adequacy for risk assessment.
+registry_mapping:
+  standard: none
+  item_name: none
+  item_number: none
+  xml_id: none
+  effective_years: none
+evidence_coverage:
+  registry_to_rule:
+    semantic: absent
+    temporal: misaligned
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: none
+    transformation_id: null
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: ASCO Management of Locally Advanced Rectal Cancer 2024
+  items:
+  - Recommendations 1.2, 1.3 and 2.1
+  source_refs:
+  - ASCO.LARC.2024
+  - ESMO.RECTAL_LOCALIZED.2025
+question: What is the Rectal MRI adequacy for the indexed CRC tumor or decision at pretreatment?
+applicability_guard:
+  primary_site: rectum
+  disease_setting: locally_advanced
+  timepoint: before_first_cancer_directed_treatment
+evidence_contract:
+  establishing_source_documents:
+  - pelvic_mri_report
+  - radiology_review
+  excluded_sources:
+  - assumed_quality
+  positive_witness: A tumor-linked source appropriate to pretreatment establishes rectal_mri_quality.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - mesorectal_fascia
+    - MRI
+    - adequacy
+    statement: Not documented is not adequate.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Not documented is not adequate.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish rectal_mri_quality.
+  SPEC_INSUFFICIENT: The requested meaning of rectal_mri_quality is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CHART.rectal_mri_risk
+  output_field: rectal_mri_quality
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[rectal_mri_quality].allowable_values
+  origin: model_authored
+  basis: no external source; local quality states.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 7a95f4164ab4e50e913d2bc4695f0e1e13dd2b2ffc9631a996f61e1388fc5928

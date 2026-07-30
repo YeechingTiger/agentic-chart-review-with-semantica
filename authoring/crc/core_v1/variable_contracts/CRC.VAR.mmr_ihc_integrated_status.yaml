@@ -1,0 +1,99 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.mmr_ihc_integrated_status
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.mmr_ihc_integrated_status
+contract_kind: canonical_extraction_with_lossy_registry_projection
+label: Integrated MMR-IHC status
+roles:
+- action
+- eligibility
+- exceptions
+temporal_meaning: indexed_specimen_result
+field_contract:
+  name: mmr_ihc_integrated_status
+  type: string
+  allowable_values:
+  - pMMR
+  - dMMR
+  - indeterminate
+  - discordant
+  - not_performed
+  - not_documented
+  nullable: true
+  description: Integrated MMR-IHC interpretation; retain all four protein results separately.
+registry_mapping:
+  standard: NAACCR_v26
+  item_name: Microsatellite Instability MSI
+  item_number: '3890'
+  xml_id: microsatelliteInstability
+  effective_years: 2018+
+evidence_coverage:
+  registry_to_rule:
+    semantic: coarsened
+    temporal: conditional
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: coarsened
+    transformation_id: PENDING_VERSIONED_PROJECTION
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: CAP/AMP/Fight CRC 2022 MMR/MSI guideline plus ASCP/CAP/AMP/ASCO 2017 CRC biomarker guideline
+  items:
+  - CAP 2022 Recommendation 1 and Good Practice Statements 1-3
+  - CAP 2017 Statements 1, 2b, 3, 9-21
+  source_refs:
+  - CAP.MMR_MSI_ICI.2022
+  - ASCO.CAP_MMR_MSI_ENDORSEMENT.2023
+  - CAP.CRC_BIOMARKERS.2017
+question: What is the Integrated MMR-IHC status for the indexed CRC tumor or decision at indexed_specimen_result?
+applicability_guard:
+  disease: colorectal_carcinoma
+  tumor_identity_required: true
+  do_not_merge_specimens: true
+evidence_contract:
+  establishing_source_documents:
+  - MMR_IHC_report
+  - pathology_addendum
+  excluded_sources:
+  - MSI_assay_as_raw_IHC
+  positive_witness: A tumor-linked source appropriate to indexed_specimen_result establishes mmr_ihc_integrated_status.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - MSI
+    - microsatellite
+    - Integrated
+    statement: Registry code 0/2 may represent pMMR/dMMR but loses method and protein pattern.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Registry code 0/2 may represent pMMR/dMMR but loses method and protein pattern.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish mmr_ihc_integrated_status.
+  SPEC_INSUFFICIENT: The requested meaning of mmr_ihc_integrated_status is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CHART.molecular_detail
+  output_field: mmr_ihc_integrated_status
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[mmr_ihc_integrated_status].allowable_values
+  origin: model_authored
+  basis: no external source; normalization preserving CAP method and interpretation distinctions.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: e1b01f7f4c17c5e807230496f673965ad40d258bf281a751aa579bf4107f0798

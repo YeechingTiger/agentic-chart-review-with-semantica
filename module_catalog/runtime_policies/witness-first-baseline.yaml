@@ -1,0 +1,14 @@
+schema: acr.module_asset/1
+module_id: witness-first-baseline
+version: 1.0.0
+kind: RUNTIME_POLICY
+runner: CODE
+inputs: [run_context]
+output_schema: acr.search_plan/1
+implementation: runtime.witness_first.v1
+truth_modes: [BLIND]
+capabilities: []
+maximum_authority: OBSERVE
+description: Stop after a grounded witness and closure of discovered conflicts.
+owner: runtime-owner
+tags: [runtime, coverage, baseline]

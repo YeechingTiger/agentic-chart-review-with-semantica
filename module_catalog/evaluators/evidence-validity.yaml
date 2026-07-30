@@ -1,0 +1,14 @@
+schema: acr.module_asset/1
+module_id: evidence-validity
+version: 1.0.0
+kind: EVALUATOR
+runner: CODE
+inputs: [trajectory]
+output_schema: acr.evidence_validity/1
+implementation: evaluation.evidence_validity.v1
+truth_modes: [BLIND, REGISTRY_REFERENCE, GOLD]
+capabilities: []
+maximum_authority: BLOCK_RELEASE
+description: Check structured citation and proof presence for final output.
+owner: evaluation-engineer
+tags: [evidence, proof, quality]

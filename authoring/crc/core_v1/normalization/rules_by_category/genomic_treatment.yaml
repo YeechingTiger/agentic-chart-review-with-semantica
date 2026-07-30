@@ -1,0 +1,93 @@
+schema_version: '2.0'
+category: genomic_treatment
+clinical_use: NOT_FOR_CLINICAL_USE
+candidate_count: 1
+rules:
+- candidate_id: ASCO-SGT-14
+  parent_recommendation_id: ASCO-SGT-PCO4.3
+  related_parent_recommendation_ids: []
+  candidate_kind: formal_recommendation
+  source_id: asco_somatic_genomic_2022
+  source_anchor: PCO 4.3
+  category: genomic_treatment
+  title: Guard off-label treatment based on another disease
+  core_or_supplemental: core
+  source_context:
+    eligibility: Target-drug pair approved only in another disease
+    action: Do not use off-label when a trial is available or meaningful efficacy evidence is absent
+    timing: Before off-label use
+    exceptions: May be considered with meaningful evidence and no feasible trial
+    predicate_logic: trial_available OR no_meaningful_evidence => not_offlabel
+  requirements:
+    eligibility:
+      expression: Target-drug pair approved only in another disease
+      variables:
+      - crc.molecular_variant_hgvs
+      - crc.regulatory_jurisdiction
+      - crc.tumor_type
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_variant_hgvs
+        - variable: crc.regulatory_jurisdiction
+        - variable: crc.tumor_type
+    action:
+      expression: Do not use off-label when a trial is available or meaningful efficacy evidence is absent
+      variables:
+      - crc.molecular_clinical_evidence
+      - crc.off_label_treatment_decision
+      - crc.off_label_treatment_rationale
+      - crc.trial_availability
+      evidence_logic:
+        op: all_of
+        operands:
+        - variable: crc.molecular_clinical_evidence
+        - variable: crc.off_label_treatment_decision
+        - variable: crc.off_label_treatment_rationale
+        - variable: crc.trial_availability
+    timing:
+      expression: Before off-label use
+      variables: []
+      evidence_logic:
+        op: unresolved
+        reason_code: TEMPORAL_ANCHOR_MISSING
+        expression: Before off-label use
+      evidence_requirement_status: unresolved
+    exceptions:
+      expression: May be considered with meaningful evidence and no feasible trial
+      variables:
+      - crc.molecular_clinical_evidence
+      - crc.off_label_treatment_rationale
+      - crc.trial_availability
+      evidence_logic:
+        op: conditional
+        condition:
+          op: any_of
+          operands:
+          - variable: crc.trial_availability
+          - variable: crc.molecular_clinical_evidence
+        then:
+          variable: crc.off_label_treatment_rationale
+        else:
+          op: constant
+          value: true
+          meaning: no_evidence_requirement_on_this_branch
+  required_variables:
+  - crc.molecular_clinical_evidence
+  - crc.molecular_variant_hgvs
+  - crc.off_label_treatment_decision
+  - crc.off_label_treatment_rationale
+  - crc.regulatory_jurisdiction
+  - crc.trial_availability
+  - crc.tumor_type
+  computability:
+    status: not_computable
+    blockers:
+    - B_DYNAMIC_LABEL
+    - B_HUMAN_REVIEW
+    - NORMALIZATION_CLINICAL_REVIEW_PENDING
+    - LOCAL_OPERATIONALIZATION_REVIEW_PENDING
+    - TEMPORAL_ANCHOR_MISSING
+    - OUTSIDE_CURRENT_SOURCES
+  review_status: pending
+  clinical_use: NOT_FOR_CLINICAL_USE

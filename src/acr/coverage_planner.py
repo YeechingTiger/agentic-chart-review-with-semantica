@@ -257,6 +257,37 @@ MARKER_TRUNCATED = "truncated"
 #: whole predicate, and it holds the whole predicate for `truncated` alone.
 MECHANICALLY_DISCHARGEABLE_MARKERS = frozenset({MARKER_TRUNCATED})
 
+#: WHICH MARKERS MAY BLOCK AN ANSWER. The same one, for a different reason, and the two reasons
+#: must not be conflated: above is "the runtime can settle it without asking anybody", here is
+#: "the runtime is entitled to refuse an answer over it".
+#:
+#: `truncated` is COMPUTED -- from the character counts of the run's own read, against the
+#: document length the read reported. It is a fact about what this run did, it cannot be wrong
+#: about the corpus, and the agent can always discharge it by reading to the end.
+#:
+#: The other twenty markers are MATCHED -- substrings scanned across document text, parsed out
+#: of a Markdown table in `skills/thread-chasing/SKILL.md`. Measured over every recorded trace
+#: on 2026-07-30: 39 thread refusals, of which 11 (28%) refused a tuple that was exactly the
+#: registry's answer. `addendum` alone refused 40 times while `read_section("ADDENDUM")` could
+#: address the heading in 0 of the 2,401 documents that contain the word -- an obligation whose
+#: tool could not reach its target. `pending` is the second most common string in the corpus.
+#:
+#: So the matched markers are now ADVISORY: they are still detected, still opened as threads,
+#: still rendered into the prompt by `OpenThreadLedger.render()` with the call that settles them
+#: already filled in, and still recorded in the manifest. What they no longer do is refuse the
+#: answer. Whether a `pending` on a cytology report matters to THIS question is a clinical
+#: judgement, and the model is the thing being asked to make it.
+BLOCKING_MARKERS = frozenset({MARKER_TRUNCATED})
+
+
+def marker_blocks_answer(marker: str) -> bool:
+    """True when an unsettled thread on `marker` may refuse an answer.
+
+    A function rather than a bare `in` at the call site so the distinction has one home and one
+    docstring: computed markers block, text-matched markers advise.
+    """
+    return str(marker or "").strip().lower() in BLOCKING_MARKERS
+
 #: Written into `OpenThread.resolution` by the deterministic route, so a manifest reader can
 #: separate "the runtime observed the end of the document" from "the agent said it chased it".
 SETTLED_BY_READING_TO_THE_END = "read to its end by the runtime's own count"
@@ -588,8 +619,8 @@ class OpenThreadLedger:
                    "`truncated` thread on this document may never discharge mechanically"})
             return []
         if total_chars is not None and total_chars >= 0:
-            # The largest length any read reported. A `read_section` knows offsets but not
-            # the document length, so it contributes spans and never a length.
+            # The largest length any read reported. Kept as a max rather than an assignment
+            # because two reads of one document must not disagree about how long it is.
             self.doc_length[note_id] = max(self.doc_length.get(note_id, 0), int(total_chars))
         spans = self.read_spans.setdefault(note_id, [])
         spans.append([int(offset), int(offset) + int(returned_chars)])
@@ -627,11 +658,18 @@ class OpenThreadLedger:
         so completeness is the one-span test.
 
         The three non-complete states are kept apart because they are three different pieces
-        of news. `unread` is a document nobody opened. `length_unknown` is the `read_section`
-        case — true offsets, no document length — where the run knows how much it has seen
-        and nothing at all about how much there is. `incomplete` is the only one that asserts
-        a hole. A single False for all three is the empty-answer-as-meaning shape, and it is
-        the reason this is a state and `fully_read` is its projection.
+        of news. `unread` is a document nobody opened. `length_unknown` is spans with no
+        document length: the run knows how much it has seen and nothing about how much there
+        is. `incomplete` is the only one that asserts a hole. A single False for all three is
+        the empty-answer-as-meaning shape, and it is the reason this is a state and
+        `fully_read` is its projection.
+
+        `length_unknown` USED TO BE THE `read_section` CASE, and that tool is gone: a named
+        section reported true offsets and no total length, so a run that had only ever read
+        sections could not tell it had left a hole. Every read now reports `total_chars`. The
+        state is kept because it is still the truthful answer for a malformed read result, and
+        because collapsing "I do not know the length" into "there is a hole" would let a
+        `truncated` thread discharge on a document nobody had measured.
         """
         spans = self.read_spans.get(note_id)
         if not spans:
@@ -1214,16 +1252,22 @@ class CoveragePlan:
             self._record_refusal(out, step=step, trigger=trigger, rev=rev)
             return out
 
-        # A revision whose whole retrieval half was variants is a REFUSAL, not a silent no-op.
-        # `graph._after_reflect` renders `outcome.refused` to the agent on the refusal branch
-        # only; reporting "APPLIED" over a plan that did not move would leave the agent
-        # believing it had widened its search, and it would send the variant again. The thread
-        # half is not collateral — the caller re-applies it, see `_salvage_thread_work`.
-        if redundant and not new_terms and not new_proms:
-            out.refused = [_redundant_why(t, e) for t, e in redundant]
-            out.refusal_class = REFUSED_REDUNDANT_TERM
-            self._record_refusal(out, step=step, trigger=trigger, rev=rev)
-            return out
+        # THE REDUNDANT-TERM REFUSAL IS GONE. It used to refuse a revision whose retrieval half
+        # was entirely variants of terms already in the plan, on the reasoning that reporting
+        # "APPLIED" over a plan that did not move would let the agent believe it had widened its
+        # search.
+        #
+        # That reasoning depended on the term list MEANING something: the gate discharged
+        # against it, so a term that was not really added was a term that would be demanded
+        # later. Both halves of that are gone -- `check_gate` no longer refuses over an
+        # unsearched term, and `fit_terms_to_budget` no longer trims -- so the plan's keyword
+        # list is now a record of what the model said it would search rather than a contract it
+        # is held to. A refusal over a record costs a round trip and buys nothing.
+        #
+        # The redundancy is still COMPUTED and still reported: the loop further down already
+        # appends `_redundant_why` for every variant on the APPLIED path, alongside the
+        # already-at-that-policy promote no-ops. So the agent is told "these were already there"
+        # through the channel that always carried it, and nothing here needs a second one.
 
         # ---- 3. commit.
         for t in new_terms:
@@ -1422,6 +1466,30 @@ def plan_from_spec(spec, chart) -> CoveragePlan:
     return p
 
 
+def plan_from_patient_inventory(spec, chart) -> CoveragePlan:
+    """An unbiased retrieval surface for the guideline-only experiment.
+
+    The model receives every document type that exists for this patient and may search or
+    open any of them.  It receives no task-authored keywords and no mapping from a local
+    document type to ``can_establish``/``may_mention``/``cannot_establish``.  This is not an
+    assertion that every type is equally useful; it is the absence of a prior, which is what
+    the baseline is intended to measure.
+    """
+    docs, _ = chart.list_documents(limit=100_000)
+    types = sorted({d.doc_type for d in docs})
+    return CoveragePlan(
+        search=types,
+        initial_keywords=[],
+        keywords=[],
+        n_fields=max(1, len(getattr(spec, "fields", []) or [])),
+        source="patient_inventory_only",
+        rationale={
+            t: "patient inventory only; no task keyword or note-type prior supplied"
+            for t in types
+        },
+    )
+
+
 PLAN_PROMPT = """You are planning the document coverage for one chart review.
 
 THE QUESTION BEING ANSWERED:
@@ -1593,7 +1661,7 @@ def triggers_from_tool_result(name: str, args: dict, result: dict, *, plan: Cove
             terms_proposed=()))
 
     docs: list[dict] = []
-    if name in ("read_document", "read_section") and result.get("note_id"):
+    if name == "read_document" and result.get("note_id"):
         docs = [result]
     elif name == "read_documents_batch":
         docs = list(result.get("documents") or [])

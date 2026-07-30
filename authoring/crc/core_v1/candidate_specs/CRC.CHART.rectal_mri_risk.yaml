@@ -1,0 +1,153 @@
+spec_id: CRC.CHART.rectal_mri_risk
+spec_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+source_authority:
+  document: "ASCO Management of Locally Advanced Rectal Cancer 2024"
+  items:
+    - "Recommendations 1.2, 1.3 and 2.1"
+  source_refs: [ASCO.LARC.2024, ESMO.RECTAL_LOCALIZED.2025]
+data_source: notes
+question: >
+  Does the pretreatment dedicated rectal MRI adequately establish tumor height, sphincter
+  relation, extramural depth, MRF, EMVI, tumor deposits, and intersphincteric-plane risk?
+applicability_guard:
+  primary_site: rectum
+  disease_setting: locally_advanced
+  timepoint: before_first_cancer_directed_treatment
+fields:
+  - name: rectal_mri_protocol
+    type: string
+    allowable_values: [dedicated_high_resolution_rectal, pelvic_mri_not_dedicated, protocol_unclear, not_performed]
+    nullable: true
+    description: "Whether the examination/report establishes a dedicated high-resolution rectal protocol."
+  - name: rectal_mri_quality
+    type: string
+    allowable_values: [adequate, limited_but_interpretable, inadequate, not_documented]
+    nullable: true
+    description: "Technical/report adequacy for risk assessment."
+  - name: pelvic_mri_date
+    type: string
+    format: "\\d{4}(?:\\d{2}(?:\\d{2})?)?"
+    nullable: true
+    description: "Pretreatment MRI date with documented precision only."
+  - name: rectal_tumor_height_cm
+    type: string
+    format: "\\d+(?:\\.\\d+)?"
+    nullable: true
+    description: "Distance in cm from the source-specified landmark; preserve the landmark in evidence."
+  - name: sphincter_relation
+    type: string
+    allowable_values: [clear, approaches, involves, indeterminate, not_reported]
+    nullable: true
+    description: "Relationship to the sphincter complex; retain exact anatomic wording in evidence."
+  - name: extramural_depth_mm
+    type: string
+    format: "\\d+(?:\\.\\d+)?"
+    nullable: true
+    description: "Maximum extramural depth in mm, when reported."
+  - name: mrf_status
+    type: string
+    allowable_values: [clear, threatened, involved, indeterminate, not_reported]
+    nullable: true
+    description: "Mesorectal fascia status under a clinically reviewed distance definition."
+  - name: emvi_status
+    type: string
+    allowable_values: [present, absent, indeterminate, not_reported]
+    nullable: true
+    description: "MRI extramural venous invasion status."
+  - name: mri_tumor_deposits
+    type: string
+    allowable_values: [present, absent, indeterminate, not_reported]
+    nullable: true
+    description: "Tumor deposits identified on MRI; not the surgical-pathology STORE SSDI."
+  - name: intersphincteric_plane_status
+    type: string
+    allowable_values: [clear, threatened, involved, indeterminate, not_reported, not_applicable]
+    nullable: true
+    description: "Intersphincteric-plane risk as reported."
+decision_rule:
+  - "A nondedicated or inadequate examination cannot establish a complete negative risk profile."
+  - "Tumor height must retain the measurement landmark; a number without its landmark is incomplete."
+  - "MRI tumor deposits and pathologic tumor-deposit count are different facts and never overwrite each other."
+  - "MRF threatened/involved thresholds remain a clinician-reviewed operationalization, not a model guess."
+evidence_rules:
+  counts_as_evidence:
+    - "Pretreatment dedicated rectal MRI report and reviewed multidisciplinary radiology interpretation."
+  does_not_count:
+    - "Post-treatment MRI as the pretreatment risk assessment."
+    - "A generic pelvic CT as proof of MRF, EMVI or intersphincteric-plane negativity."
+    - "Silence in a nonsynoptic report as an absent risk feature."
+conflict_rules:
+  - if: "the report body conflicts with the impression"
+    then: "retain the conflict and route to radiology review; do not default to the impression"
+  - if: "multiple pretreatment MRIs show different risk features"
+    then: "use the examination closest before the indexed treatment decision and retain the earlier trajectory"
+proof_obligation:
+  for_positive: "A dated pretreatment rectal MRI report directly establishes each returned feature."
+  for_negative:
+    mode: stratified_exclusion
+    required_coverage:
+      - "Review the complete MRI body/impression and any multidisciplinary reinterpretation."
+    required_keywords: [MRF, EMVI, sphincter, "tumor deposit"]
+    statement: "Absent is valid only when the adequate examination addresses the feature; not reported is not absent."
+abstention:
+  EVIDENCE_INSUFFICIENT: "The MRI/report is missing, inadequate, or does not establish the requested feature."
+  SPEC_INSUFFICIENT: "The case is not pretreatment LARC or requires response/cCR assessment rather than baseline risk."
+boundary_cases:
+  - case: "MRI says 'no definite EMVI' in the body but impression omits EMVI"
+    result: "retain the body evidence with its reservation; do not code not_reported"
+  - case: "Tumor is 4 cm from anal verge but the report does not describe sphincter relation"
+    result: "height is populated; sphincter_relation=not_reported"
+search_hints: [MRF, EMVI, sphincter, "tumor deposit", mesorectal_fascia, anal_verge, extramural, intersphincteric]
+downstream_warning:
+  - "All MRI domains and thresholds require gastrointestinal-radiology sign-off and corpus testing."
+provenance:
+  - element: "fields[rectal_mri_protocol].allowable_values"
+    origin: model_authored
+    basis: "no external source; local protocol normalization prompted by ASCO 2024 Recommendation 1.2."
+    status: draft
+  - element: "fields[rectal_mri_quality].allowable_values"
+    origin: model_authored
+    basis: "no external source; local quality states."
+    status: draft
+  - element: "fields[pelvic_mri_date].format"
+    origin: model_authored
+    basis: "no external source; partial-date syntax preserving source precision."
+    status: draft
+  - element: "fields[rectal_tumor_height_cm].format"
+    origin: model_authored
+    basis: "no external source; candidate nonnegative decimal representation."
+    status: draft
+  - element: "fields[sphincter_relation].allowable_values"
+    origin: model_authored
+    basis: "no external source; local anatomic relationship normalization."
+    status: draft
+  - element: "fields[extramural_depth_mm].format"
+    origin: model_authored
+    basis: "no external source; candidate nonnegative decimal representation."
+    status: draft
+  - element: "fields[mrf_status].allowable_values"
+    origin: model_authored
+    basis: "no external source; threshold-dependent MRF normalization pending radiology review."
+    status: draft
+  - element: "fields[emvi_status].allowable_values"
+    origin: model_authored
+    basis: "no external source; local MRI EMVI normalization."
+    status: draft
+  - element: "fields[mri_tumor_deposits].allowable_values"
+    origin: model_authored
+    basis: "no external source; local MRI tumor-deposit normalization."
+    status: draft
+  - element: "fields[intersphincteric_plane_status].allowable_values"
+    origin: model_authored
+    basis: "no external source; local anatomic risk normalization."
+    status: draft
+  - element: proof_obligation.for_negative.required_coverage
+    origin: model_authored
+    basis: "no external source; project-specific MRI evidence coverage requirement."
+    status: draft
+  - element: proof_obligation.for_negative.required_keywords
+    origin: model_authored
+    basis: "no external source; unmeasured candidate search vocabulary."
+    status: draft

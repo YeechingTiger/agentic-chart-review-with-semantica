@@ -1,0 +1,106 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.clinical_n
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.clinical_n
+contract_kind: registry_projection_and_chart_extraction
+label: Pretreatment clinical N
+roles:
+- action
+temporal_meaning: before_first_treatment
+field_contract:
+  name: clinical_n
+  type: string
+  format: cN(?:X|0|1|1a|1b|1c|2|2a|2b)
+  nullable: true
+  description: Pretreatment clinical N as explicitly documented or derived under an approved staging spec.
+registry_mapping:
+  standard: NAACCR_v26
+  item_name: AJCC TNM Clin N
+  item_number: '1002'
+  xml_id: ajccTnmClinN
+  effective_years: 2018+
+evidence_coverage:
+  registry_to_rule:
+    semantic: exact
+    temporal: exact
+    decision_boundary_preserved: true
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: direct
+    transformation_id: null
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: CoC STORE 2026 and NAACCR v26, with rule-specific ASCO context
+  items:
+  - Primary Site [400]
+  - Histologic Type ICD-O-3 [522]
+  - AJCC TNM Clin T [1001]
+  - AJCC TNM Clin N [1002]
+  source_refs:
+  - COC.STORE.2026
+  - NAACCR.SSDI.3_3
+  - ASCO.LARC.2024
+  - ASCO.MCRC.2022
+question: What is the Pretreatment clinical N for the indexed CRC tumor or decision at before_first_treatment?
+applicability_guard:
+  primary_sites:
+  - C180
+  - C182-C189
+  - C199
+  - C209
+  exclude_schemas:
+  - appendix
+  - NET
+  - GIST
+  - sarcoma
+  - Kaposi
+  rule_time_required: true
+evidence_contract:
+  establishing_source_documents:
+  - pelvic_mri
+  - staging_imaging
+  - examination
+  - tumor_board
+  - registry
+  excluded_sources:
+  - pathologic_N_copied_without_clinical_basis
+  positive_witness: A tumor-linked source appropriate to before_first_treatment establishes clinical_n.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - Pretreatment
+    - AJCC
+    - TNM
+    statement: Unknown/null is not node negative.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Unknown/null is not node negative.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish clinical_n.
+  SPEC_INSUFFICIENT: The requested meaning of clinical_n is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CANDIDATE.disease_context
+  output_field: clinical_n
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[clinical_n].format
+  origin: model_authored
+  basis: no external source; candidate syntax requires reconciliation with the licensed AJCC edition and existing stage spec.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - A candidate contract exists, but the current production owner in specs/ fails provenance enforcement and promotion/collision
+    resolution is pending.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 0a1c833586164ab0aabe9f6f85824906b3c2fe3cc74fe5686776bcdbcf8ca74c

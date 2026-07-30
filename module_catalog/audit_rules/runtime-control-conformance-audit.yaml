@@ -1,0 +1,14 @@
+schema: acr.module_asset/1
+module_id: runtime-control-conformance-audit
+version: 1.0.0
+kind: AUDIT_RULE
+runner: CODE
+inputs: [trajectory, application_events]
+output_schema: acr.audit_report/1
+implementation: audit.runtime_control_conformance.v1
+truth_modes: [BLIND]
+capabilities: []
+maximum_authority: QUARANTINE_RESULT
+description: Detect final results that bypass recorded hard-control denials.
+owner: runtime-owner
+tags: [audit, gate, conformance]

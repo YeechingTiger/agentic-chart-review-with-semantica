@@ -1,0 +1,43 @@
+schema_version: "1.0"
+clinical_use: NOT_FOR_CLINICAL_USE
+policy: >
+  Cross-module aliases are included only when the clinical fact, timepoint, and evidence
+  owner are equivalent. Same source-concept spelling is not sufficient. Context-specific
+  stage, treatment, response, recurrence, and regimen variables intentionally remain split.
+aliases:
+  - alias: crc.molecular.assay_method
+    canonical: crc.molecular_assay_method
+    rationale: Same indexed molecular assay method; namespace spelling only.
+  - alias: crc.patient.ecog_at_decision
+    canonical: crc.ecog_performance_status
+    rationale: Both represent ECOG performance status at the indexed treatment decision.
+  - alias: crc.patient.age_at_decision
+    canonical: crc.age_at_decision
+    rationale: Both represent patient age at the indexed decision date.
+  - alias: crc.patient.comorbidity_constraints_at_decision
+    canonical: crc.comorbidity_constraints
+    rationale: Same decision-time comorbidity constraints fact.
+  - alias: crc.treatment.contraindication_at_decision
+    canonical: crc.treatment_contraindication
+    rationale: Same treatment-specific contraindication at the indexed decision.
+  - alias: crc.patient.preference_at_decision
+    canonical: crc.patient_preference
+    rationale: Same documented patient treatment preference at the indexed decision.
+  - alias: crc.patient.oxaliplatin_fitness_at_decision
+    canonical: crc.oxaliplatin_fitness_at_decision
+    rationale: Same decision-time oxaliplatin fitness assessment.
+  - alias: crc.patient.treatment_toxicity_risk_at_decision
+    canonical: crc.treatment_toxicity_risk_at_decision
+    rationale: Same decision-time treatment toxicity-risk assessment.
+  - alias: crc.patient.life_expectancy_at_decision
+    canonical: crc.estimated_life_expectancy
+    rationale: Same estimated life expectancy at the indexed treatment decision.
+  - alias: crc.therapy.regulatory_jurisdiction_at_decision
+    canonical: crc.regulatory_jurisdiction
+    rationale: Same jurisdiction governing the indexed molecular or treatment decision.
+  - alias: crc.clinical_trial_availability_at_decision
+    canonical: crc.trial_availability
+    rationale: Same trial-availability fact at the indexed treatment decision.
+  - alias: crc.anti_egfr_washout_duration_before_decision
+    canonical: crc.anti_egfr_washout_interval
+    rationale: Same interval from prior anti-EGFR exposure to the indexed decision.

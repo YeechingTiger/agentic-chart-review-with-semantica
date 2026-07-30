@@ -1,0 +1,92 @@
+contract_schema_version: '1.0'
+contract_id: CRC.VAR.rectal_mri_protocol
+contract_version: 0.1.0
+authoring_status: candidate
+clinical_use: NOT_FOR_CLINICAL_USE
+canonical_variable_id: crc.rectal_mri_protocol
+contract_kind: chart_extraction
+label: Dedicated rectal MRI protocol
+roles:
+- action
+temporal_meaning: pretreatment
+field_contract:
+  name: rectal_mri_protocol
+  type: string
+  allowable_values:
+  - dedicated_high_resolution_rectal
+  - pelvic_mri_not_dedicated
+  - protocol_unclear
+  - not_performed
+  nullable: true
+  description: Whether the examination/report establishes a dedicated high-resolution rectal protocol.
+registry_mapping:
+  standard: none
+  item_name: none
+  item_number: none
+  xml_id: none
+  effective_years: none
+evidence_coverage:
+  registry_to_rule:
+    semantic: absent
+    temporal: misaligned
+    decision_boundary_preserved: false
+    status: inferred_from_mapping_level_requires_use_specific_review
+  canonical_to_registry:
+    level: none
+    transformation_id: null
+    status: candidate
+  observed_availability:
+    status: NOT_ASSESSED
+    profile_id: null
+source_authority:
+  document: ASCO Management of Locally Advanced Rectal Cancer 2024
+  items:
+  - Recommendations 1.2, 1.3 and 2.1
+  source_refs:
+  - ASCO.LARC.2024
+  - ESMO.RECTAL_LOCALIZED.2025
+question: What is the Dedicated rectal MRI protocol for the indexed CRC tumor or decision at pretreatment?
+applicability_guard:
+  primary_site: rectum
+  disease_setting: locally_advanced
+  timepoint: before_first_cancer_directed_treatment
+evidence_contract:
+  establishing_source_documents:
+  - pelvic_mri_report
+  excluded_sources:
+  - pelvic_CT
+  positive_witness: A tumor-linked source appropriate to pretreatment establishes rectal_mri_protocol.
+  negative_or_unknown_proof:
+    required_coverage:
+    - Review every available establishing source class for this variable in the indexed time window.
+    required_keywords:
+    - mesorectal_fascia
+    - Dedicated
+    - MRI
+    statement: Protocol unclear is not a dedicated protocol.
+  conflict_policy: Retain conflicting citations, apply the reviewed temporal/source precedence, and abstain when the conflict
+    remains unresolved.
+missingness_semantics: Protocol unclear is not a dedicated protocol.
+abstention:
+  EVIDENCE_INSUFFICIENT: The available indexed evidence does not establish rectal_mri_protocol.
+  SPEC_INSUFFICIENT: The requested meaning of rectal_mri_protocol is outside this candidate contract.
+execution_binding:
+  execution_group_id: CRC.CHART.rectal_mri_risk
+  output_field: rectal_mri_protocol
+  runtime_shape: multi_field_ExtractionSpec
+  runtime_status: candidate_materialized_group
+field_provenance:
+- element: fields[rectal_mri_protocol].allowable_values
+  origin: model_authored
+  basis: no external source; local protocol normalization prompted by ASCO 2024 Recommendation 1.2.
+  status: draft
+conformance:
+  verdict: needs_revision
+  issues:
+  - The candidate is structurally specified but contains unmeasured model-authored domains or source precedence requiring
+    specialist review.
+review_requirements:
+- clinical_domain_reviewer
+- registrar
+- engineer
+contract_hash: 791199f48c10530c55743a5c1f5f85292814cf3044cd08cf49438c72f2cd0a0e

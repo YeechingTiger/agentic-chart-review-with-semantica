@@ -6,6 +6,13 @@ machine-checkable specification**, and cannot report an answer it has not proved
 This file is the handover document. It describes what the pipeline is, what every component
 takes and returns, how to run each one, and — at the end, in detail — **what is not done**.
 
+The lifecycle vocabulary used here—task contract, in-request control, runtime policy,
+observability, audit, evaluation, experiment and experience—is defined in
+[`docs/AGENTLOOP_TO_ACR_METHODOLOGY.md`](docs/AGENTLOOP_TO_ACR_METHODOLOGY.md). Read that
+document before classifying a new check as a runtime requirement or an evaluator.
+The implemented Module/Skill/Capability/Stage contracts and the Audit/Evaluation split are in
+[`docs/ACR_MODULE_ARCHITECTURE_V2.md`](docs/ACR_MODULE_ARCHITECTURE_V2.md).
+
 The design question is not "can a model read a note". It is: *what has to be in the input, and
 what has to be enforced in code, for two independent executors — a human abstractor and an LLM
 agent — to reach the same label for the same reason?*
@@ -24,10 +31,15 @@ Four consequences run through everything:
 1. **The gate.** `submit_answer` is the only way an answer comes into existence, and it goes
    through `answer_gate.gate_answer`. A rejection is not a failure; it is the instruction for
    what to do next, and it always names the call that satisfies it.
-2. **Enforced / advisory / declarative.** Rules that must hold are **code** (`answer_checks`,
-   `coverage`). Rules that are judgement are **skills** the model may decline to read
-   (`skills/`). Everything domain-specific is **YAML** a registrar can review (`specs/`).
-   Clinical knowledge never lives in Python.
+2. **Enforced / advisory / declarative.** What the runtime may REFUSE an answer over is a fact
+   about the run: evidence exists, every quote re-reads at its offsets, a read stopped short,
+   patient scope, spend. What an answer MEANS is judgement, and it reaches the model as
+   instruction (`specs/`) and as **skills** it may decline (`skills/`). Clinical knowledge never
+   lives in Python — and as of 2026-07-30 no clinical rule is enforced by Python either:
+   every deterministic check that judged an answer's content was measured and removed, because
+   **60 of 254 recorded rejections (24%) refused a tuple that was exactly the registry's**. See
+   [docs/DETERMINISTIC_RULES_REMOVED.md](docs/DETERMINISTIC_RULES_REMOVED.md). A wrong value
+   against a stated instruction is an instruction-following failure and is counted, not gated.
 3. **Two planes.** DEVELOP may see the answer key; RUN may not. The only channel between them
    is a provenance record plus a human signature.
 4. **A green gate is not a validated answer.** `provenance.reportable_as_validated` is the field
@@ -81,6 +93,15 @@ Everything after L3 is deterministic and replays from a file. `acr concord` and 
 call no model and read no chart, which is why a number they produce can be re-derived six weeks
 later without paying for the agent again.
 
+Two optional loops sit beside this pipeline; neither replaces it:
+
+- `SpecRepairLab` is DEVELOP-only. It replays the same deepagents runtime on adjudicated
+  chart-observable gold, clusters structured behaviour, and proposes one cited spec change.
+  It never edits a spec.
+- `acr run --conflict-refine` is a feature-flagged RUN wrapper for hard cases. It calls the
+  same `agent.run_patient`, preserves the same tools and gate, and returns
+  `REVIEW_REQUIRED` instead of choosing a majority when conflicts remain.
+
 ---
 
 ## 2. Components
@@ -95,7 +116,7 @@ Line counts are the current tree. "No model" means the module *cannot* reach a p
 | `agent.py` | **The agent.** `create_agent` from LangChain plus deepagents middleware; our rules live in hooks. Replaced a 1,197-line hand-written ReAct loop. |
 | `tool_surface.py` | The whitelist. Refuses an agent carrying a tool nobody declared. |
 | `spend.py` | The cost ceiling, priced from `audit/prices.json`. |
-| `audit.py` | Token/cost accounting, wired to LiteLLM or LangChain callbacks. |
+| `usage_telemetry.py` | Optional LiteLLM/LangChain token and cost callbacks; separate from post-run Audit. |
 | `corpus.py` | `PatientChart` — the only thing that touches note files. |
 | `state.py` | `EvidenceLedger`, `Budget`. |
 | `llm.py` | LiteLLM client, used by the develop-plane commands. |
@@ -124,12 +145,12 @@ paths outside root_dir — including `ground_truth.csv`. No recorded run exercis
 unexercised open door is not a boundary. `tool_surface.assert_tool_surface` is the boundary, and
 it is a **whitelist** — a blacklist of today's nine would pass the tenth.
 
-### 2.2 The audit layer — 6,508 lines. **This is the product.**
+### 2.2 Runtime controls and policies
 
 | module | what it decides |
 |---|---|
 | `answer_gate.py` | `gate_answer` — the single decision on whether an answer may be emitted. Every front end calls THIS. |
-| `answer_checks.py` | Deterministic checks on a submitted value (`not_less_specific`, `conflict_requires_nos`, `origin_not_specimen`, …). Declared per spec; no clinical knowledge in the file. |
+| `answer_checks.py` | Field `format` / `allowable_values` shape checks, RECORDED and not enforced. The five clinical checks it used to carry (`not_less_specific`, `conflict_requires_nos`, `nos_requires_search`, `origin_not_specimen`, `code_matches_cited_text`) were removed 2026-07-30 after measurement; `ANSWER_CHECK_KINDS` is empty and a spec declaring one fails to load. |
 | `answer_contract.py` | What an answer owes at emission: `assert_answer_is_reportable`, `build_spec_gap`, `attach_coverage_claim`, `strip_value_from_spec_insufficient`. |
 | `coverage.py` | The stratified coverage ledger, the forced sampler, the elusion bound (Clopper–Pearson). |
 | `coverage_planner.py` | The ONE retrieval plan, monotone expansion, the thread ledger, the marker catalogue, trigger detection. |
@@ -137,6 +158,16 @@ it is a **whitelist** — a blacklist of today's nine would pass the tenth.
 | `run_triggers.py` | `detect_gate_obligations` — an obligation the current plan structurally cannot discharge. |
 | `spec.py` / `speclint.py` | Load, freeze-hash and lint a spec; bind provenance and refuse an unmarked enforced element. |
 | `trace.py` / `run_manifest.py` | The trace and the run record. |
+
+These modules guide or constrain the current extraction. They are not the post-run Audit
+plane. In particular, coverage is a versioned runtime policy whose benefit must be measured,
+while `answer_gate` is an inline control.
+
+Select the policy with `--runtime-profile current-stratified-coverage` (the unchanged
+default) or `--runtime-profile witness-first-baseline` on `acr run`, `acr batch`,
+`acr consistency`, and `acr extract`. The witness-first negative arm never receives a
+`coverage_attested` claim; manifests record the selected profile and content hash so paired
+ablations cannot be silently mixed.
 
 **Coverage is stratified, not a count.** Each spec assigns document types to
 `can_establish` (search exhaustively) / `may_mention` (search, then sample the misses) /
@@ -158,17 +189,53 @@ merge) · `intake.py` (question → spec routing).
 `specview/` renders a spec as prose a registrar can review and sign, with every element's
 provenance and measurement beside it.
 
-### 2.5 The develop plane — 3,608 lines. **Never run on data.**
+### 2.5 The develop plane — 3,608 lines. **Never run on production data.**
 
 `labelling.py` (read every note of a dev set once) · `derive.py` (labels → keywords + read
-policy) · `assetdev.py` (evolve / certify / adopt retrieval assets). Consumes the answer key;
-must never run in the same process as a RUN-plane job.
+policy) · `assetdev.py` (evolve / certify / adopt retrieval assets) · `spec_repair.py`
+(chart-observable gold, behaviour clusters, contrastive packets, minimal proposals, paired
+validation and sealed certification). Consumes the answer key; must never run in the same
+process as a RUN-plane job.
+
+`spec_repair.py` does not treat a tumor-registry field as truth merely because it was manually
+abstracted. Registry values are staged only as a local `REGISTRY_REFERENCE`; they are not
+de-identified, imported into a dataset, or called silver/gold. A case can guide repair only
+after a human records field-level `chart_answer`, chart derivability,
+supporting/contradicting witnesses and adjudication. If the registry abstractor had evidence
+outside the available corpus, the correct chart answer can be `EVIDENCE_INSUFFICIENT`; that
+case is not an instruction to make the agent guess.
+
+`attribution.py` is an offline deepagents layer over another run's trace. It may inspect exact
+spec rules and open read-only tools for the same patient, but every chart access first names
+the rival causes it distinguishes. `GOLD` supports contrastive diagnosis;
+`REGISTRY_REFERENCE` and `BLIND` can produce only hypotheses and review obligations. It writes
+an append-only JSONL error library outside Git and never changes a spec.
+
+`conflict_refinement.py` is RUN-plane and gold-blind. Its `Hypothesis` keeps field results,
+evidence, rule IDs, entity/time anchors, coverage and proof obligations—not free-form chain of
+thought. Ranking is deterministic and evidence-first, but only the existing answer gate can
+make a candidate usable.
 
 ### 2.6 The eval plane — 3,066 lines
 
 `evals.py` (precedence registry, abnormal-behaviour detectors, regression harness) ·
 `judge.py` (agent-as-a-judge, fenced) · `refine.py` (route a classified failure at the text
 parameter that caused it).
+
+The v2 analysis contracts add:
+
+- `kernel.py`: `AssetRef`, canonical `Trajectory`, `TargetRef`, `SignalEnvelope`;
+- `modules.py`: independent `ModuleAsset`, `PipelineProfile`, `EvaluationTask` binding and
+  `CertificationSuite`;
+- `audit_loop.py`: truth-blind application AuditRule → Finding → Incident;
+- `evaluation_pipeline.py`: typed channels, separate `TruthContext`, and EvaluationResult
+  without audit incidents;
+- `runtime_profiles.py`: witness-first and current-stratified coverage profiles;
+- `repair_loop.py`: deterministic signal-to-owner repair routing.
+
+The v1 EvalLoop and its duplicated evaluator catalog have been removed. Current analysis
+uses `ModuleAsset` + `PipelineProfile`; causal attribution keeps its dedicated tool-using
+runtime under `acr attribute`.
 
 **The fence:** where a deterministic check exists, a model judge is *forbidden*, not
 discouraged. `correctness` is `==`. A task-completion judge is refused outright because it
@@ -214,7 +281,7 @@ the git tree. Keep it that way.**
   --cohort cohort.txt \                 # csv/tsv/txt/json of patient ids
   --variables primary_site,histology,behavior \
   --corpus /N/project/computable_phenotype/acr_real/patients \
-  --max-steps 50 --temperature 1 --seed 1234 \
+  --max-steps 50 --max-usd 5 --temperature 1 --seed 1234 \
   --out runs/
 ```
 
@@ -224,14 +291,28 @@ the git tree. Keep it that way.**
 - The unit of work is the **spec**, not the variable. `--variables primary_site,histology` is
   ONE pass because that spec answers both; asking per variable pays for the chart twice and can
   return two different sites for one patient.
-- `--max-steps` is **model calls**, not plan/act/reflect cycles — there is no reflect node. The
-  limit meant to bind is the cost ceiling in `spend.py` ($5/patient default).
+- `--max-steps` is **model calls**, not plan/act/reflect cycles — there is no reflect node.
+  `--max-usd` is the priced per-patient ceiling ($5 default) and is the limit meant to bind.
 - `--temperature` defaults to **1.0**: `gpt-5.6-luna` rejects any other value and 400s on the
   first call.
 
 Single chart, for debugging: `acr chart run SYN0001 --spec specs/….yaml`.
 Same chart N times, to measure self-consistency (which is *stability, not validity*):
 `acr chart consistency SYN0001 --spec … --n 3`.
+
+Optional conflict refinement on one hard chart:
+
+```bash
+.venv/bin/acr run SYN0001 --spec specs/….yaml \
+  --conflict-refine --conflict-candidates 3 --conflict-rounds 2 \
+  --conflict-max-usd 15
+```
+
+Without `--conflict-refine`, the CLI still calls `run_patient` directly. With the flag, every
+candidate is another call to that same function. The wrapper stops on gate-valid structured
+agreement, a round with no new evidence or conflict reduction, or its round/cost bound. It
+never selects a modal answer when the gate, proof obligations, entity/time conflicts or
+degradation remain.
 
 ### L4 · concordance — no model
 
@@ -263,6 +344,7 @@ Same chart N times, to measure self-consistency (which is *stability, not validi
 .venv/bin/acr eval detect  --runs runs/…/ --min-term-chars 3 --max-rejection-repeats 2 \
                            --token-band 20000,1500000 --turn-band 3,60
 .venv/bin/acr eval compare --before a.json --after b.json     # exits 1 on REGRESSION
+.venv/bin/acr eval compare-refinement --baseline runs/base --refined runs/refined
 ```
 
 **`eval compare` needs `ACR_PSEUDONYM_KEY` set** on real data. Without it every real person_id
@@ -272,6 +354,41 @@ over a comparison that actually held 6 improvements and 3 regressions.
 
 `eval detect` has **no default thresholds** on purpose: a detector that ran with numbers nobody
 chose reports "nothing fired" indistinguishably from "nothing looked".
+
+### ACR evaluation — local typed pipelines
+
+`acr eval` remains the deterministic detector/regression toolkit. `acr evaluation` owns
+versioned module discovery and typed post-run quality pipelines:
+
+```bash
+.venv/bin/acr evaluation modules
+.venv/bin/acr evaluation validate
+.venv/bin/acr evaluation batch \
+  --runs runs/extract__… --pipeline chart-review-quality-v1 \
+  --provider-boundary EXTERNAL --local-root /secure/local-acr
+.venv/bin/acr evaluation summarize --local-root /secure/local-acr
+```
+
+Assets under `module_catalog/`, compositions under `pipeline_catalog/`, and suites under
+`certification_catalog/` are independently versioned. Audit incidents are queried through
+`acr audit incidents`, not through Evaluation.
+
+The generic capability broker rejects undeclared tools, cross-patient access and chart reads
+beyond the evaluator budget. Tool-using causal analysis is implemented once inside the
+causal-attribution evaluator instead of duplicated in a second EvalLoop runtime.
+
+The causal-attribution profile is modular: target framing, trace reconstruction, cause
+hypothesis, targeted probe, counterfactual replay, skeptic review and attribution gate. A
+second, tool-free skeptic model call reviews the investigator's structured proposal; a
+`REVISE` or `UNRESOLVED` verdict downgrades the primary cause to `UNRESOLVED`. It never
+authorizes a spec patch.
+
+All evaluator ledgers stay below the external local root:
+`evaluation/evaluator-runs.jsonl`, `findings.jsonl`, `incidents.jsonl`,
+`attributions.jsonl`, and `adjudications.jsonl`. Runs record the evaluator asset and Prompt
+hashes, extraction-spec hash, input/result hashes, model, capability/skill versions, calls,
+chart reads and cost. Raw chart and extraction traces remain referenced by local path/hash;
+they are not copied into the evaluator library.
 
 ### The develop plane — spends money, consumes the answer key
 
@@ -284,6 +401,99 @@ chose reports "nothing fired" indistinguishably from "nothing looked".
 
 Every `derive` threshold is a **required option**. There are no defaults, because a threshold
 nobody chose is a finding nobody owns.
+
+### Ground-truth-guided spec repair — DEVELOP only
+
+The first pilot should use
+`STORE.400_522_523.site_histology_behavior`: it exposes partial fields, pathology/radiology
+standing, origin-versus-specimen, biopsy/resection precedence and known registry/spec
+disagreements.
+
+```bash
+export ACR_LOCAL_ARTIFACT_ROOT=/secure/local-acr
+
+# 1. Registry values remain a local unresolved reference — not silver and not gold.
+.venv/bin/acr gold stage-registry-reference \
+  --answer-key /secure/local-acr/registry.json \
+  --spec-id STORE.400_522_523.site_histology_behavior \
+  --source-version tumor-registry/2026-07 --out registry-reference.json
+
+# 2. A registrar separately creates chart-observable gold after chart review.
+.venv/bin/acr gold audit --gold gold.json --out gold-audit.json
+
+# 3. Three runs per case; only unstable/ungrounded cases expand to five.
+.venv/bin/acr repair sample --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  --gold gold.json --case-map secure-case-map.json \
+  --initial-runs 3 --hard-runs 5 --max-usd 5 --out spec-repair
+
+# 4. Deterministic clustering and contrastive diagnosis.
+.venv/bin/acr repair cluster --runs spec-repair__… \
+  --gold gold.json --case-map secure-case-map.json --out clusters.json
+.venv/bin/acr repair diagnose --runs spec-repair__… \
+  --gold gold.json --case-map secure-case-map.json --spec specs/….yaml \
+  --out failure-packets.json
+
+# 5. One proposal, one registered parameter. This validates a supplied proposal and
+#    does not edit the spec; omit --proposal to use the one-call proposer.
+.venv/bin/acr repair propose --packet failure-packets.json --case CASE001 \
+  --spec specs/….yaml --proposal proposed-edit.json --max-usd 1 \
+  --out validated-proposal.json
+
+# 6. Replay frozen baseline/candidate runs on the same validation cases and seeds.
+.venv/bin/acr repair validate --before before --after after \
+  --gold validation-gold.json --before-case-map before-map.json \
+  --after-case-map after-map.json --max-subgroup-drop 0 --out validation.json
+
+# 7. Consume a sealed cohort once after the candidate bundle is frozen.
+.venv/bin/acr repair certify --validation-report sealed-report.json \
+  --sealed-cases sealed-case-ids.json --bundle-hash <frozen-bundle-hash> \
+  --state sealed-state.json
+```
+
+The local root is mandatory for `gold` and `repair`: a relative root, a Git path, an ignored
+directory inside Git, or a symlink resolving into Git is refused before any write.
+`--case-map` is `{pseudonymous_case_id: corpus_patient_id}` and remains under that root.
+Directories are mode `0700`, files `0600`. Portable artifacts still refuse identifiers matching
+this corpus's real person-ID format.
+
+Proposal routing is deliberately narrow:
+
+- missing gold evidence can change only retrieval assets/policy;
+- ambiguous text may propose one semantic change, but requires clinician sign-off;
+- a rule already present but not followed must target a skill or deterministic check;
+- no proposal is applied by `repair propose`;
+- paired validation rejects any per-case regression, increased overclaim or disallowed
+  subgroup drop, even when an aggregate improves.
+
+Stop spec iteration after two declared iterations with no new failure cluster, improvement
+below the preregistered minimum useful difference, and remaining disagreements classified as
+evidence gaps or gold disputes. A frozen bundle still gets one sealed-cohort read. After that,
+production RUN jobs carry neither registry values nor chart-observable gold.
+
+### Offline error attribution
+
+```bash
+# All runs are screened deterministically; only abnormal cases call the model.
+.venv/bin/acr attribute batch \
+  --runs runs/extract__… --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  --case-map case-map.json --mode REGISTRY_REFERENCE \
+  --registry-reference registry-reference.json \
+  --corpus /N/project/computable_phenotype/acr_real/patients \
+  --max-model-calls 12 --max-usd 1 --max-chart-reads 12 \
+  --min-term-chars 2 --max-rejection-repeats 2 \
+  --token-band 0,10000000 --turn-band 0,1000 --library-id shb-pilot
+
+.venv/bin/acr attribute cluster --library-id shb-pilot
+.venv/bin/acr attribute summarize --library-id shb-pilot
+.venv/bin/acr attribute adjudicate --library-id shb-pilot --case-id CASE001 \
+  --decision ATTRIBUTED --actor <reviewer> --actor-role registrar \
+  --rationale "chart-observable evidence reviewed"
+```
+
+The library is four append-only files under
+`$ACR_LOCAL_ARTIFACT_ROOT/error-cases/<library-id>/`: `cases.jsonl`,
+`attributions.jsonl`, `adjudications.jsonl`, and `clusters.jsonl`. Raw manifests and traces
+are content-addressed by local path and hash rather than copied.
 
 ---
 
@@ -358,6 +568,14 @@ that *both* front ends go through the shared builders — extend that assertion 
   own `not_less_specific` message verbatim ("favor squamous supports 8070 over 8046"); the
   registry coded 8046. **The spec and the registry disagree, and a registrar has to rule.** That
   rule's provenance is `model_authored / draft`.
+
+  *Half of this is now fixed and half is not.* The mechanism — a check whose message named the
+  code, so the agent complied and the check supplied its own answer — is gone with the check
+  (`not_less_specific` refused the registry's value on 22 of 22 firings and never once helped;
+  see [docs/DETERMINISTIC_RULES_REMOVED.md](docs/DETERMINISTIC_RULES_REMOVED.md)). The clinical
+  question is untouched: whether a hedged "favor squamous" over a NOS final-diagnosis line codes
+  8070 or 8046 is a registrar's ruling, it is now stated only as prose in the spec's
+  `conflict_rules`, and nobody has signed it.
 - **`cached_input_per_1m = $0.10`** in `audit/prices.json` was stated, not measured against an
   invoice. Every cost conclusion's magnitude depends on it — at full price the same tokens cost
   4.3× more.
@@ -378,6 +596,14 @@ that *both* front ends go through the shared builders — extend that assertion 
 The develop plane (`labelling` / `derive` / `assetdev`, 3,608 lines) has a CLI and tests and
 **has never performed a single real scan**. Until it does, every keyword list in `specs/` is
 model-authored and unmeasured — which is exactly what `develop_plane_candidates` exists to fix.
+
+The offline attribution layer has now been exercised on the ten-patient local registry-reference
+pilot: deterministic screening selected six runs, every result remained
+`NEEDS_ADJUDICATION`, and zero semantic patches were emitted. That validates execution and
+isolation, not clinical correctness. `SpecRepairLab` and conflict refinement still have not
+shown an accuracy gain on adjudicated chart-observable gold. Run the four-arm pilot—single
+run, repeated sampling, repaired-spec single run, repaired spec plus hard-case
+refinement—before adopting a patch or turning the feature flag on at scale.
 
 ### 5.6 Architectural, unsolved
 
@@ -403,7 +629,8 @@ a56a61e  Sixteen audit rules the port had dropped, found by refusing to delete t
 e7e61bb  Port the three things the hooks runtime was missing, before deleting the one that had them
 ```
 
-`1410 passed, 12 skipped, 0 failed`.
+The full suite must finish with zero failures; the exact test count changes as controls are
+added.
 
 ---
 
@@ -432,6 +659,15 @@ never read its own required-keywords field; a keyword matcher that `t` satisfied
 test skipped in one venv and uninvokable in the other, so it ran nowhere; `_callbacks()`
 swallowing `ModuleNotFoundError` into an empty list so every run recorded `usage: null`. When you
 add a guard, **mutate the code and watch the test go red** before you believe it.
+
+**A check that CAN fail, and does, on the right answer is worse still — and it looks like
+diligence.** The five clinical `answer_checks` each arrived after a real chart went wrong, each was
+argued for in a long comment, and each was written from the one chart that motivated it. Measured
+across every recorded trace they destroyed a correct value 58 times against 21 helps, and the one
+that looked like it broke even (`conflict_requires_nos`, 15 helps to 18 harms) turned out to have a
+single mechanism — push the answer to the NOS code — that pays off at that code's 9.6% base rate.
+A rule written from one chart is a rule measured on n=1. **Before adding a check, measure what it
+would have done to every answer already recorded**; the join is free.
 
 **Do not edit by range slice.** `s[s.index('def X'):s.index('def Y')]` swallows everything
 between the boundaries. It silently deleted `_record_reads` (twice — once in the port, once by my

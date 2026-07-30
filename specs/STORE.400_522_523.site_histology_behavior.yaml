@@ -6,6 +6,16 @@ source_authority:
   applicability: "cases diagnosed 2025-01-01 onward; Solid Tumor Rules apply to dx 2007-01-01 onward"
 data_source: notes
 
+# WHICH CODE SYSTEM THESE VALUES BELONG TO. A Task Contract declaration: which table a value is
+# coded into is part of what the answer means, and it is not the runtime's guess. Rendered into
+# the prompt (`codes/icdo3_lung.yaml`, 8 topography and 55 morphology terms with what each one
+# is) and read by the evaluators so an out-of-domain code is counted. Nothing refuses an answer
+# over it.
+#
+# Validated against all 1,788 operator-confirmed registry answers in this corpus: 1,782 clean,
+# and the six that are not are the haematopoietic cases `when_not_to_use` below already excludes.
+value_domain: icdo3_lung
+
 question: >
   For the tumour being reported, what are the ICD-O-3 primary site (topography), the
   4-digit histology (morphology), and the 1-digit behaviour code?
@@ -132,90 +142,39 @@ search_hints:
   - adenocarcinoma
   - resection
   - cytology
-
-# Deterministic post-checks on a submitted answer, enforced in code (src/acr/answer_checks.py)
-# rather than hoped for in the prompt. Every rule below is already stated in decision_rule or
-# conflict_rules above; these three were nonetheless broken on real charts on 2026-07-26, so
-# they are now mechanically decided and rejected through the same loop as the coverage gate.
-# The clinical content lives here, in the spec, where a registrar can review it -- the checker
-# itself contains no oncology.
-answer_checks:
-  - field: primary_site
-    kind: not_less_specific
-    nos_values: ["C349"]
-    contradicted_by:
-      ["upper lobe", "middle lobe", "lower lobe", "main bronchus",
-       "RUL", "RML", "RLL", "LUL", "LLL"]
-    message: >
-      A documented lobe or main bronchus gives a specific ICD-O-3 subsite; C349 asserts the
-      subsite is unknown. Radiology may be used for this -- it localises, it just cannot
-      establish histology or behaviour.
-
-  - field: primary_site
-    kind: nos_requires_search
-    nos_values: ["C349"]
-    required_searches: ["lobe", "bronchus"]
-    message: >
-      C349 asserts no subsite is documented. Radiology and operative notes routinely state
-      the lobe even when pathology says only "right lung", and this spec permits radiology
-      for localisation. Search for it before claiming it is absent.
-
-  - field: primary_site
-    kind: origin_not_specimen
-    specimen_markers: ["specimen received", "specimen:", ", biopsy:", "fine needle", "fna"]
-    message: >
-      Rule 1: code the site of ORIGIN, not the site of a biopsy or a metastasis. A specimen
-      taken from the main bronchus does not make the main bronchus the origin.
-
-  - field: primary_site
-    kind: conflict_requires_nos
-    nos_value: "C349"
-    mutually_exclusive:
-      - ["upper lobe", "RUL", "LUL"]
-      - ["middle lobe", "RML"]
-      - ["lower lobe", "RLL", "LLL"]
-      - ["main bronchus"]
-    message: >
-      Two documents can name two different lobes for one tumour -- an operative note
-      describing where the surgeon went, a pathology header naming the container the
-      specimen arrived in, a radiology report describing a second lesion. Coding the first
-      lobe you read is not a decision, it is an order-of-reading artefact. Say which
-      statement describes the ORIGIN and why the other does not, or code C349.
-
-  # THE SAME LOBE VOCABULARY, WITH THE CODE EACH GROUP MEANS. `conflict_requires_nos` above
-  # asks whether TWO groups appear; this asks whether the group that appears is the one the code
-  # names. They are the two halves of one question and the aliases must stay identical between
-  # them -- tests/test_answer_checks.py asserts that, because two copies of a vocabulary drift.
-  - field: primary_site
-    kind: code_matches_cited_text
-    nos_value: "C349"
-    code_wordings:
-      C341: ["upper lobe", "RUL", "LUL"]
-      C342: ["middle lobe", "RML"]
-      C343: ["lower lobe", "RLL", "LLL"]
-      C340: ["main bronchus"]
-    message: >
-      A lobe code and a lobe word are the same claim written twice, so they cannot disagree. If
-      you believe the evidence supports the code anyway, quote the line that says so.
-
-  - field: histology
-    kind: not_less_specific
-    nos_values: ["8000", "8010", "8046"]
-    # "favor squamous" is gone: `"squamous" in blob` is true whenever it is, so it never
-    # decided anything -- it existed only because the message below quoted one chart.
-    contradicted_by:
-      ["squamous", "adenocarcinoma", "small cell", "large cell", "adenosquamous"]
-    # NAMES NO CODE. This message used to end: '"favor squamous cell carcinoma" supports 8070
-    # over 8046.' -- a worked example from one chart, delivered as instruction on every firing.
-    # On 2026-07-28 it fired on a chart containing neither word (the agent's own searches for
-    # "squamous" and "squamous cell carcinoma" both returned zero hits, and the runtime raised
-    # ZERO_HIT_SEARCH for both), told the agent that phrase supported 8070, and the agent
-    # complied. A check that supplies the answer is not checking it.
-    message: >
-      Say which line in your cited evidence is more specific than the code you chose, and code
-      what THAT line says. If the more specific wording is hedged -- "favor", "consistent with",
-      "suggestive of" -- and the pathologist's own final diagnosis line stayed at the NOS level,
-      then the NOS code is the answer and this check is wrong to fire; say so.
+  - lobe
+  - bronchus
+# ------------------------------------------------------------------ answer_checks: REMOVED
+# This spec used to declare deterministic post-checks that decided clinical questions by
+# matching word lists against the model's own cited quotes. All of them were removed on
+# 2026-07-30 after being measured over every trace this project has recorded (266 traces, 202
+# joinable to registry gold, 122 firings):
+#
+#   not_less_specific        22 fires   22 rejected the registry's own value    0 ever helped
+#   nos_requires_search      24 fires   21 rejected the registry's own value    0 ever helped
+#   conflict_requires_nos    67 fires   18 rejected the registry's own value   15 "helped"
+#   origin_not_specimen       2 fires    0                                      0
+#   code_matches_cited_text   0 fires    -                                      -
+#
+# `conflict_requires_nos` looked like it broke even. All 15 of its helps were the same event,
+# a push to C349, because that is the only remedy its message offers -- and C349 is the
+# registry's answer for 9.6% of this corpus against C341's 52.7%. It never helped a run reach
+# a specific subsite.
+#
+# Counted per submission: 60 of 254 recorded rejections refused a tuple that was exactly the
+# registry's, and 12 runs held the exact registry answer and shipped something else -- 8 of
+# them shipped nothing at all.
+#
+# The clinical content these checks encoded is NOT lost: every one of them restated a rule
+# that is already written above in `decision_rule` and `conflict_rules`, where a registrar can
+# read it and where it reaches the model as instruction. A value that violates those rules is
+# an instruction-following failure and is measured as one. It is not repaired by a word list
+# written from one chart and applied to every chart.
+#
+# `acr.answer_checks.ANSWER_CHECK_KINDS` is now empty, so re-adding a block here makes this
+# file fail to load rather than declare rules that never fire. Field `format` and
+# `allowable_values` are still enforced -- they are a contract on shape, they carry no
+# oncology, and they are the only check with a positive measured record.
 
 # ------------------------------------------------------------------------------ provenance
 # WHY THIS BLOCK EXISTS, and it is a fact about this file rather than about the software.
@@ -266,115 +225,6 @@ provenance:
       may be missing codes, and it may contain codes the table does not have. Check it against
       the manual before relying on it -- and note that this record is NOT a citation of the
       manual, precisely because that check has not been done.
-  - element: "answer_checks[primary_site.not_less_specific.C349]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by a language model in commit e5229b0 (2026-07-25) and
-      committed under a human author's name. Rejects the site-not-stated topography code when
-      the quoted evidence names a lobe or the main bronchus. The rule restates a coding rule
-      stated in prose above; the list of lobe wordings it matches on was written from a model's
-      idea of how radiologists and surgeons write, and has never been measured against real
-      notes.
-  - element: "answer_checks[primary_site.nos_requires_search.C349]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by a language model in commit e5229b0 (2026-07-25) and
-      committed under a human author's name. Refuses the site-not-stated code unless the chart
-      was first searched for a lobe and for the bronchus. The two search terms were chosen by a
-      language model; nobody has measured whether they find a documented lobe when one exists.
-  - element: "answer_checks[primary_site.origin_not_specimen]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by a language model in commit e5229b0 (2026-07-25) and
-      committed under a human author's name. Refuses a site coded from a quote that describes
-      the tissue taken rather than where the tumour started. The wordings it recognises were
-      invented for this file; a note that phrases it any other way passes the check unexamined.
-  - element: "answer_checks[primary_site.conflict_requires_nos.C349]"
-    origin: corpus_derived
-    # DRAFT, not measured, and the verdict below says why: one chart is not a rate. The
-    # measurement establishes that the conflict occurs and was resolved silently; it does not
-    # establish how often, nor that C349 is the right fallback. Promoting this to `measured`
-    # would rank a check built on n=1 above a check nobody has looked at.
-    status: draft
-    measured:
-      run: "extract__20260727T224009Z__e28d754-dirty (real_ten, seed 20260727)"
-      n_patients: 10
-      n_conflicts_observed: 1
-      verdict: underpowered
-      what_would_settle_it: >-
-        the rate of two-lobe answers over a few hundred charts, and a registrar's ruling on
-        whether C349 is what a coder does when an operative note and a pathology header
-        disagree. Neither exists.
-    basis: >-
-      no manual section; derived from a measured failure. On the 10-patient real-chart batch of
-      2026-07-27 (seed 20260727), one run cited an operative note saying the lesion was "coming
-      and arising from the right middle lobe" AND a pathology header reading "Lung, right lower
-      lobe" in the same answer, coded C342, and passed the coverage gate; the registry coded
-      C349. The lobe groups are ICD-O-3 C34 subsites and the abbreviations are the ones this
-      corpus uses. What is measured is that the conflict occurs and was silently resolved --
-      NOT that C349 is the right answer whenever two lobes appear, which is a coding judgement
-      no one has reviewed. n=1 failure, 1 chart.
-  - element: "answer_checks[primary_site.code_matches_cited_text.C349]"
-    origin: corpus_derived
-    # DRAFT. What is measured is that the disagreement happened and that nothing looked. What is
-    # NOT measured is the rate, nor whether refusing is the right response every time -- a code
-    # can legitimately differ from the wording if a later document overrides an earlier one, and
-    # this check demands the agent SAY so rather than deciding for it. n=1.
-    status: draft
-    measured:
-      run: "extract__20260728T214551Z__3550858-dirty (hooks_current, seed 1234)"
-      n_patients: 10
-      n_disagreements_observed: 1
-      n_caught_by_any_existing_check: 0
-      verdict: underpowered
-      what_happened: >-
-        one run cited evidence naming "left lower lobe" nine times and "LLL" once, wrote a
-        reasoning paragraph beginning "The primary site is the left lower lobe of lung", and
-        coded C342 -- middle lobe. `answer_check_rejections` was empty: none of the four existing
-        checks compares the code to the words in the quote. The registry coded C343. The left lung
-        has no middle lobe, so the answer was also anatomically impossible, which this check does
-        not need to know to catch it.
-      what_would_settle_it: >-
-        the rate of code-versus-wording disagreement over a few hundred charts, and a registrar's
-        ruling on when a later document may override the lobe an earlier one names. Neither
-        exists.
-    basis: >-
-      no manual section; derived from a measured failure, and written by a language model in
-      commit e5229b0 (2026-07-25) style under a human author's name. The lobe words and
-      abbreviations are the ones this corpus uses and are the SAME LIST as
-      `conflict_requires_nos.mutually_exclusive` above, with the ICD-O-3 subsite each group
-      means attached. That mapping (C341 upper, C342 middle, C343 lower, C340 main bronchus) was
-      recalled by a model, not copied out of the manual; a human should check it against
-      ICD-O-3 topography C34.
-  - element: "answer_checks[histology.not_less_specific.8000]"
-    origin: model_authored
-    status: draft
-    basis: >-
-      no external source; written by a language model in commit e5229b0 (2026-07-25) and
-      committed under a human author's name. Refuses the three vaguest morphology codes when the
-      quoted evidence is more specific. The list of more-specific wordings was invented.
-    measured:
-      run: "extract__20260728T214551Z__3550858-dirty (hooks_current, seed 1234)"
-      n_patients: 10
-      n_fires: 1
-      n_fires_wrongly: 1
-      verdict: falsified
-      what_happened: >-
-        the run coded histology 8046 -- the registry's answer -- citing "poorly differentiated
-        non-small cell carcinoma". `contradicted_by` contained "small cell", which matched INSIDE
-        "non-small cell", so the check read a negation as its opposite and refused the correct
-        answer. Its message then named 8070; the agent submitted 8070 and that was accepted. The
-        rule as written was falsified: on its only observed firing it turned a right answer into
-        a wrong one. Fixed by `_occurs_unnegated` in acr/answer_checks.py and by taking the code
-        out of the message.
-      what_would_settle_it: >-
-        the fire rate and the wrong-fire rate over a few hundred charts. One chart establishes
-        that the negation blindness was real and cost an answer. It does not establish that the
-        six phrases now in `_NEGATIONS` are the right six, nor that the remaining wordings in
-        `contradicted_by` are the right ones.
   - element: "proof_obligation.for_negative.gate.require_can_establish_nonempty"
     origin: model_authored
     status: draft

@@ -16,9 +16,9 @@ fields:
     description: "STORE [1880] code"
   - name: recurrence_date
     type: string
-    format: "CCYYMMDD"
+    format: "(19|20)\\d{2}(0[1-9]|1[0-2]|99)([0-2]\\d|3[01]|99)"
     nullable: true
-    description: "date of first recurrence; null when there is none or it is unknown"
+    description: "CCYYMMDD date of first recurrence; null when there is none or it is unknown"
 
 decision_rule:
   - "A recurrence is the first progression, metastasis or recurrence AFTER a documented disease-free interval."
@@ -185,11 +185,11 @@ provenance:
     origin: model_authored
     status: draft
     basis: >-
-      no external source; written by a language model in commit e5229b0 (2026-07-25) and
-      committed under a human author's name. The value written here is registry notation for an
-      eight-digit date, NOT a pattern -- but the software applies it as one, with a full match,
-      so this field rejects every valid date it is ever given. The bug is real, known, and still
-      unfixed; it is reported in the review document rather than paraphrased away.
+      no external source; mechanically replaced the literal registry notation written by a
+      language model in commit e5229b0 (2026-07-25) with a Python full-match pattern. The
+      pattern accepts eight-digit dates with explicit unknown month/day components and rejects
+      non-date text, but its year range and unknown-component rules have not been checked
+      against STORE item [1860]; it remains draft until that comparison is done.
   - element: "proof_obligation.for_negative.gate.all_claims_satisfied"
     origin: model_authored
     status: draft

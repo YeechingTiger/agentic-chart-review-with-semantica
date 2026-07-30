@@ -61,6 +61,75 @@ def _manifests(runs: str) -> list[Path]:
     return found
 
 
+def _refinement_artifacts(runs: str) -> list[Path]:
+    p = Path(runs)
+    if p.is_file():
+        found = [p]
+    else:
+        found = sorted(p.rglob("conflict-refinement.json"))
+    if not found:
+        raise typer.BadParameter(f"no conflict-refinement.json under {p}")
+    return found
+
+
+def _operational_baseline(runs: str) -> dict:
+    rows = [read_json(path, "baseline manifest") for path in _manifests(runs)]
+    costs = [
+        float((row.get("spend") or {}).get("usd"))
+        for row in rows
+        if isinstance((row.get("spend") or {}).get("usd"), (int, float))
+    ]
+    return {
+        "n_cases": len(rows),
+        "n_deepagents_runs": len(rows),
+        "n_gate_validated": sum(bool(row.get("gate_validated")) for row in rows),
+        "n_review_required": sum(
+            bool((row.get("answer") or {}).get("route_to_human")) for row in rows
+        ),
+        "total_cost_usd": round(sum(costs), 6),
+        "mean_cost_usd": round(sum(costs) / len(costs), 6) if costs else None,
+        "mean_steps": round(
+            sum(float(row.get("steps") or 0) for row in rows) / len(rows), 6
+        ) if rows else None,
+    }
+
+
+def _operational_refinement(runs: str) -> dict:
+    artifacts = [read_json(path, "conflict-refinement artifact")
+                 for path in _refinement_artifacts(runs)]
+    for row in artifacts:
+        if not isinstance(row, dict) or row.get("schema") != "acr.conflict_refinement/1":
+            raise typer.BadParameter(
+                "refinement input expected schema acr.conflict_refinement/1")
+    hypotheses = [
+        h for artifact in artifacts for round_rows in (artifact.get("rounds") or ())
+        for h in round_rows
+    ]
+    costs = [
+        float(h["cost_usd"]) for h in hypotheses
+        if isinstance(h.get("cost_usd"), (int, float))
+    ]
+    statuses = {
+        status: sum(a.get("status") == status for a in artifacts)
+        for status in ("NO_CONFLICT", "CONVERGED", "REVIEW_REQUIRED")
+    }
+    return {
+        "n_cases": len(artifacts),
+        "n_deepagents_runs": len(hypotheses),
+        "n_gate_validated": sum(bool(h.get("gate_validated")) for h in hypotheses),
+        "n_review_required": statuses["REVIEW_REQUIRED"],
+        "status_counts": statuses,
+        "total_cost_usd": round(sum(costs), 6),
+        "mean_cost_usd_per_case": (
+            round(sum(costs) / len(artifacts), 6) if costs and artifacts else None
+        ),
+        "mean_rounds": (
+            round(sum(float(a.get("n_rounds") or 0) for a in artifacts)
+                  / len(artifacts), 6) if artifacts else None
+        ),
+    }
+
+
 @eval_app.command("dimensions")
 def dimensions(
     check: str = typer.Option("", "--check",
@@ -250,3 +319,54 @@ def compare(
         typer.echo(json.dumps({"verdict": d["verdict"]}))
     if d["verdict"] == "REGRESSION":
         raise typer.Exit(1)
+
+
+@eval_app.command("compare-refinement")
+def compare_refinement(
+    baseline: str = typer.Option(
+        ..., "--baseline", help="single-run baseline manifest or manifest tree"),
+    refined: str = typer.Option(
+        ..., "--refined", help="conflict-refinement.json file or artifact tree"),
+    out: str = typer.Option("", "--out", help="write the operational A/B report here"),
+):
+    """Compare optional refinement compute and routing; correctness is scored separately.
+
+    Conflict artifacts deliberately contain no patient identifier or gold label, so this
+    command cannot manufacture a paired accuracy result. Use `repair validate` with
+    chart-observable gold for correctness and this report for incremental compute, rounds and
+    human-review routing.
+    """
+    before = _operational_baseline(baseline)
+    after = _operational_refinement(refined)
+    same_size = before["n_cases"] == after["n_cases"]
+    report = {
+        "schema": "acr.refinement_comparison/1",
+        "scope": "operational_only",
+        "correctness_command": "acr repair validate",
+        "baseline": before,
+        "refined": after,
+        "comparable_case_count": same_size,
+        "delta": {
+            "deepagents_runs": after["n_deepagents_runs"] - before["n_deepagents_runs"],
+            "total_cost_usd": round(
+                after["total_cost_usd"] - before["total_cost_usd"], 6),
+            "review_required": after["n_review_required"] - before["n_review_required"],
+        },
+    }
+    t = Table("arm", "cases", "deepagents runs", "gate-valid runs", "review", "cost")
+    t.add_row(
+        "baseline", str(before["n_cases"]), str(before["n_deepagents_runs"]),
+        str(before["n_gate_validated"]), str(before["n_review_required"]),
+        f"${before['total_cost_usd']:.4f}")
+    t.add_row(
+        "refined", str(after["n_cases"]), str(after["n_deepagents_runs"]),
+        str(after["n_gate_validated"]), str(after["n_review_required"]),
+        f"${after['total_cost_usd']:.4f}")
+    con.print(t)
+    con.print(
+        "[dim]Operational comparison only. Run `acr repair validate` on pseudonymous "
+        "chart-observable gold for paired correctness and subgroup regression.[/]")
+    if not same_size:
+        con.print("[yellow]Case counts differ; the aggregate operational deltas are not a "
+                  "paired estimate.[/]")
+    dump(report, out)
