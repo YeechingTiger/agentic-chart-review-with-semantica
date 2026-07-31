@@ -99,6 +99,27 @@ class Blueprint:
     #: and the two are different failures with different owners.
     trap: str = ""
 
+    #: WHEN THE RECORDED ANSWER IS NOT THE CHART'S ANSWER.
+    #:
+    #: A registry value is what a human abstractor wrote down, and abstractors read outside
+    #: records, mistype, and apply the wrong rule. README section 2.5 already refuses to call
+    #: such a value gold: it is staged as a REGISTRY_REFERENCE and only a human adjudication of
+    #: field-level chart derivability turns it into anything stronger.
+    #:
+    #: On these charts `_ground_truth.json` carries the REGISTRY value — including when it is
+    #: wrong — because that is what a deployment actually has. An agent that reads the chart
+    #: correctly therefore scores MISMATCH, and that is the point: what is being tested is not
+    #: the agent but whether the EVALUATION can tell "the agent erred" from "the key did".
+    #:
+    #: `dispute` names which of those it is. Three kinds, and conflating them is the failure:
+    #:   OUTSIDE_EVIDENCE  the key is right and the chart cannot show it. Abstaining is correct;
+    #:                     scoring it as a miss teaches the agent to guess from outside knowledge
+    #:                     it does not have.
+    #:   KEY_ERROR         the key is wrong. The agent is right and is being marked down.
+    #:   CHART_AMBIGUOUS   two readings are both supportable. Neither side erred, and any
+    #:                     verdict that names a winner is manufacturing certainty.
+    dispute: dict = field(default_factory=dict)
+
     #: The date the chart is LAID OUT around: index imaging, background years, follow-up arc.
     #: Defaults to `dx_date`, which is the answer. They come apart exactly when the answer is
     #: earlier than the workup that found it — `retrospective` is the case — and conflating
@@ -401,6 +422,109 @@ BLUEPRINTS = [
         expect={"dx_date": "20210917", "naive_answer": "EVIDENCE_INSUFFICIENT",
                 "requires": "widening to a stem after the contract's own words miss"},
     ),
+
+    # ==================================================================================
+    # CHARTS WHERE THE RECORDED ANSWER IS IN DISPUTE (SYNK01-K03)
+    #
+    # Everything above assumes the key is right and asks whether the agent can reach it. These
+    # ask the other question. `ground_truth` here carries the REGISTRY value — wrong on K02 —
+    # because that is what a deployment has, so a correct agent scores MISMATCH and the
+    # evaluation has to be the thing that notices.
+    #
+    # The measurement is on the EVAL, and `key_dispute.kind` is its answer key. An evaluation
+    # that returns KEY_ERROR on K01 has taught the agent to guess from outside knowledge; one
+    # that returns OUTSIDE_EVIDENCE on K02 has laundered an abstractor's typo into truth; one
+    # that names a winner on K03 has manufactured certainty. Three different harms, and a
+    # single "the answer disagrees" verdict cannot tell them apart.
+    # ==================================================================================
+    Blueprint(
+        pid="SYNK01", pattern="the key rests on an outside report that is not in this chart",
+        trap="outside_evidence",
+        site_text="left upper lobe of lung", site_code="C341",
+        histology_text="adenocarcinoma", histology_code="8140", behavior="3",
+        dx_date="20210315", index_date="20210802",
+        dx_date_why=("REGISTRY VALUE. The abstractor had the outside facility's biopsy report of "
+                     "2021-03-15. That report is not in this chart and no document here "
+                     "establishes any diagnosis before 2021-08-02."),
+        tissue=False, recurrence_type="00", recurrence_date="",
+        imaging=["Chest-CT-W-Contr"],
+        notes=("The key is CORRECT and unreachable. The only in-chart reference is a transfer "
+               "note saying the biopsy was done elsewhere in March. An agent that answers "
+               "EVIDENCE_INSUFFICIENT has read the chart correctly and will be scored as having "
+               "missed — and an evaluation that calls that an agent error is teaching it to "
+               "produce dates it cannot support."),
+        dispute={
+            "kind": "OUTSIDE_EVIDENCE",
+            "registry_value": "20210315",
+            "chart_supports": None,
+            "why": ("The chart names an outside biopsy and its month but carries neither the "
+                    "report nor a physician's diagnostic statement predating 2021-08-02."),
+            "correct_eval_verdict": "KEY_NOT_DERIVABLE_FROM_CHART",
+            "harm_if_missed": ("scoring the abstention as a miss trains the agent to guess on "
+                               "exactly the subpopulation where records are incomplete"),
+        },
+        expect={"chart_answer": "EVIDENCE_INSUFFICIENT", "registry_value": "20210315"},
+    ),
+    Blueprint(
+        pid="SYNK02", pattern="the key is a transcription error — no document carries that date",
+        trap="key_typo",
+        site_text="sigmoid colon", site_code="C187",
+        histology_text="adenocarcinoma", histology_code="8140", behavior="3",
+        dx_date="20200714", index_date="20200614",
+        dx_date_why=("REGISTRY VALUE, AND IT IS WRONG. Every document in the chart places the "
+                     "diagnosis at 2020-06-14; no document exists on 2020-07-14 and nothing "
+                     "supports it. The month digit was mistyped."),
+        tissue=True, recurrence_type="00", recurrence_date="",
+        imaging=["Abd-Pelvis-CT-W-Contr"],
+        notes=("The agent is right and the key is wrong. This is the cheapest dispute to detect "
+               "and the one most worth detecting automatically: the key names a date on which "
+               "the chart holds NO DOCUMENT AT ALL, which is decidable without reading a word "
+               "of clinical text. An evaluation that cannot catch this one will not catch any."),
+        dispute={
+            "kind": "KEY_ERROR",
+            "registry_value": "20200714",
+            "chart_supports": "20200614",
+            "why": ("Pathology, the oncology note and the index imaging all fall in June 2020. "
+                    "The chart contains no document dated 2020-07-14."),
+            "correct_eval_verdict": "KEY_CONTRADICTED_BY_CHART",
+            "harm_if_missed": ("a correct run is recorded as a failure, and repeated, the "
+                               "measured accuracy of a working system decays toward the "
+                               "abstractor's error rate"),
+        },
+        expect={"chart_answer": "20200614", "registry_value": "20200714"},
+    ),
+    Blueprint(
+        pid="SYNK03", pattern="two defensible readings — the chart itself does not settle it",
+        trap="genuinely_ambiguous",
+        site_text="right lower lobe of lung", site_code="C342",
+        histology_text="adenocarcinoma", histology_code="8140", behavior="3",
+        dx_date="20210510", index_date="20210510",
+        dx_date_why=("REGISTRY VALUE, and defensible. The 2021-04-05 cytology reads POSITIVE "
+                     "FOR MALIGNANT CELLS — not an ambiguous term — with no clinical impression "
+                     "beside it. Whether an unambiguous cytology establishes the diagnosis "
+                     "without tissue, or whether the 2021-05-10 biopsy does, is a reading the "
+                     "spec's own wording supports both ways."),
+        tissue=True, recurrence_type="00", recurrence_date="",
+        imaging=["Chest-CT-W-Contr"],
+        notes=("NEITHER SIDE IS WRONG, and that is what makes it a control. STORE.390 counts 'a "
+               "pathology or cytology report whose interpretation establishes the diagnosis' "
+               "and separately discounts 'cytology carrying only an ambiguous term'. POSITIVE "
+               "FOR MALIGNANT CELLS is not ambiguous, so the first clause reaches it; but the "
+               "conflict_rules are written around the ambiguous case and say nothing here. "
+               "Without this chart an evaluation can score full marks by calling every "
+               "disagreement a defect, which is the same failure as calling none of them one."),
+        dispute={
+            "kind": "CHART_AMBIGUOUS",
+            "registry_value": "20210510",
+            "chart_supports": ["20210405", "20210510"],
+            "why": ("An unambiguous cytology and a confirmatory biopsy, and a spec whose "
+                    "conflict rules only cover the ambiguous-cytology case."),
+            "correct_eval_verdict": "HUMAN_ADJUDICATION_REQUIRED",
+            "harm_if_missed": ("naming a winner here manufactures certainty, and a spec gap "
+                               "reported as an agent error never reaches whoever owns the spec"),
+        },
+        expect={"chart_answer": "AMBIGUOUS", "registry_value": "20210510"},
+    ),
 ]
 
 
@@ -658,6 +782,53 @@ def shorthand_note(bp, name, sex, dob, dtype, d) -> str:
     return _hdr(bp, name, sex, dob, dtype, d) + "\n".join(body) + "\n"
 
 
+def outside_transfer_note(bp, name, sex, dob, dtype, d, month_text: str) -> str:
+    """Names an outside biopsy and its month. Carries no diagnosis of its own.
+
+    This is what a chart looks like when the abstractor knew more than the record does. The note
+    is a handover: it reports what the patient says was done elsewhere, which is hearsay about a
+    document, not a physician's diagnostic statement and not a pathology report.
+    """
+    body = [
+        "SUBJECTIVE:",
+        "  New patient, transferred care. Reports a lung biopsy performed at an outside",
+        f"  facility in {month_text}. Records requested; not yet received.",
+        "  Brought a medication list only.",
+        "",
+        "ASSESSMENT AND PLAN:",
+        "  1. History per patient of a lung lesion biopsied elsewhere. Outside pathology is",
+        "     NOT available for review and no report is in this record. Cannot verify the",
+        "     result independently today.",
+        "  2. Records request re-sent. Restage here if they do not arrive.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, dtype, d) + "\n".join(body) + "\n"
+
+
+def positive_cytology_note(bp, name, sex, dob, d) -> str:
+    """Cytology reading POSITIVE, not "suspicious for".
+
+    The distinction is the whole of SYNK03. STORE.390 counts "a pathology or cytology report
+    whose interpretation establishes the diagnosis" and separately discounts "cytology carrying
+    only an ambiguous term". POSITIVE FOR MALIGNANT CELLS is not an ambiguous term, so the first
+    clause reaches it — and the conflict_rules, which are all written around the ambiguous case,
+    say nothing about what happens next.
+    """
+    body = [
+        "SPECIMEN:",
+        f"  Fine needle aspirate, {bp.site_text}",
+        "",
+        "INTERPRETATION:",
+        "  Cellular aspirate. Malignant epithelial cells are present, forming glandular",
+        "  groups. No benign explanation is identified.",
+        "",
+        "IMPRESSION:",
+        "  POSITIVE FOR MALIGNANT CELLS.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, "Surgical-Pathology-Document", d) + "\n".join(body) + "\n"
+
+
 def progress_note(bp, name, sex, dob, dtype, d, rng, *, kind: str) -> str:
     """kind: initial | interval | disease_free | recurrence | gap_outside | gap_declined | conflict"""
     lines = ["SUBJECTIVE:"]
@@ -836,6 +1007,31 @@ def _emit_trap(bp: Blueprint, emit, name, sex, dob, dx: date, rng) -> None:
                                     dx - timedelta(days=118)))
         pulm = "Pulm-MD-OP-Progress-Note"
         emit(pulm, dx, shorthand_note(bp, name, sex, dob, pulm, dx))
+
+    elif bp.trap == "outside_evidence":
+        # `tissue=False`: the establishing report is at the other hospital, which is the point.
+        # The chart gets a transfer note that NAMES the outside biopsy without reproducing it.
+        emit(onc, dx, outside_transfer_note(bp, name, sex, dob, onc, dx, "March"))
+        emit(onc, dx + timedelta(days=40),
+             progress_note(bp, name, sex, dob, onc, dx + timedelta(days=40), rng,
+                           kind="disease_free"))
+
+    elif bp.trap == "key_typo":
+        # Ordinary chart, ordinary layout. Everything that makes this case is in the KEY, which
+        # names a date on which nothing was written — decidable without reading clinical text,
+        # and the reason this is the dispute an evaluation must catch if it catches any.
+        emit("Surgical-Pathology-Report", dx,
+             pathology_note(bp, name, sex, dob, "Surgical-Pathology-Report", dx))
+        emit(onc, dx + timedelta(days=2),
+             progress_note(bp, name, sex, dob, onc, dx + timedelta(days=2), rng, kind="initial"))
+
+    elif bp.trap == "genuinely_ambiguous":
+        cyto = dx - timedelta(days=35)
+        emit("Surgical-Pathology-Document", cyto, positive_cytology_note(bp, name, sex, dob, cyto))
+        emit("Surgical-Pathology-Report", dx,
+             pathology_note(bp, name, sex, dob, "Surgical-Pathology-Report", dx))
+        emit(onc, dx + timedelta(days=2),
+             progress_note(bp, name, sex, dob, onc, dx + timedelta(days=2), rng, kind="initial"))
 
     else:
         raise ValueError(
@@ -1038,6 +1234,14 @@ def build_patient(bp: Blueprint, out_root: Path) -> dict:
         # Machine-assertable expectations. Tests read this; nobody eyeballs it.
         "expect": bp.expect,
     }
+    if bp.dispute:
+        # SEPARATE FROM `ground_truth` ON PURPOSE. `ground_truth` is what a deployment has —
+        # the registry's value, wrong or right — and `acr eval score` reads it, so an agent
+        # that reads the chart correctly against a bad key scores MISMATCH exactly as it would
+        # in production. This block is the designer's record of what is actually going on, and
+        # it scores the EVALUATION, never the agent. Anything that fed it to a run would be
+        # handing over the answer to the question the run exists to ask.
+        gt["key_dispute"] = dict(bp.dispute)
     (pdir / "_ground_truth.json").write_text(json.dumps(gt, indent=2) + "\n", encoding="utf-8")
     return gt
 

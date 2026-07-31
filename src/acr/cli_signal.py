@@ -78,6 +78,10 @@ DEFAULT_EVAL_SKILLS: tuple[str, ...] = (
     "eval-cluster-failures",
     "eval-missed-evidence",
     "eval-overconfidence",
+    # The other four all ask why the RUN went wrong. This one asks whether the KEY did, which
+    # is a different question and the only one nobody was asking: a registry value is what a
+    # person wrote down, and "the run erred" is the default reading of every disagreement.
+    "eval-key-challenge",
 )
 
 #: Turns the attribution agent gets. `acr attribute case` defaults to 12 and this dispatcher

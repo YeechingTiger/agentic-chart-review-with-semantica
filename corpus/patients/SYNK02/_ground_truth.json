@@ -1,0 +1,59 @@
+{
+  "patient_id": "SYNK02",
+  "evidence_pattern": "the key is a transcription error \u2014 no document carries that date",
+  "designer_notes": "The agent is right and the key is wrong. This is the cheapest dispute to detect and the one most worth detecting automatically: the key names a date on which the chart holds NO DOCUMENT AT ALL, which is decidable without reading a word of clinical text. An evaluation that cannot catch this one will not catch any.",
+  "n_documents": 322,
+  "date_range": [
+    "2010-06-26",
+    "2021-12-06"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20200714",
+      "status": "FOUND",
+      "why": "REGISTRY VALUE, AND IT IS WRONG. Every document in the chart places the diagnosis at 2020-06-14; no document exists on 2020-07-14 and nothing supports it. The month digit was mistyped."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C187",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2010-06-26",
+        "end": "2021-12-06"
+      },
+      "expected_through_date": "2021-12-06",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "chart_answer": "20200614",
+    "registry_value": "20200714"
+  },
+  "key_dispute": {
+    "kind": "KEY_ERROR",
+    "registry_value": "20200714",
+    "chart_supports": "20200614",
+    "why": "Pathology, the oncology note and the index imaging all fall in June 2020. The chart contains no document dated 2020-07-14.",
+    "correct_eval_verdict": "KEY_CONTRADICTED_BY_CHART",
+    "harm_if_missed": "a correct run is recorded as a failure, and repeated, the measured accuracy of a working system decays toward the abstractor's error rate"
+  }
+}

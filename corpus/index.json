@@ -907,5 +907,185 @@
       "naive_answer": "EVIDENCE_INSUFFICIENT",
       "requires": "widening to a stem after the contract's own words miss"
     }
+  },
+  {
+    "patient_id": "SYNK01",
+    "evidence_pattern": "the key rests on an outside report that is not in this chart",
+    "designer_notes": "The key is CORRECT and unreachable. The only in-chart reference is a transfer note saying the biopsy was done elsewhere in March. An agent that answers EVIDENCE_INSUFFICIENT has read the chart correctly and will be scored as having missed \u2014 and an evaluation that calls that an agent error is teaching it to produce dates it cannot support.",
+    "n_documents": 312,
+    "date_range": [
+      "2011-08-05",
+      "2023-01-24"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": "20210315",
+        "status": "FOUND",
+        "why": "REGISTRY VALUE. The abstractor had the outside facility's biopsy report of 2021-03-15. That report is not in this chart and no document here establishes any diagnosis before 2021-08-02."
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C341",
+        "histology": "8140",
+        "behavior": "3",
+        "status": "EVIDENCE_INSUFFICIENT",
+        "why": "No pathology in the record; histology must NOT be inferred from imaging."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "00",
+        "date": null,
+        "status": "FOUND",
+        "observable_period": {
+          "start": "2011-08-05",
+          "end": "2023-01-24"
+        },
+        "expected_through_date": "2023-01-24",
+        "followup_shape": "normal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "chart_answer": "EVIDENCE_INSUFFICIENT",
+      "registry_value": "20210315"
+    },
+    "key_dispute": {
+      "kind": "OUTSIDE_EVIDENCE",
+      "registry_value": "20210315",
+      "chart_supports": null,
+      "why": "The chart names an outside biopsy and its month but carries neither the report nor a physician's diagnostic statement predating 2021-08-02.",
+      "correct_eval_verdict": "KEY_NOT_DERIVABLE_FROM_CHART",
+      "harm_if_missed": "scoring the abstention as a miss trains the agent to guess on exactly the subpopulation where records are incomplete"
+    }
+  },
+  {
+    "patient_id": "SYNK02",
+    "evidence_pattern": "the key is a transcription error \u2014 no document carries that date",
+    "designer_notes": "The agent is right and the key is wrong. This is the cheapest dispute to detect and the one most worth detecting automatically: the key names a date on which the chart holds NO DOCUMENT AT ALL, which is decidable without reading a word of clinical text. An evaluation that cannot catch this one will not catch any.",
+    "n_documents": 322,
+    "date_range": [
+      "2010-06-26",
+      "2021-12-06"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": "20200714",
+        "status": "FOUND",
+        "why": "REGISTRY VALUE, AND IT IS WRONG. Every document in the chart places the diagnosis at 2020-06-14; no document exists on 2020-07-14 and nothing supports it. The month digit was mistyped."
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C187",
+        "histology": "8140",
+        "behavior": "3",
+        "status": "FOUND",
+        "why": "Tissue diagnosis present in the chart."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "00",
+        "date": null,
+        "status": "FOUND",
+        "observable_period": {
+          "start": "2010-06-26",
+          "end": "2021-12-06"
+        },
+        "expected_through_date": "2021-12-06",
+        "followup_shape": "normal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "chart_answer": "20200614",
+      "registry_value": "20200714"
+    },
+    "key_dispute": {
+      "kind": "KEY_ERROR",
+      "registry_value": "20200714",
+      "chart_supports": "20200614",
+      "why": "Pathology, the oncology note and the index imaging all fall in June 2020. The chart contains no document dated 2020-07-14.",
+      "correct_eval_verdict": "KEY_CONTRADICTED_BY_CHART",
+      "harm_if_missed": "a correct run is recorded as a failure, and repeated, the measured accuracy of a working system decays toward the abstractor's error rate"
+    }
+  },
+  {
+    "patient_id": "SYNK03",
+    "evidence_pattern": "two defensible readings \u2014 the chart itself does not settle it",
+    "designer_notes": "NEITHER SIDE IS WRONG, and that is what makes it a control. STORE.390 counts 'a pathology or cytology report whose interpretation establishes the diagnosis' and separately discounts 'cytology carrying only an ambiguous term'. POSITIVE FOR MALIGNANT CELLS is not ambiguous, so the first clause reaches it; but the conflict_rules are written around the ambiguous case and say nothing here. Without this chart an evaluation can score full marks by calling every disagreement a defect, which is the same failure as calling none of them one.",
+    "n_documents": 325,
+    "date_range": [
+      "2011-05-16",
+      "2022-11-01"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": "20210510",
+        "status": "FOUND",
+        "why": "REGISTRY VALUE, and defensible. The 2021-04-05 cytology reads POSITIVE FOR MALIGNANT CELLS \u2014 not an ambiguous term \u2014 with no clinical impression beside it. Whether an unambiguous cytology establishes the diagnosis without tissue, or whether the 2021-05-10 biopsy does, is a reading the spec's own wording supports both ways."
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C342",
+        "histology": "8140",
+        "behavior": "3",
+        "status": "FOUND",
+        "why": "Tissue diagnosis present in the chart."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "00",
+        "date": null,
+        "status": "FOUND",
+        "observable_period": {
+          "start": "2011-05-16",
+          "end": "2022-11-01"
+        },
+        "expected_through_date": "2022-11-01",
+        "followup_shape": "normal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "chart_answer": "AMBIGUOUS",
+      "registry_value": "20210510"
+    },
+    "key_dispute": {
+      "kind": "CHART_AMBIGUOUS",
+      "registry_value": "20210510",
+      "chart_supports": [
+        "20210405",
+        "20210510"
+      ],
+      "why": "An unambiguous cytology and a confirmatory biopsy, and a spec whose conflict rules only cover the ambiguous-cytology case.",
+      "correct_eval_verdict": "HUMAN_ADJUDICATION_REQUIRED",
+      "harm_if_missed": "naming a winner here manufactures certainty, and a spec gap reported as an agent error never reaches whoever owns the spec"
+    }
   }
 ]

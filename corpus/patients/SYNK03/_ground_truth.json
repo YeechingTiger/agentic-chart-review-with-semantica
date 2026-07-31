@@ -1,0 +1,62 @@
+{
+  "patient_id": "SYNK03",
+  "evidence_pattern": "two defensible readings \u2014 the chart itself does not settle it",
+  "designer_notes": "NEITHER SIDE IS WRONG, and that is what makes it a control. STORE.390 counts 'a pathology or cytology report whose interpretation establishes the diagnosis' and separately discounts 'cytology carrying only an ambiguous term'. POSITIVE FOR MALIGNANT CELLS is not ambiguous, so the first clause reaches it; but the conflict_rules are written around the ambiguous case and say nothing here. Without this chart an evaluation can score full marks by calling every disagreement a defect, which is the same failure as calling none of them one.",
+  "n_documents": 325,
+  "date_range": [
+    "2011-05-16",
+    "2022-11-01"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20210510",
+      "status": "FOUND",
+      "why": "REGISTRY VALUE, and defensible. The 2021-04-05 cytology reads POSITIVE FOR MALIGNANT CELLS \u2014 not an ambiguous term \u2014 with no clinical impression beside it. Whether an unambiguous cytology establishes the diagnosis without tissue, or whether the 2021-05-10 biopsy does, is a reading the spec's own wording supports both ways."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C342",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2011-05-16",
+        "end": "2022-11-01"
+      },
+      "expected_through_date": "2022-11-01",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "chart_answer": "AMBIGUOUS",
+    "registry_value": "20210510"
+  },
+  "key_dispute": {
+    "kind": "CHART_AMBIGUOUS",
+    "registry_value": "20210510",
+    "chart_supports": [
+      "20210405",
+      "20210510"
+    ],
+    "why": "An unambiguous cytology and a confirmatory biopsy, and a spec whose conflict rules only cover the ambiguous-cytology case.",
+    "correct_eval_verdict": "HUMAN_ADJUDICATION_REQUIRED",
+    "harm_if_missed": "naming a winner here manufactures certainty, and a spec gap reported as an agent error never reaches whoever owns the spec"
+  }
+}

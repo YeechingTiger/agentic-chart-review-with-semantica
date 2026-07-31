@@ -57,3 +57,12 @@ corpus/patients/.doc_type_vocab.json
 
 # (The real-patient globs that used to live here are gone: `runs/` is ignored wholesale
 # above, so there is nothing left for a name-based exception to get wrong.)
+
+# iCloud conflict copies. ~/Desktop is synced, and the corpus generator unlinks and rewrites
+# ~5,500 files in a few seconds, which iCloud resolves by leaving "Name 2.txt" beside "Name.txt".
+# 1,929 of them appeared during one regeneration. `corpus.FILENAME_RE` does not match the
+# space-digit suffix so they never enter a chart and no run was affected — but they are 1,929
+# staged additions away from being committed as corpus, and the next reader would have no way
+# to tell them from real documents.
+*[0-9].txt
+!*__[0-9].txt

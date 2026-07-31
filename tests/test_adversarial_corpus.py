@@ -198,3 +198,136 @@ def test_x06_no_document_contains_a_full_diagnostic_word():
 
     assert "adenoca" in text, "the shorthand itself must be present, or nothing can be found"
     assert "adeno" in text
+
+
+# ======================================================================================
+# CHARTS WHERE THE RECORDED ANSWER IS IN DISPUTE
+#
+# These test the EVALUATION, not the agent. `ground_truth` carries the registry's value —
+# wrong on K02 — because that is what a deployment has, so an agent that reads the chart
+# correctly scores MISMATCH and something downstream has to be the thing that notices.
+# `key_dispute.kind` is the answer key for that downstream thing.
+# ======================================================================================
+
+DISPUTED = ["SYNK01", "SYNK02", "SYNK03"]
+KINDS = {"OUTSIDE_EVIDENCE", "KEY_ERROR", "CHART_AMBIGUOUS"}
+
+
+def dispute(pid: str) -> dict:
+    d = truth(pid).get("key_dispute")
+    assert d, f"{pid} carries no key_dispute block"
+    return d
+
+
+@pytest.mark.parametrize("pid", DISPUTED)
+def test_the_scorer_sees_the_registry_value_not_the_chart_answer(pid: str):
+    """The simulation only works if `acr eval score` reads what a deployment would read.
+
+    If `ground_truth` carried the chart's answer instead, a correct run would score EXACT and
+    there would be nothing for an evaluation to catch — the whole point of these charts is that
+    the disagreement reaches the scorer.
+    """
+    d = dispute(pid)
+    assert answer(pid) == d["registry_value"], (
+        f"{pid}: the scorer's key must be the REGISTRY value, wrong or right")
+
+
+@pytest.mark.parametrize("pid", DISPUTED)
+def test_each_dispute_declares_a_kind_and_the_harm_of_getting_it_wrong(pid: str):
+    d = dispute(pid)
+    assert d["kind"] in KINDS, f"{pid}: unknown dispute kind {d['kind']!r}"
+    assert d.get("correct_eval_verdict"), f"{pid}: no verdict for the eval to be scored against"
+    assert d.get("harm_if_missed"), (
+        f"{pid}: a dispute kind with no stated harm is a taxonomy, not a test — the three kinds "
+        f"exist because they cause DIFFERENT damage")
+
+
+def test_the_three_kinds_are_all_represented():
+    """One of each. Two of a kind and an evaluation can score well by always guessing it."""
+    assert {dispute(p)["kind"] for p in DISPUTED} == KINDS
+
+
+def test_k01_the_chart_contains_no_establishing_document_at_all():
+    """The key is right and unreachable: the report is at another hospital."""
+    paths = chart("SYNK01")
+    assert not [p for p in paths if "Surgical-Pathology" in p.name], (
+        "a pathology report in this chart would make the key derivable and the case pointless")
+    # Matched on a phrase that cannot be split by the note's wrapping. "outside facility" is
+    # the obvious probe and it fails here for a reason that has nothing to do with the chart:
+    # the words land on either side of a line break. A test that pins prose across a newline
+    # pins the formatter, not the property.
+    referring = [p for p in paths
+                 if "NOT available for review" in p.read_text(encoding="utf-8")]
+    assert referring, (
+        "the chart must REFER to the evidence it lacks — that reference is the whole tell "
+        "separating OUTSIDE_EVIDENCE from KEY_ERROR, and without it this chart is simply a "
+        "record with a gap")
+    assert dispute("SYNK01")["chart_supports"] is None
+
+
+def test_k02_the_key_names_a_date_no_document_falls_on():
+    """The cheapest dispute to detect, and the one that must never be missed.
+
+    Decidable without reading a word of clinical text: list the chart, look for the date.
+    """
+    paths = chart("SYNK02")
+    key = answer("SYNK02")
+    key_iso = f"{key[:4]}-{key[4:6]}-{key[6:]}"
+    assert not [p for p in paths if key_iso in p.name], (
+        f"a document dated {key_iso} would give the key something to stand on")
+    assert not [p for p in paths if key_iso in p.read_text(encoding="utf-8")], (
+        f"{key_iso} appears in some document's text; the contradiction is no longer structural")
+
+    supported = dispute("SYNK02")["chart_supports"]
+    sup_iso = f"{supported[:4]}-{supported[4:6]}-{supported[6:]}"
+    assert [p for p in paths if sup_iso in p.name], (
+        "the date the chart DOES support must be present, or this is not a typo, it is a gap")
+
+
+def test_k03_both_readings_are_present_in_the_chart():
+    """Neither side erred. Without this control, an evaluation scores full marks by calling
+    every disagreement a defect — which is the same failure as calling none of them one."""
+    paths = chart("SYNK03")
+    cyto = [p for p in paths if "POSITIVE FOR MALIGNANT CELLS" in p.read_text(encoding="utf-8")]
+    assert len(cyto) == 1, "the unambiguous cytology is what makes both readings defensible"
+    assert not [p for p in cyto if "SUSPICIOUS FOR" in p.read_text(encoding="utf-8")], (
+        "'suspicious for' would make this the ordinary ambiguous-cytology case the spec DOES "
+        "settle, and the ambiguity would be gone")
+
+    both = dispute("SYNK03")["chart_supports"]
+    assert isinstance(both, list) and len(both) == 2
+    for candidate in both:
+        iso = f"{candidate[:4]}-{candidate[4:6]}-{candidate[6:]}"
+        assert [p for p in paths if iso in p.name], (
+            f"{iso} is offered as a defensible reading but no document falls on it")
+
+
+def test_the_key_challenge_skill_exists_and_is_offered_by_default():
+    """A card nobody loads is guidance nobody receives — the defect `acr.skills` was written
+    to prevent, one level up."""
+    from acr.cli_signal import DEFAULT_EVAL_SKILLS
+    from acr.skills import eval_skill_judges, skill_slot
+
+    assert "eval-key-challenge" in DEFAULT_EVAL_SKILLS
+    assert skill_slot("eval-key-challenge") == "eval"
+    assert "key_derivability" in eval_skill_judges("eval-key-challenge")
+
+
+def test_no_unparseable_document_is_sitting_in_the_corpus():
+    """A .txt whose name the loader cannot parse is invisible to every run.
+
+    `corpus.FILENAME_RE` skips a stem it cannot read, silently — which is correct for iCloud's
+    "Name 2.txt" conflict copies (1,929 appeared during one regeneration of this corpus, and
+    none of them reached a chart) and dangerous for anything else. A genuinely misnamed clinical
+    document would disappear the same way, and a chart missing a document still answers, still
+    passes its gate, and still reports coverage over the documents it did see.
+
+    So the skip stays silent and this makes the population visible instead.
+    """
+    from acr.corpus import FILENAME_RE
+
+    unparseable = [p for p in CORPUS.rglob("*.txt") if not FILENAME_RE.match(p.stem)]
+    assert not unparseable, (
+        f"{len(unparseable)} document(s) the loader will skip without saying so, e.g. "
+        f"{[p.name for p in unparseable[:3]]}. If these are iCloud conflict copies, delete "
+        f"them: find corpus/patients -name '* [0-9].txt' -delete")
