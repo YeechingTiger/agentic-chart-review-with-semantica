@@ -701,6 +701,94 @@ def detect_uncaused_reads(run: RunRecord) -> list[Finding]:
     )]
 
 
+def _evidence_of(run: RunRecord) -> list[dict]:
+    """The recorded evidence set, mappings only. One accessor, so three checks cannot disagree.
+
+    WHERE the set lives is already settled by `RunRecord.evidence` above, and this delegates to
+    it rather than repeating the lookup: `agent.py` writes the ledger TWICE — top level at
+    :1205 and inside the answer at :987 — while `run_manifest.build_manifest` writes only the
+    answer copy, so a second accessor that happened to check one key would report "no evidence"
+    for whole classes of manifest. "No evidence" is the gate's conclusion, not this audit's.
+
+    All this adds is dropping non-mapping rows, so a hand-edited manifest costs one detector a
+    skipped item instead of raising AttributeError partway through a batch.
+    """
+    return [e for e in run.evidence if isinstance(e, dict)]
+
+
+def audit_evidence_set(run: RunRecord) -> list[Finding]:
+    """Structural defects in the evidence set AS A SET, not in any one item.
+
+    Every existing check is per-item: does this quote re-read at its offsets, is this span
+    non-empty. DeepEvidence's evidence-graph audit reports set-level numbers instead — a 0.6%
+    duplication rate, ≥99% relation correctness — and nothing here had ever counted the
+    equivalent. Each finding carries a RATE, not a flag, because a check that can only say
+    "there is duplication" cannot be compared against a baseline or tracked across arms.
+
+    Silent on an empty ledger: that is the gate's case, and it already refuses the answer.
+    """
+    items = _evidence_of(run)
+    if not items:
+        return []
+    out: list[Finding] = []
+
+    # 1. Overlapping spans supporting the SAME field. The ledger de-duplicates identical
+    #    (note, start, end, supports) tuples; it cannot see that chars 0-40 and 10-50 of one
+    #    note are largely the same sentence recorded twice. Per field, because one sentence
+    #    legitimately supports both a site and a histology.
+    by_field: dict[str, list[dict]] = {}
+    for e in items:
+        by_field.setdefault(str(e.get("supports") or ""), []).append(e)
+    pairs = 0
+    for field_items in by_field.values():
+        for i, a in enumerate(field_items):
+            for b in field_items[i + 1:]:
+                if a.get("note_id") != b.get("note_id"):
+                    continue
+                if int(a.get("start", 0)) < int(b.get("end", 0)) and \
+                   int(b.get("start", 0)) < int(a.get("end", 0)):
+                    pairs += 1
+    if pairs:
+        out.append(Finding(
+            "evidence_span_overlap", WARN,
+            f"{pairs} overlapping span pair(s) support the same field; the same sentence is "
+            f"recorded more than once",
+            {"n_evidence": len(items), "n_overlapping_pairs": pairs,
+             "overlap_rate": round(pairs / len(items), 3)}))
+
+    # 2. A contradiction with nothing to contradict. `stance=contradicts` beside a supporting
+    #    span is a conflict in the record — a real state, reported honestly. Alone, it means
+    #    the run recorded what argues AGAINST a field and never recorded what argues for it,
+    #    and the answer is resting on something outside the ledger.
+    supported = {str(e.get("supports") or "") for e in items
+                 if e.get("stance") != "contradicts"}
+    orphans = sorted({str(e.get("supports") or "") for e in items
+                      if e.get("stance") == "contradicts"} - supported)
+    if orphans:
+        out.append(Finding(
+            "orphan_contradiction", WARN,
+            f"{len(orphans)} field(s) carry contradicting evidence and no supporting "
+            f"evidence: {', '.join(orphans)}",
+            {"fields": orphans, "n_evidence": len(items)}))
+
+    # 3. A field resting on a single document. Not a defect — a chart may document a value
+    #    once — but it is the shape in which "the right document, the wrong specimen" survives
+    #    to submission, because there is no second witness to disagree with.
+    docs_per_field: dict[str, set] = {}
+    for e in items:
+        if e.get("stance") == "contradicts":
+            continue
+        docs_per_field.setdefault(str(e.get("supports") or ""), set()).add(e.get("note_id"))
+    singles = sorted(f for f, docs in docs_per_field.items() if len(docs) == 1 and f)
+    if singles:
+        out.append(Finding(
+            "single_witness_field", WARN,
+            f"{len(singles)} field(s) rest on one document: {', '.join(singles)}",
+            {"fields": singles,
+             "single_witness_rate": round(len(singles) / max(1, len(docs_per_field)), 3)}))
+    return out
+
+
 @dataclass(frozen=True)
 class DetectorConfig:
     """Every threshold, declared by the caller. No field has a default.
@@ -729,6 +817,7 @@ def run_detectors(run: RunRecord, *, config: DetectorConfig,
     out += detect_rejection_loop(run, max_repeats=config.max_rejection_repeats)
     out += detect_resource_band(run, token_band=config.token_band, turn_band=config.turn_band)
     out += detect_uncaused_reads(run)
+    out += audit_evidence_set(run)
     return sorted(out, key=lambda f: _SEVERITY_ORDER.get(f.severity, 9))
 
 
