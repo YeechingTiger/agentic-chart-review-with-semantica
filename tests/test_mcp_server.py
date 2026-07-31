@@ -350,6 +350,39 @@ def test_a_fabricated_quote_cannot_enter_the_ledger():
     assert svc._runs_by_id[run_id].evidence.items == []
 
 
+def test_the_entity_anchor_survives_this_surface():
+    """An anchor sent to the MCP front end must reach the ledger, not be dropped in silence.
+
+    `_record_evidence` builds a CLOSED whitelist before dispatching, which is what stops a caller
+    smuggling an unknown field past the toolbox. The cost of that design is that every field the
+    ledger learns has to be added here too, and one that is not is discarded while the call still
+    reports `accepted: True`. `entity` was exactly that until 2026-07-31: the two front ends
+    disagreed about what an evidence row can carry, and both said the write had succeeded.
+    """
+    svc = service()
+    run_id = plan(svc, FOUND_PATIENT)
+    anchored = [dict(FOUND_EVIDENCE[0], entity="right upper lobe")]
+    out = svc.call("gate.check", {"run_id": run_id, "answer": {
+        "status": "FOUND", "value": FOUND_VALUE, "reasoning": "tissue diagnosis",
+        "evidence": anchored}})
+
+    assert out["evidence_recorded"][0]["accepted"] is True
+    stored = svc._runs_by_id[run_id].evidence.items
+    assert stored and stored[0].entity == "right upper lobe"
+
+
+def test_an_evidence_row_without_an_anchor_is_still_accepted():
+    """The anchor is optional on both surfaces; requiring it here would fork the contract."""
+    svc = service()
+    run_id = plan(svc, FOUND_PATIENT)
+    out = svc.call("gate.check", {"run_id": run_id, "answer": {
+        "status": "FOUND", "value": FOUND_VALUE, "reasoning": "tissue diagnosis",
+        "evidence": FOUND_EVIDENCE}})
+
+    assert out["evidence_recorded"][0]["accepted"] is True
+    assert svc._runs_by_id[run_id].evidence.items[0].entity == ""
+
+
 def test_validated_has_exactly_one_origin_in_the_source():
     """If this count ever exceeds one, the gate has grown a second door.
 

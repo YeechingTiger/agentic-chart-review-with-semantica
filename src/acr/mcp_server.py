@@ -718,11 +718,17 @@ class ChartReviewService:
             if not isinstance(item, dict):
                 out.append({"accepted": False, "error": "evidence items must be objects"})
                 continue
+            # The whitelist is closed on purpose — a caller cannot smuggle a field past the
+            # toolbox by naming it. So every field the ledger accepts has to be added HERE too,
+            # and one that is not is dropped in silence: `entity` was, until this line, which
+            # made the two front ends disagree about what an evidence row can carry while both
+            # reported success.
             args = {"note_id": str(item.get("note_id", "")),
                     "start": int(item.get("start", 0) or 0),
                     "end": int(item.get("end", 0) or 0),
                     "supports": str(item.get("supports", "")),
-                    "stance": str(item.get("stance", "supports"))}
+                    "stance": str(item.get("stance", "supports")),
+                    "entity": str(item.get("entity", "") or "")}
             res, _ms = run.toolbox.dispatch("record_evidence", args)
             out.append({"note_id": args["note_id"], "accepted": bool(res.get("recorded")),
                         **({"error": res["error"]} if res.get("error") else {})})
