@@ -308,7 +308,7 @@ class RetrievalPlan:
     @classmethod
     def from_spec(cls, spec: Any, field_name: str) -> RetrievalPlan:
         """The plan the spec ships today: the incumbent every candidate is scored against."""
-        from .coverage import strata_from_spec
+        from .strata import strata_from_spec
 
         assignment, keywords, policies, fallback = [], [], [], "cannot_establish"
         for st in strata_from_spec(spec):

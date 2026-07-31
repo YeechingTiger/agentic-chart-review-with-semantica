@@ -117,8 +117,8 @@ import typer
 import yaml
 
 from .corpus import DocMeta
-from .coverage import assign_strata, strata_from_spec
 from .spec import ProvenanceRecord, _content_hash, load_spec
+from .strata import assign_strata, strata_from_spec
 
 #: Where the cached document bitmaps live. Built once by `termcache/build_cache.py`; this
 #: module reads them and never rescans a chart.

@@ -7,16 +7,20 @@
 但目录会被下一个人重新打乱，而且一次搬迁之后没有任何东西阻止 `evals.py` 反过来 import
 `agent.py`。所以先把分层写成断言，再搬目录 —— 搬迁由这条测试保护，而不是由搬迁者的记性。
 
-层的定义不是"文件放在哪"，是**允许依赖谁**。规则只有一条：
+层的定义不是"文件放在哪"，是**允许依赖谁**。两条规则：
 
-    低层不得 import 高层。同层之间不限制。
+    1. 低层不得 import 高层。同层之间不限制。
+    2. 干活的平面之间只能通过共享层的类型相见 —— 也就是"输入输出的形式"。直接 import
+       对方的函数是代码耦合，即使方向合法。
 
-九层，自下而上：
+十层，自下而上。前三层是共享的 I/O 契约，其余是干活的平面：
 
   0 kernel       跨任务稳定的公共物：AssetRef/Trajectory/SignalEnvelope、本地 artifact
                  边界、模型客户端、花费、状态、module protocol。不含任何领域语义。
+  0 chartstore   病历数据访问。和 kernel 同 rank 但分开命名：kernel 是抽象词汇，这一层是
+                 "怎么把一个病人的文档读出来"，而三个平面都要读。
   1 contract     任务合同与其词表：spec、答案契约、字段格式检查、指南三值逻辑、skill 装配、
-                 rule catalog。"这个答案必须意味着什么"住在这里。
+                 rule catalog、分层声明、值域码表。"这个答案必须意味着什么"住在这里。
   2 review       chart review agent 本身：编排、请求内硬控制、coverage 策略、工具面、
                  manifest 序列化。唯一能产出答案的一层。
   3 audit        安全/边界证据链。Finding → Incident。不接收 TruthContext。
@@ -31,8 +35,11 @@
   6 cli          入口。可以依赖任何层，不许被任何层依赖。
 
 `usecase` 排在 cli 之下、其余之上，是因为一个 use case 应该坐在边缘：框架 import 它，
-就是框架被那个 use case 绑住了。今天恰好有三条这样的边，它们全部登记在
-`KNOWN_DOMAIN_COUPLING` 里，每条都写明哪项工作会让它消失。这不是豁免清单 —— 清单只能变短。
+就是框架被那个 use case 绑住了。
+
+两个登记清单现在都是空的：`KNOWN_DOMAIN_COUPLING`（框架依赖 use case）和
+`KNOWN_DIRECT_COUPLING`（工作平面之间直接 import）。它们空着但保留，因为规则还在 ——
+清单只能变短，而那里是下一个想违反规则的人被迫写下理由的地方。
 """
 from __future__ import annotations
 
@@ -50,9 +57,19 @@ LAYERS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
     (0, "kernel", (
         "kernel", "local_artifacts", "llm", "spend", "state", "modules", "tool_surface",
         "cli_common", "usage_telemetry")),
+    # 病历数据访问。**不是** kernel：kernel 是 AssetRef/Trajectory/SignalEnvelope 那套抽象
+    # 词汇，而这一层是"怎么把一个病人的文档读出来"。`corpus.py` 零内部依赖 —— 它此前被归进
+    # review 只因为 agent 是第一个用它的人，而 speclint/derive/labelling 也都要读病历。
+    (0, "chartstore", ("corpus",)),
     (1, "contract", (
         "spec", "answer_contract", "answer_checks", "concordance", "skills",
         "registry_catalog", "deps", "spec_repair", "trace",
+        # 分层声明与匹配。从 spec 的 proof_obligation 推导出来的，不是运行时策略 ——
+        # 放在 coverage 里就意味着任何想按 spec 分层的模块都得 import 运行时平面。
+        "strata",
+        # 本地文档类型名 -> 可移植概念的冻结映射。名字里的 "site" 指**院区**不是解剖部位。
+        # 它是 strata 的 `means:` 所依赖的词表，所以属于合同层。
+        "site_mapping",
         # 值域加载器。在 contract 层而不是 usecase 层，因为泛化之后它只知道"表有若干个有序
         # 的轴"—— 轴名、章节标题、码形正则和记法折叠规则全部在 `codes/*.yaml` 里。癌症的
         # 部分现在是纯资产，`tests/test_icdo3.py` 测那些资产。
@@ -60,8 +77,7 @@ LAYERS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
     (2, "review", (
         "agent", "answer_gate", "coverage", "coverage_planner", "plan_expansion",
         "conflict_refinement", "runtime_controls", "runtime_profiles", "document_concepts",
-        "tools.toolbox", "corpus", "mcp_server", "run_triggers", "site_mapping",
-        "run_manifest")),
+        "tools.toolbox", "mcp_server", "run_triggers", "run_manifest")),
     (3, "audit", ("audit_loop",)),
     (3, "evaluation", (
         "evals", "evaluation_modules", "evaluation_pipeline", "judge", "explain")),
@@ -88,7 +104,7 @@ KNOWN_DOMAIN_COUPLING: dict[tuple[str, str], str] = {}
 #: 允许被跨平面共享的两层。它们承载的正是"输入输出的形式"：`kernel` 是 AssetRef /
 #: Trajectory / SignalEnvelope，`contract` 是 spec 与其词表。一个工作平面通过这两层认识
 #: 另一个平面的产物，是设计要求；直接 import 对方的函数，是代码耦合。
-SHARED_LAYERS = ("kernel", "contract")
+SHARED_LAYERS = ("kernel", "chartstore", "contract")
 
 #: 干活的平面。它们之间**只能**通过 SHARED_LAYERS 的类型和落盘的 artifact 相见。
 WORK_LAYERS = ("review", "audit", "evaluation", "diagnosis", "improvement", "authoring",
@@ -96,22 +112,7 @@ WORK_LAYERS = ("review", "audit", "evaluation", "diagnosis", "improvement", "aut
 
 #: 今天还存在的直接耦合，以及删掉它的那个动作。键是 (源模块, 目标模块)。
 #: 和 KNOWN_DOMAIN_COUPLING 一样：只能变短。
-KNOWN_DIRECT_COUPLING: dict[tuple[str, str], str] = {
-    # 动作 A —— `corpus` 不属于 review 平面。Corpus/DocMeta 是**病历数据访问**，
-    # 三个平面都要读它；它现在被归进 review 只是因为 agent 是第一个用它的人。
-    # 把它下移到共享层，这三条一起消失。
-    ("speclint", "corpus"): "A: corpus 下移到共享的数据访问层",
-    ("derive", "corpus"): "A: 同上",
-    ("labelling", "corpus"): "A: 同上",
-    # 动作 B —— `strata_from_spec` / `assign_strata` 是**从 spec 推导**出来的，不是运行时
-    # 策略。它们住在 coverage 里，于是任何想按 spec 分层的模块都得 import 运行时平面。
-    # 拆到 contract 之后这两条消失。
-    ("assetdev", "coverage"): "B: strata_from_spec/assign_strata 拆到 contract",
-    ("derive", "coverage"): "B: 同上",
-    # 动作 C 已完成，原先 ("agent","icdo3") 和 ("run_manifest","icdo3") 两条在此，
-    # 随 `icdo3.py` -> `code_tables.py` 一起消失：值域加载器现在在 contract 层，
-    # 而 contract 是允许被共享的 I/O 契约层。
-}
+KNOWN_DIRECT_COUPLING: dict[tuple[str, str], str] = {}
 
 
 def _modules() -> dict[str, pathlib.Path]:
