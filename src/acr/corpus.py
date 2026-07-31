@@ -23,23 +23,122 @@ FILENAME_RE = re.compile(
     r"^(?P<doc_type>.+?)_(?P<date>\d{4}-\d{2}-\d{2})(?:__(?P<seq>\d+))?$"
 )
 
-#: Separators a clinical phrase may be written with, in the query and in the text: any run of
-#: whitespace (including a hard line wrap) or hyphens. Used only to relate one spelling of a
-#: phrase to another -- never to relate one WORD to another. See `PatientChart.search`.
-_SEPARATORS = re.compile(r"[\s\-]+")
+#: Separators a clinical phrase may be written with, in the query and in the text.
+#:
+#: Any run of whitespace (a hard line wrap included), any dash, or a solidus. Used only to relate
+#: one SPELLING of a phrase to another -- never one WORD to another. See `PatientChart.search`.
+#:
+#: The class started as `[\s\-]+`, which is ASCII-only, and that is a real gap the synthetic
+#: corpus cannot show: this generator writes ASCII hyphens, while text that has been through
+#: Word, a PDF or a dictation front end carries U+2013 and U+2014 routinely. `non-small` did not
+#: find `non\u2013small`.
+#:
+#: The solidus is here because clinical prose runs on it -- `c/w`, `s/p`, `w/o`, `R/O` -- and a
+#: query written either way should reach text written the other. It costs nothing: it can only
+#: relate two spellings of the same token sequence, never two different sequences.
+_SEP_CHARS = r"\s\-\u2010-\u2015\u2212/"
+_SEPARATORS = re.compile(f"[{_SEP_CHARS}]+")
+
+#: Apostrophes and quotes that denote the same mark. Word turns `'` into U+2019 on the way in, so
+#: `patient's` in a query and `patient\u2019s` in the text are the same phrase written twice.
+#:
+#: Expressed as a CHARACTER CLASS IN THE PATTERN and never by normalising the text, which is the
+#: constraint every tolerance here works under: `quote()` slices the file by the offsets `search`
+#: reported, so a matcher that rewrote the text would hand back offsets into a string nobody
+#: else has.
+_QUOTE_CHARS = "'\u2018\u2019\u02bc\u00b4`"
+_QUOTE_CLASS = "[" + re.escape(_QUOTE_CHARS) + "]"
+
+_MONTHS = ("january", "february", "march", "april", "may", "june",
+           "july", "august", "september", "october", "november", "december")
+_ISO_DATE = re.compile(r"\A(\d{4})-(\d{2})-(\d{2})\Z")
+
+
+def _date_alternation(query: str) -> str | None:
+    """If the whole query is an ISO date, a pattern matching how that day is actually written.
+
+    WHY THIS IS NOTATION AND NOT VOCABULARY, which is the line this module refuses to cross
+    everywhere else. A synonym set is open, contested and incomplete -- 23.9% of this corpus's
+    diagnosis-bearing documents contain none of the seven commonest words for cancer, so any
+    fixed list guesses on the model's behalf and hides the miss inside a hit. The renderings of
+    one calendar day are none of those things: the set is closed, decidable, and every member
+    denotes exactly the same thing. Nothing is being folded that a reader would distinguish.
+    
+    It earns its place because `STORE.390`'s answer IS a date. A run that finds the retrospective
+    remark "the 3/12/19 nodule is this same tumour" and then searches `2019-03-12` for the study
+    it names gets nothing, and the failure looks like an absent document.
+
+    Returns None for anything that is not a bare ISO date, so every other query is untouched.
+    """
+    m = _ISO_DATE.match(query.strip())
+    if not m:
+        return None
+    y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if not (1 <= mo <= 12 and 1 <= d <= 31):
+        return None
+    name = _MONTHS[mo - 1]
+    sep = f"[{_SEP_CHARS}.]+"          # date parts also get written with dots: 12.03.2019
+    forms = [
+        rf"{y}{sep}0?{mo}{sep}0?{d}",                       # 2019-03-12, 2019/3/12
+        rf"0?{mo}{sep}0?{d}{sep}{y}",                       # 3/12/2019
+        rf"0?{mo}{sep}0?{d}{sep}{y % 100:02d}",             # 3/12/19
+        rf"0?{d}{sep}0?{mo}{sep}{y}",                       # 12/3/2019, day-first
+        rf"{y}{mo:02d}{d:02d}",                             # 20190312
+        rf"{name}{sep}0?{d}(?:,)?{sep}{y}",                 # March 12, 2019
+        rf"{name[:3]}\.?{sep}0?{d}(?:,)?{sep}{y}",          # Mar 12, 2019 / Mar. 12 2019
+        rf"0?{d}{sep}{name}{sep}{y}",                       # 12 March 2019
+    ]
+    return "(?:" + "|".join(forms) + ")"
+
+
+#: A token this short is not a word, it is a fragment, and joining fragments with a permissive
+#: separator matches nearly everywhere. Measured the moment the solidus went into the separator
+#: class: `s/p` became `s[sep]+p`, which found 43 documents where a literal found one — and every
+#: one of the 43 was noise like "lungs Plan" and "masses present". The gain column said +43 and
+#: the tolerance was worse than useless.
+#:
+#: So a pattern whose shortest token is a fragment gets word boundaries. `s/p` then reaches
+#: "s/p", "s p" and "s-p" and stops reaching the inside of other words. Anchors are NOT added
+#: otherwise, because the documented substring behaviour depends on their absence: `lobe` must
+#: keep matching inside `lobes`, and a trailing `\b` would end that.
+_FRAGMENT_LEN = 2
 
 
 def _notation_tolerant(query: str) -> str:
     """A literal query, with its separators allowed to be spelled any of the ways this corpus
     spells them. Returns a regex source string.
 
-    Single-token queries come back as a plain escaped literal, so substring behaviour is
-    unchanged: `lobe` still matches inside `lobes`, as it always did.
+    Single-token queries come back as an escaped literal with only its quote marks widened, so
+    substring behaviour is unchanged: `lobe` still matches inside `lobes`, as it always did, and
+    `nonsmall` still does not find `non-small` -- that needs a word list, which is the thing
+    this module does not have.
     """
-    tokens = [re.escape(t) for t in _SEPARATORS.split(query.strip()) if t]
-    if not tokens:
-        return re.escape(query)
-    return _SEPARATORS.pattern.join(tokens)
+    if (dates := _date_alternation(query)) is not None:
+        return dates
+    raw = [tok for tok in _SEPARATORS.split(query.strip()) if tok]
+    if not raw:
+        return _widen_quotes(re.escape(query))
+    joined = _SEPARATORS.pattern.join(_widen_quotes(re.escape(tok)) for tok in raw)
+    if len(raw) > 1 and min(len(tok) for tok in raw) <= _FRAGMENT_LEN:
+        return rf"\b{joined}\b"
+    return joined
+
+
+#: Matches any quote mark, and is applied in ONE pass. A loop of `str.replace` per character
+#: corrupts its own output: the first pass inserts a class that CONTAINS the marks the later
+#: passes go looking for, so the second replacement rewrites the inside of the class the first
+#: one built and the result matches nothing it should.
+_ANY_QUOTE = re.compile("[" + re.escape(_QUOTE_CHARS) + "]")
+
+
+def _widen_quotes(escaped: str) -> str:
+    """Let any apostrophe in an already-escaped literal match any of the marks it is written as.
+
+    Runs on the ESCAPED literal, where a quote mark is still a single literal character on every
+    Python version — `re.escape` has not escaped apostrophes since 3.7, but it is not this
+    function's business to know that.
+    """
+    return _ANY_QUOTE.sub(_QUOTE_CLASS.replace("\\", "\\\\"), escaped)
 
 
 @dataclass(frozen=True)

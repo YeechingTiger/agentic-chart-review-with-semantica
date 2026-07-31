@@ -144,3 +144,98 @@ def test_dates_and_types_come_back_so_the_model_can_choose_reading_order():
     for h in hits:
         assert h.doc_type and h.note_id
         date.fromisoformat(h.date)
+
+
+# ======================================================================================
+# NOTATION ADDED 2026-07-31: unicode dashes, the solidus, quote marks, date renderings.
+#
+# All four are aimed at text that has been through Word, a PDF or a dictation front end. This
+# corpus is generated and writes ASCII hyphens, straight quotes and ISO dates by construction,
+# so `tools/measure_matcher.py` reports "not exercised here" for most of them — which is not
+# evidence they are worthless, and is the reason these tests assert on constructed strings
+# rather than on corpus counts.
+#
+# The measurement earned its place on its first run anyway, in the negative direction: see
+# `test_a_two_character_token_does_not_match_the_inside_of_other_words`.
+# ======================================================================================
+
+import re
+
+from acr.corpus import _notation_tolerant
+
+
+def found(query: str, text: str) -> bool:
+    return bool(re.search(_notation_tolerant(query), text, re.IGNORECASE))
+
+
+@pytest.mark.parametrize("dash", ["-", "‐", "‑", "–", "—", "−"])
+def test_any_dash_is_the_same_dash(dash: str):
+    """The class was `[\\s\\-]+`, ASCII only. Nothing in a generated corpus can show that gap:
+    this generator writes hyphens. Word and most PDF extractors do not."""
+    assert found("non-small cell", f"non{dash}small cell")
+
+
+def test_the_solidus_relates_the_two_ways_an_abbreviation_is_written():
+    assert found("c/w", "path c/w adenoCA")
+    assert found("c/w", "path c w adenoCA")
+
+
+def test_a_two_character_token_does_not_match_the_inside_of_other_words():
+    """THE MEASUREMENT CAUGHT THIS, AND READING DID NOT.
+
+    Putting the solidus in the separator class turned `s/p` into `s[sep]+p`, and
+    `tools/measure_matcher.py` reported it finding 43 documents where a literal found one. Every
+    one of the 43 was noise — "lungs Plan", "masses present" — so the gain column said +43 for a
+    tolerance that had become strictly harmful.
+
+    A token of one or two characters is a fragment, not a word, so a pattern whose shortest
+    token is that short gets word boundaries.
+    """
+    assert found("s/p", "s/p right lobectomy")
+    assert not found("s/p", "lungs Plan")
+    assert not found("s/p", "no masses present")
+    assert not found("c/w", "specific work")
+
+
+def test_the_boundary_guard_does_not_touch_ordinary_substring_behaviour():
+    """`lobe` must keep matching inside `lobes`. A trailing `\\b` would end that, so anchors go
+    on only when the shortest token is a fragment."""
+    assert found("lobe", "both lower lobes")
+    assert found("carcinoma", "adenocarcinomatous")
+    assert found("right upper lobe", "the right  upper\nlobe")
+
+
+@pytest.mark.parametrize("written", [
+    "3/12/19", "03/12/2019", "March 12, 2019", "Mar 12 2019", "12 March 2019", "20190312",
+])
+def test_one_calendar_day_is_found_however_it_is_written(written: str):
+    """Closed, decidable, and every member denotes the same day — which is what separates this
+    from a synonym set. STORE.390's answer IS a date: a run that reads "the 3/12/19 nodule" and
+    then searches `2019-03-12` for the study it names gets nothing, and the miss looks like an
+    absent document."""
+    assert found("2019-03-12", f"reviewed the {written} study")
+
+
+def test_a_date_query_does_not_match_a_different_day():
+    assert not found("2019-03-12", "the 2019-03-13 study")
+    assert not found("2019-03-12", "the 3/13/19 study")
+
+
+@pytest.mark.parametrize("mark", ["'", "‘", "’", "ʼ", "´"])
+def test_any_apostrophe_is_the_same_apostrophe(mark: str):
+    assert found("patient's", f"the patient{mark}s wishes")
+
+
+def test_widening_quotes_is_one_pass_not_one_per_character():
+    """A loop of `str.replace` per quote character corrupts its own output: the first pass
+    inserts a class CONTAINING the marks the later passes search for, so the second rewrites the
+    inside of the class the first built and the result matches nothing."""
+    pattern = _notation_tolerant("patient's")
+    assert pattern.count("[") == 1, f"the quote class was rewritten by a later pass: {pattern}"
+
+
+def test_the_refusal_to_fold_synonyms_survives_all_of_it():
+    assert not found("cancer", "carcinoma")
+    assert not found("adenocarcinoma", "adenoCA")
+    assert not found("right upper lobe", "RUL")
+    assert not found("nonsmall", "non-small")
