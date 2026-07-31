@@ -168,7 +168,12 @@ def test_label_refuses_a_store_inside_the_repository():
                             "--max-terms-per-note", "8", "--min-term-chars", "4",
                             "--labels-root", str(ROOT / "runs" / "labels")])
     assert r.exit_code == 2
-    assert "inside the repository" in r.output
+    # Flattened first. Rich wraps the refusal to the terminal width and the wrap landed between
+    # "inside the" and "repository", so the literal substring was absent while the message was
+    # exactly right — a failure that comes and goes with the width of whoever ran it.
+    # `tests/test_cli_signal.py::_flat` already carries this note for the same reason.
+    flat = " ".join(r.output.split())
+    assert "inside the repository" in flat
 
 
 # ----------------------------------------------------------------------------- acr refine

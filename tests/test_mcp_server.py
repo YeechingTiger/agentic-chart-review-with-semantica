@@ -23,6 +23,7 @@ is the one place an in-process guarantee could still be lost.
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
@@ -534,7 +535,7 @@ DODGY_SPELLINGS = [
     " SYN0002",               # leading space
     "SYN0002.",               # trailing dot
     "syn0002",                # case difference: the same directory on a case-insensitive fs
-    "SYN0002​",          # zero-width space
+    "SYN0002\u200b",          # zero-width space
     "ＳＹＮ０００２",   # fullwidth lookalikes, NFKC -> SYN0002
     "SYN0002\x00",            # null byte truncation
 ]
@@ -763,7 +764,7 @@ def test_the_call_that_quarantines_is_the_call_that_discloses():
     svc = service()
     out = svc.call("registry.truth",
                    {"patient": GAP_PATIENT, "variable": SITE, "token": "eval-token"})
-    assert "truth" in out and out["truth"], "the payload the ledger entry is written beside"
+    assert out.get("truth"), "the payload the ledger entry is written beside"
     assert GAP_PATIENT in svc.truth_served
     assert not any(k in out for k in ("withheld", "dry_run", "value_withheld")), (
         "if registry.truth grew a way to quarantine WITHOUT disclosing, this finding is stale")
@@ -845,6 +846,19 @@ def test_a_symlinked_patient_directory_is_one_identity_not_two(tmp_path):
     assert svc.truth_served == {"SYN0002"}
 
 
+def _case_sensitive_fs(tmp_path) -> bool:
+    """Can two names differing only in case be two directories here?
+
+    macOS ships APFS case-INsensitive by default, so the fixture below cannot be built at all:
+    the second mkdir raises FileExistsError before any assertion runs. The property under test
+    is real and belongs to the code, not to the filesystem — so this skips rather than deletes,
+    and the test still runs wherever CI is case-sensitive.
+    """
+    probe = tmp_path / "_caseprobe"
+    probe.mkdir()
+    return not (tmp_path / "_CASEPROBE").exists()
+
+
 def test_two_charts_that_differ_only_by_case_are_refused_not_merged(tmp_path):
     """Case folding is right for one chart under two names and catastrophic for two charts
     under one folded name — it would charge SYN0002's ground truth to syn0002's ledger entry
@@ -853,6 +867,9 @@ def test_two_charts_that_differ_only_by_case_are_refused_not_merged(tmp_path):
     The FIRST lookup is the one under test. An ambiguity discovered while building the index
     but consulted before the build would be invisible to exactly the call that opens a chart.
     """
+    if not _case_sensitive_fs(tmp_path):
+        pytest.skip("case-insensitive filesystem: two charts differing only by case cannot "
+                    "both exist, so the ambiguity this refuses cannot be constructed here")
     root = tmp_path / "patients"
     _tiny_corpus(root, "SYN0002")
     _tiny_corpus(root, "syn0002")   # a distinct directory, distinct inode
@@ -1117,6 +1134,9 @@ def test_the_gate_is_the_agent_s_gate_and_not_a_second_copy():
             f"validation means whichever copy happened to execute")
 
 
+@pytest.mark.skipif(importlib.util.find_spec("mcp") is None,
+                    reason="the MCP SDK is an optional dependency; `build_mcp_server` imports "
+                           "it lazily precisely so the service stays testable without it")
 def test_the_mcp_adapter_is_a_shim_over_the_same_entry_point():
     """If the wire path diverged from `call`, every test above would be exercising a route no
     client can take."""

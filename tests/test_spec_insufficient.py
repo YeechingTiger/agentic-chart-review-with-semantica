@@ -708,6 +708,17 @@ def test_a_crashed_run_is_distinguishable_from_one_that_never_happened(monkeypat
             raise RuntimeError("simulated provider failure")
 
     monkeypatch.setattr("acr.core.cli_common.llm_client", lambda *a, **k: Boom(None, {}))
+
+    # AND `chat_model`, which is the seam `extract` actually reaches. Patching only
+    # `llm_client` left this test dialling a REAL provider: `.env` supplies credentials, the
+    # run made two paid calls (29k prompt tokens), terminated on MODEL_CALL_LIMIT and wrote a
+    # manifest — so the assertion below failed while the test believed it had simulated a
+    # crash. `chat_model`'s own docstring already records this shape: "the eight end-to-end
+    # `extract` tests inject at `llm_client`, so they could not drive this runtime at all".
+    def no_provider(*a, **k):
+        raise RuntimeError("simulated provider failure")
+
+    monkeypatch.setattr("acr.core.cli_common.chat_model", no_provider)
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
 
     r = CliRunner().invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),
