@@ -267,6 +267,56 @@ def test_run_patient_renders_the_stack_it_was_given(tmp_path: Path):
     assert not _was_rendered(prompt, "coverage-judgement")
 
 
+def _scripted_manifest_skills(tmp_path: Path, **run_kwargs) -> list[dict]:
+    """`prompt_assets.skills` from a real run, as the manifest actually records it."""
+    pytest.importorskip("deepagents")
+    from hooks_harness import ToolScript
+
+    from acr.agent import run_patient
+    from acr.corpus import Corpus
+    from acr.spec import load_spec
+
+    model = ToolScript(script=[], submit={"status": "EVIDENCE_INSUFFICIENT", "value": {},
+                                          "reasoning": "the script submits at once"})
+    out = run_patient(spec=load_spec(SPEC), corpus=Corpus(CORPUS), patient_id="SYN0001",
+                      out_dir=tmp_path, model=model, max_model_calls=1, seed=7,
+                      run_id="manifest-stack", **run_kwargs)
+    return out["prompt_assets"]["skills"]
+
+
+def test_the_manifest_records_the_stack_the_model_was_actually_given(tmp_path: Path):
+    """The prompt and the manifest must name the SAME cards.
+
+    This is a regression test for a defect found on the first live run against the synthetic
+    corpus. `--skills search=search-breadth-first` was honoured by the prompt builder and
+    ignored by `prompt_asset_manifest`, which re-derived the stack from the runtime profile. The
+    run therefore produced an artifact asserting it had used the profile's default guidance while
+    the model had read a different card — and two arms of a retrieval ablation would have
+    compared as identical on exactly the axis they were varying.
+
+    A manifest that names the wrong asset is worse than one that names none: the second is a gap
+    a reader can see. Asserting agreement between the two, rather than the value of either, is
+    what makes the two halves impossible to drift apart again.
+    """
+    stack = SkillStack(search="keyword-strategy")
+    recorded = _scripted_manifest_skills(tmp_path / "m", skill_stack=stack)
+    prompt = _scripted_system_prompt(tmp_path / "p", skill_stack=stack)
+
+    assert [e["skill"] for e in recorded] == ["keyword-strategy"]
+    assert [e["slot"] for e in recorded] == ["search"]
+    for entry in recorded:
+        assert _was_rendered(prompt, entry["skill"]), (
+            f"the manifest claims {entry['skill']!r} but the model was never given it")
+    assert not _was_rendered(prompt, "coverage-judgement"), (
+        "the profile's card reached the prompt despite being overridden")
+
+
+def test_the_manifest_records_the_profiles_stack_when_nothing_overrode_it(tmp_path: Path):
+    """`skill_stack=None` — the path every recorded run took — must not have moved."""
+    recorded = _scripted_manifest_skills(tmp_path)
+    assert [(e["skill"], e["slot"]) for e in recorded] == [("coverage-judgement", "general")]
+
+
 def _invoke(monkeypatch, tmp_path: Path, *args):
     """Run a CLI command with the model client wired to explode if it is ever built."""
     from typer.testing import CliRunner

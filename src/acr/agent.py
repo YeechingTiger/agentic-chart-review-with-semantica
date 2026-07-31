@@ -877,7 +877,11 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
                      out_dir, elapsed_fn, expansion_budget, ctx_out=None,
                      max_usd: float = 5.0, seed_record: dict | None = None,
                      runtime_profile_asset=None, runtime_policy_plan=None,
-                     coverage_plan=None, coverage_state: dict | None = None) -> dict:
+                     coverage_plan=None, coverage_state: dict | None = None,
+                     # The stack that was actually rendered into `system_prompt`, so the manifest
+                     # records what the model received rather than re-deriving it from the profile
+                     # and silently disagreeing with the prompt whenever `--skills` overrode it.
+                     skill_stack=None) -> dict:
     """One patient, one spec, through the library's graph. Returns the manifest."""
     from .answer_contract import (
         NO_COVERAGE_CLAIM,
@@ -1079,7 +1083,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # `table_version` would otherwise masquerade as the one an earlier run used. The lung
         # table gained eleven morphologies from one validation pass; manifests written either
         # side of that must not compare as equal.
-        "prompt_assets": prompt_asset_manifest(spec, runtime_profile_asset),
+        "prompt_assets": prompt_asset_manifest(spec, runtime_profile_asset, skill_stack),
         "answer": answer, "spec_gap": spec_gap, "gate_validated": ctx.gate_validated,
         "coverage_gate_validated": ctx.coverage_claim_earned,
         "coverage_activation": dict(ctx.coverage_state),
@@ -1470,6 +1474,14 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
                            coverage_state=coverage_state,
                            runtime_profile=runtime_profile_asset.ref)
 
+    # RESOLVED ONCE. The prompt renders this and the manifest records this — the same object,
+    # not two evaluations of the same conditional. Two evaluations is how the first live run
+    # against the synthetic corpus ended up with `search-breadth-first` in the model's prompt
+    # and the profile's default in its manifest: the render honoured the override and the
+    # manifest re-derived from the profile, so the artifact described a run that never happened.
+    effective_stack = (skill_stack if skill_stack is not None
+                       else runtime_policy_skills(runtime_profile_asset.module_id))
+
     t0 = time.time()
     return run_chart_review(
         spec=spec, chart=chart, toolbox=toolbox, coverage=coverage, evidence=evidence,
@@ -1515,14 +1527,13 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
                        # into a prompt, so moving the coverage obligation into
                        # `skills/coverage-judgement/` deleted it rather than relocating it. The
                        # profile chooses which skills load; see `acr.skills`.
-                       + (f"\n\n{sk}" if (sk := skills_block(
-                           skill_stack if skill_stack is not None
-                           else runtime_policy_skills(runtime_profile_asset.module_id))) else "")
+                       + (f"\n\n{sk}" if (sk := skills_block(effective_stack)) else "")
                        + (f"\n\n{additional_task_context.strip()}"
                           if additional_task_context.strip() else "")),
         backend=StateBackend(), max_model_calls=max_model_calls, out_dir=out_dir,
         elapsed_fn=lambda: round(time.time() - t0, 1), ctx_out=ctx_out,
         max_usd=max_usd,
+        skill_stack=effective_stack,
         seed_record={"effective": seed, "provenance": "caller_supplied",
                      "caller_supplied": True},
         runtime_profile_asset=runtime_profile_asset,

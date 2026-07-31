@@ -395,7 +395,7 @@ def build_manifest(*, spec, patient_id: str, model: str, plan, coverage, threads
     }
 
 
-def prompt_asset_manifest(spec, runtime_profile_asset=None) -> dict:
+def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None) -> dict:
     """The identity of every prompt block whose content can change a run's answer.
 
     Lives here rather than in `agent` because a manifest field belongs with the manifest, and
@@ -406,6 +406,15 @@ def prompt_asset_manifest(spec, runtime_profile_asset=None) -> dict:
     are `False` today, and that is the honest state: the code tables were recalled by a model, the
     document concepts are unmeasured by construction, and no registrar has read either. A manifest
     that recorded the names without that would let a reader assume otherwise.
+
+    `skill_stack` IS THE STACK THAT WAS RENDERED, and it must be the same object `agent` passed to
+    `skills_block`. Deriving it here from the profile instead was a real defect, caught on the
+    first live run against the synthetic corpus: `--skills search=search-breadth-first` reached
+    the model and the manifest recorded the profile's default, so the artifact said two arms of a
+    retrieval ablation used identical guidance while their prompts differed by a whole card. A
+    manifest that names the wrong asset is worse than one that names none — the second is a gap a
+    reader can see. `None` still means "the profile's stack", which is what every recorded run
+    used before an override existed.
     """
     from .document_concepts import concepts_manifest
     from .icdo3 import table_manifest
@@ -414,7 +423,8 @@ def prompt_asset_manifest(spec, runtime_profile_asset=None) -> dict:
 
     module_id = getattr(runtime_profile_asset, "module_id", "") or ""
     try:
-        skills = skills_manifest(runtime_policy_skills(module_id))
+        stack = skill_stack if skill_stack is not None else runtime_policy_skills(module_id)
+        skills = skills_manifest(stack)
     except Exception as exc:            # noqa: BLE001 - a manifest must not take down a run
         skills = [{"error": f"{type(exc).__name__}: {exc}"}]
     return {
