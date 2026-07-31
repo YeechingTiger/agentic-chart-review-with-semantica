@@ -89,11 +89,13 @@ LOCAL_ROOT = typer.Option(
 
 @signal_app.callback()
 def signal_main() -> None:
-    """Keep `signal` a group while it still has one command.
+    """Keep `signal` a group, whatever the command count happens to be.
 
     Typer collapses a single-command app into a bare command, which would make `acr signal run`
-    an unexpected-argument error and quietly rename the entry point to `acr signal`. Task 8
-    adds `batch` beside it; the spelling in every runbook must not change when it does.
+    an unexpected-argument error and quietly rename the entry point to `acr signal`. `batch`
+    now sits beside `run`, so the collapse cannot fire today — and this stays anyway, because
+    otherwise the spelling in every runbook is load-bearing on the group having at least two
+    commands, which nobody would think to check before deleting one.
     """
 
 
@@ -183,7 +185,8 @@ def _rule_signal(*, run: str, spec: str, subject_id: str = "",
 
 
 def _agent_signal(*, run: str, spec: str, gold: str, case_id: str,
-                  eval_skills: tuple[str, ...], local_root: str | None = None) -> dict:
+                  eval_skills: tuple[str, ...], case_map: str = "",
+                  local_root: str | None = None) -> dict:
     """The diagnostic agent over one run. Provider imports live here, not at module scope."""
     from .skills import SkillError, eval_skills_block
 
@@ -201,5 +204,129 @@ def _agent_signal(*, run: str, spec: str, gold: str, case_id: str,
     from .cli_attribute import attribute_case_payload
     return attribute_case_payload(
         run=run, spec=spec, gold=gold, case_id=case_id, eval_skills_prompt=block,
-        signal_type=SIGNAL_TYPE_FOR_KIND["agent"], local_root=local_root,
+        signal_type=SIGNAL_TYPE_FOR_KIND["agent"], case_map=case_map, local_root=local_root,
         **DEFAULT_DETECTOR_ARGS)
+
+
+# =============================================================== MANY RUNS, ONE ARRAY
+def _manifest_paths(runs: str) -> list[Path]:
+    """One manifest, or every manifest below a directory, sorted so two batches line up.
+
+    Sorted, not `rglob` order: two arms of the same cohort are compared by reading their two
+    signal arrays side by side, and filesystem order would silently misalign them.
+
+    Plain paths, not `LocalArtifactStore` paths. The store boundary is enforced one layer down,
+    inside `audit_run_payload` and `attribute_case_payload`, and re-deciding it here would be a
+    second answer to "may this dispatcher read that file" — the mistake `cli_judge` names in its
+    own docstring about re-implementing a fence.
+    """
+    p = Path(runs)
+    if p.is_file():
+        return [p]
+    if not p.is_dir():
+        raise typer.BadParameter(f"{runs}: not a file or directory")
+    found = sorted(p.rglob("*.manifest.json"))
+    if not found:
+        raise typer.BadParameter(f"{runs}: no *.manifest.json below it")
+    return found
+
+
+def _patient_to_case(case_map: str, local_root: str | None) -> dict[str, str]:
+    """`acr attribute`'s own `{case_id: patient_id}` map, reversed and loaded by its own reader.
+
+    THE SAME FILE AND THE SAME DIRECTION AS `acr attribute --case-map`, deliberately. The plan
+    gave this command a private shape — manifest stem to case id — and one flag name meaning two
+    different mappings inside one CLI is a trap that costs an operator a whole batch. Reversing
+    the existing map also puts the pseudonymisation check (`attribution.safe_case_id`) on this
+    path for free, whereas a stem-keyed map would have carried `SYN0001.manifest` into the
+    error-case library as a case identifier.
+    """
+    if not case_map:
+        return {}
+    from .cli_attribute import _case_map as load_case_map, _store
+    return {patient: case for case, patient in load_case_map(_store(local_root), case_map).items()}
+
+
+def _case_id_for(path: Path, patient_to_case: dict[str, str]) -> str:
+    """The pseudonymous case id for one manifest, from its patient id.
+
+    With no map the manifest's own `patient_id` is used. That is right for a synthetic corpus
+    and refused for a real one: `attribution.safe_case_id` rejects an id that matches the real
+    corpus's person shape, so the boundary is checked where it is already implemented rather
+    than guessed at here.
+    """
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    patient = str(raw.get("patient_id") or "")
+    return patient_to_case.get(patient) or patient
+
+
+def _batch_signals(*, kind: str, paths: list[Path], spec: str, gold: str,
+                   patient_to_case: dict[str, str], eval_skills: tuple[str, ...],
+                   case_map: str = "", local_root: str | None = None) -> list[dict]:
+    """Signals for every run, in path order.
+
+    A FAILURE ON ONE RUN IS RECORDED AND THE BATCH CONTINUES. Aborting would discard the signals
+    already produced — and on the agent kind, the money already spent producing them. The
+    failure lands in the array beside the successes, in the same position the signal would have
+    occupied, so the array is still one entry per run and a reader counts both without knowing
+    which runs failed in advance.
+    """
+    out: list[dict] = []
+    for path in paths:
+        try:
+            if kind == "rule":
+                out.append(_rule_signal(run=str(path), spec=spec, local_root=local_root))
+            else:
+                # Inside the try, not above the loop: a manifest that will not parse is one bad
+                # run, and resolving every case id up front would make it the whole batch.
+                out.append(_agent_signal(
+                    run=str(path), spec=spec, gold=gold,
+                    case_id=_case_id_for(path, patient_to_case),
+                    eval_skills=eval_skills, case_map=case_map, local_root=local_root))
+        except Exception as exc:                # noqa: BLE001 - one bad run is not the batch
+            _err.print(f"[red]{path.name}: {type(exc).__name__}: {exc}[/]")
+            out.append({"schema": "acr.signal/1", "run": str(path), "kind": kind,
+                        "error": f"{type(exc).__name__}: {exc}"})
+    return out
+
+
+@signal_app.command("batch")
+def signal_batch(
+    kind: str = typer.Option(..., "--kind", callback=_check_kind,
+                             help=f"one of {list(KINDS)}"),
+    runs: str = typer.Option(..., "--runs",
+                             help="a *.manifest.json, or a directory searched recursively"),
+    spec: str = typer.Option(..., "--spec", "-s", help="the spec those runs were made under"),
+    gold: str = typer.Option("", "--gold", help="answer key; agent kind only"),
+    case_map: str = typer.Option(
+        "", "--case-map",
+        help="JSON {pseudonymous_case_id: patient_id}, the same file `acr attribute` takes; "
+             "agent kind only. Without it a run's own patient_id is used as its case id."),
+    eval_skills: str = typer.Option("", "--eval-skills",
+                                    help="comma list; default is all four"),
+    out: str = typer.Option("", "--out", help="write the JSON array here instead of stdout"),
+    local_root: str | None = LOCAL_ROOT,
+):
+    """Produce signals for MANY completed runs. One bad run is recorded, not fatal.
+
+    The exit code is not the verdict on any run — read the array. It is 2 only when EVERY run
+    failed, because exit 0 over an array of nothing but errors tells a shell script the cohort
+    was evaluated when it was not.
+    """
+    _check_kind(kind)       # again: the callback covers the CLI, this covers a direct call
+    paths = _manifest_paths(runs)
+    _err.print(f"[dim]{len(paths)} runs, kind={kind}[/]")
+    signals = _batch_signals(
+        kind=kind, paths=paths, spec=spec, gold=gold,
+        patient_to_case=_patient_to_case(case_map, local_root) if kind != "rule" else {},
+        eval_skills=_eval_skill_names(eval_skills), case_map=case_map, local_root=local_root)
+    failed = sum("error" in s for s in signals)
+    text = json.dumps(signals, indent=2, ensure_ascii=False, default=str)
+    if out:
+        Path(out).write_text(text, encoding="utf-8")
+        con.print(f"→ {out}  ({failed} of {len(signals)} failed)")
+    else:
+        con.print_json(text)
+        _err.print(f"[dim]{failed} of {len(signals)} failed[/]")
+    if failed == len(signals):
+        raise typer.Exit(2)

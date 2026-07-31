@@ -9,6 +9,8 @@ import ast
 import json
 from pathlib import Path
 
+import pytest
+import typer
 from typer.testing import CliRunner
 
 from acr.cli_signal import KINDS, signal_app
@@ -164,3 +166,160 @@ def test_the_agent_path_refuses_a_non_eval_skill_before_spending(tmp_path, monke
     assert res.exit_code != 0
     flat = _flat(res)
     assert "coverage-judgement" in flat and "not an eval skill" in flat
+
+
+# ============================================================ BATCH — A COHORT OF RUNS
+# The load-bearing property is at the bottom of this block: one bad run does not abort the
+# batch. Everything above it is the plumbing that has to be right for that property to be
+# reachable at all.
+def test_the_group_still_lists_both_commands():
+    """`acr signal run` and `acr signal batch`, both spelled as subcommands.
+
+    Typer collapses a single-command app into a bare command. Two commands means the collapse
+    cannot happen today, but the group shape is the thing runbooks depend on, and pinning it
+    here means deleting `batch` later fails a test instead of silently renaming `signal run`.
+    """
+    res = runner.invoke(signal_app, ["--help"])
+    assert res.exit_code == 0
+    flat = _flat(res)
+    assert "run" in flat and "batch" in flat
+
+
+def test_batch_help_names_the_runs_option():
+    res = runner.invoke(signal_app, ["batch", "--help"])
+    assert res.exit_code == 0
+    assert "--runs" in _flat(res)
+
+
+def test_batch_collects_manifests_from_a_directory(tmp_path: Path):
+    from acr.cli_signal import _manifest_paths
+    (tmp_path / "a.manifest.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "b.manifest.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "notes.txt").write_text("x", encoding="utf-8")
+    got = _manifest_paths(str(tmp_path))
+    assert [p.name for p in got] == ["a.manifest.json", "b.manifest.json"]
+
+
+def test_batch_accepts_a_single_file(tmp_path: Path):
+    from acr.cli_signal import _manifest_paths
+    f = tmp_path / "only.manifest.json"
+    f.write_text("{}", encoding="utf-8")
+    assert _manifest_paths(str(f)) == [f]
+
+
+def test_batch_refuses_an_empty_directory(tmp_path: Path):
+    from acr.cli_signal import _manifest_paths
+    with pytest.raises(typer.BadParameter, match=r"no \*\.manifest\.json"):
+        _manifest_paths(str(tmp_path))
+
+
+def test_batch_refuses_a_path_that_is_neither(tmp_path: Path):
+    from acr.cli_signal import _manifest_paths
+    with pytest.raises(typer.BadParameter, match="not a file or directory"):
+        _manifest_paths(str(tmp_path / "nowhere"))
+
+
+def test_one_failure_does_not_abort_the_batch(tmp_path: Path, monkeypatch):
+    """One bad run must not discard the rest.
+
+    Aborting throws away the signals already produced and, on the agent and judge kinds, the
+    money already spent producing them. The failure belongs in the output array beside the
+    successes, where a reader counts both without re-running anything.
+    """
+    import acr.cli_signal as cs
+    ok = tmp_path / "ok.manifest.json"
+    ok.write_text("{}", encoding="utf-8")
+    bad = tmp_path / "bad.manifest.json"
+    bad.write_text("{}", encoding="utf-8")
+
+    def fake(*, run, spec, local_root=None):
+        if "bad" in run:
+            raise RuntimeError("boom")
+        return {"kind": "rule", "run": run}
+
+    monkeypatch.setattr(cs, "_rule_signal", fake)
+    out = cs._batch_signals(kind="rule", paths=[ok, bad], spec="s.yaml", gold="",
+                            patient_to_case={}, eval_skills=())
+    assert len(out) == 2
+    assert out[0]["run"].endswith("ok.manifest.json")
+    assert out[1]["error"] == "RuntimeError: boom"
+    assert out[1]["kind"] == "rule" and out[1]["run"].endswith("bad.manifest.json")
+
+
+def test_the_rule_batch_records_a_broken_manifest_and_keeps_the_good_one(tmp_path, monkeypatch):
+    """The same property end to end, with no monkeypatch on the thing under test.
+
+    A manifest that is not JSON is the cheapest real failure to construct, and it is the one an
+    operator actually hits — a run killed mid-write. The good run's signal must still arrive.
+    """
+    monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
+    _manifest(tmp_path, "aa")
+    (tmp_path / "zz.manifest.json").write_text("{ truncated", encoding="utf-8")
+    res = runner.invoke(signal_app, ["batch", "--kind", "rule", "--runs", str(tmp_path),
+                                     "--spec", "specs/whatever.yaml",
+                                     "--local-root", str(tmp_path)])
+    assert res.exit_code == 0, res.output
+    signals = json.loads(res.stdout)
+    assert len(signals) == 2
+    assert signals[0]["kind"] == "rule" and signals[0]["deterministic"] is True
+    assert "error" not in signals[0]
+    assert "JSONDecodeError" in signals[1]["error"]
+
+
+def test_batch_stdout_carries_only_the_json_array(tmp_path, monkeypatch):
+    """Progress and failures go to stderr. stdout is one document a pipe can parse.
+
+    The count of runs and the name of each failure are exactly what an operator wants to watch
+    scroll past, and exactly what makes `acr signal batch ... | jq` stop working if it lands on
+    stdout beside the array.
+    """
+    monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
+    _manifest(tmp_path, "aa")
+    (tmp_path / "zz.manifest.json").write_text("{ truncated", encoding="utf-8")
+    res = runner.invoke(signal_app, ["batch", "--kind", "rule", "--runs", str(tmp_path),
+                                     "--spec", "specs/whatever.yaml",
+                                     "--local-root", str(tmp_path)])
+    assert res.exit_code == 0, res.output
+    assert isinstance(json.loads(res.stdout), list)      # nothing else got in
+    assert "zz.manifest.json" in " ".join(res.stderr.split())
+
+
+def test_a_batch_where_every_run_failed_is_not_reported_as_success(tmp_path, monkeypatch):
+    """One bad run is data; nothing but bad runs is a broken invocation.
+
+    Exit 0 with an array of nothing but errors tells a shell script the cohort was evaluated.
+    It was not.
+    """
+    monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
+    (tmp_path / "zz.manifest.json").write_text("{ truncated", encoding="utf-8")
+    res = runner.invoke(signal_app, ["batch", "--kind", "rule", "--runs", str(tmp_path),
+                                     "--spec", "specs/whatever.yaml",
+                                     "--local-root", str(tmp_path)])
+    assert res.exit_code == 2
+    assert json.loads(res.stdout)[0]["error"]            # the array is still emitted
+
+
+def test_batch_out_writes_the_array_instead_of_printing_it(tmp_path, monkeypatch):
+    monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
+    _manifest(tmp_path, "aa")
+    out = tmp_path / "signals.json"
+    res = runner.invoke(signal_app, ["batch", "--kind", "rule", "--runs", str(tmp_path),
+                                     "--spec", "specs/whatever.yaml",
+                                     "--local-root", str(tmp_path), "--out", str(out)])
+    assert res.exit_code == 0, res.output
+    assert json.loads(out.read_text(encoding="utf-8"))[0]["kind"] == "rule"
+
+
+def test_the_batch_case_id_comes_from_the_same_case_map_acr_attribute_takes(tmp_path):
+    """`--case-map` is `{case_id: patient_id}` here because that is what it is everywhere else.
+
+    The plan specified `{manifest stem: case id}` for this command alone. Two shapes behind one
+    flag name in one CLI is a trap, and the stem of `SYN0001.manifest.json` is
+    `SYN0001.manifest`, so the wrong shape also produces case ids with a file extension in them.
+    """
+    from acr.cli_signal import _case_id_for
+    manifest = _manifest(tmp_path, "SYN0001")
+    assert _case_id_for(manifest, {"SYN0001": "CASE-001"}) == "CASE-001"
+    # No map: the manifest's own patient id, which `attribution.safe_case_id` refuses
+    # downstream if it looks like a real person rather than a synthetic subject.
+    assert _case_id_for(manifest, {}) == "SYN0001"

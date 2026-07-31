@@ -237,6 +237,13 @@ The v1 EvalLoop and its duplicated evaluator catalog have been removed. Current 
 uses `ModuleAsset` + `PipelineProfile`; causal attribution keeps its dedicated tool-using
 runtime under `acr attribute`.
 
+**One entry point:** `acr signal run` / `acr signal batch` is where a finished run is asked for
+signals, whichever way the signal is produced — `--kind rule` runs the deterministic checks and
+imports no provider at all, `--kind agent` runs the diagnostic attribution agent under the
+`skills/eval-*` cards. It is a new group rather than a flag on `acr eval` precisely because that
+group promises it calls no model, and a test keeps provider imports out of the dispatcher's
+module scope so the promise stays true in practice.
+
 **The fence:** where a deterministic check exists, a model judge is *forbidden*, not
 discouraged. `correctness` is `==`. A task-completion judge is refused outright because it
 **launders abstention** — it scores a correct `EVIDENCE_INSUFFICIENT` as a failure, and
@@ -354,6 +361,55 @@ over a comparison that actually held 6 improvements and 3 regressions.
 
 `eval detect` has **no default thresholds** on purpose: a detector that ran with numbers nobody
 chose reports "nothing fired" indistinguishably from "nothing looked".
+
+### Signals over finished runs — one entry, several kinds
+
+`acr signal` is the single front door for asking a completed run anything. `--kind` chooses how
+the answer is produced; the envelope out is the same shape either way, so whatever consumes
+signals consumes one thing.
+
+```bash
+# deterministic checks over the trace and the manifest — CALLS NO MODEL
+.venv/bin/acr signal run --kind rule \
+  --run runs/arm-native/SYN0001.manifest.json \
+  --spec specs/STORE.400_522_523.site_histology_behavior.yaml
+
+# the diagnostic agent: WHY did this run come out the way it did. Costs money.
+# Run `--kind rule` first to learn WHICH cases were wrong; hand only those to the agent.
+.venv/bin/acr signal run --kind agent \
+  --run runs/arm-native/SYN0001.manifest.json \
+  --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  --gold gold/store400.csv --case-id CASE-001
+```
+
+All four `skills/eval-*` diagnostic cards are offered to the agent by default and it decides
+which apply. `--eval-skills a,b` narrows that when you already have a suspicion and want to
+spend less prompt; it is not a required argument. A name that is not a `slot: eval` card is
+refused before the provider is even imported, so a typo costs nothing.
+
+`batch` is the same dispatcher over a directory of manifests, and it emits one JSON array with
+**one entry per run**:
+
+```bash
+.venv/bin/acr signal batch --kind rule --runs runs/arm-native \
+  --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  --out signals/native-rule.json
+
+.venv/bin/acr signal batch --kind agent --runs runs/arm-native \
+  --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  --gold gold/store400.csv --case-map case-map.json \
+  --out signals/native-agent.json
+```
+
+**One bad run is recorded, not fatal.** It lands in the array as `{"error": "…"}` in the slot
+its signal would have occupied, because aborting throws away the signals already produced and,
+on the agent kind, the money already spent producing them. The exit code is 2 only when *every*
+run failed. `--case-map` is the same `{case_id: patient_id}` file `acr attribute` takes; without
+it, a run's own `patient_id` is used as its case id, which the develop plane's pseudonymity
+check refuses on a real corpus and accepts on a synthetic one.
+
+A third kind, `--kind judge`, joins this entry point in the next commit: the fenced
+agent-as-a-judge scoring the trajectory itself rather than diagnosing an error.
 
 ### ACR evaluation — local typed pipelines
 
