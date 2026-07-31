@@ -138,20 +138,167 @@ def test_out_writes_the_signal_instead_of_printing_it(tmp_path, monkeypatch):
     assert json.loads(out.read_text(encoding="utf-8"))["kind"] == "rule"
 
 
-def test_eval_skill_names_default_to_all_four():
-    from acr.cli_signal import DEFAULT_EVAL_SKILLS, _eval_skill_names
-    assert _eval_skill_names("") == DEFAULT_EVAL_SKILLS
-    assert _eval_skill_names("  ") == DEFAULT_EVAL_SKILLS
+# ==================================== TWO POSTURES TOWARD THE KEY, NEVER IN ONE PROMPT
+# A failed run has two readings and they license opposite mistakes. Believe the key and the
+# cause must be in the run — a term never searched, a type filter that masked the document, a
+# passage read and misjudged. Doubt the key and the question is whether it was ever derivable
+# from THIS chart. Offer both at once and the agent picks whichever fits what it happened to
+# find: every hard failure can exit through "the key may be wrong", and every unreachable key
+# can be booked as an agent error. The modes exist so that the posture is an input.
+
+
+def test_the_two_modes_never_put_both_postures_in_one_prompt():
+    """The property the old five-card default violated, and the only one here that matters.
+
+    `eval-key-challenge` opens with "the key is also a suspect". `eval-missed-evidence` opens
+    with "Confirm from the scorer and the answer key that the value is genuinely documented
+    before you start". Both sentences in one system prompt is not more method, it is a prompt
+    with no posture — and the agent's choice between them stops being recorded anywhere.
+    """
+    from acr.cli_signal import EVAL_MODES, KEY_IS_RIGHT_SKILLS, KEY_IS_SUSPECT_SKILLS
+    for mode, cards in EVAL_MODES.items():
+        believes = set(cards) & set(KEY_IS_RIGHT_SKILLS)
+        doubts = set(cards) & set(KEY_IS_SUSPECT_SKILLS)
+        assert not (believes and doubts), (
+            f"mode {mode!r} carries both postures: believes={sorted(believes)} "
+            f"doubts={sorted(doubts)}")
+
+
+def test_every_eval_card_in_the_tree_belongs_to_exactly_one_posture():
+    """A card assigned to no posture is a card no mode offers, which is a card nobody receives.
+
+    This is the failure `acr.skills` exists to prevent, one level up: the runtime reports that
+    method was supplied and the model gets nothing. Adding a sixth eval card must therefore be a
+    decision about its posture, made here, rather than something a reviewer notices later.
+    """
+    from pathlib import Path
+
+    from acr.cli_signal import (
+        KEY_AGNOSTIC_SKILLS,
+        KEY_IS_RIGHT_SKILLS,
+        KEY_IS_SUSPECT_SKILLS,
+    )
+    from acr.skills import skill_slot
+
+    skills_dir = Path(__file__).resolve().parents[1] / "skills"
+    in_tree = {p.name for p in skills_dir.iterdir()
+               if (p / "SKILL.md").is_file() and skill_slot(p.name) == "eval"}
+    postures = [set(KEY_AGNOSTIC_SKILLS), set(KEY_IS_RIGHT_SKILLS), set(KEY_IS_SUSPECT_SKILLS)]
+    assigned = set().union(*postures)
+    assert assigned == in_tree, f"unassigned: {sorted(in_tree - assigned)}"
+    for i, a in enumerate(postures):
+        for b in postures[i + 1:]:
+            assert not a & b, f"card in two postures: {sorted(a & b)}"
+
+
+def test_run_fault_is_the_default_and_it_does_not_doubt_the_key():
+    """Believing the key is the right default: it is true far more often than not, and the
+    diagnosis it produces is actionable. Doubt has to be ASKED for, per run."""
+    from acr.cli_signal import DEFAULT_EVAL_MODE, EVAL_MODES, _eval_skill_names
+    assert DEFAULT_EVAL_MODE == "run-fault"
+    assert "eval-key-challenge" not in EVAL_MODES["run-fault"]
+    assert _eval_skill_names("") == EVAL_MODES["run-fault"]
+    assert _eval_skill_names("  ") == EVAL_MODES["run-fault"]
+
+
+def test_key_suspect_mode_offers_the_challenge_card_and_drops_the_believing_ones():
+    from acr.cli_signal import EVAL_MODES, KEY_IS_RIGHT_SKILLS
+    cards = EVAL_MODES["key-suspect"]
+    assert "eval-key-challenge" in cards
+    assert not set(cards) & set(KEY_IS_RIGHT_SKILLS)
+
+
+def test_an_explicit_eval_skills_list_still_overrides_the_mode():
+    """The escape hatch stays: a mode is a named pair of defaults, not a whitelist."""
+    from acr.cli_signal import _eval_skill_names
     assert _eval_skill_names("eval-overconfidence, eval-missed-evidence") == (
         "eval-overconfidence", "eval-missed-evidence")
+    assert _eval_skill_names("eval-key-challenge", mode="run-fault") == ("eval-key-challenge",)
 
 
-def test_the_default_eval_skills_all_exist_and_are_eval_slot():
-    """A default that names a card nobody wrote fails at spend time, not at read time."""
-    from acr.cli_signal import DEFAULT_EVAL_SKILLS
+def test_an_unknown_mode_is_refused_on_a_kind_that_would_have_ignored_it(tmp_path, monkeypatch):
+    """`--kind rule` never reads the mode, and that is exactly why it must still be checked.
+
+    `_check_kind` states the rule this follows: reject as the option is PARSED, not in the
+    command body. A mode validated only on the branch that consumes it means `--mode run-falut`
+    on a deterministic pass is accepted in silence, and the operator learns about the typo on
+    the agent run they queued behind it.
+    """
+    monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
+    m = _manifest(tmp_path, "ruled")
+    res = runner.invoke(signal_app, ["run", "--kind", "rule", "--run", str(m),
+                                     "--spec", "s.yaml", "--mode", "run-falut",
+                                     "--local-root", str(tmp_path)])
+    assert res.exit_code != 0
+    assert "run-falut" in _flat(res)
+
+
+def test_an_unknown_mode_is_refused_and_named(tmp_path, monkeypatch):
+    monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
+    m = _manifest(tmp_path, "moded")
+    res = runner.invoke(signal_app, ["run", "--kind", "agent", "--run", str(m),
+                                     "--spec", "s.yaml", "--case-id", "C1",
+                                     "--mode", "trust-nobody",
+                                     "--local-root", str(tmp_path)])
+    assert res.exit_code != 0
+    flat = _flat(res)
+    assert "trust-nobody" in flat and "run-fault" in flat
+
+
+@pytest.mark.parametrize("cmd", ["run", "batch"])
+def test_both_commands_name_both_modes_in_their_help(cmd: str):
+    """Asserted on the mode NAMES, not on the string `--mode`.
+
+    `--model` contains `--mode`, so the obvious spelling of this test passes before the flag
+    exists — it did, on the first run of this block, while the CLI answered
+    `No such option: --mode`. An operator cannot choose a posture they cannot see named.
+    """
+    from acr.cli_signal import EVAL_MODES
+    res = runner.invoke(signal_app, [cmd, "--help"])
+    assert res.exit_code == 0
+    flat = _flat(res)
+    for mode in EVAL_MODES:
+        assert mode in flat, f"{cmd} --help never names the {mode!r} mode"
+
+
+def test_the_mode_decides_what_actually_reaches_the_prompt(monkeypatch, tmp_path):
+    """A flag that is parsed and not wired is the same as no flag.
+
+    Asserts on the rendered block the attribution agent receives, not on the tuple that was
+    computed on the way there — `eval_skills_prompt` is the only thing the model sees.
+    """
+    monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
+    import acr.cli_attribute as CA
+    seen: dict = {}
+
+    def fake(**kw):
+        seen.update(kw)
+        return {"schema": "acr.signal/1", "kind": "agent", "report": {}}
+
+    monkeypatch.setattr(CA, "attribute_case_payload", fake)
+    m = _manifest(tmp_path, "wired")
+    res = runner.invoke(signal_app, ["run", "--kind", "agent", "--run", str(m),
+                                     "--spec", "s.yaml", "--case-id", "C1",
+                                     "--mode", "key-suspect",
+                                     "--local-root", str(tmp_path)])
+    assert res.exit_code == 0, res.output
+    block = seen["eval_skills_prompt"]
+    assert "eval skill: eval-key-challenge" in block
+    assert "eval skill: eval-missed-evidence" not in block
+
+
+@pytest.mark.parametrize("mode", ["run-fault", "key-suspect"])
+def test_every_mode_renders_and_names_only_cards_that_exist(mode: str):
+    """A mode that names a card nobody wrote fails at spend time, not at read time.
+
+    Per mode, not over one merged list: a card that only the unused mode names would otherwise
+    be validated by whichever mode happened to include it.
+    """
+    from acr.cli_signal import EVAL_MODES
     from acr.skills import eval_skills_block
-    block = eval_skills_block(list(DEFAULT_EVAL_SKILLS))
-    for name in DEFAULT_EVAL_SKILLS:
+    cards = EVAL_MODES[mode]
+    block = eval_skills_block(list(cards))
+    for name in cards:
         assert f"eval skill: {name}" in block
 
 
@@ -568,3 +715,36 @@ def test_both_budget_flags_are_offered_on_both_commands(cmd: str):
     assert res.exit_code == 0
     flat = _flat(res)
     assert "--max-model-calls" in flat and "--max-chart-reads" in flat
+
+
+def test_the_agent_batch_reaches_the_diagnosis_at_all(tmp_path, monkeypatch):
+    """回归：`_batch_signals` 的函数体用了两个签名里没有的名字。
+
+    `acr signal batch --kind agent` 于是对每一个 run 抛 `NameError`，而这条路径上的
+    `except Exception` 正是为"一个坏 run 不算整批"写的——它把 NameError 一视同仁地记成
+    per-run error，整批以 exit 2 结束，看起来像"这批 run 都有问题"，而不是"这个命令从来没跑过"。
+    上面那个测试只检查 flag 出现在 help 里，`--kind agent` 的批量路径没有任何测试穿过。
+
+    这是两个模式跑一个 cohort 的必经之路，所以在这里补上。
+    """
+    monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
+    import acr.cli_attribute as CA
+    seen: list[dict] = []
+
+    def fake(**kw):
+        seen.append(kw)
+        return {"schema": "acr.signal/1", "kind": "agent", "report": {}}
+
+    monkeypatch.setattr(CA, "attribute_case_payload", fake)
+    _manifest(tmp_path, "SYN0001")
+    res = runner.invoke(signal_app, ["batch", "--kind", "agent", "--runs", str(tmp_path),
+                                     "--spec", "s.yaml", "--mode", "key-suspect",
+                                     "--max-model-calls", "31", "--max-chart-reads", "7",
+                                     "--local-root", str(tmp_path)])
+    assert res.exit_code == 0, res.output
+    signals = json.loads(res.stdout)
+    assert len(signals) == 1 and "error" not in signals[0], signals
+    assert len(seen) == 1
+    assert seen[0]["max_model_calls"] == 31      # the flags reach the payload, not just the help
+    assert seen[0]["max_chart_reads"] == 7
+    assert "eval-key-challenge" in seen[0]["eval_skills_prompt"]     # and so does the mode

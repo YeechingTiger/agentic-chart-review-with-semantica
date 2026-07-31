@@ -71,18 +71,42 @@ SIGNAL_TYPE_FOR_KIND: dict[str, str] = {
     "agent": "ATTRIBUTION_REPORT",
 }
 
-#: The eval skills the diagnostic agent is offered by default. Every one is `slot: eval` and
-#: declares what it may judge; see `acr.skills.eval_skills_block`.
-DEFAULT_EVAL_SKILLS: tuple[str, ...] = (
-    "eval-contrast-traces",
-    "eval-cluster-failures",
-    "eval-missed-evidence",
-    "eval-overconfidence",
-    # The other four all ask why the RUN went wrong. This one asks whether the KEY did, which
-    # is a different question and the only one nobody was asking: a registry value is what a
-    # person wrote down, and "the run erred" is the default reading of every disagreement.
-    "eval-key-challenge",
-)
+#: WHAT THE EVAL AGENT IS ALLOWED TO ASSUME ABOUT THE ANSWER KEY, as three groups of cards.
+#: Every one is `slot: eval` and declares what it may judge; see `acr.skills.eval_skills_block`.
+#:
+#: A failed run has two readings and they license OPPOSITE mistakes. Believe the key and the
+#: cause has to be in the run — a term never searched, a type filter that masked the document, a
+#: passage read and misjudged. Doubt the key and the question is whether it was ever derivable
+#: from THIS chart. Both are real; which one applies is not something the agent can settle from
+#: the trace, because the trace looks the same either way.
+#:
+#: These groups were previously ONE default tuple containing all five, so every diagnosis was
+#: told "the key is also a suspect" AND "confirm the value is genuinely documented before you
+#: start" in the same system prompt. That is not more method. It hands the agent an exit from
+#: every hard failure ("the key may be wrong") and an exit from every unreachable key ("the
+#: agent erred"), and its choice between them is recorded nowhere.
+KEY_IS_RIGHT_SKILLS: tuple[str, ...] = ("eval-missed-evidence", "eval-overconfidence")
+
+#: Doubt, licensed. A registry value is what a person wrote down: they read outside records this
+#: chart does not have, they mistype, and they apply a rule differently than the contract does.
+#: README §2.5 already refuses to call such a value gold — this is the card that can act on it.
+KEY_IS_SUSPECT_SKILLS: tuple[str, ...] = ("eval-key-challenge",)
+
+#: Neither posture. Both cards defer the correctness question to the deterministic scorer in
+#: their own opening lines, so they carry no assumption to conflict with, and both modes get them.
+KEY_AGNOSTIC_SKILLS: tuple[str, ...] = ("eval-contrast-traces", "eval-cluster-failures")
+
+#: The posture is an INPUT, chosen per invocation. Two modes and no third: a mode that mixed the
+#: groups would be the merged default this replaced, wearing a name.
+EVAL_MODES: dict[str, tuple[str, ...]] = {
+    "run-fault": KEY_AGNOSTIC_SKILLS + KEY_IS_RIGHT_SKILLS,
+    "key-suspect": KEY_AGNOSTIC_SKILLS + KEY_IS_SUSPECT_SKILLS,
+}
+
+#: Believing the key is the right default: it is true far more often than not, and the diagnosis
+#: it yields is actionable — a fix aimed at the run. Doubt has to be asked for, per run, which is
+#: also what makes "we doubted the key here" a legible decision afterwards.
+DEFAULT_EVAL_MODE = "run-fault"
 
 #: Turns the attribution agent gets. `acr attribute case` defaults to 12 and this dispatcher
 #: copied that, which turned out to be structurally too few HERE: the pipeline has eight stages,
@@ -153,10 +177,37 @@ def _check_kind(kind: str) -> str:
     return kind
 
 
-def _eval_skill_names(raw: str) -> tuple[str, ...]:
-    """Which diagnostic skills to offer. Empty string means the default set."""
+def _check_mode(mode: str) -> str:
+    """Reject an unknown mode AS THE OPTION IS PARSED, for `_check_kind`'s reason.
+
+    The message names the modes, because the whole point of the flag is that a posture is a
+    choice somebody makes on purpose — and a refusal that does not say what the choices are
+    sends the operator to the source.
+    """
+    if mode not in EVAL_MODES:
+        raise typer.BadParameter(
+            f"unknown mode {mode!r}; expected one of {list(EVAL_MODES)}")
+    return mode
+
+
+# Shared verbatim between `run` and `batch`, for the reason the judge options are: two spellings
+# of one posture is how a cohort ends up half-diagnosed under each. Declared here rather than
+# beside LOCAL_ROOT because the callback has to exist by the time this line is evaluated.
+MODE = typer.Option(
+    DEFAULT_EVAL_MODE, "--mode", callback=_check_mode,
+    help="agent kind only, but CHECKED ON EVERY KIND: which posture toward the answer key. "
+         "`run-fault` believes the key and looks for the cause in the run; `key-suspect` asks "
+         "whether the key was derivable from this chart at all. Overridden by --eval-skills.")
+
+
+def _eval_skill_names(raw: str, mode: str = DEFAULT_EVAL_MODE) -> tuple[str, ...]:
+    """Which diagnostic skills to offer. Empty string means the mode's set.
+
+    An explicit list still wins: a mode is a named pair of defaults, not a whitelist. Somebody
+    diagnosing a one-off has to be able to name three cards without inventing a mode for it.
+    """
     if not raw.strip():
-        return DEFAULT_EVAL_SKILLS
+        return EVAL_MODES[_check_mode(mode)]
     return tuple(s.strip() for s in raw.split(",") if s.strip())
 
 
@@ -190,7 +241,8 @@ def signal_run(
     case_id: str = typer.Option("", "--case-id", help="pseudonymous case id; agent kind only"),
     eval_skills: str = typer.Option(
         "", "--eval-skills",
-        help="comma list of eval skills to offer the agent; default is all four"),
+        help="comma list of eval skills to offer the agent; default is the --mode's set"),
+    mode: str = MODE,
     max_model_calls: int = typer.Option(
         DEFAULT_AGENT_MODEL_CALLS, "--max-model-calls", min=1,
         help="agent kind only: turns the attribution pipeline gets. Its eight stages plus the "
@@ -223,7 +275,7 @@ def signal_run(
                                   api_base=api_base, local_root=local_root)
     else:
         payload = _agent_signal(run=run, spec=spec, gold=gold, case_id=case_id,
-                                eval_skills=_eval_skill_names(eval_skills),
+                                eval_skills=_eval_skill_names(eval_skills, mode),
                                 max_usd=max_usd, local_root=local_root,
                                 max_model_calls=max_model_calls,
                                 max_chart_reads=max_chart_reads)
@@ -473,7 +525,14 @@ def _batch_signals(*, kind: str, paths: list[Path], spec: str, gold: str,
                    case_map: str = "", dimension: str = "",
                    usd_per_call: float | None = None, max_usd: float | None = None,
                    model: str | None = None, api_base: str | None = None,
-                   local_root: str | None = None) -> list[dict]:
+                   local_root: str | None = None,
+                   # Defaulted to the same constants `run` uses, not to None: the agent branch
+                   # below read these two out of thin air, so `--kind agent` raised NameError per
+                   # run and the per-run `except` filed it as a bad RUN. A batch of nothing but
+                   # that reads as a cohort that failed evaluation, not as a command that has
+                   # never once worked.
+                   max_model_calls: int = DEFAULT_AGENT_MODEL_CALLS,
+                   max_chart_reads: int = DEFAULT_AGENT_CHART_READS) -> list[dict]:
     """Signals for every run, in path order.
 
     A FAILURE ON ONE RUN IS RECORDED AND THE BATCH CONTINUES. Aborting would discard the signals
@@ -520,7 +579,8 @@ def signal_batch(
         help="JSON {pseudonymous_case_id: patient_id}, the same file `acr attribute` takes; "
              "agent kind only. Without it a run's own patient_id is used as its case id."),
     eval_skills: str = typer.Option("", "--eval-skills",
-                                    help="comma list; default is all four"),
+                                    help="comma list; default is the --mode's set"),
+    mode: str = MODE,
     max_model_calls: int = typer.Option(
         DEFAULT_AGENT_MODEL_CALLS, "--max-model-calls", min=1,
         help="agent kind only: turns the attribution pipeline gets. Its eight stages plus the "
@@ -554,9 +614,10 @@ def signal_batch(
     signals = _batch_signals(
         kind=kind, paths=paths, spec=spec, gold=gold,
         patient_to_case=_patient_to_case(case_map, local_root) if kind == "agent" else {},
-        eval_skills=_eval_skill_names(eval_skills), case_map=case_map, dimension=dimension,
+        eval_skills=_eval_skill_names(eval_skills, mode), case_map=case_map, dimension=dimension,
         usd_per_call=usd_per_call, max_usd=max_usd, model=model, api_base=api_base,
-        local_root=local_root)
+        local_root=local_root,
+        max_model_calls=max_model_calls, max_chart_reads=max_chart_reads)
     failed = sum("error" in s for s in signals)
     text = json.dumps(signals, indent=2, ensure_ascii=False, default=str)
     if out:

@@ -389,8 +389,24 @@ signals consumes one thing.
   --gold gold/store400.csv --case-id CASE-001
 ```
 
-All four `skills/eval-*` diagnostic cards are offered to the agent by default and it decides
-which apply. `--eval-skills a,b` narrows that when you already have a suspicion and want to
+`--mode` chooses what the agent may assume about the answer key, and it is the one input that
+changes what a diagnosis can conclude:
+
+| `--mode` | assumes | the question it can answer |
+|---|---|---|
+| `run-fault` (default) | the key is right | where in the run the cause sits — a term never searched, a type filter that masked the document, a passage read and misjudged |
+| `key-suspect` | the key may be wrong | whether the key was derivable from THIS chart at all |
+
+The two are separate invocations on purpose, and the cards are disjoint: `eval-key-challenge`
+opens with *"the key is also a suspect"* while `eval-missed-evidence` opens with *"confirm the
+value is genuinely documented before you start"*, and both sentences in one prompt is a prompt
+with no posture — every hard failure can then exit through "the key may be wrong" and every
+unreachable key through "the agent erred", with the choice recorded nowhere. Running BOTH modes
+over the same failed run and getting two non-empty answers is itself the signal that the case
+needs a human. The three `SYNK*` charts are the fixture for the doubting mode; `key_dispute.kind`
+in their `_ground_truth.json` is its answer key.
+
+`--eval-skills a,b` overrides the mode outright when you already have a suspicion and want to
 spend less prompt; it is not a required argument. A name that is not a `slot: eval` card is
 refused before the provider is even imported, so a typo costs nothing.
 

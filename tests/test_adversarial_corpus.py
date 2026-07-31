@@ -302,13 +302,20 @@ def test_k03_both_readings_are_present_in_the_chart():
             f"{iso} is offered as a defensible reading but no document falls on it")
 
 
-def test_the_key_challenge_skill_exists_and_is_offered_by_default():
+def test_the_key_challenge_skill_exists_and_a_named_mode_offers_it():
     """A card nobody loads is guidance nobody receives — the defect `acr.skills` was written
-    to prevent, one level up."""
-    from acr.cli_signal import DEFAULT_EVAL_SKILLS
+    to prevent, one level up.
+
+    It is deliberately NOT in the default mode. These three charts are the reason the doubting
+    posture exists, and the reason it is opt-in: on a chart whose key IS derivable, an agent
+    holding this card can book every hard failure as a bad key. What must be true is that the
+    card is reachable by naming a mode, not that every diagnosis receives it.
+    """
+    from acr.cli_signal import DEFAULT_EVAL_MODE, EVAL_MODES
     from acr.skills import eval_skill_judges, skill_slot
 
-    assert "eval-key-challenge" in DEFAULT_EVAL_SKILLS
+    assert "eval-key-challenge" in EVAL_MODES["key-suspect"]
+    assert "eval-key-challenge" not in EVAL_MODES[DEFAULT_EVAL_MODE]
     assert skill_slot("eval-key-challenge") == "eval"
     assert "key_derivability" in eval_skill_judges("eval-key-challenge")
 
