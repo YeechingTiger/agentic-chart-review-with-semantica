@@ -38,7 +38,7 @@
 | `skills/eval-cluster-failures/SKILL.md` | 复盘卡：把多个失败归类 |
 | `skills/eval-missed-evidence/SKILL.md` | 复盘卡：答案在某份报告里却没翻到 |
 | `skills/eval-overconfidence/SKILL.md` | 复盘卡：斩钉截铁但答错 |
-| `src/acr/cli_signal.py` | `acr signal run` / `acr signal batch` 薄壳，两种做法一个出口 |
+| `src/acr/cli_signal.py` | `acr signal run` / `acr signal batch` 薄壳，三种做法一个出口（Task 7-8 先接 rule/agent 两种，Task 9 接入 judge） |
 | `tests/test_skill_slots.py` | 槽位声明与装配校验 |
 | `tests/test_eval_skill_fence.py` | 评测卡不得含判分指令、必须声明 `judges` |
 | `tests/test_cli_signal.py` | 新入口的路由与 signal 形状 |
@@ -1792,7 +1792,7 @@ Expected: PASS
 
 - [ ] **Step 7: 更新 README**
 
-在 `README.md` §3 "How to run each component" 里，`acr extract` 那段之后，加一节（照抄本计划末尾"怎么用"的四个例子），并在 §2.6 eval 平面的描述里加一句：`acr signal` 是两种信号的统一入口，`--kind rule` 无模型、`--kind agent` 走 eval skills。
+在 `README.md` §3 "How to run each component" 里，`acr extract` 那段之后，加一节（照抄本计划末尾"怎么用"的四个例子），并在 §2.6 eval 平面的描述里加一句：`acr signal` 是信号的统一入口，`--kind rule` 无模型、`--kind agent` 走 eval skills（Task 9 再加第三种 `--kind judge`）。
 
 - [ ] **Step 8: 提交**
 
@@ -1812,7 +1812,216 @@ EOF
 
 ---
 
-## 怎么用（八个任务做完之后）
+## Task 9: `--kind judge` —— AI 评卷进统一入口
+
+**Files:**
+- Modify: `src/acr/cli_judge.py:76-90`（`_JsonModel` 改名公开）
+- Modify: `src/acr/cli_signal.py`（`KINDS` 加第三种、`_judge_signal`、`run`/`batch` 加评卷参数）
+- Test: `tests/test_cli_signal.py`（追加 + 改一处断言）
+
+**Interfaces:**
+- Consumes: `acr.judge` 现成的机器——`judge()`、`blind_packet()`、`keyed_packet()`、
+  `JUDGEABLE_DIMENSIONS`、`KEY_PERMITTED_DIMENSIONS`、`apply_verdict()`；
+  `evals.precedence_gate()`；`cli_common.llm_client()`；Task 7 的 `_check_kind` 分发结构
+- Produces:
+  - `acr.cli_judge.JsonJudgeModel`（原 `_JsonModel` 改名，保留 `_JsonModel = JsonJudgeModel` 别名）
+  - `acr.cli_signal._judge_signal(...) -> dict`
+  - CLI：`acr signal run --kind judge --dimension trajectory_quality --run ... --usd-per-call ...`
+
+**这条线评什么、归谁管**：`judge.py` 是现成的"评卷员"（agent-as-a-judge，评 trajectory
+本身，不归因）。五个可评维度（翻病历的路子、证据支撑的判断半、步骤效率的判断半、解释
+质量、坏案例排序），每维度三个内置镜头。围栏、蒙答案（`BlindPacket`）、"观感分不当闸门"
+（`apply_verdict` 只认 SCREEN/RANK/FLAG）全部已经在 `judge.py` 里钉死——**本任务一个字
+都不改它**，只做两件事：把 run manifest+trace 自动组装成 packet（现有 `acr judge panel`
+要求操作者手拼 JSON，这是真实的使用门槛），和把这条线纳入 `acr signal` 统一入口。
+
+**扩展方式随之明确**：加一个评卷角度 = 加一个 `evaluators/*.yaml`（`judge.py` 自己的
+规矩：内置 LENSES 字典不许再长，新评测走声明式 YAML，加载时对着判分注册表核查）。
+诊断角度加 `skills/eval-*`，评卷角度加 `evaluators/*.yaml`，都不改代码。
+
+- [ ] **Step 1: 写失败的测试**
+
+`tests/test_cli_signal.py` 里，把 `test_both_kinds_are_offered` 改成：
+
+```python
+def test_all_three_kinds_are_offered():
+    assert KINDS == ("rule", "judge", "agent")
+```
+
+并追加：
+
+```python
+def test_judge_kind_requires_a_dimension():
+    res = runner.invoke(signal_app, ["run", "--kind", "judge",
+                                     "--run", "x.manifest.json", "--spec", "s.yaml"])
+    assert res.exit_code != 0
+    assert "--dimension" in res.stdout
+
+
+def test_judge_signal_builds_a_blind_packet_for_blinded_dimensions(tmp_path: Path):
+    """蒙着答案不是嘱咐，是包上没有放答案的口袋。给了 --gold 也不能漏进去。"""
+    import acr.cli_signal as cs
+    from acr import judge as J
+    m = tmp_path / "r.manifest.json"
+    m.write_text(json.dumps({"patient_id": "SYN01"}), encoding="utf-8")
+    (tmp_path / "r.jsonl").write_text('{"event": "run_start"}\n', encoding="utf-8")
+    g = tmp_path / "gold.json"
+    g.write_text(json.dumps({"SYN01": {"primary_site": "C341"}}), encoding="utf-8")
+    packet = cs._packet_from_run(run=str(m), gold=str(g), dimension="trajectory_quality")
+    assert isinstance(packet, J.BlindPacket)          # keyed 包根本没被构造
+
+
+def test_judge_signal_allows_the_key_only_for_triage(tmp_path: Path):
+    import acr.cli_signal as cs
+    from acr import judge as J
+    m = tmp_path / "r.manifest.json"
+    m.write_text(json.dumps({"patient_id": "SYN01"}), encoding="utf-8")
+    g = tmp_path / "gold.json"
+    g.write_text(json.dumps({"SYN01": {"primary_site": "C341"}}), encoding="utf-8")
+    packet = cs._packet_from_run(run=str(m), gold=str(g), dimension="bad_case_triage")
+    assert isinstance(packet, J.KeyedPacket)
+```
+
+测试文件顶部需要 `import json`。
+
+- [ ] **Step 2: 跑测试确认失败**
+
+Run: `.venv/bin/pytest tests/test_cli_signal.py -q`
+Expected: FAIL — `KINDS` 还是两元组，`_packet_from_run` 不存在
+
+- [ ] **Step 3: `_JsonModel` 改名公开**
+
+`src/acr/cli_judge.py:76` 附近，类改名 `JsonJudgeModel`，类定义之后加一行
+`_JsonModel = JsonJudgeModel`（模块内两处使用可以不动）。改名的理由写在类 docstring 尾部：
+
+```python
+    Public because `cli_signal` builds the same adapter for --kind judge; a second JSON-mode
+    adapter would be a second place for the parsing rules to drift.
+```
+
+- [ ] **Step 4: 实现 `_judge_signal` 和参数**
+
+`src/acr/cli_signal.py`：`KINDS` 改为 `("rule", "judge", "agent")`，
+`SIGNAL_TYPE_FOR_KIND` 加 `"judge": "EVALUATION_RESULT"`（评卷也是 EVALUATION_RESULT，
+和 rule 的区别由 `deterministic: false` 和 `evidence_class: JUDGED` 字段表达——这正是
+`judge.py` "两种分数不许平均"的约定在信号层的样子）。
+
+追加：
+
+```python
+def _packet_from_run(*, run: str, gold: str, dimension: str):
+    """Assemble a judge packet from a run's manifest and trace.
+
+    The blind/keyed decision is NOT made here by policy — it falls out of `judge.py`'s
+    constants. For a blinded dimension the gold argument is ignored ENTIRELY: the packet type
+    has no field to carry it, which is the isolation working as designed.
+    """
+    from . import judge as J
+
+    manifest_path = Path(run)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    trace_path = manifest_path.with_name(manifest_path.name.replace(".manifest.json", ".jsonl"))
+    trace = ([json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines()
+              if line.strip()] if trace_path.is_file() else [])
+    subject = str(manifest.get("patient_id") or manifest_path.stem)
+    if dimension in J.KEY_PERMITTED_DIMENSIONS and gold:
+        key = json.loads(Path(gold).read_text(encoding="utf-8"))
+        return J.keyed_packet(trace=trace,
+                              artifacts={"manifest": manifest, "answer_key": key},
+                              subject_id=subject)
+    return J.blind_packet(trace=trace, artifacts={"manifest": manifest}, subject_id=subject)
+
+
+def _judge_signal(*, run: str, spec: str, dimension: str, gold: str,
+                  usd_per_call: float, max_usd: float, model: str, api_base: str) -> dict:
+    """One judged verdict as a signal. Refusals are judge()'s own, reported verbatim."""
+    from . import evals
+    from . import judge as J
+    from .cli_common import llm_client
+    from .cli_judge import JsonJudgeModel
+
+    if not dimension:
+        raise typer.BadParameter("--kind judge requires --dimension "
+                                 f"(one of {list(J.JUDGEABLE_DIMENSIONS)})")
+    n_lenses = len(J.LENSES[dimension]) if dimension in J.LENSES else 3
+    planned = round(n_lenses * usd_per_call, 6)
+    if planned > max_usd:
+        raise typer.BadParameter(f"{n_lenses} lenses x ${usd_per_call} = ${planned} exceeds "
+                                 f"--max-usd {max_usd}; nothing was called")
+    packet = _packet_from_run(run=run, gold=gold, dimension=dimension)
+    verdict = J.judge(dimension, packet, registry=evals.precedence_gate(),
+                      model=JsonJudgeModel(llm_client(model, api_base), model))
+    return {
+        "schema": "acr.signal/1",
+        "signal_type": SIGNAL_TYPE_FOR_KIND["judge"],
+        "kind": "judge",
+        "run": run,
+        "spec": spec,
+        "deterministic": False,
+        "evidence_class": "JUDGED",   # judge.py's rule, restated where consumers read it:
+                                      # this number screens and ranks; it never gates and it
+                                      # never averages with a deterministic score
+        "dimension": dimension,
+        "verdict": verdict.to_dict() if hasattr(verdict, "to_dict") else vars(verdict),
+    }
+```
+
+`signal_run` 加参数（放在 `eval_skills` 之后）：
+
+```python
+    dimension: str = typer.Option("", "--dimension",
+                                  help="judge kind only: which judged dimension to ask"),
+    usd_per_call: float = typer.Option(0.05, "--usd-per-call",
+                                       help="judge kind only: price of one lens call"),
+    max_usd: float = typer.Option(1.0, "--max-usd", help="judge/agent kinds: cost ceiling"),
+    model: str = typer.Option("", "--model", help="judge kind only: judge model"),
+    api_base: str = typer.Option("", "--api-base"),
+```
+
+分发处加一支：
+
+```python
+    elif kind == "judge":
+        payload = _judge_signal(run=run, spec=spec, dimension=dimension, gold=gold,
+                                usd_per_call=usd_per_call, max_usd=max_usd,
+                                model=model, api_base=api_base)
+```
+
+`signal_batch` 同样加这几个参数，`_batch_signals` 的分发处同样加 judge 一支（签名加
+`dimension/usd_per_call/max_usd/model/api_base` 透传）。
+
+- [ ] **Step 5: 跑测试**
+
+Run: `.venv/bin/pytest tests/test_cli_signal.py tests/test_judge.py -q`
+Expected: PASS（`test_judge.py` 是回归确认：本任务没碰 `judge.py`）
+
+- [ ] **Step 6: 确认帮助与拒绝路径**
+
+Run: `.venv/bin/acr signal run --kind judge --run x.manifest.json --spec s.yaml 2>&1 | tail -3`
+Expected: 报 `--dimension` 缺失，并列出五个可评维度
+
+- [ ] **Step 7: 跑全套并提交**
+
+Run: `.venv/bin/pytest -q`
+
+```bash
+git add src/acr/cli_signal.py src/acr/cli_judge.py tests/test_cli_signal.py
+git commit -m "$(cat <<'EOF'
+acr signal --kind judge: the trajectory judge joins the one entry point
+
+judge.py already had the fenced agent-as-a-judge — five judgeable dimensions, three lenses
+each, key-blinding in the packet type. What it lacked was ergonomics: panel takes a hand-built
+JSON packet. The signal entry assembles the packet from a run's manifest and trace, and the
+blind/keyed decision falls out of judge.py's own constants rather than being re-decided here.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+EOF
+)"
+```
+
+---
+
+## 怎么用（九个任务做完之后）
 
 ### 跑病历——单个
 
@@ -1851,6 +2060,23 @@ acr signal run --kind rule \
                --spec specs/STORE.400_522_523.site_histology_behavior.yaml
 ```
 
+### 评测——单个，AI 评卷（trajectory 观感分，蒙着答案）
+
+评的是**过程质量**，不是对错——对错程序已经算了。五个可评维度：`trajectory_quality`
+（翻病历的路子）、`evidence_support.judged`（证据到底撑不撑）、`step_efficiency.judged`
+（每一步值不值）、`l5_explanation_quality`（解释质量）、`bad_case_triage`（坏案例排序，
+唯一允许看答案的一个）。每个维度三个镜头、三次模型调用，所以要报单价：
+
+```bash
+acr signal run --kind judge --dimension trajectory_quality \
+               --run runs/arm-native/SYN0001.manifest.json \
+               --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+               --usd-per-call 0.05 --max-usd 0.5 --model openrouter/openai/gpt-5.6-luna
+```
+
+给不给 `--gold` 都一样——蒙着答案的维度**包上就没有放答案的口袋**。观感分只用来
+筛查和排序，不拦答案、不和程序分平均。
+
 ### 评测——单个，AI 看的（归因 agent）
 
 **你不需要预先知道错因是哪一类。** 顺序是：先用 `--kind rule` 判出**哪些** case 错了，
@@ -1883,13 +2109,20 @@ acr signal batch --kind rule  --runs runs/arm-native \
                  --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
                  --out signals/native-rule.json
 
+acr signal batch --kind judge --dimension step_efficiency.judged --runs runs/arm-native \
+                 --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+                 --usd-per-call 0.05 --max-usd 5 --model openrouter/openai/gpt-5.6-luna \
+                 --out signals/native-judge.json
+
 acr signal batch --kind agent --runs runs/arm-native \
                  --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
                  --gold gold/store400.csv --case-map runs/case-map.json \
                  --out signals/native-agent.json
 ```
 
-### 加一种复盘角度
+### 加一种评测角度——两条扩展路，都不改 Python
+
+**加诊断角度**（归因 agent 的新思路）——一张卡：
 
 ```bash
 mkdir -p skills/eval-timeline-drift
@@ -1898,7 +2131,16 @@ mkdir -p skills/eval-timeline-drift
 acr signal run --kind agent ... --eval-skills eval-timeline-drift
 ```
 
-不用改一行 Python。
+**加评卷角度**（trajectory 观感的新问题）——一个 YAML：
+
+```bash
+# 写 evaluators/tool-selection.yaml：声明评哪个判断维度、问什么问题、需要什么材料
+acr judge evaluators                       # 列出并围栏核查——声称判"正确性"的会被拒绝加载
+acr judge run --evaluator tool-selection --context ... --subject-id CASE-001 ...
+```
+
+诊断角度是 Markdown 卡（给会用工具的归因 agent 读的方法），评卷角度是 YAML（机器要
+核查它评的维度不被程序管辖、材料按声明注入）。格式不同，思想相同：加文件，不改代码。
 
 ---
 
