@@ -438,8 +438,12 @@ class Tracer:
     def plan(self, plan, revision, rationale=""): return self.emit("plan", plan=plan, revision=revision, rationale=rationale)
     def llm(self, role, content, tool_calls=None, usage=None):
         return self.emit("llm", role=role, content=content, tool_calls=tool_calls or [], usage=usage or {})
-    def tool(self, name, args, result, ok=True, ms=0.0):
-        return self.emit("tool", tool=name, args=args, result=result, ok=ok, ms=ms)
+    def tool(self, name, args, result, ok=True, ms=0.0, because=""):
+        # Promoted out of `args` and into the envelope on purpose. It is already inside `args`,
+        # but a consumer that has to reach into a free-form argument bag to find the causal
+        # link will not do it, and a field nobody reads is a field nobody maintains.
+        return self.emit("tool", tool=name, args=args, result=result, ok=ok, ms=ms,
+                         because=str(because or ""))
     def reflect(self, verdict, reason, evidence_count):
         return self.emit("reflect", verdict=verdict, reason=reason, evidence_count=evidence_count)
     def rejected(self, why, missing, attempted):

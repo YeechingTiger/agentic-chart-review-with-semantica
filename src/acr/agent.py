@@ -1562,7 +1562,11 @@ def chart_tools(toolbox, tracer) -> list[StructuredTool]:
 
         def _call(_name=name, **kwargs):
             out, ms = toolbox.dispatch(_name, kwargs)
-            tracer.tool(_name, kwargs, out, ok="error" not in (out or {}), ms=ms)
+            # Read straight after the dispatch that set it. `dispatch` strips `because` out of
+            # the arguments, so this is the only place it can still be seen — and it must be
+            # read here rather than remembered, because the next dispatch clears it.
+            tracer.tool(_name, kwargs, out, ok="error" not in (out or {}), ms=ms,
+                        because=toolbox.last_cause)
             return json.dumps(out, default=str)[:20000]
 
         tools.append(StructuredTool.from_function(

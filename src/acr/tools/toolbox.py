@@ -20,6 +20,22 @@ def _tool(name: str, description: str, properties: dict, required: list[str] | N
     }
 
 
+#: The parameter every retrieval tool offers so an action can name what prompted it.
+#: NEVER in `required`: a cause is a judgement, and a required judgement becomes a ritual --
+#: the model writes "to find the answer" on every call and the field measures nothing. What
+#: it is for is the OTHER end: `attribution` reconstructing a run currently has to infer
+#: "step 9 read D12 because step 7's search returned it" from adjacency, and reports that
+#: inference without marking it as one.
+CAUSE_PARAM = "because"
+
+_CAUSE_PROPERTY = {
+    "type": "string",
+    "description": ("optional: what prompted this call — the search that surfaced the "
+                    "document, the open thread it settles, the stratum it samples. Recorded, "
+                    "never checked; it is how a later reader tells your reasoning from theirs."),
+}
+
+
 TOOL_SCHEMAS: list[dict] = [
     _tool(
         "list_documents",
@@ -50,6 +66,7 @@ TOOL_SCHEMAS: list[dict] = [
             "date_from": {"type": "string"},
             "date_to": {"type": "string"},
             "max_hits": {"type": "integer", "description": "default 25"},
+            CAUSE_PARAM: _CAUSE_PROPERTY,
         },
         ["query"],
     ),
@@ -60,6 +77,7 @@ TOOL_SCHEMAS: list[dict] = [
             "note_id": {"type": "string"},
             "offset": {"type": "integer", "description": "character offset, default 0"},
             "limit": {"type": "integer", "description": "characters to return, default 4000"},
+            CAUSE_PARAM: _CAUSE_PROPERTY,
         },
         ["note_id"],
     ),
@@ -75,6 +93,7 @@ TOOL_SCHEMAS: list[dict] = [
             "note_ids": {"type": "array", "items": {"type": "string"},
                          "description": "note_ids to read, typically the ones the runtime drew"},
             "chars_each": {"type": "integer", "description": "excerpt size per document, default 1200"},
+            CAUSE_PARAM: _CAUSE_PROPERTY,
         },
         ["note_ids"],
     ),
@@ -180,12 +199,20 @@ class Toolbox:
         # vocabulary is supplied, and say so in the error.
         self.known_doc_types: list[str] = sorted(known_doc_types or chart.doc_types)
         self.domain_is_corpus_wide = known_doc_types is not None
+        #: What the model said prompted the most recent dispatch. Read by the tracing hook
+        #: immediately after the call; cleared each dispatch so a stale cause cannot attach
+        #: itself to a later action as a causal link nobody wrote.
+        self.last_cause: str = ""
 
     def schemas(self) -> list[dict]:
         return TOOL_SCHEMAS
 
     def dispatch(self, name: str, args: dict) -> tuple[dict, float]:
         t0 = time.time()
+        # Stripped centrally, not accepted per tool: one place to change, and no `_t_` method
+        # has to grow a parameter it does not use. Cleared every call — see `last_cause`.
+        args = dict(args)
+        self.last_cause = str(args.pop(CAUSE_PARAM, "") or "")
         fn = getattr(self, f"_t_{name}", None)
         if fn is None:
             return {"error": f"unknown tool {name!r}", "available": [s["function"]["name"] for s in TOOL_SCHEMAS]}, 0.0

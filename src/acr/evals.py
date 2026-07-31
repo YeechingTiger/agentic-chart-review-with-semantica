@@ -672,6 +672,35 @@ def detect_resource_band(run: RunRecord, *, token_band: tuple[int, int],
     return out
 
 
+def detect_uncaused_reads(run: RunRecord) -> list[Finding]:
+    """How much of this run's reading is causally unexplained in its own record.
+
+    Not a violation — `because` is optional and a model that omits it has broken no rule.
+    This counts, because the number is what tells a reader how much of an attribution report
+    over this run rests on adjacency rather than on the record. A run at 0% caused reads can
+    still be diagnosed; the diagnosis is just weaker, and it should say so.
+
+    Silent on a run with no reads at all: `detect_zero_document_read` owns that case, and two
+    detectors reporting one fact reads as two problems.
+    """
+    reads = run.tool_calls(READ_TOOLS)
+    if not reads:
+        return []
+    uncaused = [e for e in reads if not str(e.get("because") or "").strip()]
+    if not uncaused:
+        return []
+    # WARN, and it is the mildest tier this module has — there is no informational level, and
+    # inventing one here would put a fourth string into `_SEVERITY_ORDER`'s blind spot, where
+    # unknown severities sort to 9 by accident rather than by decision.
+    return [Finding(
+        "uncaused_read", WARN,
+        f"{len(uncaused)} of {len(reads)} reads record no cause; attribution over this run "
+        f"must infer their motivation from adjacency",
+        {"n_reads": len(reads), "n_uncaused": len(uncaused),
+         "caused_fraction": round(1 - len(uncaused) / len(reads), 3), "source": run.source},
+    )]
+
+
 @dataclass(frozen=True)
 class DetectorConfig:
     """Every threshold, declared by the caller. No field has a default.
@@ -699,6 +728,7 @@ def run_detectors(run: RunRecord, *, config: DetectorConfig,
     out += detect_patient_crossover(run, expected_patient=exp) if exp else []
     out += detect_rejection_loop(run, max_repeats=config.max_rejection_repeats)
     out += detect_resource_band(run, token_band=config.token_band, turn_band=config.turn_band)
+    out += detect_uncaused_reads(run)
     return sorted(out, key=lambda f: _SEVERITY_ORDER.get(f.severity, 9))
 
 
