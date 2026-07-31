@@ -2021,7 +2021,1088 @@ EOF
 
 ---
 
-## 怎么用（九个任务做完之后）
+## Task 10: 每一次读都记下"为什么读它"
+
+**Files:**
+- Modify: `src/acr/tools/toolbox.py`（`TOOL_SCHEMAS` 三处、`dispatch`）
+- Modify: `src/acr/trace.py:441`（`Tracer.tool` 把成因提到顶层字段）
+- Modify: `src/acr/evals.py`（加一个检测器 + 挂进 `run_detectors`）
+- Test: `tests/test_read_causality.py`（新建）
+
+**Interfaces:**
+- Consumes: 无（独立于 Task 1-9，可以先做）
+- Produces:
+  - `acr.tools.toolbox.CAUSE_PARAM = "because"`——工具参数名，一处定义
+  - `Toolbox.dispatch` 返回值不变；`Toolbox.last_cause: str` 供发射端读取
+  - `Tracer.tool(name, args, result, ok, ms, because="")`——`because` 升为顶层字段
+  - `acr.evals.detect_uncaused_reads(run) -> list[Finding]`，detector 名 `uncaused_read`
+
+**为什么做这个、为什么排第一**：轨迹现在是一串平铺事件，信封只有
+`run_id / seq / ts / elapsed_s / kind`，**事件之间没有连线**。归因 agent 第一步是"重建
+工作记录，分清记录证明的和推测的"——它现在只能靠**相邻位置猜**因果：第 7 步搜索返回了
+D12，第 9 步读了 D12，所以大概是因为那次搜索。中间穿插别的事件、或者模型其实是照着未决
+线索去读的，这个推断就错，而**报告不会说它是猜的**。加一个字段，归因第一步从推断变成查表。
+
+改动之所以便宜，是因为 `Tracer.tool` 已经把整个 `args` 写进事件了——模型填了就自动留痕。
+本任务做三件事：把参数**加进工具说明书**（不问模型就不会填）、**提到顶层**（免得归因和检测器
+去 `args` 里挖）、**数出来**（有成因的读占多大比例，本身就是一个信号）。
+
+**这不是硬控制。** 不填 `because` 不会被拒——它是记录，不是闸门。理由和 `skills` 一样：
+成因是模型的判断，判断可以缺席，缺席要能被看见。检测器报的是比例，不是违规。
+
+- [ ] **Step 1: 写失败的测试**
+
+新建 `tests/test_read_causality.py`：
+
+```python
+"""一次读要说明它为什么发生，否则归因只能靠相邻位置猜。
+
+轨迹是平铺的事件序列，事件之间没有连线。归因 agent 被要求"分清记录证明的和推测的"，
+但在没有成因字段的轨迹上，"第 9 步读 D12 是因为第 7 步搜索返回了它"永远是推测——
+而报告不会说它是推测。这个字段把它变成记录。
+
+不填不拒：成因是判断，判断可以缺席，缺席要能被数出来。
+"""
+from __future__ import annotations
+
+import pytest
+
+from acr.evals import Finding, RunRecord, detect_uncaused_reads, run_detectors
+from acr.tools.toolbox import CAUSE_PARAM, TOOL_SCHEMAS
+
+
+def _schema(name: str) -> dict:
+    for s in TOOL_SCHEMAS:
+        if s["function"]["name"] == name:
+            return s["function"]["parameters"]["properties"]
+    raise AssertionError(f"no tool {name!r}")
+
+
+@pytest.mark.parametrize("tool", ["read_document", "read_documents_batch", "search_notes"])
+def test_retrieval_tools_ask_for_a_cause(tool: str):
+    assert CAUSE_PARAM in _schema(tool), f"{tool} never asks the model why"
+
+
+@pytest.mark.parametrize("tool", ["read_document", "read_documents_batch", "search_notes"])
+def test_cause_is_never_required(tool: str):
+    """记录，不是闸门。必填会把判断变成仪式。"""
+    for s in TOOL_SCHEMAS:
+        if s["function"]["name"] == tool:
+            assert CAUSE_PARAM not in s["function"]["parameters"].get("required", [])
+
+
+def test_dispatch_accepts_and_strips_the_cause(toolbox_with_one_doc):
+    """`_t_` 方法不必知道这个参数——它在 dispatch 就被摘掉了，一处而不是每个工具一处。"""
+    tb = toolbox_with_one_doc
+    out, _ms = tb.dispatch("read_document", {"note_id": "N1", CAUSE_PARAM: "search #7 hit"})
+    assert "error" not in out
+    assert tb.last_cause == "search #7 hit"
+
+
+def test_dispatch_clears_the_cause_between_calls(toolbox_with_one_doc):
+    """上一次的成因不许粘到下一次——那会造出一条没人写过的因果连线。"""
+    tb = toolbox_with_one_doc
+    tb.dispatch("read_document", {"note_id": "N1", CAUSE_PARAM: "thread T3"})
+    tb.dispatch("read_document", {"note_id": "N1"})
+    assert tb.last_cause == ""
+
+
+def test_tracer_promotes_the_cause_to_a_top_level_field(tracer):
+    ev = tracer.tool("read_document", {"note_id": "N1"}, {"ok": True}, because="thread T3")
+    assert ev["because"] == "thread T3"
+
+
+def test_detector_counts_reads_with_no_cause():
+    run = RunRecord(manifest={"patient_id": "SYN01"}, trace=[
+        {"kind": "tool", "tool": "read_document", "because": "search #2 hit"},
+        {"kind": "tool", "tool": "read_document", "because": ""},
+        {"kind": "tool", "tool": "read_document"},
+        {"kind": "tool", "tool": "submit_answer"},          # 不是读，不进分母
+    ])
+    findings = detect_uncaused_reads(run)
+    assert len(findings) == 1
+    ev = findings[0].evidence
+    assert (ev["n_reads"], ev["n_uncaused"]) == (3, 2)
+    assert findings[0].detector == "uncaused_read"
+
+
+def test_detector_is_silent_when_every_read_has_a_cause():
+    run = RunRecord(manifest={"patient_id": "SYN01"}, trace=[
+        {"kind": "tool", "tool": "read_document", "because": "search #2 hit"},
+    ])
+    assert detect_uncaused_reads(run) == []
+
+
+def test_detector_is_silent_on_a_run_with_no_reads():
+    """零阅读是 detect_zero_document_read 的案子，不是这个检测器的——两个检测器报同一件事，
+    读的人会以为是两个问题。"""
+    assert detect_uncaused_reads(RunRecord(manifest={}, trace=[])) == []
+
+
+def test_detector_is_wired_into_run_detectors():
+    from acr.evals import DetectorConfig
+    run = RunRecord(manifest={"patient_id": "SYN01"}, trace=[
+        {"kind": "tool", "tool": "read_document"},
+    ])
+    cfg = DetectorConfig(min_term_chars=3, max_rejection_repeats=2,
+                         token_band=(0, 10 ** 9), turn_band=(0, 10 ** 6))
+    assert any(f.detector == "uncaused_read" for f in run_detectors(run, config=cfg))
+```
+
+`toolbox_with_one_doc` 和 `tracer` 两个 fixture 加在同文件顶部（不要放进 `conftest.py`
+——只有这个文件用）：
+
+```python
+@pytest.fixture
+def toolbox_with_one_doc(tmp_path):
+    from acr.corpus import Corpus
+    from acr.coverage import CoverageLedger, ForcedSampler
+    from acr.state import EvidenceLedger
+    from acr.tools.toolbox import Toolbox
+    d = tmp_path / "patients" / "SYN01"
+    d.mkdir(parents=True)
+    (d / "2024-01-01__pathology__N1.txt").write_text("final diagnosis: adenocarcinoma\n",
+                                                     encoding="utf-8")
+    chart = Corpus(tmp_path / "patients").chart("SYN01")
+    docs, _ = chart.list_documents(limit=100)
+    return Toolbox(chart, EvidenceLedger(), CoverageLedger(docs, (), ForcedSampler(1)))
+
+
+@pytest.fixture
+def tracer(tmp_path):
+    from acr.trace import Tracer
+    return Tracer.create(tmp_path, "t1")
+```
+
+**注意**：corpus 的文件名约定要和 `acr.corpus` 实际解析的一致。开工第一件事是读
+`src/acr/corpus.py` 确认命名格式，对不上就照实际的改——fixture 造不出 chart，后面每个
+测试都会以看不懂的方式失败。
+
+- [ ] **Step 2: 跑测试确认失败**
+
+Run: `.venv/bin/pytest tests/test_read_causality.py -q`
+Expected: FAIL — `cannot import name 'CAUSE_PARAM'`
+
+- [ ] **Step 3: 工具说明书加参数**
+
+`src/acr/tools/toolbox.py`，`_tool` 定义之后加常量：
+
+```python
+#: The parameter every retrieval tool offers so an action can name what prompted it.
+#: NEVER in `required`: a cause is a judgement, and a required judgement becomes a ritual —
+#: the model writes "to find the answer" on every call and the field measures nothing. What
+#: it is for is the OTHER end: `attribution` reconstructing a run currently has to infer
+#: "step 9 read D12 because step 7's search returned it" from adjacency, and reports that
+#: inference without marking it as one.
+CAUSE_PARAM = "because"
+
+_CAUSE_PROPERTY = {
+    "type": "string",
+    "description": ("optional: what prompted this call — the search that surfaced the "
+                    "document, the open thread it settles, the stratum it samples. Recorded, "
+                    "never checked; it is how a later reader tells your reasoning from theirs."),
+}
+```
+
+给 `read_document`、`read_documents_batch`、`search_notes` 三个 schema 的 properties
+各加一行 `CAUSE_PARAM: _CAUSE_PROPERTY`（`required` 一律不动）。
+
+**开工前先确认搜索工具的真名**：`grep -n '"search' src/acr/tools/toolbox.py`。上面按
+`search_notes` 写，注释里出现过这个名字；实际叫别的就照实际的改，三个测试的参数化列表
+也要同步改。
+
+- [ ] **Step 4: `dispatch` 摘掉并记住成因**
+
+`Toolbox.__init__` 末尾加一行：
+
+```python
+        #: What the model said prompted the most recent dispatch. Read by the tracing hook
+        #: immediately after the call; cleared each dispatch so a stale cause cannot attach
+        #: itself to a later action as a causal link nobody wrote.
+        self.last_cause: str = ""
+```
+
+`dispatch`（187 行）改成：
+
+```python
+    def dispatch(self, name: str, args: dict) -> tuple[dict, float]:
+        t0 = time.time()
+        # Stripped centrally, not accepted per tool: one place to change, and no `_t_` method
+        # has to grow a parameter it does not use. Cleared every call — see `last_cause`.
+        args = dict(args)
+        self.last_cause = str(args.pop(CAUSE_PARAM, "") or "")
+        fn = getattr(self, f"_t_{name}", None)
+        if fn is None:
+            return {"error": f"unknown tool {name!r}", "available": [s["function"]["name"] for s in TOOL_SCHEMAS]}, 0.0
+        try:
+            out = fn(**args)
+        except TypeError as e:
+            out = {"error": f"bad arguments for {name}: {e}"}
+        except KeyError as e:
+            out = {"error": f"unknown note_id {e}"}
+        except Exception as e:  # noqa: BLE001 - surface tool errors to the model, don't crash the run
+            out = {"error": f"{type(e).__name__}: {e}"}
+        return out, (time.time() - t0) * 1000
+```
+
+- [ ] **Step 5: 轨迹把成因提到顶层**
+
+`src/acr/trace.py:441`：
+
+```python
+    def tool(self, name, args, result, ok=True, ms=0.0, because=""):
+        # Promoted out of `args` and into the envelope on purpose. It is already inside `args`,
+        # but a consumer that has to reach into a free-form argument bag to find the causal
+        # link will not do it, and a field nobody reads is a field nobody maintains.
+        return self.emit("tool", tool=name, args=args, result=result, ok=ok, ms=ms,
+                         because=str(because or ""))
+```
+
+在 `agent.py` 调用 `tracer.tool(...)` 的地方（`wrap_tool_call` 钩子里，紧跟
+`toolbox.dispatch` 之后）补上 `because=toolbox.last_cause`。开工时用
+`grep -n "tracer.tool(" src/acr/agent.py` 定位；有多处就每处都补。
+
+- [ ] **Step 6: 加检测器**
+
+`src/acr/evals.py`，`detect_resource_band` 之后：
+
+```python
+#: Tools whose call is a retrieval action and therefore has a reason worth recording.
+_READ_TOOLS = ("read_document", "read_documents_batch")
+
+
+def detect_uncaused_reads(run: RunRecord) -> list[Finding]:
+    """How much of this run's reading is causally unexplained in its own record.
+
+    Not a violation — `because` is optional and a model that omits it has broken no rule.
+    This counts, because the number is what tells a reader how much of an attribution report
+    over this run rests on adjacency rather than on the record. A run at 0% caused reads can
+    still be diagnosed; the diagnosis is just weaker, and it should say so.
+
+    Silent on a run with no reads at all: `detect_zero_document_read` owns that case, and two
+    detectors reporting one fact reads as two problems.
+    """
+    reads = [e for e in run.trace
+             if e.get("kind") == "tool" and e.get("tool") in _READ_TOOLS]
+    if not reads:
+        return []
+    uncaused = [e for e in reads if not str(e.get("because") or "").strip()]
+    if not uncaused:
+        return []
+    # WARN, and it is the mildest tier this module has — there is no informational level, and
+    # inventing one here would put a fourth string into `_SEVERITY_ORDER`'s blind spot, where
+    # unknown severities sort to 9 by accident rather than by decision.
+    return [Finding(
+        "uncaused_read", WARN,
+        f"{len(uncaused)} of {len(reads)} reads record no cause; attribution over this run "
+        f"must infer their motivation from adjacency",
+        {"n_reads": len(reads), "n_uncaused": len(uncaused),
+         "caused_fraction": round(1 - len(uncaused) / len(reads), 3)},
+    )]
+```
+
+`run_detectors` 里加一行 `out += detect_uncaused_reads(run)`。
+
+**严重度只有三档**（`evals.py:386`：`IRB, CRITICAL, WARN = "IRB", "CRITICAL", "WARN"`），
+本仓库的检测器一律用**位置参数**构造 `Finding("name", SEVERITY, "message", {...})`——
+上面照这个风格写。别引入第四档：`_SEVERITY_ORDER` 只认这三个，未知值回落到 9，排序
+就成了偶然而不是决定。
+
+- [ ] **Step 7: 跑测试**
+
+Run: `.venv/bin/pytest tests/test_read_causality.py tests/test_evals.py tests/test_agent_tool_surface.py -q`
+Expected: PASS
+
+- [ ] **Step 8: 跑全套并提交**
+
+Run: `.venv/bin/pytest -q`
+
+```bash
+git add src/acr/tools/toolbox.py src/acr/trace.py src/acr/evals.py tests/test_read_causality.py
+git commit -m "$(cat <<'EOF'
+Reads may name what prompted them, and the unexplained ones are counted
+
+The trace is a flat event sequence with no edges. Attribution is asked to separate what the
+record proves from what it infers, but "step 9 read D12 because step 7's search returned it"
+is only ever adjacency — and the report does not mark it as inferred. `because` is optional
+by design: a required judgement becomes a ritual. What is enforced is visibility — the
+detector reports the caused fraction, so a diagnosis resting on adjacency says so.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+EOF
+)"
+```
+
+---
+
+## Task 11: 广度优先 / 深度优先 / 组合——三张检索卡和四臂对照
+
+**Files:**
+- Create: `skills/search-breadth-first/SKILL.md`
+- Create: `skills/search-depth-first/SKILL.md`
+- Create: `skills/search-breadth-then-depth/SKILL.md`
+- Create: `docs/BFS_DFS_SEARCH_PILOT.md`（试验协议，结果留空待填）
+- Test: 沿用 `tests/test_skills_load.py` / `tests/test_skill_slots.py` 的参数化，无需新测试文件
+
+**Interfaces:**
+- Consumes: Task 1 的 `slot:` 约定、Task 3 的 `--skills search=...`
+- Produces: 三个可放进 `search` 槽的名字
+
+**依据**：DeepEvidence 的消融结论是**单用广度或单用深度都不够，只有组合最优**。你们的
+pilot（`docs/SEARCH_PLANNING_PILOT.md`）比的是另一根轴——计划从哪来（模型自己想 vs
+dev set 统计），结论是统计先验没赢。**走法的形状这根轴从没测过。**
+
+**深度优先你们其实已经有了，只是没当成检索策略**：`OpenThreadLedger` + `thread-chasing`
+就是顺藤摸瓜，P05 那个 8046 错误（"特殊染色待出"的结论就在同一份文件往后 353 字符处）
+是典型的深度优先失败。本任务不改那套机制，只是把"走法"提出来变成可替换的一张卡。
+
+- [ ] **Step 1: 写 `skills/search-breadth-first/SKILL.md`**
+
+```markdown
+---
+name: search-breadth-first
+description: Use when deciding how to traverse a chart and you want coverage before depth - building the full candidate pool of documents that could carry the field before reading any of them closely. Tells you how to sweep the document inventory by type, what to record about each candidate, when a sweep is complete, and what a sweep cannot tell you. Pairs with but does not replace chasing an individual lead.
+slot: search
+license: MIT
+---
+
+# Sweeping wide before reading deep
+
+Build the pool first. One `document_type_summary` call gives you every type, its count and
+its date span; a type-filtered search over each candidate type gives you the documents that
+could carry the field. Only then start reading.
+
+## The sweep
+
+1. **Inventory by type.** Which types exist in THIS chart, and how many of each. Types the
+   contract can never accept still get listed — you need them to say what you excluded.
+2. **One search per candidate type.** Same terms, type filter varied. This is what makes the
+   result a comparison rather than a walk: a term that hits in pathology and misses in
+   imaging tells you something about the term; a term tried only in pathology does not.
+3. **Record the pool before reading.** Which documents matched, which type, which date. The
+   pool is your denominator, and once you begin reading you will stop being able to say what
+   you started with.
+
+## When the sweep is done
+
+A sweep is complete when every type in the inventory has been searched or explicitly
+excluded, with a reason for each exclusion. It is not complete because you found a hit —
+a hit ends the sweep only if the contract lets that document type establish the field
+outright, and even then the rest of the pool is what a later absence claim rests on.
+
+## What a sweep cannot do
+
+It cannot follow a lead. A pathology report saying "stains pending", a note saying "see
+outside records", an addendum referenced but not returned — a sweep records these as pool
+members and walks on. Each of them is a question the sweep has now RAISED and not answered.
+
+So a sweep alone under-reads exactly the documents that were about to become decisive. When
+your pool contains a deferred conclusion, the sweep has done its job and the next move is not
+another sweep.
+```
+
+- [ ] **Step 2: 写 `skills/search-depth-first/SKILL.md`**
+
+```markdown
+---
+name: search-depth-first
+description: Use when a document points somewhere else and you want to follow the lead to where the question was settled, rather than sampling more of the chart. Tells you which pointers are worth following and in what order, how far to follow one before abandoning it, how to avoid walking in a circle, and what following a lead cannot tell you about the rest of the chart. Pairs with but does not replace a broad sweep.
+slot: search
+license: MIT
+---
+
+# Following one lead to where it ends
+
+A chart is written forward in time by people who did not yet know the answer. Any document
+may defer its own conclusion, and the resolving text is usually reachable from the deferral.
+This traversal chases that, one thread at a time, to its end.
+
+## Which pointers to follow, in order
+
+1. **Deferral in a document that COULD establish the field.** A pathology report saying
+   stains are pending is the highest-value pointer in a chart: the thing it defers is exactly
+   the thing you need, and the resolution is usually in the same file or its addendum.
+2. **An explicit cross-reference.** "See addendum", "per outside records", "correlate with
+   the 3/14 biopsy" — a named destination. Follow the name.
+3. **A hedge that a later document would have resolved.** "Favor squamous" invites a later
+   definite statement. Search forward in time from that date.
+
+## How far, and when to stop following
+
+Follow one thread until it resolves, or until the next hop would be a guess rather than a
+named destination. A resolved thread is worth more than three half-followed ones: the value
+is in reaching the settled statement, and a chain abandoned in the middle has cost the reads
+and produced nothing citable.
+
+Never revisit a document you have already read in full during this chase — that is the circle
+this traversal is prone to. Keep the thread's hops in mind and, if a hop returns you to a
+document already read, the thread is exhausted, not continuing.
+
+## What following a lead cannot do
+
+It tells you nothing about the documents no lead pointed at. A chase that ends in a confident,
+well-cited answer has still read a narrow slice of the chart, and if your answer claims that
+something is ABSENT, the slice is not the basis for that claim — the rest of the chart is,
+and you have not looked at it.
+```
+
+- [ ] **Step 3: 写 `skills/search-breadth-then-depth/SKILL.md`**
+
+```markdown
+---
+name: search-breadth-then-depth
+description: Use as the default traversal when neither coverage nor lead-chasing alone fits - sweep the document inventory to build a candidate pool, then chase the leads the sweep raised. Tells you the handover point between the two modes, which leads earn a chase and which do not, when to return to the sweep, and how to record which mode produced the decisive read. Combines the breadth-first and depth-first methods rather than choosing between them.
+slot: search
+license: MIT
+---
+
+# Sweep, then chase what the sweep raised
+
+Two traversals, in one order, with a stated handover. Each covers the other's blind spot: a
+sweep records deferred conclusions and walks past them; a chase reads a narrow slice and
+cannot support a claim of absence.
+
+## Phase 1 — sweep
+
+Inventory the chart by document type. One search per candidate type, same terms, type filter
+varied. Record the pool — which documents matched, which type, which date — BEFORE reading
+closely. The pool is the denominator any later absence claim rests on.
+
+## The handover
+
+Leave the sweep when it has done what only it can do: every type searched or explicitly
+excluded. At that moment you hold two things — a pool of candidates, and a list of the
+questions the sweep RAISED without answering. The second list is the input to phase 2.
+
+Do not hand over early because you found a hit. A hit that the contract lets establish the
+field outright can end the whole run, but it does not license skipping the rest of the sweep
+if your answer will also assert that nothing else was documented.
+
+## Phase 2 — chase
+
+Rank the raised questions by whether the deferral sits in a document type that COULD establish
+the field, and chase them in that order. Follow one thread until it resolves or until the next
+hop would be a guess. Do not start a second thread while a higher-ranked one is unresolved.
+
+## Returning to the sweep
+
+Go back when a chase turns up a document type absent from your inventory — an outside report,
+a scanned addendum filed under an unexpected type. That is new territory, and the sweep is the
+tool for territory. Sweep only the new type, then resume the chase where you left it.
+
+## Recording which mode found it
+
+For each read, say whether it came from the sweep or from a chase, and for a chase, which
+thread. The whole reason for running two traversals is to learn which one earns its cost, and
+a run that cannot say which mode produced the decisive read cannot contribute to that.
+```
+
+- [ ] **Step 4: 写试验协议 `docs/BFS_DFS_SEARCH_PILOT.md`**
+
+```markdown
+# Breadth / Depth / Combined Search Pilot
+
+## Question
+
+Does the SHAPE of the chart traversal change accuracy — sweeping wide, chasing leads, or
+both — holding the clinical contract, the model, the seed and everything else fixed?
+
+`SEARCH_PLANNING_PILOT.md` answered a different question: where the plan COMES FROM (the
+model's own vs a dev-set-derived prior). It found the prior did not improve accuracy. Traversal
+shape was never varied, and it is the axis DeepEvidence reports an ablation on — that neither
+breadth nor depth alone was sufficient and only the combination was best. Whether that holds
+for a chart, which is one patient's record rather than a federation of knowledge bases, is
+an open question and this pilot is how it gets answered here.
+
+## Arms
+
+Four, differing in exactly one skill:
+
+| Arm | `--skills` |
+|---|---|
+| native (control) | `search=search-native` |
+| breadth-first | `search=search-breadth-first` |
+| depth-first | `search=search-depth-first` |
+| combined | `search=search-breadth-then-depth` |
+
+Everything else is held: same spec, same corpus, same model, same `--seed 1234`, same
+`--runtime-profile`, same cost and call ceilings, same `task` and `general` skill slots.
+
+## Protocol
+
+```bash
+for arm in native breadth-first depth-first breadth-then-depth; do
+  acr batch --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+            --skills "search=search-$arm" --seed 1234 --out "runs/bfs-$arm"
+done
+
+for arm in native breadth-first depth-first breadth-then-depth; do
+  acr signal batch --kind rule --runs "runs/bfs-$arm" \
+                   --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+                   --out "signals/bfs-$arm.json"
+done
+```
+
+Note `search-native` is written `search=search-native` while the others follow the loop
+variable; the loop above produces `search=search-native` for the first arm because the skill
+is named for the arm. Verify the four skill names resolve before spending:
+`acr run --help` and one `--dry-run` per arm.
+
+## What is measured
+
+Primary, from the deterministic scorer only — a judged opinion decides nothing here:
+
+| Metric | Why it is in the table |
+|---|---|
+| three-field exact match | the headline, and the only one that is the task |
+| per-field match (site / histology / behavior) | a traversal can help one field and hurt another |
+| correct abstentions retained | the failure mode this repo guards hardest: an arm that trades a correct EVIDENCE_INSUFFICIENT for a guess has made things worse at any accuracy |
+| documents read per patient | the bill, and breadth's expected cost |
+| search calls / read calls | which traversal actually ran, independent of what the skill said |
+| open threads left unresolved | depth's expected advantage, measured directly |
+| priced model cost | the other bill |
+| caused-read fraction (Task 10) | how much of each arm is causally legible afterwards |
+
+## Powering, stated before the run
+
+Ten patients. One chart moves every rate by ten points, so this pilot can detect a large
+effect and nothing else. A difference of one or two cases is NOT a result and must be reported
+as underpowered — `MIN_PATIENTS_FOR_SUPPORT` is 20 in `assetdev.py` for this reason. What ten
+cases CAN do is expose a traversal that is grossly worse, and rule an arm out.
+
+## Results
+
+Not yet run.
+```
+
+- [ ] **Step 5: 跑卡片测试**
+
+Run: `.venv/bin/pytest tests/test_skills_load.py tests/test_skill_slots.py -q`
+Expected: PASS，三张新卡自动进参数化
+
+- [ ] **Step 6: 确认三张卡都能进 search 槽**
+
+Run:
+```bash
+.venv/bin/python -c "
+from acr.skills import SkillStack, parse_skill_stack
+base = SkillStack(general=('coverage-judgement',))
+for s in ('search-breadth-first', 'search-depth-first', 'search-breadth-then-depth'):
+    print(s, '->', parse_skill_stack(f'search={s}', base).names())
+"
+```
+Expected: 三行，每行第一个名字是对应的卡
+
+- [ ] **Step 7: 提交**
+
+```bash
+git add skills/search-breadth-first skills/search-depth-first skills/search-breadth-then-depth docs/BFS_DFS_SEARCH_PILOT.md
+git commit -m "$(cat <<'EOF'
+Traversal shape as a swappable skill: breadth, depth, and the combination
+
+The earlier pilot varied where the plan came from and found a measured prior did not beat the
+model's own planning. It never varied the SHAPE of the traversal, which is the axis
+DeepEvidence reports an ablation on — neither breadth nor depth alone sufficed there.
+
+Depth-first already existed in this tree as an obligation that blocks submission
+(OpenThreadLedger, thread-chasing); this makes it a traversal a run can be pointed at, so the
+three shapes are one --skills flag apart and the comparison is clean.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+EOF
+)"
+```
+
+---
+
+## Task 12: 证据集合的结构审计
+
+**Files:**
+- Modify: `src/acr/evals.py`
+- Test: `tests/test_evidence_set_audit.py`（新建）
+
+**Interfaces:**
+- Consumes: Task 10 的 `Finding` 用法（已存在）
+- Produces: `acr.evals.audit_evidence_set(run) -> list[Finding]`，三个 detector 名：
+  `evidence_span_overlap` / `orphan_contradiction` / `single_witness_field`；
+  挂进 `run_detectors`
+
+**依据与它补的洞**：DeepEvidence 对 10 张证据图、316 个条目做人工审计，报了五个数：
+出处有效性 100%、规范化 99.7%、重复率 0.6%、关系正确率 ≥99%、**断言一致性 93.3%**。
+前四项接近满分、第五项明显掉下来——**落差本身就是结论**：把东西挂对位置几乎不出错，
+出错的是"我写的观察忠不忠于我引的来源"。
+
+对照你们的现状：
+
+| | 现状 |
+|---|---|
+| 出处有效性 | **比论文强**——引文按位置从原文切出来，在工具边界强制，不是事后审计 |
+| 断言一致性 | 有对应镜头：`quote_states_the_value`、`hedge_read_as_fact`（AI 评卷那条线） |
+| **证据集合作为整体的结构** | **空白** |
+
+现在查的是**每一条证据**合不合格，从没查过**这一整套证据作为集合**合不合格。本任务补
+三项可确定性计算的：跨度重复、孤儿反证、单一见证。**每一项都要能给出一个可以和论文
+0.6% 重复率对话的数字**，所以证据里带的是比率而不只是布尔。
+
+**不做的**：跨知识库规范标识符去重（你们只有一个病历库，没有这个问题）；实体归属正确性
+（要等 Task 13 的实体锚点，那时再加一个 detector）。
+
+- [ ] **Step 1: 写失败的测试**
+
+新建 `tests/test_evidence_set_audit.py`：
+
+```python
+"""证据集合作为一个整体，也可以有毛病。
+
+现有检查全是逐条的：这条引文回原文对得上吗、这条span非空吗。DeepEvidence 审计证据图时
+报的是集合层面的数（重复率 0.6%、关系正确率 ≥99%），而这里连"同一个字段被同一段文字
+支持了两次"都没人数过。三项，全部确定性，全部给比率——一个只说"有重复"的检查没法和
+任何基准对话。
+"""
+from __future__ import annotations
+
+from acr.evals import RunRecord, audit_evidence_set
+
+
+def _run(evidence: list[dict]) -> RunRecord:
+    return RunRecord(manifest={"patient_id": "SYN01", "evidence": evidence}, trace=[])
+
+
+def _ev(note="N1", start=0, end=10, supports="primary_site", stance="supports") -> dict:
+    return {"note_id": note, "start": start, "end": end, "supports": supports,
+            "stance": stance, "quote": "x" * (end - start)}
+
+
+def test_overlapping_spans_for_one_field_are_reported():
+    """完全相同的 span 台账自己会去重；重叠的不会，而它是同一句话记了两遍。"""
+    f = audit_evidence_set(_run([_ev(start=0, end=40), _ev(start=10, end=50)]))
+    hit = [x for x in f if x.detector == "evidence_span_overlap"]
+    assert len(hit) == 1
+    assert hit[0].evidence["n_overlapping_pairs"] == 1
+    assert hit[0].evidence["overlap_rate"] == 0.5      # 2 条里 1 条是多余的
+
+
+def test_non_overlapping_spans_are_clean():
+    f = audit_evidence_set(_run([_ev(start=0, end=10), _ev(start=20, end=30)]))
+    assert not [x for x in f if x.detector == "evidence_span_overlap"]
+
+
+def test_overlap_is_per_field_not_across_fields():
+    """同一段文字同时支持部位和组织学是正常的，不是重复。"""
+    f = audit_evidence_set(_run([_ev(supports="primary_site"),
+                                 _ev(supports="histology")]))
+    assert not [x for x in f if x.detector == "evidence_span_overlap"]
+
+
+def test_a_contradiction_with_nothing_to_contradict_is_reported():
+    f = audit_evidence_set(_run([_ev(supports="histology", stance="contradicts")]))
+    hit = [x for x in f if x.detector == "orphan_contradiction"]
+    assert len(hit) == 1
+    assert hit[0].evidence["fields"] == ["histology"]
+
+
+def test_a_contradiction_beside_a_support_is_a_conflict_not_an_orphan():
+    """两边都有＝记录内部有矛盾，这是要如实报告的状态，不是缺陷。"""
+    f = audit_evidence_set(_run([_ev(supports="histology"),
+                                 _ev(supports="histology", start=99, end=120,
+                                     stance="contradicts")]))
+    assert not [x for x in f if x.detector == "orphan_contradiction"]
+
+
+def test_a_field_resting_on_one_document_is_reported():
+    f = audit_evidence_set(_run([_ev(note="N1", supports="primary_site")]))
+    hit = [x for x in f if x.detector == "single_witness_field"]
+    assert hit and hit[0].evidence["fields"] == ["primary_site"]
+
+
+def test_two_documents_for_one_field_is_not_single_witness():
+    f = audit_evidence_set(_run([_ev(note="N1"), _ev(note="N2", start=5, end=9)]))
+    assert not [x for x in f if x.detector == "single_witness_field"]
+
+
+def test_no_evidence_is_silent_here():
+    """空台账是交卷检查的案子。这个审计只描述已经存在的证据集合。"""
+    assert audit_evidence_set(_run([])) == []
+
+
+def test_audit_is_wired_into_run_detectors():
+    from acr.evals import DetectorConfig, run_detectors
+    cfg = DetectorConfig(min_term_chars=3, max_rejection_repeats=2,
+                         token_band=(0, 10 ** 9), turn_band=(0, 10 ** 6))
+    run = _run([_ev(start=0, end=40), _ev(start=10, end=50)])
+    assert any(f.detector == "evidence_span_overlap" for f in run_detectors(run, config=cfg))
+```
+
+**开工前先确认存档单里证据放在哪个键下**：
+`.venv/bin/python -c "import json;print(list(json.load(open('<某个manifest>')).keys()))"`。
+上面按 `manifest["evidence"]` 写；实际是嵌套的（比如 `answer.evidence`）就改
+`_evidence_of()` 一处，测试的 `_run()` 也跟着改。
+
+- [ ] **Step 2: 跑测试确认失败**
+
+Run: `.venv/bin/pytest tests/test_evidence_set_audit.py -q`
+Expected: FAIL — `cannot import name 'audit_evidence_set'`
+
+- [ ] **Step 3: 实现**
+
+`src/acr/evals.py`，`detect_uncaused_reads` 之后：
+
+```python
+def _evidence_of(run: RunRecord) -> list[dict]:
+    """The recorded evidence set. One accessor, so three checks cannot disagree about it."""
+    ev = run.manifest.get("evidence")
+    if isinstance(ev, list):
+        return [e for e in ev if isinstance(e, dict)]
+    answer = run.manifest.get("answer")
+    if isinstance(answer, dict) and isinstance(answer.get("evidence"), list):
+        return [e for e in answer["evidence"] if isinstance(e, dict)]
+    return []
+
+
+def audit_evidence_set(run: RunRecord) -> list[Finding]:
+    """Structural defects in the evidence set AS A SET, not in any one item.
+
+    Every existing check is per-item: does this quote re-read at its offsets, is this span
+    non-empty. DeepEvidence's evidence-graph audit reports set-level numbers instead — a 0.6%
+    duplication rate, ≥99% relation correctness — and nothing here had ever counted the
+    equivalent. Each finding carries a RATE, not a flag, because a check that can only say
+    "there is duplication" cannot be compared against a baseline or tracked across arms.
+
+    Silent on an empty ledger: that is the gate's case, and it already refuses the answer.
+    """
+    items = _evidence_of(run)
+    if not items:
+        return []
+    out: list[Finding] = []
+
+    # 1. Overlapping spans supporting the SAME field. The ledger de-duplicates identical
+    #    (note, start, end, supports) tuples; it cannot see that chars 0-40 and 10-50 of one
+    #    note are largely the same sentence recorded twice. Per field, because one sentence
+    #    legitimately supports both a site and a histology.
+    by_field: dict[str, list[dict]] = {}
+    for e in items:
+        by_field.setdefault(str(e.get("supports") or ""), []).append(e)
+    pairs = 0
+    for field_items in by_field.values():
+        for i, a in enumerate(field_items):
+            for b in field_items[i + 1:]:
+                if a.get("note_id") != b.get("note_id"):
+                    continue
+                if int(a.get("start", 0)) < int(b.get("end", 0)) and \
+                   int(b.get("start", 0)) < int(a.get("end", 0)):
+                    pairs += 1
+    if pairs:
+        out.append(Finding(
+            "evidence_span_overlap", WARN,
+            f"{pairs} overlapping span pair(s) support the same field; the same sentence is "
+            f"recorded more than once",
+            {"n_evidence": len(items), "n_overlapping_pairs": pairs,
+             "overlap_rate": round(pairs / len(items), 3)}))
+
+    # 2. A contradiction with nothing to contradict. `stance=contradicts` beside a supporting
+    #    span is a conflict in the record — a real state, reported honestly. Alone, it means
+    #    the run recorded what argues AGAINST a field and never recorded what argues for it,
+    #    and the answer is resting on something outside the ledger.
+    supported = {str(e.get("supports") or "") for e in items
+                 if e.get("stance") != "contradicts"}
+    orphans = sorted({str(e.get("supports") or "") for e in items
+                      if e.get("stance") == "contradicts"} - supported)
+    if orphans:
+        out.append(Finding(
+            "orphan_contradiction", WARN,
+            f"{len(orphans)} field(s) carry contradicting evidence and no supporting "
+            f"evidence: {', '.join(orphans)}",
+            {"fields": orphans, "n_evidence": len(items)}))
+
+    # 3. A field resting on a single document. Not a defect — a chart may document a value
+    #    once — but it is the shape in which "the right document, the wrong specimen" survives
+    #    to submission, because there is no second witness to disagree with.
+    docs_per_field: dict[str, set] = {}
+    for e in items:
+        if e.get("stance") == "contradicts":
+            continue
+        docs_per_field.setdefault(str(e.get("supports") or ""), set()).add(e.get("note_id"))
+    singles = sorted(f for f, docs in docs_per_field.items() if len(docs) == 1 and f)
+    if singles:
+        out.append(Finding(
+            "single_witness_field", WARN,
+            f"{len(singles)} field(s) rest on one document: {', '.join(singles)}",
+            {"fields": singles,
+             "single_witness_rate": round(len(singles) / max(1, len(docs_per_field)), 3)}))
+    return out
+```
+
+`run_detectors` 里加 `out += audit_evidence_set(run)`。
+
+- [ ] **Step 4: 跑测试**
+
+Run: `.venv/bin/pytest tests/test_evidence_set_audit.py tests/test_evals.py -q`
+Expected: PASS
+
+- [ ] **Step 5: 跑全套并提交**
+
+Run: `.venv/bin/pytest -q`
+
+```bash
+git add src/acr/evals.py tests/test_evidence_set_audit.py
+git commit -m "$(cat <<'EOF'
+Audit the evidence set as a set: overlap, orphan contradictions, single witnesses
+
+Every check here was per-item — does this quote re-read at its offsets. DeepEvidence's
+evidence-graph audit reports set-level rates instead, and the equivalent had never been
+counted in this tree. Each finding carries a rate rather than a flag, because a check that
+can only say "there is duplication" cannot be compared against a baseline or across arms.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+EOF
+)"
+```
+
+---
+
+## Task 13: 证据带实体锚点（哪条引文说的是哪个标本）
+
+**Files:**
+- Modify: `src/acr/state.py`（`Evidence` 加字段）
+- Modify: `src/acr/tools/toolbox.py`（`record_evidence` 加参数）
+- Modify: `src/acr/evals.py`（加一个 detector）
+- Test: `tests/test_evidence_entity.py`（新建）
+
+**Interfaces:**
+- Consumes: Task 12 的 `_evidence_of()`
+- Produces:
+  - `acr.state.Evidence.entity: str = ""`（可选字段，默认空）
+  - `record_evidence` 多一个可选参数 `entity`
+  - `acr.evals.detect_entity_answer_mismatch(run) -> list[Finding]`，detector 名
+    `entity_answer_mismatch`
+
+**它补的洞**：证据台账是**一维 span 列表**，`eval-overconfidence` 卡里点名的一种失败——
+"对的文档、错的片段：真实的原文，但说的是**另一个标本**"——在这个数据结构里**根本无法
+表达**。只能靠人读引文自己判断。
+
+**为什么这个洞能便宜地补上**：`submit_answer` 已经有 `lesions_considered` 和
+`reported_lesion` 两个字段（记录模型选了哪个病灶作为答案的锚）。证据这边加上锚点，
+两边就能**机器比对**：证据说的是标本 A，答案报的是病灶 B，这是确定性可查的不一致。
+
+**排最后的原因**：动的是核心数据结构和存档格式。字段可选、默认空字符串，所以历史存档
+照常读，`Evidence.to_dict()` 多一个键；`detect_entity_answer_mismatch` 在两边都为空时
+沉默——没锚点不是缺陷，是这个字段还没被用起来。
+
+- [ ] **Step 1: 写失败的测试**
+
+新建 `tests/test_evidence_entity.py`：
+
+```python
+"""一条引文说的是哪个标本，要能写下来。
+
+"对的文档、错的片段"——真实的原文，说的却是另一个标本——是 eval-overconfidence 点名的
+失败模式，而扁平的 span 列表在结构上无法表达它：没有地方写"这条说的是 A，那条说的是 B"。
+submit_answer 早就有 reported_lesion 了；证据这边补上锚点，两边就能机器比对。
+
+字段可选：没锚点不是缺陷，是没用起来。检查在两边都为空时沉默。
+"""
+from __future__ import annotations
+
+from acr.evals import RunRecord, detect_entity_answer_mismatch
+from acr.state import Evidence, EvidenceLedger
+
+
+def test_evidence_carries_an_optional_entity():
+    e = Evidence("N1", "pathology", "2024-01-01", 0, 10, "x", "primary_site",
+                 entity="specimen A")
+    assert e.to_dict()["entity"] == "specimen A"
+
+
+def test_entity_defaults_to_empty_so_old_records_still_load():
+    e = Evidence("N1", "pathology", "2024-01-01", 0, 10, "x", "primary_site")
+    assert e.to_dict()["entity"] == ""
+
+
+def test_same_span_different_entity_is_not_a_duplicate():
+    """去重键必须带上实体，否则两个标本的同位置引文会被吞掉一条。"""
+    led = EvidenceLedger()
+    led.add(Evidence("N1", "p", "2024-01-01", 0, 10, "x", "histology", entity="specimen A"))
+    led.add(Evidence("N1", "p", "2024-01-01", 0, 10, "x", "histology", entity="specimen B"))
+    assert len(led.items) == 2
+
+
+def test_identical_entity_still_de_duplicates():
+    led = EvidenceLedger()
+    for _ in range(2):
+        led.add(Evidence("N1", "p", "2024-01-01", 0, 10, "x", "histology", entity="specimen A"))
+    assert len(led.items) == 1
+
+
+def _run(evidence, reported_lesion="") -> RunRecord:
+    return RunRecord(manifest={"patient_id": "SYN01", "evidence": evidence,
+                               "answer": {"reported_lesion": reported_lesion}}, trace=[])
+
+
+def test_evidence_about_another_lesion_than_the_one_reported_is_flagged():
+    ev = [{"note_id": "N1", "start": 0, "end": 9, "supports": "histology",
+           "stance": "supports", "entity": "left upper lobe"}]
+    f = detect_entity_answer_mismatch(_run(ev, reported_lesion="right lower lobe"))
+    assert len(f) == 1
+    assert f[0].detector == "entity_answer_mismatch"
+    assert f[0].evidence["reported_lesion"] == "right lower lobe"
+    assert f[0].evidence["evidence_entities"] == ["left upper lobe"]
+
+
+def test_matching_entity_is_clean():
+    ev = [{"note_id": "N1", "start": 0, "end": 9, "supports": "histology",
+           "stance": "supports", "entity": "right lower lobe"}]
+    assert detect_entity_answer_mismatch(_run(ev, reported_lesion="right lower lobe")) == []
+
+
+def test_silent_when_no_entity_was_recorded():
+    """没用这个字段不是缺陷。一个对着空数据报警的检查，会教人把它关掉。"""
+    ev = [{"note_id": "N1", "start": 0, "end": 9, "supports": "histology",
+           "stance": "supports"}]
+    assert detect_entity_answer_mismatch(_run(ev, reported_lesion="right lower lobe")) == []
+
+
+def test_silent_when_the_answer_named_no_lesion():
+    ev = [{"note_id": "N1", "start": 0, "end": 9, "supports": "histology",
+           "stance": "supports", "entity": "left upper lobe"}]
+    assert detect_entity_answer_mismatch(_run(ev, reported_lesion="")) == []
+```
+
+- [ ] **Step 2: 跑测试确认失败**
+
+Run: `.venv/bin/pytest tests/test_evidence_entity.py -q`
+Expected: FAIL — `Evidence.__init__() got an unexpected keyword argument 'entity'`
+
+- [ ] **Step 3: `Evidence` 加字段，去重键带上它**
+
+`src/acr/state.py`，`Evidence` 的 `stance` 之后加：
+
+```python
+    #: WHICH THING IN THE CHART this span is about — the specimen, the lesion, the procedure.
+    #: Optional and empty by default, so every recorded run still loads. It exists because a
+    #: flat span list cannot express "this quote is about specimen A and that one about
+    #: specimen B", and "the right document, the wrong specimen" is a failure mode this repo
+    #: has already named. `submit_answer` records `reported_lesion`; with both, the agreement
+    #: between them is machine-checkable instead of something a reader has to notice.
+    entity: str = ""
+```
+
+`EvidenceLedger.add` 的去重键加上实体：
+
+```python
+    def add(self, e: Evidence) -> None:
+        for x in self.items:  # de-duplicate identical spans
+            # `entity` is IN the key: without it, one sentence quoted about two specimens
+            # collapses to one item, and the collapse is silent — exactly the confusion the
+            # field was added to make visible.
+            if (x.note_id, x.start, x.end, x.supports, x.entity) == \
+               (e.note_id, e.start, e.end, e.supports, e.entity):
+                return
+        self.items.append(e)
+```
+
+`render()` 里，实体非空时加进去（跟在 `supports` 那行后面）：
+
+```python
+            ent = f"\n      entity:   {e.entity}" if e.entity else ""
+```
+并把 `ent` 拼进该条的输出。
+
+- [ ] **Step 4: 工具加参数**
+
+`src/acr/tools/toolbox.py`，`record_evidence` 的 schema properties 加：
+
+```python
+            "entity": {"type": "string",
+                       "description": ("optional: which specimen, lesion or procedure this "
+                                       "quote is ABOUT. Record it when the chart describes "
+                                       "more than one; it is how a reader tells a quote about "
+                                       "the reported lesion from a quote about another.")},
+```
+
+（`required` 不动。）`_t_record_evidence` 签名加 `entity: str = ""`，构造 `Evidence` 时
+传进去：
+
+```python
+    def _t_record_evidence(self, note_id: str, start: int, end: int, supports: str,
+                           stance: str = "supports", entity: str = "") -> dict:
+```
+```python
+        self.evidence.add(Evidence(note_id, meta.doc_type, meta.date.isoformat(), start, end,
+                                   quote, supports,
+                                   "contradicts" if stance == "contradicts" else "supports",
+                                   entity=str(entity or "")))
+```
+
+- [ ] **Step 5: 加 detector**
+
+`src/acr/evals.py`，`audit_evidence_set` 之后：
+
+```python
+def detect_entity_answer_mismatch(run: RunRecord) -> list[Finding]:
+    """Evidence anchored to one lesion, an answer reported about another.
+
+    Silent unless BOTH sides recorded an anchor. An entity-less ledger is not a defect — the
+    field is optional and most runs will not use it at first — and a detector that fires on
+    absent data teaches people to switch it off, which costs the cases where it was right.
+    """
+    items = [e for e in _evidence_of(run) if str(e.get("entity") or "").strip()]
+    answer = run.manifest.get("answer")
+    reported = str((answer or {}).get("reported_lesion") or "").strip() \
+        if isinstance(answer, dict) else ""
+    if not items or not reported:
+        return []
+    entities = sorted({str(e["entity"]).strip() for e in items})
+    if reported in entities:
+        return []
+    return [Finding(
+        "entity_answer_mismatch", CRITICAL,
+        f"the answer reports lesion {reported!r} but every anchored span is about "
+        f"{', '.join(repr(x) for x in entities)}",
+        {"reported_lesion": reported, "evidence_entities": entities,
+         "n_anchored": len(items)})]
+```
+
+`run_detectors` 里加 `out += detect_entity_answer_mismatch(run)`。
+
+**`CRITICAL` 而不是 `WARN`，但仍然只是一个检测器**——不进交卷检查、不拒答案。理由和
+已删掉的那五条临床规则一样：判断答案**内容**的确定性规则，这棵树测量过并全部移除了
+（254 次拒绝里 60 次refused 的正是登记处自己的答案）。这个检测器判断的是**记录自身
+前后一致吗**——属于"关于这次运行的事实"，可以报；升级成闸门要先有测量，不在本任务范围。
+
+**字符串比较是有意的下限**：`reported in entities` 是精确匹配，"right lower lobe" 和
+"RLL" 会被判成不一致。宁可这样，也不要在这里放一个近似匹配——同义词判断是临床知识，
+放进 Python 就是这棵树已经犯过五次的那个错误。误报的代价是有人多看一眼；漏报的代价是
+一条引文说的是另一个标本，而没人知道。
+
+- [ ] **Step 6: 跑测试**
+
+Run: `.venv/bin/pytest tests/test_evidence_entity.py tests/test_evals.py tests/test_agent_tool_surface.py tests/test_single_ledger.py -q`
+Expected: PASS
+
+- [ ] **Step 7: 跑全套并提交**
+
+Run: `.venv/bin/pytest -q`
+
+```bash
+git add src/acr/state.py src/acr/tools/toolbox.py src/acr/evals.py tests/test_evidence_entity.py
+git commit -m "$(cat <<'EOF'
+Evidence may name which lesion it is about, and disagreement with the answer is detectable
+
+"The right document, the wrong specimen" is a failure this repo already named in prose and
+could not express in data: a flat span list has nowhere to say that one quote is about
+specimen A and another about specimen B. submit_answer already recorded reported_lesion; with
+an anchor on the evidence too, the agreement between them stops being something a reader has
+to notice. Optional and empty by default, so every recorded run still loads, and the detector
+stays silent unless both sides recorded an anchor.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+EOF
+)"
+```
+
+---
+
+## 怎么用（十三个任务做完之后）
 
 ### 跑病历——单个
 
