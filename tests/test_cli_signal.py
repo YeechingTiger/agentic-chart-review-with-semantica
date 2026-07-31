@@ -611,6 +611,7 @@ def test_the_manifest_does_not_crowd_the_trace_out_of_the_packet(tmp_path: Path)
     assert "search_notes" in J._render(packet)          # the trace survived the budget
 
 
+@pytest.mark.provider_seam   # 客户端在围栏拒绝之前就被构造了；没有请求发出
 def test_the_fence_is_judges_own_and_not_a_copy(tmp_path, monkeypatch):
     """`correctness` is `==`. Asking the judge for it must fail with judge()'s own sentence.
 
@@ -628,6 +629,7 @@ def test_the_fence_is_judges_own_and_not_a_copy(tmp_path, monkeypatch):
     assert "DeterministicEvaluatorExists" in flat and "acr.evaluation.evals.score" in flat
 
 
+@pytest.mark.provider_seam   # 同上
 def test_a_dimension_the_registry_never_heard_of_is_refused(tmp_path, monkeypatch):
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
     m = _traced(tmp_path, "unknown")
