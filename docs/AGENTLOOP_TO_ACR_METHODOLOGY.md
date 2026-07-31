@@ -584,32 +584,13 @@ Task package 至少包含：
 
 ## 7. 对当前仓库的具体解释
 
-当前 README 中的 “audit layer — this is the product” 实际混合了：
+本节原先逐个列出扁平模块该叫什么名字（`agent.py`: runtime orchestration，`answer_gate.py`:
+in-request controls，等等），并指出 README 的 "audit layer — this is the product" 混淆了三件事。
+那份清单**已经被目录结构本身取代**：`src/acr/` 现在按平面分成十个包，每个模块所在的目录就是
+它属于哪一层，而"允许依赖谁"由 `tests/test_layering.py` 断言。
 
-- in-request answer controls；
-- coverage acquisition policy；
-- trace/manifest observability。
-
-更准确的命名应是：
-
-- `agent.py`：runtime orchestration；
-- `answer_gate.py` / `answer_checks.py` / `answer_contract.py`：in-request controls；
-- `coverage_planner.py` / `coverage.py`：claim proof 支撑 + runtime coverage policy；
-- `trace.py` / `run_manifest.py` / `usage_telemetry.py`：observability；
-- `evaluation_modules.py`：post-run deterministic quality evaluators；
-- `evaluation_pipeline.py`：typed evaluation control plane；
-- `attribution.py`：post-run causal attribution；
-- `spec_repair.py`：DEVELOP optimization；
-- `conflict_refinement.py`：optional RUN policy。
-
-同一事实可以在两处出现，但作用不同。例如：
-
-- runtime gate 拒绝一个未闭合的负向答案；
-- post-run `gate-consistency` evaluator 检查 gate 是否按 ledger 正确执行。
-
-后者是在检查 control 的实现，不是在重新回答患者问题。
-
----
+现在读这一节请看 README §2.0 的那张表：plane -> `src/acr/<dir>` -> `assets/<dir>` -> 它回答
+哪个问题。一份需要人去和代码比对的命名清单，正是它当初要纠正的那种东西。
 
 ## 8. 官方文档 coverage matrix
 

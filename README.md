@@ -106,10 +106,37 @@ Two optional loops sit beside this pipeline; neither replaces it:
 
 ## 2. Components
 
-Line counts are the current tree. "No model" means the module *cannot* reach a provider —
-`tests/test_evals.py` walks the import closure and fails if one appears.
+### 2.0 Where everything lives
 
-### 2.1 The runtime — 2,107 lines
+Read this table first. Every module is in exactly one plane, and a plane is defined by **what it
+may depend on**, not by what its files are called. The rule is one line — *a lower plane may not
+import a higher one* — and `tests/test_layering.py` fails if it is broken.
+
+| plane | `src/acr/` | its assets | the question it answers |
+|---|---|---|---|
+| core | `core/` | `assets/pricing/` | — (AssetRef, Trajectory, SignalEnvelope, spend, model client) |
+| chartstore | `chartstore/` | `corpus/` | how do I read one patient's documents |
+| contract | `contract/` | `assets/specs/` `assets/codes/` `assets/guidelines/` `assets/contracts/` | what must this answer MEAN |
+| **review** | `review/` | `assets/skills/` (task·search·general), `assets/module_catalog/runtime_*` | **what is the answer** — the chart review agent, the only plane that produces one |
+| audit | `audit/` | `assets/module_catalog/audit_rules/` | did this run cross a safety boundary |
+| evaluation | `evaluation/` | `assets/evaluators/` `assets/pipeline_catalog/` `assets/certification_catalog/` | was the run any good |
+| diagnosis | `diagnosis/` | `assets/skills/eval-*` | which defect explains THIS error |
+| improvement | `improvement/` | — | route a confirmed signal to an owner |
+| authoring | `authoring/` | — | onboard a new task; lint a spec |
+| usecase | `usecase/` | `assets/usecase/` | one use case's own knowledge — cancer registry is A use case, not the framework |
+| commands | `commands/` | — | the CLI. Depends on everything; nothing depends on it |
+
+Three of these are the **shared** layers — `core`, `chartstore`, `contract`. The other planes
+meet each other only through their types, never by importing each other's functions. That is
+also asserted, and both exception lists are currently empty.
+
+`audit`, `evaluation` and `diagnosis` are three DIFFERENT conclusions about the same run and may
+not depend on one another: a PHI leak, a wrong value and the defect that caused it are not
+interchangeable, so they never share a number. The one permitted direction is
+diagnosis → evaluation, because attribution has to ask the deterministic scorer which error it
+is explaining.
+
+### 2.1 The runtime — `src/acr/review/`
 
 | module | what it is |
 |---|---|
@@ -177,19 +204,19 @@ it is tied to **the frame it was drawn from**: adding a search term shrinks the 
 draws taken before the term was added no longer bound the population that remains. Monotone
 expansion is monotone in the *evidence*, not in the *bound*.
 
-### 2.3 Downstream, no model — 3,983 lines
+### 2.3 Downstream, no model — `contract/` + `evaluation/`
 
 `concordance.py` (L4 rule engine) · `explain.py` (L5 cause elimination) · `deps.py` (what a
 recommendation reads, and what a spec edit invalidates) · `registry_catalog.py` (variable → spec
 resolution; a variable belongs to exactly one spec, and ambiguity is an error rather than a
 merge) · `intake.py` (question → spec routing).
 
-### 2.4 The clinician's view — 1,648 lines
+### 2.4 The clinician's view — `usecase/specview/`
 
 `specview/` renders a spec as prose a registrar can review and sign, with every element's
 provenance and measurement beside it.
 
-### 2.5 The develop plane — 3,608 lines. **Never run on production data.**
+### 2.5 The develop plane — `improvement/` + `authoring/`. **Never run on production data.**
 
 `labelling.py` (read every note of a dev set once) · `derive.py` (labels → keywords + read
 policy) · `assetdev.py` (evolve / certify / adopt retrieval assets) · `spec_repair.py`
@@ -216,7 +243,7 @@ evidence, rule IDs, entity/time anchors, coverage and proof obligations—not fr
 thought. Ranking is deterministic and evidence-first, but only the existing answer gate can
 make a candidate usable.
 
-### 2.6 The eval plane — 3,066 lines
+### 2.6 The eval plane — `evaluation/` + `diagnosis/`
 
 `evals.py` (precedence registry, abnormal-behaviour detectors, regression harness) ·
 `judge.py` (agent-as-a-judge, fenced) · `refine.py` (route a classified failure at the text
@@ -251,7 +278,7 @@ discouraged. `correctness` is `==`. A task-completion judge is refused outright 
 optimising against that teaches the agent to guess on exactly the subpopulation where the stakes
 are highest. The fence is **per sub-question**, not per dimension.
 
-### 2.7 Other front end — 941 lines
+### 2.7 Other front end — `review/mcp_server.py`
 
 `mcp_server.py` exposes the chart tools and the gate over MCP. It shares `gate_answer`
 (pinned by `tests/test_mcp_server.py`) but **not** the answer contract — see §5.2.
