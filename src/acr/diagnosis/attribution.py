@@ -23,10 +23,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from . import evals
-from .local_artifacts import LocalArtifactStore, content_hash
-from .spec_repair import ChartObservableGold, safe_case_id
-from .trace import rule_catalog
+from ..evaluation import evals
+from ..local_artifacts import LocalArtifactStore, content_hash
+from ..spec_repair import ChartObservableGold, safe_case_id
+from ..trace import rule_catalog
 
 ATTRIBUTION_SCHEMA = "acr.attribution_report/2"
 PACKET_SCHEMA = "acr.attribution_packet/1"
@@ -800,7 +800,7 @@ def build_packet(*, manifest_path: str | Path, case_id: str, spec: Any, mode: st
     if str(manifest.get("spec_hash") or "") != spec.spec_hash:
         raise AttributionError(
             f"{mpath}: manifest spec hash does not match the supplied frozen spec")
-    from .spec_repair import BehaviorSignature
+    from ..spec_repair import BehaviorSignature
     signature = BehaviorSignature.from_manifest(manifest, case_id=case_id).to_dict()
     return AttributionPacket(
         case_id=safe_case_id(case_id), spec_id=spec.spec_id, spec_hash=spec.spec_hash,
@@ -1989,8 +1989,8 @@ def run_attribution_agent(*, packet: AttributionPacket, chart: Any, model: Any,
     from langchain.agents.middleware.types import AgentMiddleware, ModelRequest
     from langchain_core.messages import SystemMessage
 
+    from ..spend import Spend
     from .attribution_modules import builtin_attribution_registry
-    from .spend import Spend
 
     if chart.patient_id == packet.case_id:
         # Synthetic charts often use safe case IDs; this is fine and still one-patient scoped.

@@ -7,7 +7,7 @@ from pathlib import Path
 import typer
 from rich.table import Table
 
-from .audit_loop import (
+from .audit.audit_loop import (
     AuditContext,
     AuditRunner,
     AuditStore,

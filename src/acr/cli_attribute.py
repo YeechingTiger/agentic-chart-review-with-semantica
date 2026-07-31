@@ -7,9 +7,10 @@ from pathlib import Path
 import typer
 from rich.table import Table
 
-from . import attribution as A
-from . import cli_common, evals
+from . import cli_common
 from .cli_common import API_BASE, CORPUS, MODEL, con
+from .diagnosis import attribution as A
+from .evaluation import evals
 from .local_artifacts import LOCAL_ROOT_ENV, LocalArtifactError, LocalArtifactStore
 
 attribute_app = typer.Typer(add_completion=False, help=(

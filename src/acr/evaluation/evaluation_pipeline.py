@@ -13,15 +13,15 @@ from datetime import UTC, datetime
 from functools import partial
 from typing import Any
 
-from .kernel import (
+from ..kernel import (
     SignalEnvelope,
     SignalEvidenceRef,
     TargetRef,
     Trajectory,
     digest,
 )
-from .local_artifacts import LocalArtifactStore
-from .modules import (
+from ..local_artifacts import LocalArtifactStore
+from ..modules import (
     CapabilityRequest,
     ModuleAsset,
     ModuleContractError,

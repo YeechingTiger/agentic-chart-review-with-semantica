@@ -32,7 +32,7 @@ from typer.testing import CliRunner
 from acr.cli import app
 from acr.corpus import Corpus
 from acr.coverage import CoverageLedger, ForcedSampler, clopper_pearson_upper, evaluate_gate
-from acr.explain import (A_CARE_GAP, B_DOCUMENTATION_GAP, BOUND_BY_DIGEST, BOUND_BY_REFERENCE,
+from acr.evaluation.explain import (A_CARE_GAP, B_DOCUMENTATION_GAP, BOUND_BY_DIGEST, BOUND_BY_REFERENCE,
                          C_EXTRACTION_ERROR, CANNOT_DISTINGUISH, D_JUSTIFIED_EXCEPTION,
                          DEFAULT_MAX_ELUSION_UPPER, ELIMINATED, OPEN, SUPPORTED, UNBOUND,
                          ArtifactBindingError, ExplanationClaimError, VariableResult,
@@ -523,7 +523,7 @@ def test_an_allowed_override_brands_every_scaffold_it_produced(chain):
     The stamp goes on the run, on each scaffold, and inside the packet an adjudicating agent
     reads — because that agent never sees the top of the file."""
     _, b = _resolve(chain, override_path=str(chain / "other_extract.json"), allow_unbound=True)
-    out = {"schema": "acr.explain/1",
+    out = {"schema": "acr.evaluation.explain/1",
            "cases": [{"case_id": "P1", "scaffold": _scaffold([_absent()]).to_dict()},
                      {"case_id": "P2", "scaffold": None, "not_explainable": "x"}]}
     mark_binding(out, b)

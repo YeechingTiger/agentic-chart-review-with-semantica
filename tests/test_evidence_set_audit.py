@@ -18,7 +18,7 @@ orphan 8/12 必报，全是构造性误报。一个不可能返回干净的检�
 """
 from __future__ import annotations
 
-from acr.evals import RunRecord, audit_evidence_set
+from acr.evaluation.evals import RunRecord, audit_evidence_set
 
 
 def _run(evidence: list[dict]) -> RunRecord:
@@ -69,7 +69,7 @@ def test_the_two_prose_grouped_detectors_are_gone():
     它们在十二次真实运行上分别报了 12 次和 8 次，全部是误报，因为 supports 是自由文本。
     重新引入任何按 supports 分组的检查，都会重现同一个失效。
     """
-    import acr.evals as E
+    import acr.evaluation.evals as E
     assert not hasattr(E, "detect_orphan_contradiction")
     ev = [_ev(supports="独一无二的一句话"), _ev(note="N2", supports="另一句")]
     names = {f.detector for f in audit_evidence_set(_run(ev))}
@@ -107,7 +107,7 @@ def test_the_answer_copy_of_the_ledger_is_audited_too():
 
 
 def test_audit_is_wired_into_run_detectors():
-    from acr.evals import DetectorConfig, run_detectors
+    from acr.evaluation.evals import DetectorConfig, run_detectors
     cfg = DetectorConfig(min_term_chars=3, max_rejection_repeats=2,
                          token_band=(0, 10 ** 9), turn_band=(0, 10 ** 6))
     run = _run([_ev(start=0, end=40), _ev(start=10, end=50)])

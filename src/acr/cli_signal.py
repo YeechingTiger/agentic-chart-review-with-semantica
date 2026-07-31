@@ -202,7 +202,7 @@ def _check_truth_mode(mode: str) -> str:
     and refused by `_mode_inputs` after the operator has waited for a batch to start. Imported
     lazily because this module's contract is that no analysis stack loads on the rule path.
     """
-    from .attribution import ATTRIBUTION_MODES
+    from .diagnosis.attribution import ATTRIBUTION_MODES
     if mode not in ATTRIBUTION_MODES:
         raise typer.BadParameter(
             f"unknown truth mode {mode!r}; expected one of {list(ATTRIBUTION_MODES)}")
@@ -318,8 +318,8 @@ def _rule_signal(*, run: str, spec: str, subject_id: str = "",
     for reuse. Rebuilding the AuditContext here would be a second place where a trajectory is
     assembled from a manifest, and the two would drift.
     """
-    from . import evals
     from .cli_audit import audit_run_payload
+    from .evaluation import evals
 
     report = audit_run_payload(manifest=run, subject_id=subject_id,
                                provider_boundary=provider_boundary, local_root=local_root)
@@ -402,7 +402,7 @@ def _packet_from_run(*, run: str, gold: str, dimension: str,
     packet is built and filtered, and the type that comes back has no field one could have
     reached. That is the isolation working as designed rather than being re-promised here.
     """
-    from . import judge as J
+    from .evaluation import judge as J
 
     store = _store(local_root)
     manifest_path = store.require_input(run, what="manifest")
@@ -432,9 +432,10 @@ def _judge_signal(*, run: str, spec: str, dimension: str, gold: str,
     of the judgement, free to drift the first time somebody adds a row. `cli_judge` opens with
     that rule; arriving through a different front door does not suspend it.
     """
-    from . import cli_common, evals
-    from . import judge as J
+    from . import cli_common
     from .cli_judge import JsonJudgeModel
+    from .evaluation import evals
+    from .evaluation import judge as J
 
     if not dimension:
         raise typer.BadParameter("--kind judge requires --dimension (one of "
@@ -487,7 +488,7 @@ def _judged_or_exit(**kw) -> dict:
     to a script, from the command crashing. `cli_judge` already learned that. In `batch` the
     same exception is caught one level up and recorded as this run's entry in the array.
     """
-    from . import judge as J
+    from .evaluation import judge as J
 
     try:
         return _judge_signal(**kw)

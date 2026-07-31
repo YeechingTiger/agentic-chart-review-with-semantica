@@ -8,8 +8,8 @@ import typer
 from rich.table import Table
 
 from .cli_common import con
-from .evaluation_modules import builtin_evaluation_module_registry
-from .evaluation_pipeline import (
+from .evaluation.evaluation_modules import builtin_evaluation_module_registry
+from .evaluation.evaluation_pipeline import (
     EvaluationContext,
     EvaluationPipelineError,
     EvaluationPipelineRunner,

@@ -1,6 +1,6 @@
 """Built-in v2 quality evaluators.
 
-Security/privacy rules live in :mod:`acr.audit_loop`; these evaluators emit only
+Security/privacy rules live in :mod:`acr.audit.audit_loop`; these evaluators emit only
 quality results.
 """
 from __future__ import annotations
@@ -10,13 +10,13 @@ from collections import Counter
 from collections.abc import Mapping
 from typing import Any
 
+from ..kernel import SignalEvidenceRef, TargetRef
+from ..modules import ModuleAsset, ModuleRegistry
 from .evaluation_pipeline import (
     EvaluationInvocation,
     EvaluationResult,
     make_result,
 )
-from .kernel import SignalEvidenceRef, TargetRef
-from .modules import ModuleAsset, ModuleRegistry
 
 
 def _event_text(event: Mapping[str, Any]) -> str:

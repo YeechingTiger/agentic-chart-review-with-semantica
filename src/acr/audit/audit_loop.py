@@ -16,7 +16,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from .kernel import (
+from ..kernel import (
     AssetRef,
     SignalEnvelope,
     SignalEvidenceRef,
@@ -24,8 +24,8 @@ from .kernel import (
     Trajectory,
     digest,
 )
-from .local_artifacts import LocalArtifactStore
-from .modules import ModuleAsset, ModuleRegistry
+from ..local_artifacts import LocalArtifactStore
+from ..modules import ModuleAsset, ModuleRegistry
 
 AUDIT_SEVERITIES = frozenset({"INFO", "WARN", "CRITICAL", "IRB"})
 AUDIT_STATUSES = frozenset({"PASS", "FINDING", "INCIDENT"})

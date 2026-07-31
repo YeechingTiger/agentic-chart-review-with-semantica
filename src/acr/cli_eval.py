@@ -2,7 +2,7 @@
 what changed between two baselines.
 
 NOTHING IN THIS GROUP CALLS A MODEL, so nothing in it takes a cost ceiling — and that is a
-property of `acr.evals`, not a promise made here:
+property of `acr.evaluation.evals`, not a promise made here:
 `tests/test_evals.py::test_no_model_is_reachable_from_this_module` walks the import closure and
 fails if `acr.llm`, `acr.graph` or a provider SDK ever appears. What every command here DOES
 take is its thresholds, because `DetectorConfig` gives none of them a default: a threshold
@@ -18,8 +18,8 @@ from pathlib import Path
 import typer
 from rich.table import Table
 
-from . import evals
 from .cli_common import con, dump, read_json
+from .evaluation import evals
 
 eval_app = typer.Typer(add_completion=False, help=(
     "The deterministic evaluation plane: the precedence registry, the abnormal-behaviour "
@@ -139,7 +139,7 @@ def dimensions(
 ):
     """Print THE FENCE: every evaluable dimension and whether a model judge is allowed on it.
 
-    This is the one namespace. `acr.judge` advertises dimensions and `evaluators/*.yaml`
+    This is the one namespace. `acr.evaluation.judge` advertises dimensions and `evaluators/*.yaml`
     declare one each; both are checked against these rows, and they once had zero names in
     common while every test on both sides passed.
     """

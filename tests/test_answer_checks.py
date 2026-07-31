@@ -166,7 +166,7 @@ def test_a_broken_pattern_in_a_spec_cannot_block_a_run():
 
 # ------------------------------------------------------- rule identity still resolves
 def test_rule_ids_still_mint_for_traces_recorded_before_the_removal():
-    """`acr.attribution` has to resolve ids in traces written while the checks existed."""
+    """`acr.diagnosis.attribution` has to resolve ids in traces written while the checks existed."""
     rid = answer_check_rule_id({"field": "primary_site", "kind": "conflict_requires_nos",
                                 "nos_value": "C349"})
     assert rid.startswith("answer_check.primary_site.conflict_requires_nos")

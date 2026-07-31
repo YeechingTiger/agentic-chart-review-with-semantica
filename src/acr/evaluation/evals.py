@@ -3,7 +3,7 @@
 PART 1 — THE PRECEDENCE REGISTRY (`REGISTRY`, `judge_ruling`, `assert_judge_allowed`)
 --------------------------------------------------------------------------------------
 One row per evaluable dimension, declaring whether a DETERMINISTIC check exists. Where one
-exists a model judge is FORBIDDEN — refused, not discouraged. `acr.judge` calls
+exists a model judge is FORBIDDEN — refused, not discouraged. `acr.evaluation.judge` calls
 `assert_judge_allowed()` and gets a `JudgeForbidden` carrying the reason.
 
 Three of the standard LLM-judge metrics have strictly stronger exact equivalents here:
@@ -30,7 +30,7 @@ split parent naming two rows. A per-dimension fence has to pick one answer for t
 dimension and is wrong either way: it forbids "does this quote actually support this value",
 or it lets a model re-decide admissibility the gate already computed.
 
-THIS REGISTRY IS THE ONE NAMESPACE. `acr.judge` advertises dimensions; `evaluators/*.yaml`
+THIS REGISTRY IS THE ONE NAMESPACE. `acr.evaluation.judge` advertises dimensions; `evaluators/*.yaml`
 declare one each; both are checked against these rows. They were not, and the two sides had
 zero names in common (see `unknown_dimensions`, and the seam test in tests/test_judge.py).
 
@@ -142,7 +142,7 @@ REGISTRY: dict[str, Dimension] = {d.name: d for d in (
               "acr.tools.toolbox.Toolbox._t_record_evidence", "faithfulness judge",
               "enforced at the tool boundary, before an estimator could be wrong"),
     Dimension("correctness", True, "exact match of the coded value against the key value",
-              "acr.evals.score", "answer-correctness judge",
+              "acr.evaluation.evals.score", "answer-correctness judge",
               "a judge calling C341 'basically right' against a key of C349 has absorbed "
               "the entire error being measured"),
     Dimension("task_completion", True, "the gate verdict recorded on the run",
@@ -158,10 +158,10 @@ REGISTRY: dict[str, Dimension] = {d.name: d for d in (
               "these rules were in the prompt when the model broke them; a second model "
               "reading them back is not the fix"),
     Dimension("abstention_correctness", True, "abstained-vs-key cross tabulation; a null "
-              "key value means abstention is right", "acr.evals.score", "hedging judge",
+              "key value means abstention is right", "acr.evaluation.evals.score", "hedging judge",
               "its own dimension so a correct abstention is never filed as a failure"),
     Dimension("patient_isolation", True, "every patient identifier in the run equals the "
-              "one asked about", "acr.evals.detect_patient_crossover", None,
+              "one asked about", "acr.evaluation.evals.detect_patient_crossover", None,
               "an IRB incident decided by string equality"),
     # SPLIT dimensions. The parent is not evaluable by anything; each half is registered
     # separately so the fence can refuse one and permit the other in the same breath.
@@ -180,13 +180,13 @@ REGISTRY: dict[str, Dimension] = {d.name: d for d in (
               "GIVEN WHAT THE RUN KNEW AT THE TIME is not a counter",
               sub_questions=("step_efficiency.deterministic", "step_efficiency.judged")),
     Dimension("step_efficiency.deterministic", True,
-              "recorded counters against a declared band", "acr.evals.detect_resource_band",
+              "recorded counters against a declared band", "acr.evaluation.evals.detect_resource_band",
               "efficiency judge",
               "arithmetic — and an unmeasured counter reports as unmeasured, not as cheap"),
     # Judge PERMITTED below. No exact equivalent exists, and inventing a fake one would be
     # the mirror-image error: a bogus exact check is worse than an honest estimate.
     #
-    # THE THREE `acr.judge` ADVERTISES ARE HERE BY NAME. They were not, and every one of them
+    # THE THREE `acr.evaluation.judge` ADVERTISES ARE HERE BY NAME. They were not, and every one of them
     # raised UnknownDimension against this registry: the judge could not run on anything it
     # claimed to support, and it failed closed, so nothing complained. Two agents each did
     # their half correctly and no test crossed the seam. `tests/test_judge.py::
@@ -297,7 +297,7 @@ class JudgeRuling:
 
 
 def judge_ruling(dimension: str) -> JudgeRuling:
-    """THE query `acr.judge` consults. A ruling with its reason, never a bare bool.
+    """THE query `acr.evaluation.judge` consults. A ruling with its reason, never a bare bool.
 
     A bare False leaves the caller nothing to show the operator, who then just reruns the
     eval with the judge 'turned back on'. The reason travels with the refusal.
@@ -339,7 +339,7 @@ def judgeable_dimensions() -> tuple[str, ...]:
 def unknown_dimensions(names: Iterable[str]) -> dict[str, str]:
     """`{advertised name: why the registry will not accept it}` — empty when the seam holds.
 
-    THE SEAM CHECK. `acr.judge` advertised three dimensions and this registry knew none of
+    THE SEAM CHECK. `acr.evaluation.judge` advertised three dimensions and this registry knew none of
     them; every call it claimed to support raised UnknownDimension. It failed closed, so it
     was safe and useless, and no test on either side could see it because each module was
     correct alone. Anything that publishes a dimension list runs this against the registry.
@@ -358,9 +358,9 @@ def unknown_dimensions(names: Iterable[str]) -> dict[str, str]:
 
 
 class PrecedenceGate:
-    """The registry in the query shape `acr.judge` requires: dimension -> verifier | None.
+    """The registry in the query shape `acr.evaluation.judge` requires: dimension -> verifier | None.
 
-    `acr.judge` takes this as a parameter rather than importing it, so this class is the one
+    `acr.evaluation.judge` takes this as a parameter rather than importing it, so this class is the one
     object that makes the real registry answerable to the judge's protocol. Before it, the
     only thing satisfying that protocol was a test double, which is exactly why the seam
     could be wrong in production while every test on both sides passed.
@@ -374,7 +374,7 @@ class PrecedenceGate:
         return None if r.allowed else r.use_instead
 
     def __repr__(self) -> str:
-        return "acr.evals.PrecedenceGate()"
+        return "acr.evaluation.evals.PrecedenceGate()"
 
 
 def precedence_gate() -> PrecedenceGate:
@@ -427,7 +427,7 @@ def mask_person_ids(obj: Any) -> Any:
     if not key:
         return json.loads(_PERSON_ID.sub("<person_id:redacted>", json.dumps(obj, default=str)))
 
-    def tok(m: "re.Match[str]") -> str:
+    def tok(m: re.Match[str]) -> str:
         digest = hmac.new(key.encode(), m.group(0).encode(), hashlib.sha256).hexdigest()[:12]
         return f"<person:{digest}>"
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from acr.evals import Finding, RunRecord, detect_uncaused_reads, run_detectors
+from acr.evaluation.evals import Finding, RunRecord, detect_uncaused_reads, run_detectors
 from acr.tools.toolbox import CAUSE_PARAM, TOOL_SCHEMAS
 
 #: The corpus filename convention is `<DocType>_<YYYY-MM-DD>[__<n>].txt` and the note_id IS the
@@ -110,7 +110,7 @@ def test_detector_is_silent_on_a_run_with_no_reads():
 
 
 def test_detector_is_wired_into_run_detectors():
-    from acr.evals import DetectorConfig
+    from acr.evaluation.evals import DetectorConfig
     run = RunRecord(manifest={"patient_id": "SYN01"}, trace=[
         {"kind": "tool", "tool": "read_document"},
     ])

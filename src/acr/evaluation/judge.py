@@ -66,7 +66,7 @@ Asking the same question three times measures the model's temperature. Each dime
 therefore decomposed into distinct questions aimed at distinct failure modes, and the lens
 questions are checked for distinctness so a copy-paste cannot turn a panel back into a poll.
 
-THE DIMENSION NAMES ARE `acr.evals`' NAMES, AND A TEST CROSSES THE SEAM
+THE DIMENSION NAMES ARE `acr.evaluation.evals`' NAMES, AND A TEST CROSSES THE SEAM
 -----------------------------------------------------------------------
 The three dimensions below were once this module's private vocabulary and the precedence
 registry had never heard of any of them: every dimension this module advertised raised
@@ -88,10 +88,12 @@ The model is a thin seam (`JudgeModel`); nothing here imports a provider or open
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping, Protocol, Sequence, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
+
 
 # ============================================================================== refusals
 class JudgeRefusal(Exception):
@@ -129,7 +131,7 @@ EV_DETERMINISTIC = "DETERMINISTIC"
 EV_JUDGED = "JUDGED"
 
 # ============================================================================== dimensions
-#: Every name here is a row in `acr.evals.REGISTRY`, checked by the seam test. A dimension
+#: Every name here is a row in `acr.evaluation.evals.REGISTRY`, checked by the seam test. A dimension
 #: this module advertises that the registry does not know is a judge that cannot run.
 DIM_L5_EXPLANATION_QUALITY = "l5_explanation_quality"
 DIM_TRAJECTORY_QUALITY = "trajectory_quality"
@@ -181,7 +183,7 @@ FORBIDDEN_USES = ("GATE", "ADOPT", "VALIDATE", "ACCEPT", "REJECT", "PUBLISH", "A
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _norm(dimension: Any) -> str:
@@ -193,7 +195,7 @@ def _norm(dimension: Any) -> str:
 # ================================================================================ the seams
 @runtime_checkable
 class PrecedenceRegistry(Protocol):
-    """The query shape this module requires of `acr.evals`' precedence registry.
+    """The query shape this module requires of `acr.evaluation.evals`' precedence registry.
 
     One method, one question: does a deterministic evaluator exist for this dimension?
     Return the evaluator (or any truthy handle) if one does, None if none does. Whether it
@@ -227,7 +229,7 @@ def _lookup(registry: Any, dimension: str) -> Any | None:
     if registry is None:
         raise RegistryUnavailable(
             "no precedence registry supplied; precedence is unknown and judging is refused. "
-            "Pass acr.evals' registry (see PrecedenceRegistry for the required query shape).")
+            "Pass acr.evaluation.evals' registry (see PrecedenceRegistry for the required query shape).")
     for name in ("deterministic_evaluator_for", "evaluator_for"):
         fn = getattr(registry, name, None)
         if callable(fn):
@@ -355,7 +357,7 @@ LENSES: dict[str, tuple[Lens, ...]] = {
              "the registrar-error mode: 'favor squamous' coded as squamous, which a "
              "supports/does-not-support question scores as supported"),
     ),
-    # The other judged half. The counters are acr.evals.detect_resource_band's and stay
+    # The other judged half. The counters are acr.evaluation.evals.detect_resource_band's and stay
     # deterministic; only "given what it knew AT THE TIME" is asked here.
     DIM_STEP_EFFICIENCY_JUDGED: (
         Lens("reasonable_given_what_was_known",
@@ -554,7 +556,7 @@ class Measurement:
     source: str = ""
 
     @classmethod
-    def from_verdict(cls, v: Verdict) -> "Measurement":
+    def from_verdict(cls, v: Verdict) -> Measurement:
         if v.score is None:
             raise ValueError(f"{v.dimension}: no lens produced a usable score, so there "
                              f"is no measurement to carry forward")
@@ -695,7 +697,7 @@ def screen_for_human(verdicts: Sequence[Verdict], *, flag_at_or_below: float,
 # already shipped in another form:
 #
 #   1. THE PRECEDENCE FENCE, PER SUB-QUESTION. A dimension that code decides is refused with
-#      the deterministic method named. The fence is `acr.evals.REGISTRY` — data — not an `if`
+#      the deterministic method named. The fence is `acr.evaluation.evals.REGISTRY` — data — not an `if`
 #      buried here. Per SUB-QUESTION because evidence_support and step_efficiency each have a
 #      deterministic half and a judged half, and a per-dimension fence kills the legitimate
 #      one. Naming a split parent is refused and told which half to declare.
@@ -704,7 +706,7 @@ def screen_for_human(verdicts: Sequence[Verdict], *, flag_at_or_below: float,
 #      file that a reviewer can check by reading it.
 #   3. TOOL SCOPE IS DECLARED AND BOUNDED. An agent-judge that can open documents IS A PHI
 #      ACCESS PATH. It may open only the chart of the patient whose trace it is judging — the
-#      same cross-patient rule `acr.evals.detect_patient_crossover` enforces on the agent,
+#      same cross-patient rule `acr.evaluation.evals.detect_patient_crossover` enforces on the agent,
 #      now on its auditor, at load AND at every tool call.
 #   4. AT LEAST ONE must_pass AND ONE must_fail CASE, OR IT DOES NOT LOAD. The one that
 #      matters most. The recurring defect here is the check that cannot fail: a gate that
@@ -826,7 +828,7 @@ def _check_dimension(dimension: str, registry: Any) -> str:
 
     `_lookup` is the same query `judge()` makes, so an evaluator file and a direct call
     cannot disagree about what is fenced. A registry that raises — including on a split
-    parent, which `acr.evals` refuses to rule on as a whole — becomes a refusal here rather
+    parent, which `acr.evaluation.evals` refuses to rule on as a whole — becomes a refusal here rather
     than an assumption that nothing deterministic exists.
     """
     dim = _norm(dimension)

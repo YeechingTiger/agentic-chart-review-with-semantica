@@ -14,7 +14,7 @@ from .state import Budget
 
 if TYPE_CHECKING:
     from .agent import run_patient
-    from .attribution import (
+    from .diagnosis.attribution import (
         AdjudicationEvent,
         AttributionPacket,
         AttributionProbe,
@@ -65,6 +65,6 @@ def __getattr__(name: str) -> Any:
     if name in {
             "AttributionPacket", "AttributionProbe", "CauseFinding", "AttributionReport",
             "ErrorCaseEvent", "AdjudicationEvent", "ErrorCluster"}:
-        from . import attribution
+        from .diagnosis import attribution
         return getattr(attribution, name)
     raise AttributeError(name)

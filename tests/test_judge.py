@@ -28,8 +28,8 @@ from pathlib import Path
 
 import pytest
 
-from acr import evals as E
-from acr.judge import (CONTEXT_VARIABLES, COST_CLASSES, DECISION_FIELD_NAMES,
+from acr.evaluation import evals as E
+from acr.evaluation.judge import (CONTEXT_VARIABLES, COST_CLASSES, DECISION_FIELD_NAMES,
                        DIM_BAD_CASE_TRIAGE, DIM_EVIDENCE_SUPPORT_JUDGED,
                        DIM_L5_EXPLANATION_QUALITY, DIM_TRAJECTORY_QUALITY, EV_DETERMINISTIC,
                        EV_JUDGED, EVALUATOR_TOOLS, FORBIDDEN_USES, JUDGEABLE_DIMENSIONS,
@@ -50,7 +50,7 @@ SENTINEL = "SENTINEL_TRUTH_C349_DO_NOT_SHOW"
 
 # ------------------------------------------------------------------------------- doubles
 class Registry:
-    """The precedence registry shape `judge()` requires of `acr.evals`.
+    """The precedence registry shape `judge()` requires of `acr.evaluation.evals`.
 
     The sibling module had not landed when this was written; the query it must answer is
     `deterministic_evaluator_for(dimension) -> evaluator | None`, and `judge()` also accepts
@@ -165,7 +165,7 @@ def test_override_by_marking_the_evaluator_disabled():
 
 def test_override_by_widening_the_module_allowlist(monkeypatch):
     """A caller who appends to JUDGEABLE_DIMENSIONS still cannot judge a decided dimension."""
-    monkeypatch.setattr("acr.judge.JUDGEABLE_DIMENSIONS",
+    monkeypatch.setattr("acr.evaluation.judge.JUDGEABLE_DIMENSIONS",
                         JUDGEABLE_DIMENSIONS + ("guideline_concordance",))
     with pytest.raises(DeterministicEvaluatorExists):
         judge("guideline_concordance", blind_packet(),
@@ -452,7 +452,7 @@ def test_a_case_the_judge_could_not_read_goes_to_the_human_rather_than_being_dro
 # ============================================== 5. THE SEAM: judge.py vs the real registry
 # These are the tests that were missing. Every test above uses the `Registry` double, which
 # is why both modules could be internally correct while sharing zero dimension names: the
-# judge advertised three dimensions, `acr.evals` had never heard of any of them, and every
+# judge advertised three dimensions, `acr.evaluation.evals` had never heard of any of them, and every
 # call the judge claimed to support raised UnknownDimension. It failed closed, so it was safe
 # and useless. Nothing here uses a double.
 ROOT = Path(__file__).resolve().parents[1]
@@ -467,7 +467,7 @@ def _ledger(max_calls=50, max_cost_usd=20.0):
 
 
 def test_every_dimension_the_judge_advertises_is_known_to_the_registry():
-    """THE SEAM TEST. Fails if this module advertises a dimension `acr.evals` cannot rule on.
+    """THE SEAM TEST. Fails if this module advertises a dimension `acr.evaluation.evals` cannot rule on.
 
     Same shape as the mismatch caught earlier between two other modules, where one read a key
     the other never wrote: two agents, two correct halves, nobody checking across. A judge
@@ -476,12 +476,12 @@ def test_every_dimension_the_judge_advertises_is_known_to_the_registry():
     """
     problems = E.unknown_dimensions(JUDGEABLE_DIMENSIONS)
     assert problems == {}, (
-        f"acr.judge advertises {sorted(problems)} which acr.evals.REGISTRY will not permit. "
+        f"acr.evaluation.judge advertises {sorted(problems)} which acr.evaluation.evals.REGISTRY will not permit. "
         f"Reconcile the names in one namespace — the registry — not in two lists: {problems}")
 
 
 def test_the_real_registry_answers_the_protocol_the_judge_requires():
-    """Not the double: `acr.evals.PrecedenceGate` itself, queried the way `judge()` queries."""
+    """Not the double: `acr.evaluation.evals.PrecedenceGate` itself, queried the way `judge()` queries."""
     assert isinstance(GATE, E.PrecedenceGate)
     for dim in JUDGEABLE_DIMENSIONS:
         assert GATE.deterministic_evaluator_for(dim) is None, dim
@@ -604,7 +604,7 @@ def test_an_unregistered_dimension_does_not_load():
 def test_the_fence_is_re_checked_at_run_time_and_not_trusted_from_load():
     """A spec outlives the registry it loaded against; 'it was allowed then' is not a check."""
     spec = _spec(dimension=DIM_TRAJECTORY_QUALITY)
-    later = Registry(**{DIM_TRAJECTORY_QUALITY: "acr.evals.some_new_exact_check"})
+    later = Registry(**{DIM_TRAJECTORY_QUALITY: "acr.evaluation.evals.some_new_exact_check"})
     stub = StubJudge()
     with pytest.raises(DeterministicEvaluatorExists):
         run_evaluator(spec, {"trace": []}, registry=later, model=stub, ledger=_ledger(),

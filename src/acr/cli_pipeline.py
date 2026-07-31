@@ -12,23 +12,44 @@ import csv
 import io
 import json
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
 from rich.table import Table
 
 from . import cli_common
-from .cli_common import (API_BASE, CONCORD_SCHEMA, CORPUS, EXPLAIN_SCHEMA, EXTRACT_SCHEMA, MODEL,
-                         code_sha, con, load_artifact)
-from .concordance import (ConcordanceInputError, GuidelineError, Recommendation, assess,
-                          load_guideline, summarise, variables_from_answer)
+from .cli_common import (
+    API_BASE,
+    CONCORD_SCHEMA,
+    CORPUS,
+    EXPLAIN_SCHEMA,
+    EXTRACT_SCHEMA,
+    MODEL,
+    code_sha,
+    con,
+    load_artifact,
+)
+from .concordance import (
+    ConcordanceInputError,
+    GuidelineError,
+    Recommendation,
+    assess,
+    load_guideline,
+    summarise,
+    variables_from_answer,
+)
 from .corpus import Corpus
-from .explain import (DEFAULT_MAX_ELUSION_UPPER, ArtifactBindingError, VariableResult,
-                      mark_binding, resolve_bound_extract, scaffold_explanation,
-                      side_input_record)
-from .registry_catalog import (VariableCatalog, VariableResolutionError,
-                               check_guideline_bindings)
+from .evaluation.explain import (
+    DEFAULT_MAX_ELUSION_UPPER,
+    ArtifactBindingError,
+    VariableResult,
+    mark_binding,
+    resolve_bound_extract,
+    scaffold_explanation,
+    side_input_record,
+)
+from .registry_catalog import VariableCatalog, VariableResolutionError, check_guideline_bindings
 
 pipeline_app = typer.Typer(add_completion=False)
 
@@ -283,7 +304,7 @@ def extract(
 
     doc = {
         "schema": EXTRACT_SCHEMA,
-        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "created_utc": datetime.now(UTC).isoformat(),
         "code_sha": code_sha(),
         "corpus": str(corpus), "specs_dir": specs_dir, "cohort": str(Path(cohort).resolve()),
         "runtime_profile": runtime_profile,
@@ -416,7 +437,7 @@ def concord(
 
     outdoc = {
         "schema": CONCORD_SCHEMA,
-        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "created_utc": datetime.now(UTC).isoformat(),
         "code_sha": code_sha(), "engine": "acr.concordance/deterministic",
         "guideline": {"path": str(Path(guideline).resolve()), "guideline_id": g.guideline_id,
                       "guideline_version": g.guideline_version,
@@ -563,7 +584,7 @@ def explain(
             con.print(sc.render())
 
     outdoc = {"schema": EXPLAIN_SCHEMA,
-              "created_utc": datetime.now(timezone.utc).isoformat(), "code_sha": code_sha(),
+              "created_utc": datetime.now(UTC).isoformat(), "code_sha": code_sha(),
               "concord_input": str(Path(input_path).resolve()),
               "extract_input": binding.used_path,
               "registry_truth_supplied": bool(truth), "registry_truth": truth_record,

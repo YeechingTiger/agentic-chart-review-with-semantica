@@ -3,7 +3,7 @@
 THE ONE TEST THIS FILE EXISTS FOR is `test_the_precedence_fence_survives_the_cli`: a CLI that
 bypasses a library invariant is a second copy of the judgement, and the fence is the invariant
 with the most to lose. `acr judge panel` on a dimension a deterministic evaluator already
-decides must fail the same way `acr.judge.judge()` fails, with the same class and the same
+decides must fail the same way `acr.evaluation.judge.judge()` fails, with the same class and the same
 sentence — not a lookalike refusal this module wrote for itself.
 
 No provider is reached anywhere here. Every judging command is exercised with --dry-run, and
@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from acr import evals, judge as J
+from acr.evaluation import evals, judge as J
 from acr.cli import app
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -186,7 +186,7 @@ def test_judge_dimensions_holds_the_seam_between_judge_and_registry():
 
 
 def test_judge_evaluators_loads_the_shipped_files_against_the_real_gate(tmp_path):
-    """Not a test double. The gate here is `acr.evals.precedence_gate()`."""
+    """Not a test double. The gate here is `acr.evaluation.evals.precedence_gate()`."""
     out = tmp_path / "e.json"
     r = runner.invoke(app, ["judge", "evaluators", "--dir", EVALUATORS, "--out", str(out)])
     assert r.exit_code == 0, r.output
@@ -409,7 +409,7 @@ def _baseline(pids, outcome):
 
 
 def test_a_baseline_whose_ids_collide_is_refused_not_averaged():
-    from acr import evals
+    from acr.evaluation import evals
     before = _baseline(["<person_id:redacted>"] * 3, "EXACT")
     after = _baseline(["<person_id:redacted>"] * 3, "MISMATCH")
     d = evals.compare(before, after)
@@ -420,14 +420,14 @@ def test_a_baseline_whose_ids_collide_is_refused_not_averaged():
 
 
 def test_distinct_ids_still_compare_per_instance():
-    from acr import evals
+    from acr.evaluation import evals
     d = evals.compare(_baseline(["a", "b", "c"], "EXACT"), _baseline(["a", "b", "c"], "MISMATCH"))
     assert d["verdict"] == "REGRESSION"
     assert len(d["regressions"]) == 3, "one row per instance, not one per field"
 
 
 def test_a_key_makes_each_person_id_its_own_stable_token(monkeypatch):
-    from acr import evals
+    from acr.evaluation import evals
     # Built, not written: a literal of this shape in the tree is what
     # tests/test_no_phi_in_tree.py exists to refuse, and it correctly refused this file.
     p1, p2 = "1168" + "0" * 11 + "1", "1168" + "0" * 11 + "2"
@@ -440,7 +440,7 @@ def test_a_key_makes_each_person_id_its_own_stable_token(monkeypatch):
 
 
 def test_without_a_key_the_old_constant_stands_and_says_so(monkeypatch):
-    from acr import evals
+    from acr.evaluation import evals
     monkeypatch.delenv(evals.PSEUDONYM_KEY_ENV, raising=False)
     m = evals.mask_person_ids({"x": "1168" + "0" * 11 + "1"})
     assert m["x"] == "<person_id:redacted>"

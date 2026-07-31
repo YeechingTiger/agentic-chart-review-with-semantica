@@ -109,7 +109,7 @@ def test_the_premise_of_the_rule_compliance_exclusion_still_holds():
     """`rule_compliance` is deterministic in the registry and unfirable since 2026-07-30, when
     `answer_checks.ANSWER_CHECK_KINDS` was emptied. The dispatcher drops it from the advertised
     dimensions for that reason and no other — if the kinds ever refill, the drop is wrong."""
-    from acr import evals
+    from acr.evaluation import evals
     from acr.answer_checks import ANSWER_CHECK_KINDS
     assert not ANSWER_CHECK_KINDS
     assert evals.REGISTRY["rule_compliance"].deterministic
@@ -157,7 +157,7 @@ def test_the_posture_vocabulary_is_attributions_own_and_not_a_third_spelling():
 
     这条断言读 attribution 自己的常量而不是抄一份 —— 抄一份的那天起两份就可以各自漂移。
     """
-    from acr.attribution import ATTRIBUTION_MODES
+    from acr.diagnosis.attribution import ATTRIBUTION_MODES
     from acr.cli_signal import EVAL_MODES
     assert tuple(EVAL_MODES) == ATTRIBUTION_MODES
 
@@ -563,7 +563,7 @@ def test_judge_signal_builds_a_blind_packet_for_blinded_dimensions(tmp_path: Pat
     second is not a leak — a trajectory judge is supposed to see the run's own output.
     """
     import acr.cli_signal as cs
-    from acr import judge as J
+    from acr.evaluation import judge as J
     m = _traced(tmp_path)
     g = tmp_path / "gold.json"
     g.write_text(json.dumps({"SYN0001": {"primary_site": "C509"}}), encoding="utf-8")
@@ -577,7 +577,7 @@ def test_judge_signal_builds_a_blind_packet_for_blinded_dimensions(tmp_path: Pat
 
 def test_judge_signal_allows_the_key_only_for_triage(tmp_path: Path):
     import acr.cli_signal as cs
-    from acr import judge as J
+    from acr.evaluation import judge as J
     m = _traced(tmp_path, "t")
     g = tmp_path / "gold.json"
     g.write_text(json.dumps({"SYN0001": {"primary_site": "C341"}}), encoding="utf-8")
@@ -589,7 +589,7 @@ def test_judge_signal_allows_the_key_only_for_triage(tmp_path: Path):
 
 def test_only_triage_is_key_permitted_and_the_dispatcher_reads_that_from_judge():
     """The blind/keyed split is judge.py's constant, not a list retyped over here."""
-    from acr import judge as J
+    from acr.evaluation import judge as J
     assert J.KEY_PERMITTED_DIMENSIONS == ("bad_case_triage",)
 
 
@@ -602,7 +602,7 @@ def test_the_manifest_does_not_crowd_the_trace_out_of_the_packet(tmp_path: Path)
     returns three confident scores.
     """
     import acr.cli_signal as cs
-    from acr import judge as J
+    from acr.evaluation import judge as J
     m = _traced(tmp_path, "big", develop_plane_candidates={"terms": ["x" * 40] * 400})
     packet = cs._packet_from_run(run=str(m), gold="", dimension="trajectory_quality",
                                  local_root=str(tmp_path))
@@ -625,7 +625,7 @@ def test_the_fence_is_judges_own_and_not_a_copy(tmp_path, monkeypatch):
                                      "--model", "stub/model", "--local-root", str(tmp_path)])
     assert res.exit_code == 2
     flat = _flat(res)
-    assert "DeterministicEvaluatorExists" in flat and "acr.evals.score" in flat
+    assert "DeterministicEvaluatorExists" in flat and "acr.evaluation.evals.score" in flat
 
 
 def test_a_dimension_the_registry_never_heard_of_is_refused(tmp_path, monkeypatch):
@@ -676,7 +676,7 @@ def test_the_judge_envelope_is_stamped_judged(tmp_path, monkeypatch):
     assert payload["verdict"]["score"] == pytest.approx(0.7)   # the mean of three 0.7s
     assert len(client.prompts) == 3                       # one call per lens, not one per run
     # A Verdict has no `passed`; the envelope must not grow one on the way out either.
-    from acr import judge as J
+    from acr.evaluation import judge as J
     assert not set(payload) & set(J.DECISION_FIELD_NAMES)
     assert not set(payload["verdict"]) & set(J.DECISION_FIELD_NAMES)
 

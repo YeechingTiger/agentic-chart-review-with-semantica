@@ -86,14 +86,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
 
-from .corpus import Corpus, PatientChart
-from .coverage import (CoverageLedger, ForcedSampler, assign_strata, derive_sample_seed,
-                       strata_from_spec)
 # THE SAME GATE — the identical function object `graph` re-exports — taken from the module
 # that owns it, so langgraph never enters this server's closure for a judgement about answers.
-from .answer_contract import (SPEC_SECTIONS, assert_answer_is_reportable, build_spec_gap,
-                              strip_value_from_spec_insufficient)
+from .answer_contract import (
+    SPEC_SECTIONS,
+    assert_answer_is_reportable,
+    build_spec_gap,
+    strip_value_from_spec_insufficient,
+)
 from .answer_gate import check_gate, gate_answer, keyword_hits_among_drawn
+from .corpus import Corpus, PatientChart
+from .coverage import (
+    CoverageLedger,
+    ForcedSampler,
+    assign_strata,
+    derive_sample_seed,
+    strata_from_spec,
+)
 from .spec import ExtractionSpec, load_specs
 from .state import EvidenceLedger
 from .tools import Toolbox

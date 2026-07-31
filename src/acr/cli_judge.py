@@ -1,5 +1,5 @@
 """Invoke the agent-as-a-judge plane with its fence intact: every command that could reach a
-model asks `acr.evals`' precedence registry first, through `acr.judge` itself.
+model asks `acr.evaluation.evals`' precedence registry first, through `acr.evaluation.judge` itself.
 
 THE FENCE HAS TO SURVIVE THE CLI, AND THE ONLY WAY TO GUARANTEE THAT IS NOT TO RE-IMPLEMENT IT
 ----------------------------------------------------------------------------------------------
@@ -26,13 +26,16 @@ validation_status=NOT_VALIDATED, and `apply_verdict` is the only door out.
 from __future__ import annotations
 
 import json
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import typer
 from rich.table import Table
 
-from . import cli_common, evals, judge as J
+from . import cli_common
 from .cli_common import API_BASE, MODEL, con, dump, read_json
+from .evaluation import evals
+from .evaluation import judge as J
 
 judge_app = typer.Typer(add_completion=False, help=(
     "Agent-as-a-judge, fenced in. Judging is refused wherever a deterministic evaluator "

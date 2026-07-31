@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from acr import attribution as A
+from acr.diagnosis import attribution as A
 from acr.corpus import Corpus
 from acr.local_artifacts import LocalArtifactError, LocalArtifactStore
 

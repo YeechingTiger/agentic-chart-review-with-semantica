@@ -78,11 +78,10 @@ LAYERS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
         "agent", "answer_gate", "coverage", "coverage_planner", "plan_expansion",
         "conflict_refinement", "runtime_controls", "runtime_profiles", "document_concepts",
         "tools.toolbox", "mcp_server", "run_triggers", "run_manifest")),
-    (3, "audit", ("audit_loop",)),
-    (3, "evaluation", (
-        "evals", "evaluation_modules", "evaluation_pipeline", "judge", "explain")),
-    (3, "diagnosis", (
-        "attribution", "attribution_modules.builtins", "attribution_modules.registry")),
+    (3, "audit", ()),          # 已搬进 src/acr/audit/
+    (3, "evaluation", ()),     # 已搬进 src/acr/evaluation/
+    # 已搬进 `src/acr/diagnosis/`，层由路径决定，所以这里不再列模块。
+    (3, "diagnosis", ()),
     (4, "improvement", ("repair_loop", "refine", "assetdev", "labelling", "derive")),
     (4, "authoring", ("intake", "speclint")),
     (5, "usecase", (
@@ -120,12 +119,26 @@ def _modules() -> dict[str, pathlib.Path]:
             for p in SRC.rglob("*.py") if p.name != "__init__.py"}
 
 
+#: 层名 -> rank。目录搬迁正在进行，所以一个模块的层有两个来源，按这个顺序：
+#:
+#:   1. 它的路径 —— `acr/diagnosis/attribution.py` 就在 diagnosis 层，不需要谁去登记；
+#:   2. `LAYERS` 里的显式清单 —— 还没搬进平面目录的那些。
+#:
+#: 搬迁完成时 `LAYERS` 的模块清单会全部空掉，而这份 rank 表留下：它是那条唯一规则要的
+#: 顺序，也是目录名的权威来源。分片搬迁因此不需要每片都改这个文件。
+PLANE_RANK: dict[str, int] = {name: r for r, name, _ in LAYERS} | {"cli": 6}
+
+
 def _layer_of() -> tuple[dict[str, str], dict[str, int]]:
     plane, rank = {}, {}
     for r, name, names in LAYERS:
         for n in names:
             assert n not in plane, f"{n} 在 LAYERS 里出现了两次"
             plane[n], rank[n] = name, r
+    for m in _modules():                    # 路径优先：已搬进平面目录的以目录为准
+        head = m.split(".")[0]
+        if head in PLANE_RANK:
+            plane[m], rank[m] = head, PLANE_RANK[head]
     return plane, rank
 
 

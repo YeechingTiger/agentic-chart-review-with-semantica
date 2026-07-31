@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -43,7 +43,7 @@ MAX_USD = typer.Option(5.0, "--max-usd", min=0.01,
 #: somebody deletes.
 EXTRACT_SCHEMA = "acr.extract/1"
 CONCORD_SCHEMA = "acr.concord/1"
-EXPLAIN_SCHEMA = "acr.explain/1"
+EXPLAIN_SCHEMA = "acr.evaluation.explain/1"
 
 
 def code_sha() -> str:
@@ -66,7 +66,7 @@ def unique_run_dir(base: str) -> Path:
     with another's, and nothing records that a substitution happened. The same configuration
     under different code is not the same experiment, so the sha is part of the identity.
     """
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     d = Path(f"{base}__{stamp}__{code_sha()}")
     d.mkdir(parents=True, exist_ok=False, mode=0o700)
     d.chmod(0o700)

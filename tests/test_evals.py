@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from acr import evals as E
+from acr.evaluation import evals as E
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -176,12 +176,12 @@ def test_the_seam_check_reports_a_deterministic_dimension_as_not_permitted():
 
 
 def test_the_precedence_gate_answers_the_query_shape_the_judge_makes():
-    """The one object that makes this registry answerable to `acr.judge`'s protocol. Before
+    """The one object that makes this registry answerable to `acr.evaluation.judge`'s protocol. Before
     it existed the only thing satisfying that protocol was a test double, which is exactly
     how the seam could be wrong in production with every test on both sides passing."""
     gate = E.precedence_gate()
-    assert gate.deterministic_evaluator_for("correctness") == "acr.evals.score"
-    assert gate.deterministic_evaluator_for("cost_and_turns") == "acr.evals.detect_resource_band"
+    assert gate.deterministic_evaluator_for("correctness") == "acr.evaluation.evals.score"
+    assert gate.deterministic_evaluator_for("cost_and_turns") == "acr.evaluation.evals.detect_resource_band"
     assert gate.deterministic_evaluator_for("trajectory_quality") is None
     for unknown in ("vibes", "evidence_support"):
         with pytest.raises(E.UnknownDimension):
@@ -242,7 +242,7 @@ FORBIDDEN_MODULES = {
 
 def test_no_model_is_reachable_from_this_module():
     """An eval plane that can call a model is an eval plane that will."""
-    tree = ast.parse((SRC / "acr" / "evals.py").read_text(encoding="utf-8"))
+    tree = ast.parse((SRC / "acr" / "evaluation" / "evals.py").read_text(encoding="utf-8"))
     imported: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):

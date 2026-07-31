@@ -7,13 +7,13 @@ from types import SimpleNamespace
 import pytest
 
 from acr.answer_gate import gate_answer
-from acr.audit_loop import (
+from acr.audit.audit_loop import (
     AuditContext,
     AuditRunner,
     builtin_audit_registry,
 )
-from acr.evaluation_modules import builtin_evaluation_module_registry
-from acr.evaluation_pipeline import (
+from acr.evaluation.evaluation_modules import builtin_evaluation_module_registry
+from acr.evaluation.evaluation_pipeline import (
     CapabilityBroker,
     EvaluationContext,
     EvaluationInvocation,

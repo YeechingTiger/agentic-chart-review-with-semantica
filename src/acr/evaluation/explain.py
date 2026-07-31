@@ -63,9 +63,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any
 
 # The four causes. Kept as module constants because they are written into manifests and
 # compared downstream; a typo'd string literal is a silently different cause.
@@ -126,7 +127,7 @@ class VariableResult:
 
     @classmethod
     def from_answer(cls, name: str, answer: Mapping[str, Any],
-                    output_field: str | None = None) -> "VariableResult":
+                    output_field: str | None = None) -> VariableResult:
         return cls(
             name=name,
             status=str(answer.get("status") or ""),

@@ -17,7 +17,7 @@ DETERMINISTIC_RULES_REMOVED.md 记录过的那个错误。
 """
 from __future__ import annotations
 
-from acr.evals import DetectorConfig, RunRecord, run_detectors
+from acr.evaluation.evals import DetectorConfig, RunRecord, run_detectors
 from acr.state import Evidence, EvidenceLedger
 
 
@@ -84,7 +84,7 @@ def test_no_detector_reads_the_anchor():
     assert "entity_answer_mismatch" not in names
     assert "multiple_anchored_entities" not in names
 
-    import acr.evals as E
+    import acr.evaluation.evals as E
     assert not hasattr(E, "detect_entity_answer_mismatch")
     assert not hasattr(E, "detect_multiple_anchored_entities")
 
