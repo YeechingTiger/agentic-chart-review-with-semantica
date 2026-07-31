@@ -414,3 +414,27 @@ def test_attribution_meta_evaluation_is_owned_by_attribution_module():
     )
     assert report["status"] == "CERTIFIED_SCREEN"
     assert report["macro_f1"] == 1.0
+
+
+def test_eval_skills_are_method_and_are_absent_unless_asked_for():
+    """The diagnostic method reaches the attribution prompt, and only when supplied.
+
+    `acr attribute case` passes nothing, and its prompt must be the one it rendered before eval
+    skills existed — byte for byte, including the blank lines. A default that quietly grew a
+    newline is a default that quietly grew, and the next reader cannot tell which parts of the
+    prompt were measured and which drifted in.
+    """
+    import inspect
+
+    assert "\nACTIVE MODULES\n\n\nCERTAINTY\n" in A._attribution_system_prompt(packet())
+    assert inspect.signature(A.run_attribution_agent).parameters[
+        "eval_skills_prompt"].default == ""
+
+    with_skills = A._attribution_system_prompt(
+        packet(), eval_skills_prompt="  DIAGNOSTIC METHOD. YOU DO NOT SCORE.  ")
+    assert "DIAGNOSTIC METHOD. YOU DO NOT SCORE." in with_skills
+    # Beside the stage instructions, ahead of the certainty fence: method first, then the rule
+    # about what may be called CONFIRMED, which no skill is allowed to soften.
+    assert (with_skills.index("ACTIVE MODULES")
+            < with_skills.index("DIAGNOSTIC METHOD")
+            < with_skills.index("CERTAINTY"))

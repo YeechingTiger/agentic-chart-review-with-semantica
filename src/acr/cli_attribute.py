@@ -139,7 +139,8 @@ def _packet(*, store, manifest, case_id, spec_path, mode, gold_path,
 
 
 def _run_one(*, packet, patient_id, corpus, model, api_base, max_model_calls,
-             max_usd, max_chart_reads, library, attribution_profile):
+             max_usd, max_chart_reads, library, attribution_profile,
+             eval_skills_prompt: str = ""):
     from .corpus import Corpus
     chart = Corpus(Path(corpus)).chart(patient_id)
     report = A.run_attribution_agent(
@@ -151,10 +152,78 @@ def _run_one(*, packet, patient_id, corpus, model, api_base, max_model_calls,
         max_model_calls=max_model_calls, max_usd=max_usd,
         max_chart_reads=max_chart_reads,
         attribution_profile=attribution_profile,
+        # Method, not authority: the eval skills say how a careful reviewer looks for a cause.
+        # Empty for `acr attribute`, which had no skills before this and must not acquire any
+        # by accident — the default this command renders to the model has to stay unchanged.
+        eval_skills_prompt=eval_skills_prompt,
     )
     library.add_attribution(
         report, manifest_sha256=packet.manifest_ref.sha256)
     return report
+
+
+def attribute_case_payload(*, run: str, spec: str, case_id: str,
+                           min_term_chars: int, max_rejection_repeats: int,
+                           token_band: str, turn_band: str,
+                           gold: str = "", eval_skills_prompt: str = "",
+                           signal_type: str = "ATTRIBUTION_REPORT",
+                           mode: str = "", registry_reference: str = "", case_map: str = "",
+                           corpus: str = "corpus/patients", model: str | None = None,
+                           api_base: str | None = None, max_model_calls: int = 12,
+                           max_usd: float = 1.0, max_chart_reads: int = 12,
+                           library_id: str = "default",
+                           attribution_profile: str = "causal-attribution-v1",
+                           local_root: str | None = None) -> dict:
+    """Attribute one run and return the report as a signal-shaped dict.
+
+    Split out of `attribute_case` so `acr signal run --kind agent` reaches the same code path
+    rather than a parallel one. A second path to a diagnosis is a second thing to keep honest.
+
+    The four detector thresholds have NO defaults here, for the reason `evals.DetectorConfig`
+    gives for having none itself: a threshold nobody typed is folklore. `acr attribute case`
+    requires them on the command line; `acr signal run` declares its own in `cli_signal`.
+    """
+    store = _store(local_root)
+    mapping = _case_map(store, case_map)
+    # An empty mode means "derive it from what was supplied". The dispatcher has no --mode
+    # switch — it either hands over an answer key or it does not — and the two mistakes that
+    # would follow from guessing wrong are both refused downstream by `_mode_inputs`.
+    resolved_mode = mode or (A.GOLD if gold else A.BLIND)
+    packet = _packet(
+        store=store, manifest=run, case_id=case_id, spec_path=spec, mode=resolved_mode,
+        gold_path=gold, registry_path=registry_reference,
+        detector_args={
+            "min_term_chars": min_term_chars,
+            "max_rejection_repeats": max_rejection_repeats,
+            "token_band": token_band, "turn_band": turn_band,
+        })
+    raw_manifest = json.loads(Path(packet.manifest_ref.path).read_text(encoding="utf-8"))
+    patient_id = mapping.get(case_id) or str(raw_manifest.get("patient_id") or "")
+    if not patient_id:
+        raise typer.BadParameter(
+            f"{case_id}: cannot resolve patient; provide --case-map")
+    library = A.ErrorCaseLibrary(store, library_id)
+    reasons = A.selection_reasons(packet) or ("manual_single_case_request",)
+    library.add_case(A.ErrorCaseEvent(
+        case_id=case_id, event="SELECTED", lifecycle="OPEN",
+        run_ref=packet.manifest_ref.to_dict(), reasons=reasons,
+        detail={"mode": resolved_mode, "semantic_patch_allowed": resolved_mode == A.GOLD},
+    ))
+    report = _run_one(
+        packet=packet, patient_id=patient_id, corpus=corpus, model=model,
+        api_base=api_base, max_model_calls=max_model_calls, max_usd=max_usd,
+        max_chart_reads=max_chart_reads, library=library,
+        attribution_profile=attribution_profile,
+        eval_skills_prompt=eval_skills_prompt,
+    )
+    return {"schema": "acr.signal/1", "signal_type": signal_type, "kind": "agent",
+            "run": run, "spec": spec, "deterministic": False,
+            "eval_skills_bytes": len(eval_skills_prompt.encode("utf-8")),
+            "report": report.to_dict(),
+            # The library path the command prints. Returned rather than printed because a
+            # dispatcher writing to stdout in the middle of building a JSON envelope is how
+            # machine-readable output stops being machine-readable.
+            "library_path": str(library.directory / "attributions.jsonl")}
 
 
 @attribute_app.command("case")
@@ -182,36 +251,21 @@ def attribute_case(
     local_root: str | None = LOCAL_ROOT,
 ):
     """Attribute one completed run; all artifacts remain below the local root."""
-    store = _store(local_root)
-    mapping = _case_map(store, case_map)
-    packet = _packet(
-        store=store, manifest=run, case_id=case_id, spec_path=spec, mode=mode,
-        gold_path=gold, registry_path=registry_reference,
-        detector_args={
-            "min_term_chars": min_term_chars,
-            "max_rejection_repeats": max_rejection_repeats,
-            "token_band": token_band, "turn_band": turn_band,
-        })
-    raw_manifest = json.loads(Path(packet.manifest_ref.path).read_text(encoding="utf-8"))
-    patient_id = mapping.get(case_id) or str(raw_manifest.get("patient_id") or "")
-    if not patient_id:
-        raise typer.BadParameter(
-            f"{case_id}: cannot resolve patient; provide --case-map")
-    library = A.ErrorCaseLibrary(store, library_id)
-    reasons = A.selection_reasons(packet) or ("manual_single_case_request",)
-    library.add_case(A.ErrorCaseEvent(
-        case_id=case_id, event="SELECTED", lifecycle="OPEN",
-        run_ref=packet.manifest_ref.to_dict(), reasons=reasons,
-        detail={"mode": mode, "semantic_patch_allowed": mode == A.GOLD},
-    ))
-    report = _run_one(
-        packet=packet, patient_id=patient_id, corpus=corpus, model=model,
-        api_base=api_base, max_model_calls=max_model_calls, max_usd=max_usd,
-        max_chart_reads=max_chart_reads, library=library,
-        attribution_profile=attribution_profile,
+    payload = attribute_case_payload(
+        run=run, spec=spec, gold=gold, case_id=case_id, mode=mode,
+        registry_reference=registry_reference, case_map=case_map,
+        min_term_chars=min_term_chars, max_rejection_repeats=max_rejection_repeats,
+        token_band=token_band, turn_band=turn_band,
+        corpus=corpus, model=model, api_base=api_base,
+        max_model_calls=max_model_calls, max_usd=max_usd, max_chart_reads=max_chart_reads,
+        library_id=library_id, attribution_profile=attribution_profile,
+        local_root=local_root,
     )
-    con.print_json(json.dumps(report.to_dict(), ensure_ascii=False))
-    con.print(f"→ {library.directory / 'attributions.jsonl'}")
+    # The command prints the attribution report, not the signal envelope. `acr signal run` is
+    # where the envelope is the output; changing what this command prints would break every
+    # reader of an existing attributions.jsonl workflow for no gain.
+    con.print_json(json.dumps(payload["report"], ensure_ascii=False))
+    con.print(f"→ {payload['library_path']}")
 
 
 @attribute_app.command("batch")

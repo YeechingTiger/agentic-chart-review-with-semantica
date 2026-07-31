@@ -1771,7 +1771,8 @@ def attribution_tools(ctx: AttributionRuntimeContext) -> list[Any]:
 
 
 def _attribution_system_prompt(
-        packet: AttributionPacket, modules: Sequence[Any] = ()) -> str:
+        packet: AttributionPacket, modules: Sequence[Any] = (),
+        eval_skills_prompt: str = "") -> str:
     boundary = {
         GOLD: (
             "The chart-observable gold in the packet was human adjudicated. You may use it to "
@@ -1791,6 +1792,14 @@ def _attribution_system_prompt(
         f"- {module.module_id}@{module.version}: {module.instructions}"
         for module in modules if module.instructions
     )
+    # Eval skills are METHOD, and they sit beside the stage instructions rather than replacing
+    # them: a stage says what this run of the evaluator must produce, a skill says how a
+    # careful reviewer goes about finding it. Neither may score — the scorer is a tool.
+    # Interpolated with its own surrounding newlines rather than on a fixed template line, so
+    # that a caller who supplies none (every `acr attribute` invocation) gets the prompt this
+    # command rendered before eval skills existed, down to the blank lines.
+    stripped = eval_skills_prompt.strip()
+    eval_block = f"\n{stripped}\n" if stripped else ""
     return f"""You are the offline error-attribution agent for a completed chart-review run.
 You explain this run; you do not re-run extraction and you never edit a specification.
 
@@ -1813,7 +1822,7 @@ WORKFLOW
 9. Finish only with submit_attribution.
 
 ACTIVE MODULES
-{module_instructions}
+{module_instructions}{eval_block}
 
 CERTAINTY
 Only deterministic ANSWER_CHECK_OR_GATE or RUNTIME_OR_PROVIDER facts may be automatically
@@ -1962,6 +1971,7 @@ def run_attribution_agent(*, packet: AttributionPacket, chart: Any, model: Any,
                           max_chart_reads: int = 12,
                           attribution_profile: str = "causal-attribution-v1",
                           skeptic_model: Any | None = None,
+                          eval_skills_prompt: str = "",
                           ) -> AttributionReport:
     """Run the bounded, same-patient attribution agent and return a validated report."""
     if max_model_calls < 2:
@@ -2059,7 +2069,8 @@ def run_attribution_agent(*, packet: AttributionPacket, chart: Any, model: Any,
         AttributionMiddleware(),
     ]
     agent = create_agent(
-        model, tools, system_prompt=_attribution_system_prompt(packet, modules),
+        model, tools,
+        system_prompt=_attribution_system_prompt(packet, modules, eval_skills_prompt),
         middleware=middleware,
     )
     n_per_turn = sum(

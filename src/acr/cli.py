@@ -47,6 +47,7 @@ from .cli_pipeline import _variable_records, pipeline_app, read_cohort  # noqa: 
 from .cli_plan import plan_app
 from .cli_refine import refine_app
 from .cli_repair import repair_app
+from .cli_signal import signal_app
 from .cli_site_mapping import site_mapping_app
 from .cli_spec import spec_app
 
@@ -95,6 +96,10 @@ app.add_typer(repair_app, name="repair")
 # fence is the thing to read before reaching for a judge: where a deterministic evaluator
 # exists a judged opinion is refused, and no flag on `acr judge` will change that.
 app.add_typer(eval_app, name="eval")
+# `signal` is the one door to a signal about a completed run, whichever way it is produced. It
+# is a group of its own rather than `acr eval --kind agent` because `eval` promises it reaches
+# no model, and a group cannot keep that promise and also host the diagnostic agent.
+app.add_typer(signal_app, name="signal")
 app.add_typer(judge_app, name="judge")
 app.add_typer(evaluation_app, name="evaluation")
 app.add_typer(audit_app, name="audit")

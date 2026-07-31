@@ -60,16 +60,21 @@ def rules():
     con.print(table)
 
 
-@audit_app.command("run")
-def run(
-    manifest: str = typer.Option(..., "--manifest"),
-    subject_id: str = typer.Option(..., "--subject-id"),
-    provider_boundary: str = typer.Option("UNKNOWN", "--provider-boundary"),
-    declared_tool: list[str] = DECLARED_TOOL,
-    rule: list[str] = RULE,
-    local_root: str | None = LOCAL_ROOT,
-):
-    """Audit one completed local run without truth or clinical judgement."""
+def audit_run_payload(*, manifest: str, subject_id: str = "",
+                      provider_boundary: str = "UNKNOWN",
+                      declared_tool: tuple[str, ...] = (),
+                      rule: tuple[str, ...] = (),
+                      local_root: str | None = None) -> dict:
+    """Run the truth-blind audit over one manifest and return the report as a dict.
+
+    Split out of the `run` command so `acr signal run --kind rule` reaches the same
+    AuditContext construction rather than assembling a second one. Two places that build a
+    trajectory from a manifest is two places that can disagree about what the run did.
+
+    `subject_id` defaults to the manifest's own `patient_id`; the command still requires it
+    explicitly because an operator naming the wrong subject is a boundary error, whereas a
+    dispatcher reading it from the file it was handed is not.
+    """
     store = _store(local_root)
     manifest_path = store.require_input(manifest, what="audit manifest")
     raw = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -113,8 +118,24 @@ def run(
         ),
         rule_refs=tuple(rule),
     )
-    con.print_json(json.dumps(report.to_dict(), ensure_ascii=False))
-    if report.incidents:
+    return report.to_dict()
+
+
+@audit_app.command("run")
+def run(
+    manifest: str = typer.Option(..., "--manifest"),
+    subject_id: str = typer.Option(..., "--subject-id"),
+    provider_boundary: str = typer.Option("UNKNOWN", "--provider-boundary"),
+    declared_tool: list[str] = DECLARED_TOOL,
+    rule: list[str] = RULE,
+    local_root: str | None = LOCAL_ROOT,
+):
+    """Audit one completed local run without truth or clinical judgement."""
+    report = audit_run_payload(
+        manifest=manifest, subject_id=subject_id, provider_boundary=provider_boundary,
+        declared_tool=tuple(declared_tool), rule=tuple(rule), local_root=local_root)
+    con.print_json(json.dumps(report, ensure_ascii=False))
+    if report.get("incidents"):
         raise typer.Exit(2)
 
 
