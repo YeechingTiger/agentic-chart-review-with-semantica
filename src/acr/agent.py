@@ -1369,7 +1369,8 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
                 seed: int = 1234, expansion_budget=None, run_id: str | None = None,
                 ctx_out: list | None = None, max_usd: float = 5.0,
                 additional_task_context: str = "",
-                runtime_profile: str = "current-stratified-coverage") -> dict:
+                runtime_profile: str = "current-stratified-coverage",
+                skill_stack=None) -> dict:
     """Assemble the ledgers, tools and gate for one patient and run it.
 
     The assembly lived in a scratch harness while this runtime was being proven. It belongs
@@ -1377,6 +1378,9 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
     plan can be wired to different objects, and that asymmetry is what `assert_answer_is_
     reportable` exists to refuse.
     """
+    # `skill_stack` is an explicit override of the profile's assembly, for a pilot arm that
+    # swaps one policy without minting a certified profile. None means "whatever the profile
+    # says", which is the only path any recorded run has taken.
     import time
 
     from deepagents.backends import StateBackend
@@ -1512,7 +1516,8 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
                        # `skills/coverage-judgement/` deleted it rather than relocating it. The
                        # profile chooses which skills load; see `acr.skills`.
                        + (f"\n\n{sk}" if (sk := skills_block(
-                           runtime_policy_skills(runtime_profile_asset.module_id))) else "")
+                           skill_stack if skill_stack is not None
+                           else runtime_policy_skills(runtime_profile_asset.module_id))) else "")
                        + (f"\n\n{additional_task_context.strip()}"
                           if additional_task_context.strip() else "")),
         backend=StateBackend(), max_model_calls=max_model_calls, out_dir=out_dir,

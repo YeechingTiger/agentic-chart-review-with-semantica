@@ -165,6 +165,47 @@ class SkillStack:
                     f"a retrieval arm replaces.")
 
 
+def parse_skill_stack(spec: str, base: SkillStack,
+                      skills_dir: Path | str | None = None) -> SkillStack:
+    """Apply a `slot=value` override string to a profile's stack.
+
+    Exists so that swapping one search policy does not require authoring a whole new profile.
+    A profile is a certified, content-hashed asset; a one-off arm in a pilot is not, and
+    forcing the second to masquerade as the first is how uncertified assets get adopted.
+    The result is validated, so a typo fails before a single model call is paid for.
+
+    Clauses are comma-separated, which is why a `general` REPLACEMENT list is joined by `|`
+    instead: `general=a|b` is one clause naming two cards, where `general=a,general=b` would
+    be two clauses of which only the last survives.
+    """
+    if not spec.strip():
+        return base
+    task, search, general = base.task, base.search, list(base.general)
+    for clause in spec.split(","):
+        clause = clause.strip()
+        if not clause:
+            continue
+        if "=" not in clause:
+            raise SkillError(f"skill override {clause!r}: expected slot=value")
+        slot, _, value = clause.partition("=")
+        slot, value = slot.strip(), value.strip()
+        if slot not in ("task", "search", "general"):
+            raise SkillError(
+                f"skill override: unknown slot {slot!r}; expected task, search or general "
+                f"(the eval slot belongs to the evaluation agent, not a chart run)")
+        if slot == "task":
+            task = value or None
+        elif slot == "search":
+            search = value or None
+        elif value.startswith("+"):
+            general.append(value[1:])
+        else:
+            general = [v for v in value.split("|") if v]
+    out = SkillStack(task=task, search=search, general=tuple(general))
+    out.validate(skills_dir)
+    return out
+
+
 def skills_block(stack: SkillStack, skills_dir: Path | str | None = None) -> str:
     """Render the stack for the system prompt, in slot order.
 

@@ -58,6 +58,21 @@ def specs_cmd(directory: str = "specs"):
     con.print(t)
 
 
+def _skill_stack(runtime_profile: str, skills: str):
+    """Resolve the profile's skill assembly and apply the `--skills` override to it.
+
+    Called BEFORE the model client is built and before the loop in `batch`, both deliberately.
+    A misspelt slot is a typo, and a typo caught after the first call is a bill for a typo;
+    inside `batch`'s per-patient `except` it would be reported once per chart as if ten charts
+    had failed, when what failed was one string.
+    """
+    from .runtime_profiles import resolve_runtime_policy, runtime_policy_skills
+    from .skills import parse_skill_stack
+
+    profile_asset, _ = resolve_runtime_policy(runtime_profile)
+    return parse_skill_stack(skills, runtime_policy_skills(profile_asset.module_id))
+
+
 @chart_app.command("run")
 def run(
     patient: str = typer.Argument(..., help="patient id"),
@@ -81,6 +96,13 @@ def run(
             "legacy-compatible profiles"
         ),
     ),
+    skills: str = typer.Option(
+        "", "--skills",
+        help="override the profile's skill assembly: comma-separated slot=value. "
+             "`search=search-native` replaces the search policy, `general=+chart-triage` "
+             "appends one, `general=chart-triage|thread-chasing` replaces the whole general "
+             "list (`|` because comma already separates clauses), `search=` clears the slot. "
+             "Validated before any model call."),
     conflict_refine: bool = typer.Option(
         False, "--conflict-refine",
         help="OPTIONAL: run bounded conflict-informed candidates around the same deepagents "
@@ -99,6 +121,7 @@ def run(
     from .agent import run_patient
 
     sp = load_spec(spec)
+    stack = _skill_stack(runtime_profile, skills)
     c = Corpus(Path(corpus))
     ch = c.chart(patient)
     con.print(f"[bold]{sp.spec_id}[/] v{sp.spec_version} (hash {sp.spec_hash}) "
@@ -110,7 +133,8 @@ def run(
         # disabled arm has already replaced the runtime in the only sense users can observe.
         show(run_patient(spec=sp, corpus=c, patient_id=patient, out_dir=run_dir,
                          model=chat, max_model_calls=max_steps, seed=seed,
-                         max_usd=max_usd, runtime_profile=runtime_profile))
+                         max_usd=max_usd, runtime_profile=runtime_profile,
+                         skill_stack=stack))
         return
 
     from .conflict_refinement import run_conflict_refinement
@@ -119,9 +143,15 @@ def run(
         runner=run_patient, candidates_per_round=conflict_candidates,
         max_rounds=conflict_rounds, max_total_usd=conflict_max_usd,
         runner_kwargs={
+            # `run_conflict_refinement` forwards this dict verbatim to the same `run_patient`,
+            # so the override rides here rather than through a new wrapper parameter. Every
+            # candidate must run under the SAME assembly: a refinement round whose arms differ
+            # in their search policy is not a re-examination of one question, and its
+            # agreement would be read as convergence.
             "spec": sp, "corpus": c, "patient_id": patient, "out_dir": run_dir,
             "model": chat, "max_model_calls": max_steps, "seed": seed,
             "max_usd": max_usd, "runtime_profile": runtime_profile,
+            "skill_stack": stack,
         })
     summary = result.to_dict(include_manifests=False)
     path = run_dir / "conflict-refinement.json"
@@ -149,6 +179,13 @@ def batch(
     runtime_profile: str = typer.Option(
         "current-stratified-coverage", "--runtime-profile"
     ),
+    skills: str = typer.Option(
+        "", "--skills",
+        help="override the profile's skill assembly: comma-separated slot=value. "
+             "`search=search-native` replaces the search policy, `general=+chart-triage` "
+             "appends one, `general=chart-triage|thread-chasing` replaces the whole general "
+             "list (`|` because comma already separates clauses), `search=` clears the slot. "
+             "Parsed once before the loop, so a typo cannot be charged per patient."),
     out: str = typer.Option("runs", "--out"),
 ):
     """Run one spec across many patients.
@@ -159,6 +196,7 @@ def batch(
     from .agent import run_patient
 
     sp = load_spec(spec)
+    stack = _skill_stack(runtime_profile, skills)
     c = Corpus(Path(corpus))
     pids = [p.strip() for p in patients_arg.split(",") if p.strip()] or c.patient_ids()
     run_dir = cli_common.unique_run_dir(out)
@@ -170,7 +208,8 @@ def batch(
                                        model=cli_common.chat_model(model, api_base, temperature),
                                        max_model_calls=max_steps, seed=seed, run_id=pid,
                                        max_usd=max_usd,
-                                       runtime_profile=runtime_profile))
+                                       runtime_profile=runtime_profile,
+                                       skill_stack=stack))
         except Exception as e:  # noqa: BLE001
             con.print(f"[red]{pid} failed: {e}[/]")
             results.append({"patient_id": pid, "error": str(e)})
