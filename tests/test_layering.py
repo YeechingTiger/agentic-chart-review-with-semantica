@@ -85,6 +85,35 @@ KNOWN_DOMAIN_COUPLING: dict[tuple[str, str], str] = {
 }
 
 
+#: 允许被跨平面共享的两层。它们承载的正是"输入输出的形式"：`kernel` 是 AssetRef /
+#: Trajectory / SignalEnvelope，`contract` 是 spec 与其词表。一个工作平面通过这两层认识
+#: 另一个平面的产物，是设计要求；直接 import 对方的函数，是代码耦合。
+SHARED_LAYERS = ("kernel", "contract")
+
+#: 干活的平面。它们之间**只能**通过 SHARED_LAYERS 的类型和落盘的 artifact 相见。
+WORK_LAYERS = ("review", "audit", "evaluation", "diagnosis", "improvement", "authoring",
+               "usecase")
+
+#: 今天还存在的直接耦合，以及删掉它的那个动作。键是 (源模块, 目标模块)。
+#: 和 KNOWN_DOMAIN_COUPLING 一样：只能变短。
+KNOWN_DIRECT_COUPLING: dict[tuple[str, str], str] = {
+    # 动作 A —— `corpus` 不属于 review 平面。Corpus/DocMeta 是**病历数据访问**，
+    # 三个平面都要读它；它现在被归进 review 只是因为 agent 是第一个用它的人。
+    # 把它下移到共享层，这三条一起消失。
+    ("speclint", "corpus"): "A: corpus 下移到共享的数据访问层",
+    ("derive", "corpus"): "A: 同上",
+    ("labelling", "corpus"): "A: 同上",
+    # 动作 B —— `strata_from_spec` / `assign_strata` 是**从 spec 推导**出来的，不是运行时
+    # 策略。它们住在 coverage 里，于是任何想按 spec 分层的模块都得 import 运行时平面。
+    # 拆到 contract 之后这两条消失。
+    ("assetdev", "coverage"): "B: strata_from_spec/assign_strata 拆到 contract",
+    ("derive", "coverage"): "B: 同上",
+    # 动作 C —— 码表加载器通用化。和 KNOWN_DOMAIN_COUPLING 里那三条是同一项工作。
+    ("agent", "icdo3"): "C: 码表加载器通用化（见 KNOWN_DOMAIN_COUPLING）",
+    ("run_manifest", "icdo3"): "C: 同上",
+}
+
+
 def _modules() -> dict[str, pathlib.Path]:
     return {str(p.relative_to(SRC).with_suffix("")).replace("/", "."): p
             for p in SRC.rglob("*.py") if p.name != "__init__.py"}
@@ -175,6 +204,54 @@ def test_the_three_post_run_planes_do_not_depend_on_each_other(a: str, b: str):
     offenders = [f"{s} -> {t}" for s in by_plane[a] for t in edges.get(s, ())
                  if t in by_plane[b]]
     assert not offenders, f"{a} 依赖了 {b}: {sorted(offenders)}"
+
+
+def test_work_planes_touch_each_other_only_through_the_io_contract():
+    """独立模块的判据：平面之间不许直接 import，只准共享 kernel/contract 的类型。
+
+    这比"低层不许 import 高层"严。分层只说明依赖方向合法，不说明耦合方式合法：
+    `derive -> coverage [assign_strata]` 方向没错，但它意味着改 coverage 的一个函数签名会
+    动到 improvement 平面。而 `audit`、`evaluation`、`diagnosis` 读的应该是同一条
+    Trajectory 和同一个 SignalEnvelope —— 那是形式，不是函数。
+
+    每条例外都必须登记，并写明哪个动作删掉它。清单只能变短。
+    """
+    plane, _ = _layer_of()
+    work = set(WORK_LAYERS)
+    bad = []
+    for src, targets in _edges().items():
+        if plane.get(src) not in work:
+            continue
+        for dst in targets:
+            dp = plane.get(dst)
+            if dp in SHARED_LAYERS or dp == plane[src] or dp is None:
+                continue
+            if (src, dst) not in KNOWN_DIRECT_COUPLING:
+                bad.append(f"{plane[src]}/{src} -> {dp}/{dst}")
+    assert not bad, (
+        "工作平面之间出现了新的直接耦合:\n  " + "\n  ".join(sorted(bad))
+        + "\n\n平面之间只应共享 kernel/contract 的类型和落盘 artifact。要么把被依赖的东西"
+          "下移到共享层，要么让调用方读产物而不是调函数。")
+
+
+def test_the_direct_coupling_list_only_shrinks():
+    """登记的耦合必须还在。修好了不删登记项，下一次同样的耦合会搭这个便车。"""
+    edges = _edges()
+    gone = [f"{s} -> {t}" for (s, t) in KNOWN_DIRECT_COUPLING if t not in edges.get(s, ())]
+    assert not gone, f"这些耦合已消失，从 KNOWN_DIRECT_COUPLING 删掉: {sorted(gone)}"
+
+
+def test_the_declared_work_and_shared_layers_are_real():
+    """守卫上面两条：层名打错会让整条断言静默变成空检查。
+
+    `plane.get(src) not in work` 对一个拼错的层名永远为真，于是测试通过而什么都没查。
+    """
+    declared = {name for _, name, _ in LAYERS} | {"cli"}
+    for name in SHARED_LAYERS + WORK_LAYERS:
+        assert name in declared, f"{name!r} 不是 LAYERS 里的层名"
+    assert not set(SHARED_LAYERS) & set(WORK_LAYERS)
+    assert declared == set(SHARED_LAYERS) | set(WORK_LAYERS) | {"cli"}, (
+        "有层既不共享也不干活 —— 它属于哪一类必须被明确决定")
 
 
 def test_the_domain_coupling_list_only_shrinks():
