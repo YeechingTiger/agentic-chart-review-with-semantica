@@ -239,10 +239,11 @@ runtime under `acr attribute`.
 
 **One entry point:** `acr signal run` / `acr signal batch` is where a finished run is asked for
 signals, whichever way the signal is produced — `--kind rule` runs the deterministic checks and
-imports no provider at all, `--kind agent` runs the diagnostic attribution agent under the
-`skills/eval-*` cards. It is a new group rather than a flag on `acr eval` precisely because that
-group promises it calls no model, and a test keeps provider imports out of the dispatcher's
-module scope so the promise stays true in practice.
+imports no provider at all, `--kind judge` runs the fenced trajectory judge below, `--kind
+agent` runs the diagnostic attribution agent under the `skills/eval-*` cards. It is a new group
+rather than a flag on `acr eval` precisely because that group promises it calls no model, and a
+test keeps provider imports out of the dispatcher's module scope so the promise stays true in
+practice.
 
 **The fence:** where a deterministic check exists, a model judge is *forbidden*, not
 discouraged. `correctness` is `==`. A task-completion judge is refused outright because it
@@ -374,6 +375,12 @@ signals consumes one thing.
   --run runs/arm-native/SYN0001.manifest.json \
   --spec specs/STORE.400_522_523.site_histology_behavior.yaml
 
+# the fenced trajectory judge: was the PROCESS any good. Costs money, three calls per run.
+.venv/bin/acr signal run --kind judge --dimension trajectory_quality \
+  --run runs/arm-native/SYN0001.manifest.json \
+  --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  --usd-per-call 0.05 --max-usd 0.5 --model openrouter/openai/gpt-5.6-luna
+
 # the diagnostic agent: WHY did this run come out the way it did. Costs money.
 # Run `--kind rule` first to learn WHICH cases were wrong; hand only those to the agent.
 .venv/bin/acr signal run --kind agent \
@@ -387,6 +394,18 @@ which apply. `--eval-skills a,b` narrows that when you already have a suspicion 
 spend less prompt; it is not a required argument. A name that is not a `slot: eval` card is
 refused before the provider is even imported, so a typo costs nothing.
 
+`--kind judge` scores **process, not correctness** — correctness is already `==` in `evals.py`,
+and asking a model for it is refused by `judge()` in its own words, not by anything in this
+dispatcher. Five judgeable dimensions, three lenses (three calls) each: `trajectory_quality`,
+`evidence_support.judged`, `step_efficiency.judged`, `l5_explanation_quality`, and
+`bad_case_triage`. Supplying `--gold` changes nothing on the first four: they are judged blind,
+and blind here means the packet **has no field an answer key could go into** — the key is never
+read. `bad_case_triage` is the one exception and the honest one, since a bad-case pool is bad
+*because* a deterministic evaluator disagreed with the key. `--usd-per-call` and `--max-usd` are
+required for this kind and the panel is priced against the ceiling before the first call.
+The envelope carries `evidence_class: "JUDGED"`: the number **screens and ranks a human's
+reading queue**. It never gates, and it is never averaged with a deterministic score.
+
 `batch` is the same dispatcher over a directory of manifests, and it emits one JSON array with
 **one entry per run**:
 
@@ -395,11 +414,20 @@ refused before the provider is even imported, so a typo costs nothing.
   --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
   --out signals/native-rule.json
 
+.venv/bin/acr signal batch --kind judge --dimension step_efficiency.judged \
+  --runs runs/arm-native \
+  --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  --usd-per-call 0.05 --max-usd 0.5 --model openrouter/openai/gpt-5.6-luna \
+  --out signals/native-judge.json
+
 .venv/bin/acr signal batch --kind agent --runs runs/arm-native \
   --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
   --gold gold/store400.csv --case-map case-map.json \
   --out signals/native-agent.json
 ```
+
+`--max-usd` is **per run, not per cohort**, on both spending kinds. The line printed to stderr
+before a batch starts multiplies it out, so the worst case is on screen before it happens.
 
 **One bad run is recorded, not fatal.** It lands in the array as `{"error": "…"}` in the slot
 its signal would have occupied, because aborting throws away the signals already produced and,
@@ -408,8 +436,12 @@ run failed. `--case-map` is the same `{case_id: patient_id}` file `acr attribute
 it, a run's own `patient_id` is used as its case id, which the develop plane's pseudonymity
 check refuses on a real corpus and accepts on a synthetic one.
 
-A third kind, `--kind judge`, joins this entry point in the next commit: the fenced
-agent-as-a-judge scoring the trajectory itself rather than diagnosing an error.
+**Two ways to add an evaluation angle, neither of which is Python.** A new *diagnostic* angle
+for `--kind agent` is one `skills/eval-*/SKILL.md` with `slot: eval` and a `judges:` list —
+`tests/test_eval_skill_fence.py` checks it carries no scoring instruction. A new *judged* angle
+is one `evaluators/*.yaml`, checked against the precedence registry at load time so an
+evaluator claiming to score `correctness` refuses to load. Different formats, same idea: add a
+file, not a branch.
 
 ### ACR evaluation — local typed pipelines
 

@@ -64,13 +64,16 @@ class _Planned(Exception):
     """Raised by `_PlanOnly` at the first question: every check upstream of it has passed."""
 
 
-class _JsonModel:
+class JsonJudgeModel:
     """The real seam: an `acr.llm` client behind `JudgeModel`.
 
     The judge prompt asks for JSON and nothing else, and a reply that is not JSON is NOT
     turned into a zero here — `_read_lens` treats a missing score as None, which keeps "the
     judge failed on this case" visible instead of sorting a fabricated zero to the front of a
     human's reading queue.
+
+    Public because `cli_signal` builds the same adapter for --kind judge; a second JSON-mode
+    adapter would be a second place for the parsing rules to drift.
     """
 
     def __init__(self, client, model_id: str):
@@ -85,6 +88,11 @@ class _JsonModel:
         except json.JSONDecodeError:
             return {}
         return out if isinstance(out, Mapping) else {}
+
+
+#: The old private name, kept so the two call sites below and anything pinned to them keep
+#: working. One class, two spellings, no second implementation.
+_JsonModel = JsonJudgeModel
 
 
 def _packet(path: str, keyed: bool):
