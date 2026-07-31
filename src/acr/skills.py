@@ -23,7 +23,7 @@ BODY is rendered. `name` and `license` are dropped too — neither is an instruc
 
 Which skills load is the RUNTIME PROFILE's decision and not this module's, because a skill is
 retrieval/judgement guidance and swapping it is exactly the kind of change an arm is supposed to
-isolate. `agent` passes the names; nothing here has a default list.
+isolate. `agent` passes the assembled `SkillStack`; nothing here has a default list.
 
 SIZE IS A REAL COST
 -------------------
@@ -38,7 +38,7 @@ returned so a caller can record it.
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
@@ -123,14 +123,57 @@ def skill_slot(name: str, skills_dir: Path | str | None = None) -> str:
     return str(slot)
 
 
-def skills_block(names: Sequence[str], skills_dir: Path | str | None = None) -> str:
-    """Render the named skills for the system prompt, in the order given.
+@dataclass(frozen=True)
+class SkillStack:
+    """How one run's method guidance is assembled: which skill sits in which slot.
 
-    The header says what they are, because the distinction is the whole point of this session's
-    work: these are judgement the model applies, not conditions the runtime enforces. A model that
-    departs from a skill is not violating anything — it owes an account of why, and the account is
-    what gets recorded.
+    `search` holds AT MOST ONE because it is the variable a retrieval arm replaces. Two search
+    policies rendered together are not "more guidance" — they are an unlabelled third policy,
+    and the manifest would record two names where the model received one merged instruction.
     """
+
+    task: str | None = None
+    search: str | None = None
+    general: tuple[str, ...] = ()
+
+    def names(self) -> tuple[str, ...]:
+        """Render order: what the task is, then how to look, then the standing habits."""
+        out: list[str] = []
+        if self.task:
+            out.append(self.task)
+        if self.search:
+            out.append(self.search)
+        out.extend(self.general)
+        return tuple(out)
+
+    def validate(self, skills_dir: Path | str | None = None) -> None:
+        """Every named skill exists and declares the slot it was placed in."""
+        placed = [(self.task, "task"), (self.search, "search")]
+        placed += [(n, "general") for n in self.general]
+        seen: set[str] = set()
+        for name, slot in placed:
+            if not name:
+                continue
+            if name in seen:
+                raise SkillError(f"skill {name!r} appears twice in one stack")
+            seen.add(name)
+            declared = skill_slot(name, skills_dir)
+            if declared != slot:
+                raise SkillError(
+                    f"skill {name!r} declares slot {declared!r} but was placed in the {slot!r} "
+                    f"slot. Placement is not a preference: the search slot is the one variable "
+                    f"a retrieval arm replaces.")
+
+
+def skills_block(stack: SkillStack, skills_dir: Path | str | None = None) -> str:
+    """Render the stack for the system prompt, in slot order.
+
+    The header says what they are, because the distinction is the whole point: these are
+    judgement the model applies, not conditions the runtime enforces. A model that departs from
+    a skill is not violating anything — it owes an account of why, and the account is recorded.
+    """
+    stack.validate(skills_dir)
+    names = stack.names()
     if not names:
         return ""
     parts = [
@@ -145,19 +188,26 @@ def skills_block(names: Sequence[str], skills_dir: Path | str | None = None) -> 
     return "\n".join(parts)
 
 
-def skills_manifest(names: Sequence[str], skills_dir: Path | str | None = None) -> list[dict]:
-    """What was actually rendered, per skill, for the run manifest.
+def skills_manifest(stack: SkillStack, skills_dir: Path | str | None = None) -> list[dict]:
+    """What was actually rendered, per skill and per slot, for the run manifest.
 
     Content-hashed rather than named. A skill is prose the model acts on, so editing a sentence
-    in it changes the run without changing its name or its version — and `refine` treats
-    `skills/*/SKILL.md` as a tunable file, so editing them is a supported operation. A manifest
-    that recorded only `["coverage-judgement"]` would say two runs were comparable when the text
-    between them had moved.
+    changes the run without changing its name or version — and `refine` treats `skills/*/SKILL.md`
+    as a tunable file. The slot is recorded beside the hash because "which search policy ran" is
+    the question a paired ablation asks, and a flat list cannot answer it.
     """
     import hashlib
+    stack.validate(skills_dir)
+    slot_of = {}
+    if stack.task:
+        slot_of[stack.task] = "task"
+    if stack.search:
+        slot_of[stack.search] = "search"
+    for n in stack.general:
+        slot_of[n] = "general"
     out = []
-    for n in names:
+    for n in stack.names():
         body = load_skill_body(n, skills_dir)
-        out.append({"skill": n, "bytes": len(body.encode("utf-8")),
+        out.append({"skill": n, "slot": slot_of[n], "bytes": len(body.encode("utf-8")),
                     "content_hash": hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]})
     return out

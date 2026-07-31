@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .modules import ModuleAsset, ModuleContractError, ModuleRegistry
+from .skills import SkillStack
 
 WITNESS_FIRST_PROFILE = "witness-first-baseline"
 STRATIFIED_COVERAGE_PROFILE = "current-stratified-coverage"
@@ -456,21 +457,35 @@ def targeted_negative_basis(ref: str) -> str:
     return "TARGETED_SEARCH_ONLY"
 
 
-#: WHICH METHOD SKILLS EACH PROFILE OFFERS THE MODEL. A skill is judgement guidance, so swapping
-#: one is exactly the kind of change an arm has to isolate — which is why this is a property of
-#: the profile and not a default buried in the prompt builder.
+#: WHICH METHOD SKILLS EACH PROFILE OFFERS THE MODEL, BY SLOT. A skill is judgement guidance,
+#: so swapping one is exactly the kind of change an arm has to isolate — which is why this is a
+#: property of the profile and not a default buried in the prompt builder.
 #:
-#: Every profile gets `coverage-judgement`, including `guideline-only`. That is not a coverage
-#: asset in the sense the arms compare: it supplies no keywords, no note-type prior and no strata,
-#: and it activates only when the answer is about to claim something is absent. What it replaces
-#: is the refusal `evaluate_gate` used to issue — the arms differ in whether coverage is PROVEN,
-#: not in whether the model is told how to think about an absence claim.
-_PROFILE_SKILLS: dict[str, tuple[str, ...]] = {}
+#: EVERY PROFILE BELOW RENDERS EXACTLY WHAT IT RENDERED BEFORE SLOTS EXISTED: `coverage-judgement`
+#: and nothing else. That is deliberate. Every run ever recorded was made under that one skill,
+#: and quietly adding a second here would make past and future runs incomparable while the
+#: manifest went on looking the same. New search policies reach a run through `--skills` or
+#: through a NEW profile, both of which are recorded as the change they are.
+#:
+#: `coverage-judgement` is in `general` and not `search`: it supplies no keywords, no note-type
+#: prior and no strata, and it activates only when the answer is about to claim something is
+#: absent. It is not the retrieval asset the arms compare. What it replaces is the refusal
+#: `evaluate_gate` used to issue — the arms differ in whether coverage is PROVEN, not in whether
+#: the model is told how to think about an absence claim.
+_PROFILE_SKILLS: dict[str, SkillStack] = {
+    GUIDELINE_ONLY_PROFILE: SkillStack(general=("coverage-judgement",)),
+    CONDITIONAL_COVERAGE_PROFILE: SkillStack(general=("coverage-judgement",)),
+    ALWAYS_COVERAGE_PROFILE: SkillStack(general=("coverage-judgement",)),
+    WITNESS_FIRST_PROFILE: SkillStack(general=("coverage-judgement",)),
+    STRATIFIED_COVERAGE_PROFILE: SkillStack(general=("coverage-judgement",)),
+}
+
+_FALLBACK_SKILLS = SkillStack(general=("coverage-judgement",))
 
 
-def runtime_policy_skills(module_id: str) -> tuple[str, ...]:
-    """The method skills this profile renders into the system prompt."""
-    return _PROFILE_SKILLS.get(module_id, ("coverage-judgement",))
+def runtime_policy_skills(module_id: str) -> SkillStack:
+    """The method skills this profile renders into the system prompt, by slot."""
+    return _PROFILE_SKILLS.get(module_id, _FALLBACK_SKILLS)
 
 
 def runtime_policy_instruction(module_id: str) -> str:
