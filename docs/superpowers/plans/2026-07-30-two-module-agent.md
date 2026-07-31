@@ -1489,7 +1489,12 @@ def _rule_signal(*, run: str, spec: str, subject_id: str = "",
         "run": run,
         "spec": spec,
         "deterministic": True,
-        "dimensions": [d.name for d in evals.REGISTRY.values() if d.deterministic],
+        # `rule_compliance` is deterministic in the registry but can never fire:
+        # `answer_checks.ANSWER_CHECK_KINDS` has been empty since 2026-07-30, when all five
+        # clinical checks were measured and removed (58 firings destroyed a correct value).
+        # Advertising it here would claim a check that no run receives.
+        "dimensions": [d.name for d in evals.REGISTRY.values()
+                       if d.deterministic and d.name != "rule_compliance"],
         "report": report,
     }
 
@@ -1846,7 +1851,13 @@ acr signal run --kind rule \
                --spec specs/STORE.400_522_523.site_histology_behavior.yaml
 ```
 
-### 评测——单个，AI 看的
+### 评测——单个，AI 看的（归因 agent）
+
+**你不需要预先知道错因是哪一类。** 顺序是：先用 `--kind rule` 判出**哪些** case 错了，
+再把错的 case 交给 `--kind agent`——它跑的是现有的归因 agent（`attribution.py` 的八段
+流程：重建工作记录 → 锁定要解释的那个错误 → 提出候选原因 → 带着候选原因去翻病历 →
+反事实检验 → 唱反调复核 → 引用校验 → 交结构化报告）。四张复盘卡默认**全部**给它，
+哪张适用是它读完记录自己判断的。
 
 ```bash
 acr signal run --kind agent \
@@ -1856,7 +1867,7 @@ acr signal run --kind agent \
                --case-id CASE-001
 ```
 
-只用其中两张复盘卡：
+`--eval-skills` 是可选的收窄：只在人已经有怀疑方向、想省 prompt 的时候用，不是必答题：
 
 ```bash
 acr signal run --kind agent --run runs/arm-native/SYN0001.manifest.json \
