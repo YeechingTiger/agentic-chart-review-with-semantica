@@ -1,0 +1,17 @@
+{
+  "_why": "Without an entry here a model is UNPRICED, and `--max-usd` is inert: `spend.usd` returns None rather than 0.0 and the ceiling cannot fire. A run against an unlisted model has no cost bound at all, which is the opposite of what passing --max-usd looks like it is doing. Point ACR_PRICES at this file (or the shared one) before spending.",
+  "_source": "https://openrouter.ai/api/v1/models, read 2026-07-31. Verified against a live call: 11 prompt + 5 completion tokens billed $0.0000041.",
+  "_units": "USD per 1M tokens.",
+  "models": {
+    "openai/gpt-5.6-luna": {
+      "input_per_1m": 0.10,
+      "output_per_1m": 0.60,
+      "cached_input_per_1m": 0.01
+    },
+    "openai/gpt-5.6-luna-pro": {
+      "input_per_1m": 0.10,
+      "output_per_1m": 0.60,
+      "cached_input_per_1m": 0.01
+    }
+  }
+}
