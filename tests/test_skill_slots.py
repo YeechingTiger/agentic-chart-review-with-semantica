@@ -95,6 +95,23 @@ def test_stack_rejects_an_eval_skill_in_the_chart_agent(tmp_path: Path):
         SkillStack(general=("eval-contrast-traces",)).validate(tmp_path)
 
 
+@pytest.mark.parametrize("name", sorted(p.name for p in SKILLS_DIR.iterdir()
+                                        if p.name.startswith("eval-")))
+@pytest.mark.parametrize("slot", ["task", "search", "general"])
+def test_a_real_eval_card_cannot_be_placed_in_a_chart_slot(name: str, slot: str):
+    """上一条用 tmp_path 造卡测机制；这一条测真卡，走的是用户真会敲的那条路。
+
+    `--skills general=eval-overconfidence` 是一次手滑就能敲出来的东西，而它一旦通过，跑病历的
+    提示词里就会多出一段"你不许判分"的复盘指令——对一个正在读病历的模型说的话，既不是它的
+    任务，也没有任何存档单会把这件事标红。所以真卡必须在装配时就被拒。
+    """
+    placed = SkillStack(**({slot: (name,)} if slot == "general" else {slot: name}))
+    with pytest.raises(SkillError, match="slot 'eval'"):
+        placed.validate()
+    with pytest.raises(SkillError, match="slot 'eval'"):
+        parse_skill_stack(f"{slot}={name}", SkillStack())
+
+
 def test_manifest_carries_the_slot():
     entries = skills_manifest(SkillStack(general=("coverage-judgement",)))
     assert [e["slot"] for e in entries] == ["general"]
