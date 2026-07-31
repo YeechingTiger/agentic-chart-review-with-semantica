@@ -38,6 +38,7 @@ returned so a caller can record it.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -204,6 +205,67 @@ def parse_skill_stack(spec: str, base: SkillStack,
     out = SkillStack(task=task, search=search, general=tuple(general))
     out.validate(skills_dir)
     return out
+
+
+#: Phrases that turn a diagnostic skill into a scoring instruction. The fence this enforces is
+#: recorded in README §2.6 and it is not stylistic: an AI judge scores a CORRECT
+#: `EVIDENCE_INSUFFICIENT` as a task failure, and optimising against that teaches the agent to
+#: guess on exactly the subpopulation where guessing is most dangerous. Scoring is `==` in
+#: `evals.py`; a skill may ask the scorer, never replace it.
+EVAL_FORBIDDEN_VERBS: tuple[str, ...] = (
+    "score the", "grade the", "mark it correct", "mark it incorrect", "mark as correct",
+    "decide whether the answer is correct", "judge whether the answer is correct",
+    "rate the answer", "assign a score", "declare the answer wrong", "declare the answer right",
+)
+
+
+def eval_skill_judges(name: str, skills_dir: Path | str | None = None) -> tuple[str, ...]:
+    """The sub-questions this eval skill is permitted to form a judgement about.
+
+    The fence is PER SUB-QUESTION, not per dimension, so a skill that may diagnose search
+    behaviour is not thereby licensed to opine on correctness. Declaring the list is what makes
+    an overstep checkable; without it, scope is whatever the prose happens to imply.
+    """
+    fm = _frontmatter(name, skills_dir)
+    slot = fm.get("slot")
+    if slot != "eval":
+        raise SkillError(
+            f"skill {name!r} has slot {slot!r}, so it has no `judges` scope to read; that key "
+            f"belongs to eval skills only")
+    judges = fm.get("judges")
+    if not judges:
+        raise SkillError(
+            f"eval skill {name!r} declares no `judges`. List the sub-questions it may form a "
+            f"judgement about; an undeclared scope cannot be checked for overreach.")
+    if isinstance(judges, str):
+        judges = [judges]
+    return tuple(str(j) for j in judges)
+
+
+def eval_skills_block(names: Sequence[str], skills_dir: Path | str | None = None) -> str:
+    """Render eval skills for the evaluation agent's prompt.
+
+    A different header from `skills_block` because the standing instruction is different: the
+    chart agent may depart from a skill, whereas the evaluation agent may not depart from the
+    fence. What it may judge is declared; what it may not, it asks the deterministic scorer.
+    """
+    if not names:
+        return ""
+    parts = [
+        "DIAGNOSTIC METHOD — HOW TO FIND A CAUSE. YOU DO NOT SCORE.",
+        "",
+        "Whether an answer was correct, whether a quote re-reads at its offsets, what a run "
+        "cost: these are settled by the deterministic scorer, which is available to you as a "
+        "read-only tool. Ask it. You have no channel for asserting a verdict yourself, and a "
+        "diagnosis that assumes one is unusable.",
+    ]
+    for n in names:
+        if skill_slot(n, skills_dir) != "eval":
+            raise SkillError(f"skill {n!r} is not an eval skill")
+        judges = ", ".join(eval_skill_judges(n, skills_dir))
+        parts += ["", f"--- eval skill: {n} (may judge: {judges}) ---", "",
+                  load_skill_body(n, skills_dir)]
+    return "\n".join(parts)
 
 
 def skills_block(stack: SkillStack, skills_dir: Path | str | None = None) -> str:
