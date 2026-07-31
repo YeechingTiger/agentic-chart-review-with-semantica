@@ -1,6 +1,6 @@
 """Provenance: which lines of a spec came from a standard, and which a model made up.
 
-Every spec in `specs/` was written by a language model in one commit (e5229b0), from the
+Every spec in `assets/specs/` was written by a language model in one commit (e5229b0), from the
 STORE manual text that happened to be in its context, and committed under a human author's
 name. No registrar has read any of it. The only provenance field that existed was
 `source_authority` — free text, read by nothing, and the stage spec's own note admits its
@@ -46,7 +46,7 @@ from acr.contract.spec import (
 from acr.core.llm import LLMClient, LLMConfig, LLMResponse
 
 ROOT = Path(__file__).resolve().parents[1]
-SPECS = ROOT / "specs"
+SPECS = ROOT / "assets" / "specs"
 SHB = SPECS / "STORE.400_522_523.site_histology_behavior.yaml"
 STAGE = SPECS / "STORE.700_880.stage.yaml"
 ALL_SPECS = sorted(SPECS.glob("*.yaml")) + sorted((SPECS / "ablation").glob("*.yaml"))
@@ -76,7 +76,7 @@ def _record(data: dict, element: str) -> dict:
 
 # Every shipped spec carries a real `provenance:` list as of 2026-07-27, so the tests below
 # run against the actual files. There was briefly an autouse fixture here that skipped the
-# whole module while `specs/*.yaml` had no provenance data; it is deliberately gone rather
+# whole module while `assets/specs/*.yaml` had no provenance data; it is deliberately gone rather
 # than left dormant. A skip that survives the gap it was written for is a skip nobody will
 # ever notice again, and this module is the one that is supposed to notice.
 

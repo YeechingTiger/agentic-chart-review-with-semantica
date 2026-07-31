@@ -378,7 +378,7 @@ def _extract_doc(answer: dict, *, created_utc: str = STAMP, pid: str = "P1") -> 
     """One patient, one spec, in the shape `acr extract` writes."""
     return {
         "schema": "acr.extract/1", "created_utc": created_utc, "code_sha": "test",
-        "corpus": "corpus/patients", "specs_dir": "specs", "cohort": "c.csv",
+        "corpus": "corpus/patients", "specs_dir": "assets/specs", "cohort": "c.csv",
         "model": "test", "sample_seed": 7, "n_failed_runs": 0,
         "specs": {SPEC: {"spec_id": SPEC}},
         "patients": [{"patient_id": pid, "runs": [], "errors": [],

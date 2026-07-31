@@ -22,7 +22,7 @@ from acr.evaluation import evals
 from acr.evaluation import judge as J
 
 ROOT = Path(__file__).resolve().parents[1]
-EVALUATORS = str(ROOT / "evaluators")
+EVALUATORS = str(ROOT / "assets" / "evaluators")
 runner = CliRunner()
 
 

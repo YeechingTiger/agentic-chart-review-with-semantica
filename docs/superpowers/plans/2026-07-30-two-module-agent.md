@@ -15,7 +15,7 @@
 - **`evals.py` 的无模型闭包不许破。** `tests/test_evals.py::test_no_model_is_reachable_from_this_module` 用 AST 走 `src/acr/evals.py` 的 import，禁止出现 `llm graph deep_runner cli openai anthropic litellm langchain langgraph deepagents requests httpx urllib socket http`。新代码一律不往 `evals.py` 里加 import。
 - **`acr eval` 组保持无模型。** 它的模块 docstring 承诺"NOTHING IN THIS GROUP CALLS A MODEL"。AI 复盘不进这个组，进新的 `acr signal` 组。
 - **AI 没有判分权。** 评测卡里不许出现判定对错的指令；Task 5 用测试检查。判分只走 `evals.py` / `audit_loop.py` 的确定性函数。
-- **`skills/*/SKILL.md` 单文件上限 12000 字节**（`skills.MAX_SKILL_BYTES`），超了报错不截断。
+- **`assets/skills/*/SKILL.md` 单文件上限 12000 字节**（`skills.MAX_SKILL_BYTES`），超了报错不截断。
 - **卡的 frontmatter 现有必填字段**：`name`（小写连字符、必须等于目录名、≤64 字符）、`description`（≤1024 字符）。本计划新增 `slot`，评测卡再加 `judges`。
 - 提交信息用英文，结尾附 `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`。
 - **必须在装了 `.venv` 的机器上执行。** 项目要 Python 3.11+（`kernel.py` 用 `datetime.UTC`），
@@ -32,12 +32,12 @@
 
 | 文件 | 职责 |
 |---|---|
-| `skills/search-native/SKILL.md` | "病历怎么翻"卡：模型自己判断查够了没有 |
-| `skills/search-preplanned/SKILL.md` | "病历怎么翻"卡：先按经验统计排序再查 |
-| `skills/eval-contrast-traces/SKILL.md` | 复盘卡：对照答对与答错的工作记录 |
-| `skills/eval-cluster-failures/SKILL.md` | 复盘卡：把多个失败归类 |
-| `skills/eval-missed-evidence/SKILL.md` | 复盘卡：答案在某份报告里却没翻到 |
-| `skills/eval-overconfidence/SKILL.md` | 复盘卡：斩钉截铁但答错 |
+| `assets/skills/search-native/SKILL.md` | "病历怎么翻"卡：模型自己判断查够了没有 |
+| `assets/skills/search-preplanned/SKILL.md` | "病历怎么翻"卡：先按经验统计排序再查 |
+| `assets/skills/eval-contrast-traces/SKILL.md` | 复盘卡：对照答对与答错的工作记录 |
+| `assets/skills/eval-cluster-failures/SKILL.md` | 复盘卡：把多个失败归类 |
+| `assets/skills/eval-missed-evidence/SKILL.md` | 复盘卡：答案在某份报告里却没翻到 |
+| `assets/skills/eval-overconfidence/SKILL.md` | 复盘卡：斩钉截铁但答错 |
 | `src/acr/cli_signal.py` | `acr signal run` / `acr signal batch` 薄壳，三种做法一个出口（Task 7-8 先接 rule/agent 两种，Task 9 接入 judge） |
 | `tests/test_skill_slots.py` | 槽位声明与装配校验 |
 | `tests/test_eval_skill_fence.py` | 评测卡不得含判分指令、必须声明 `judges` |
@@ -54,7 +54,7 @@
 | `src/acr/cli_chart.py:61, 138` | `acr run` / `acr batch` 加 `--skills` |
 | `src/acr/cli.py:97` 附近 | 挂上 `signal_app` |
 | `src/acr/attribution.py:1790-1816` | 提示词里注入评测卡 |
-| `skills/*/SKILL.md`（现有 10 张） | frontmatter 加 `slot:` |
+| `assets/skills/*/SKILL.md`（现有 10 张） | frontmatter 加 `slot:` |
 
 ---
 
@@ -62,14 +62,14 @@
 
 **Files:**
 - Modify: `src/acr/skills.py`
-- Modify: `skills/chart-triage/SKILL.md`, `skills/thread-chasing/SKILL.md`, `skills/coverage-judgement/SKILL.md`, `skills/keyword-strategy/SKILL.md`, `skills/store-icdo-coding/SKILL.md`, `skills/store-staging/SKILL.md`, `skills/store-to-spec/SKILL.md`, `skills/crc-guideline-registry-authoring/SKILL.md`, `skills/non-concordance-triage/SKILL.md`, `skills/guideline-to-rules/SKILL.md`
+- Modify: `assets/skills/chart-triage/SKILL.md`, `assets/skills/thread-chasing/SKILL.md`, `assets/skills/coverage-judgement/SKILL.md`, `assets/skills/keyword-strategy/SKILL.md`, `assets/skills/store-icdo-coding/SKILL.md`, `assets/skills/store-staging/SKILL.md`, `assets/skills/store-to-spec/SKILL.md`, `assets/skills/crc-guideline-registry-authoring/SKILL.md`, `assets/skills/non-concordance-triage/SKILL.md`, `assets/skills/guideline-to-rules/SKILL.md`
 - Test: `tests/test_skill_slots.py`（新建）
 
 **Interfaces:**
 - Consumes: 无（第一个任务）
 - Produces: `acr.skills.SLOTS: tuple[str, ...]`、`acr.skills.skill_slot(name: str, skills_dir=None) -> str`、`acr.skills.SkillError`（已存在，复用）
 
-**背景**：`skills/guideline-to-rules/` 只有 `references/`，`SKILL.md` 从未写过（build agent 被 spend limit 杀了），`tests/test_skills_load.py:49-55` 已经为它挂了 skip。本任务同样跳过它，不要补写。
+**背景**：`assets/skills/guideline-to-rules/` 只有 `references/`，`SKILL.md` 从未写过（build agent 被 spend limit 杀了），`tests/test_skills_load.py:49-55` 已经为它挂了 skip。本任务同样跳过它，不要补写。
 
 - [ ] **Step 1: 写失败的测试**
 
@@ -95,7 +95,7 @@ from acr.skills import SLOTS, SkillError, skill_slot
 SKILLS_DIR = Path(__file__).resolve().parents[1] / "skills"
 _FM = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 
-# `skills/guideline-to-rules/SKILL.md` 从未写过——见 tests/test_skills_load.py:49-55。
+# `assets/skills/guideline-to-rules/SKILL.md` 从未写过——见 tests/test_skills_load.py:49-55。
 _NO_SKILL_MD = {"guideline-to-rules"}
 
 
@@ -196,18 +196,18 @@ def skill_slot(name: str, skills_dir: Path | str | None = None) -> str:
 在每个 `SKILL.md` 的 frontmatter 里，`description` 之后、`license` 之前加一行。逐张对应：
 
 ```
-skills/chart-triage/SKILL.md                      slot: general
-skills/thread-chasing/SKILL.md                    slot: general
-skills/coverage-judgement/SKILL.md                slot: general
-skills/keyword-strategy/SKILL.md                  slot: search
-skills/store-icdo-coding/SKILL.md                 slot: task
-skills/store-staging/SKILL.md                     slot: task
-skills/store-to-spec/SKILL.md                     slot: task
-skills/crc-guideline-registry-authoring/SKILL.md  slot: task
-skills/non-concordance-triage/SKILL.md            slot: general
+assets/skills/chart-triage/SKILL.md                      slot: general
+assets/skills/thread-chasing/SKILL.md                    slot: general
+assets/skills/coverage-judgement/SKILL.md                slot: general
+assets/skills/keyword-strategy/SKILL.md                  slot: search
+assets/skills/store-icdo-coding/SKILL.md                 slot: task
+assets/skills/store-staging/SKILL.md                     slot: task
+assets/skills/store-to-spec/SKILL.md                     slot: task
+assets/skills/crc-guideline-registry-authoring/SKILL.md  slot: task
+assets/skills/non-concordance-triage/SKILL.md            slot: general
 ```
 
-`skills/guideline-to-rules/` 跳过——没有 `SKILL.md`。
+`assets/skills/guideline-to-rules/` 跳过——没有 `SKILL.md`。
 
 - [ ] **Step 5: 跑测试确认通过**
 
@@ -222,7 +222,7 @@ Expected: PASS，失败数与改动前一致
 - [ ] **Step 7: 提交**
 
 ```bash
-git add src/acr/skills.py skills/ tests/test_skill_slots.py
+git add src/acr/skills.py assets/skills/ tests/test_skill_slots.py
 git commit -m "$(cat <<'EOF'
 Skills declare their slot; an undeclared slot is refused, not defaulted
 
@@ -393,7 +393,7 @@ def skills_manifest(stack: SkillStack, skills_dir: Path | str | None = None) -> 
     """What was actually rendered, per skill and per slot, for the run manifest.
 
     Content-hashed rather than named. A skill is prose the model acts on, so editing a sentence
-    changes the run without changing its name or version — and `refine` treats `skills/*/SKILL.md`
+    changes the run without changing its name or version — and `refine` treats `assets/skills/*/SKILL.md`
     as a tunable file. The slot is recorded beside the hash because "which search policy ran" is
     the question a paired ablation asks, and a flat list cannot answer it.
     """
@@ -687,8 +687,8 @@ EOF
 ## Task 4: 两张"病历怎么翻"的卡
 
 **Files:**
-- Create: `skills/search-native/SKILL.md`
-- Create: `skills/search-preplanned/SKILL.md`
+- Create: `assets/skills/search-native/SKILL.md`
+- Create: `assets/skills/search-preplanned/SKILL.md`
 
 **Interfaces:**
 - Consumes: Task 1 的 `slot:` frontmatter 约定
@@ -696,7 +696,7 @@ EOF
 
 两张卡的内容依据 `docs/SEARCH_PLANNING_PILOT.md` 的两个试验臂写，不是新发明。
 
-- [ ] **Step 1: 写 `skills/search-native/SKILL.md`**
+- [ ] **Step 1: 写 `assets/skills/search-native/SKILL.md`**
 
 ```markdown
 ---
@@ -750,7 +750,7 @@ If your answer claims something is absent, the coverage-judgement skill applies 
 one — an absence claim owes more than a positive one.
 ```
 
-- [ ] **Step 2: 写 `skills/search-preplanned/SKILL.md`**
+- [ ] **Step 2: 写 `assets/skills/search-preplanned/SKILL.md`**
 
 ```markdown
 ---
@@ -823,7 +823,7 @@ Expected: 两行，分别是 `search-native -> ('search-native', 'coverage-judge
 - [ ] **Step 5: 提交**
 
 ```bash
-git add skills/search-native skills/search-preplanned
+git add assets/skills/search-native assets/skills/search-preplanned
 git commit -m "$(cat <<'EOF'
 Two search policies as swappable skills, from the pilot's two arms
 
@@ -1042,10 +1042,10 @@ EOF
 ## Task 6: 四张复盘卡
 
 **Files:**
-- Create: `skills/eval-contrast-traces/SKILL.md`
-- Create: `skills/eval-cluster-failures/SKILL.md`
-- Create: `skills/eval-missed-evidence/SKILL.md`
-- Create: `skills/eval-overconfidence/SKILL.md`
+- Create: `assets/skills/eval-contrast-traces/SKILL.md`
+- Create: `assets/skills/eval-cluster-failures/SKILL.md`
+- Create: `assets/skills/eval-missed-evidence/SKILL.md`
+- Create: `assets/skills/eval-overconfidence/SKILL.md`
 
 **Interfaces:**
 - Consumes: Task 5 的 `slot: eval` + `judges:` 约定、`EVAL_FORBIDDEN_VERBS` 禁用词
@@ -1053,7 +1053,7 @@ EOF
 
 四张卡都不得出现 `EVAL_FORBIDDEN_VERBS` 里的措辞。每张卡都要显式写"对错问评分工具"。
 
-- [ ] **Step 1: 写 `skills/eval-contrast-traces/SKILL.md`**
+- [ ] **Step 1: 写 `assets/skills/eval-contrast-traces/SKILL.md`**
 
 ```markdown
 ---
@@ -1104,7 +1104,7 @@ cannot point at a step, you have found a correlation, and say that instead — a
 cannot locate is a real observation and a false explanation.
 ```
 
-- [ ] **Step 2: 写 `skills/eval-cluster-failures/SKILL.md`**
+- [ ] **Step 2: 写 `assets/skills/eval-cluster-failures/SKILL.md`**
 
 ```markdown
 ---
@@ -1148,7 +1148,7 @@ Name a cluster by its mechanism, in a sentence that says what would have to chan
 aimed at. "Primary site errors" is a bucket, not a cause.
 ```
 
-- [ ] **Step 3: 写 `skills/eval-missed-evidence/SKILL.md`**
+- [ ] **Step 3: 写 `assets/skills/eval-missed-evidence/SKILL.md`**
 
 ```markdown
 ---
@@ -1191,7 +1191,7 @@ need — for instance a truncated read whose extent is unrecorded — say the lo
 undetermined and say what would settle it.
 ```
 
-- [ ] **Step 4: 写 `skills/eval-overconfidence/SKILL.md`**
+- [ ] **Step 4: 写 `assets/skills/eval-overconfidence/SKILL.md`**
 
 ```markdown
 ---
@@ -1258,7 +1258,7 @@ Expected: 开头是 `DIAGNOSTIC METHOD — HOW TO FIND A CAUSE. YOU DO NOT SCORE
 - [ ] **Step 7: 提交**
 
 ```bash
-git add skills/eval-contrast-traces skills/eval-cluster-failures skills/eval-missed-evidence skills/eval-overconfidence
+git add assets/skills/eval-contrast-traces assets/skills/eval-cluster-failures assets/skills/eval-missed-evidence assets/skills/eval-overconfidence
 git commit -m "$(cat <<'EOF'
 Four diagnostic skills for the evaluation agent
 
@@ -1835,9 +1835,9 @@ EOF
 都不改它**，只做两件事：把 run manifest+trace 自动组装成 packet（现有 `acr judge panel`
 要求操作者手拼 JSON，这是真实的使用门槛），和把这条线纳入 `acr signal` 统一入口。
 
-**扩展方式随之明确**：加一个评卷角度 = 加一个 `evaluators/*.yaml`（`judge.py` 自己的
+**扩展方式随之明确**：加一个评卷角度 = 加一个 `assets/evaluators/*.yaml`（`judge.py` 自己的
 规矩：内置 LENSES 字典不许再长，新评测走声明式 YAML，加载时对着判分注册表核查）。
-诊断角度加 `skills/eval-*`，评卷角度加 `evaluators/*.yaml`，都不改代码。
+诊断角度加 `assets/skills/eval-*`，评卷角度加 `assets/evaluators/*.yaml`，都不改代码。
 
 - [ ] **Step 1: 写失败的测试**
 
@@ -2338,9 +2338,9 @@ EOF
 ## Task 11: 广度优先 / 深度优先 / 组合——三张检索卡和四臂对照
 
 **Files:**
-- Create: `skills/search-breadth-first/SKILL.md`
-- Create: `skills/search-depth-first/SKILL.md`
-- Create: `skills/search-breadth-then-depth/SKILL.md`
+- Create: `assets/skills/search-breadth-first/SKILL.md`
+- Create: `assets/skills/search-depth-first/SKILL.md`
+- Create: `assets/skills/search-breadth-then-depth/SKILL.md`
 - Create: `docs/BFS_DFS_SEARCH_PILOT.md`（试验协议，结果留空待填）
 - Test: 沿用 `tests/test_skills_load.py` / `tests/test_skill_slots.py` 的参数化，无需新测试文件
 
@@ -2356,7 +2356,7 @@ dev set 统计），结论是统计先验没赢。**走法的形状这根轴从�
 就是顺藤摸瓜，P05 那个 8046 错误（"特殊染色待出"的结论就在同一份文件往后 353 字符处）
 是典型的深度优先失败。本任务不改那套机制，只是把"走法"提出来变成可替换的一张卡。
 
-- [ ] **Step 1: 写 `skills/search-breadth-first/SKILL.md`**
+- [ ] **Step 1: 写 `assets/skills/search-breadth-first/SKILL.md`**
 
 ```markdown
 ---
@@ -2401,7 +2401,7 @@ your pool contains a deferred conclusion, the sweep has done its job and the nex
 another sweep.
 ```
 
-- [ ] **Step 2: 写 `skills/search-depth-first/SKILL.md`**
+- [ ] **Step 2: 写 `assets/skills/search-depth-first/SKILL.md`**
 
 ```markdown
 ---
@@ -2446,7 +2446,7 @@ something is ABSENT, the slice is not the basis for that claim — the rest of t
 and you have not looked at it.
 ```
 
-- [ ] **Step 3: 写 `skills/search-breadth-then-depth/SKILL.md`**
+- [ ] **Step 3: 写 `assets/skills/search-breadth-then-depth/SKILL.md`**
 
 ```markdown
 ---
@@ -2532,13 +2532,13 @@ Everything else is held: same spec, same corpus, same model, same `--seed 1234`,
 
 ```bash
 for arm in native breadth-first depth-first breadth-then-depth; do
-  acr batch --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  acr batch --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
             --skills "search=search-$arm" --seed 1234 --out "runs/bfs-$arm"
 done
 
 for arm in native breadth-first depth-first breadth-then-depth; do
   acr signal batch --kind rule --runs "runs/bfs-$arm" \
-                   --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+                   --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
                    --out "signals/bfs-$arm.json"
 done
 ```
@@ -2596,7 +2596,7 @@ Expected: 三行，每行第一个名字是对应的卡
 - [ ] **Step 7: 提交**
 
 ```bash
-git add skills/search-breadth-first skills/search-depth-first skills/search-breadth-then-depth docs/BFS_DFS_SEARCH_PILOT.md
+git add assets/skills/search-breadth-first assets/skills/search-depth-first assets/skills/search-breadth-then-depth docs/BFS_DFS_SEARCH_PILOT.md
 git commit -m "$(cat <<'EOF'
 Traversal shape as a swappable skill: breadth, depth, and the combination
 
@@ -3109,25 +3109,25 @@ EOF
 ```bash
 set -a && . ./.env && set +a          # OpenRouter gpt-5.6-luna
 
-acr run SYN0001 --spec specs/STORE.400_522_523.site_histology_behavior.yaml
+acr run SYN0001 --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml
 ```
 
 ### 跑病历——批量
 
 ```bash
-acr batch --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+acr batch --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
           --patients SYN0001,SYN0002,SYN0003
 
-acr batch --spec specs/STORE.400_522_523.site_histology_behavior.yaml   # 整个 corpus
+acr batch --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml   # 整个 corpus
 ```
 
 ### 跑病历——换一张"病历怎么翻"的卡做对照
 
 ```bash
-acr batch --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+acr batch --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
           --skills search=search-native     --seed 1234 --out runs/arm-native
 
-acr batch --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+acr batch --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
           --skills search=search-preplanned --seed 1234 --out runs/arm-preplanned
 ```
 
@@ -3138,7 +3138,7 @@ acr batch --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
 ```bash
 acr signal run --kind rule \
                --run runs/arm-native/SYN0001.manifest.json \
-               --spec specs/STORE.400_522_523.site_histology_behavior.yaml
+               --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml
 ```
 
 ### 评测——单个，AI 评卷（trajectory 观感分，蒙着答案）
@@ -3151,7 +3151,7 @@ acr signal run --kind rule \
 ```bash
 acr signal run --kind judge --dimension trajectory_quality \
                --run runs/arm-native/SYN0001.manifest.json \
-               --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+               --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
                --usd-per-call 0.05 --max-usd 0.5 --model openrouter/openai/gpt-5.6-luna
 ```
 
@@ -3169,7 +3169,7 @@ acr signal run --kind judge --dimension trajectory_quality \
 ```bash
 acr signal run --kind agent \
                --run runs/arm-native/SYN0001.manifest.json \
-               --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+               --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
                --gold gold/store400.csv \
                --case-id CASE-001
 ```
@@ -3178,7 +3178,7 @@ acr signal run --kind agent \
 
 ```bash
 acr signal run --kind agent --run runs/arm-native/SYN0001.manifest.json \
-               --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+               --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
                --gold gold/store400.csv --case-id CASE-001 \
                --eval-skills eval-missed-evidence,eval-overconfidence
 ```
@@ -3187,16 +3187,16 @@ acr signal run --kind agent --run runs/arm-native/SYN0001.manifest.json \
 
 ```bash
 acr signal batch --kind rule  --runs runs/arm-native \
-                 --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+                 --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
                  --out signals/native-rule.json
 
 acr signal batch --kind judge --dimension step_efficiency.judged --runs runs/arm-native \
-                 --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+                 --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
                  --usd-per-call 0.05 --max-usd 5 --model openrouter/openai/gpt-5.6-luna \
                  --out signals/native-judge.json
 
 acr signal batch --kind agent --runs runs/arm-native \
-                 --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+                 --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
                  --gold gold/store400.csv --case-map runs/case-map.json \
                  --out signals/native-agent.json
 ```
@@ -3206,7 +3206,7 @@ acr signal batch --kind agent --runs runs/arm-native \
 **加诊断角度**（归因 agent 的新思路）——一张卡：
 
 ```bash
-mkdir -p skills/eval-timeline-drift
+mkdir -p assets/skills/eval-timeline-drift
 # 写 SKILL.md，frontmatter 里 slot: eval，judges: [...]
 .venv/bin/pytest tests/test_eval_skill_fence.py -q      # 围栏会检查它不含判分措辞
 acr signal run --kind agent ... --eval-skills eval-timeline-drift
@@ -3215,7 +3215,7 @@ acr signal run --kind agent ... --eval-skills eval-timeline-drift
 **加评卷角度**（trajectory 观感的新问题）——一个 YAML：
 
 ```bash
-# 写 evaluators/tool-selection.yaml：声明评哪个判断维度、问什么问题、需要什么材料
+# 写 assets/evaluators/tool-selection.yaml：声明评哪个判断维度、问什么问题、需要什么材料
 acr judge evaluators                       # 列出并围栏核查——声称判"正确性"的会被拒绝加载
 acr judge run --evaluator tool-selection --context ... --subject-id CASE-001 ...
 ```

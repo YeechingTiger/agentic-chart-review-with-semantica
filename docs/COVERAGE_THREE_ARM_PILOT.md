@@ -156,7 +156,7 @@ What was built instead:
   `gate_answer` and `gate.check` forward it, because asking the model to judge coverage without
   showing it what the runtime counted is not a design. `enforce=True` remains for the diagnostic
   arm this document already declined to make a default.
-- **The obligation is prose.** `skills/coverage-judgement/SKILL.md`: when the question arises at
+- **The obligation is prose.** `assets/skills/coverage-judgement/SKILL.md`: when the question arises at
   all (only on an absence claim), why a NOS code is a positive claim rather than a confession,
   how to judge which local type names can establish a field, and what to write down about the
   looking. Declining is recorded, not refused — which was always the real requirement, and it

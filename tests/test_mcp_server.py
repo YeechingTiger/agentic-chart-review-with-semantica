@@ -39,7 +39,7 @@ from acr.review.mcp_server import (
 
 ROOT = Path(__file__).resolve().parents[1]
 CORPUS = ROOT / "corpus" / "patients"
-SPECS = ROOT / "specs"
+SPECS = ROOT / "assets" / "specs"
 SITE = "STORE.400_522_523.site_histology_behavior"
 
 # SYN0001 is the FOUND case (tissue diagnosis present); SYN0002 is the evidence-gap case
@@ -278,7 +278,7 @@ def test_a_run_with_zero_searches_must_not_reach_keyword_list_validated():
         "a keyword list nobody searched cannot have been validated by sampling its misses")
 
     # WHAT CHANGED 2026-07-30: it is reported, not refused. Coverage is advisory — see
-    # `coverage.evaluate_gate` and `skills/coverage-judgement/SKILL.md`. Measured over every
+    # `coverage.evaluate_gate` and `assets/skills/coverage-judgement/SKILL.md`. Measured over every
     # recorded trace, coverage obligations produced ~150 answer rejections and 27 of them refused
     # a tuple that was exactly the registry's answer, so "you have not searched enough" is now
     # information the model acts on rather than a condition on its answer.

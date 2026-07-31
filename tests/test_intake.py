@@ -35,8 +35,8 @@ from acr.contract.registry_catalog import VariableCatalog
 from acr.contract.spec import load_spec
 
 ROOT = Path(__file__).resolve().parents[1]
-SPECS = ROOT / "specs"
-GUIDELINES = ROOT / "guidelines"
+SPECS = ROOT / "assets" / "specs"
+GUIDELINES = ROOT / "assets" / "guidelines"
 SHB = "STORE.400_522_523.site_histology_behavior"
 STG = "STORE.700_880.stage"
 runner = CliRunner()
@@ -410,7 +410,7 @@ def test_a_guideline_naming_the_registry_for_something_a_spec_extracts_is_a_cont
 
 def test_a_route_to_a_skill_that_is_not_in_the_tree_is_reported_not_printed_as_advice(
         cat, guides, tmp_path):
-    """Every NEW_VARIABLE outcome tells a human to go to `skills/spec-authoring`. An
+    """Every NEW_VARIABLE outcome tells a human to go to `assets/skills/spec-authoring`. An
     instruction pointing at a directory that does not exist is decoration that looks like a
     process — this repo's most-repeated failure."""
     d = I.route("NCCN-NSCLC-SUBSET", cat, guidelines=guides, skills_dir=tmp_path)

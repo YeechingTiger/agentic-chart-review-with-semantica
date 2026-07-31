@@ -185,9 +185,9 @@ accuracy、critical miss、overclaim、abstention、evidence validity、document
 独立 catalogs：
 
 ```text
-module_catalog/
-pipeline_catalog/
-certification_catalog/
+assets/module_catalog/
+assets/pipeline_catalog/
+assets/certification_catalog/
 ```
 
 CLI：

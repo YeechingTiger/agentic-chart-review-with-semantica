@@ -82,7 +82,7 @@ pathology.
 
 `Addendum`, `Path-Rpt-Addendum` and `Discharge-Summary-Staff-Addendum` are their own types.
 `ED-Corrections-Report-Document` is the amendment channel for ED notes. When a report defers
-its own conclusion, these are the types to list — see `skills/thread-chasing/SKILL.md`.
+its own conclusion, these are the types to list — see `assets/skills/thread-chasing/SKILL.md`.
 
 `Tumor-Board-Recommendation-Note` is a single type and is the closest thing in the corpus to
 a synthesised, multidisciplinary statement of the case. It is a restatement and cannot be

@@ -42,7 +42,7 @@ def spec_lint(
     single PASS over all four is the sentence this command exists to make unsayable.
     """
     p = Path(path)
-    # rglob, so `acr spec lint specs` covers specs/ablation too: an arm nobody lints is an arm
+    # rglob, so `acr spec lint specs` covers assets/specs/ablation too: an arm nobody lints is an arm
     # that drifts, and the ablation spec is the one a result gets compared against.
     paths = sorted(p.rglob("*.yaml")) if p.is_dir() else [p]
     specs = [load_spec(f) for f in paths]

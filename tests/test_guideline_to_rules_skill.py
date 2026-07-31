@@ -18,7 +18,7 @@ another form:
   the worked example is the shipped rule  `references/worked-example.md` ends on the real
               NSCLC-ADJ-SYSTEMIC-II-IIIA block. If it ends on a *stale copy* of it, the
               analyst learns a shape nobody runs. So the block is compared to
-              `guidelines/nccn_nsclc_subset.yaml` structurally, and the five-patient cohort
+              `assets/guidelines/nccn_nsclc_subset.yaml` structurally, and the five-patient cohort
               beside it is actually scored.
 
   the failure catalogue is checked against the validator  Each example in
@@ -46,12 +46,12 @@ from acr.contract import concordance as C
 from acr.contract.spec import Status
 
 ROOT = Path(__file__).resolve().parents[1]
-SKILL_DIR = ROOT / "skills" / "guideline-to-rules"
+SKILL_DIR = ROOT / "assets" / "skills" / "guideline-to-rules"
 SKILL = SKILL_DIR / "SKILL.md"
 WORKED = SKILL_DIR / "references" / "worked-example.md"
 CATALOGUE = SKILL_DIR / "references" / "failure-catalogue.md"
 
-GUIDELINE_PATH = ROOT / "guidelines" / "nccn_nsclc_subset.yaml"
+GUIDELINE_PATH = ROOT / "assets" / "guidelines" / "nccn_nsclc_subset.yaml"
 ADJ = "NSCLC-ADJ-SYSTEMIC-II-IIIA"
 
 # --------------------------------------------------------------------- known, current gaps
@@ -68,13 +68,13 @@ _CATALOGUE_MISSING = not CATALOGUE.is_file()
 skip_no_skill = pytest.mark.skipif(
     _SKILL_MISSING,
     reason=(
-        "skills/guideline-to-rules/SKILL.md was never written (build agent killed by org "
+        "assets/skills/guideline-to-rules/SKILL.md was never written (build agent killed by org "
         "spend limit; only references/worked-example.md landed)"
     ),
 )
 skip_no_catalogue = pytest.mark.skipif(
     _CATALOGUE_MISSING,
-    reason="skills/guideline-to-rules/references/failure-catalogue.md was never written",
+    reason="assets/skills/guideline-to-rules/references/failure-catalogue.md was never written",
 )
 
 #: A fenced yaml block that opts in to being checked. Blocks without the marker are
@@ -157,7 +157,7 @@ def test_the_skill_ships_with_both_references():
         assert ref.is_file(), f"{ref} is missing"
         # test_skills_load.py checks that pointers resolve; this checks they are made at all,
         # because a reference nothing points at is never read by a model.
-        assert f"skills/guideline-to-rules/references/{ref.name}" in SKILL.read_text(), \
+        assert f"assets/skills/guideline-to-rules/references/{ref.name}" in SKILL.read_text(), \
             f"SKILL.md never points at {ref.name}, so progressive disclosure dead-ends"
 
 
@@ -194,7 +194,7 @@ def test_the_worked_example_ends_on_the_recommendation_that_actually_ships(guide
     blocks = [b for tag, _, b in _blocks(WORKED) if tag == "SHIPPED"]
     assert len(blocks) == 1, "worked-example.md must carry exactly one `# expect: SHIPPED` block"
     assert _flatten(blocks[0]) == _flatten(shipped[0]), (
-        "the worked example has drifted from guidelines/nccn_nsclc_subset.yaml; the analyst "
+        "the worked example has drifted from assets/guidelines/nccn_nsclc_subset.yaml; the analyst "
         "would be copying a shape nobody runs")
 
 

@@ -22,10 +22,10 @@ from acr.commands.cli import app
 from acr.improvement import labelling as lab
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = str(ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml")
+SPEC = str(ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml")
 #: A spec with no `evidence_rules`: it does not say what would establish its answer, so the
 #: standing question has no definition and `Requirement.from_spec` refuses it.
-UNLABELLABLE = str(ROOT / "specs" / "STORE.610.class_of_case.yaml")
+UNLABELLABLE = str(ROOT / "assets" / "specs" / "STORE.610.class_of_case.yaml")
 CORPUS = str(ROOT / "corpus" / "patients")
 
 runner = CliRunner()

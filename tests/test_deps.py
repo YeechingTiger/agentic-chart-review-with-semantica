@@ -43,8 +43,8 @@ from acr.contract.concordance import _VAR_KEYS, load_guideline, parse_guideline
 from acr.contract.registry_catalog import VariableCatalog
 
 ROOT = Path(__file__).resolve().parents[1]
-SPECS = ROOT / "specs"
-GUIDELINE = ROOT / "guidelines" / "nccn_nsclc_subset.yaml"
+SPECS = ROOT / "assets" / "specs"
+GUIDELINE = ROOT / "assets" / "guidelines" / "nccn_nsclc_subset.yaml"
 
 runner = CliRunner()
 
@@ -488,9 +488,9 @@ def _fake_pipeline(tmp_path: Path, specs_dir: Path, guideline_path: Path,
 
 @pytest.fixture()
 def sandbox(tmp_path):
-    """A copy of specs/ and the guideline that a test may edit. The repo's own files are
+    """A copy of assets/specs/ and the guideline that a test may edit. The repo's own files are
     owned by another workflow and must not be touched to prove a point about hashing."""
-    sd = tmp_path / "specs"
+    sd = tmp_path / "assets" / "specs"
     shutil.copytree(SPECS, sd)
     for junk in sd.glob("*/"):
         shutil.rmtree(junk)

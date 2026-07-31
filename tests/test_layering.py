@@ -77,7 +77,7 @@ LAYERS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
 #: 这个清单只能变短 —— 新增一条就是把框架又焊死在肿瘤登记上一次。
 #:
 #: 空了。原先三条 —— `spec` / `agent` / `run_manifest` 各自 import `icdo3` —— 由动作 C
-#: 一次删掉：`icdo3.py` 换成领域中立的 `code_tables.py`，三个写死的轴变成 `codes/*.yaml`
+#: 一次删掉：`icdo3.py` 换成领域中立的 `code_tables.py`，三个写死的轴变成 `assets/codes/*.yaml`
 #: 里声明的 `axes:`。留着这个空 dict 而不是删掉它，是因为规则还在：下一次有人让框架
 #: import 一个 use case 模块，`test_no_layer_imports_a_higher_one` 会红，而这里是他被迫
 #: 写下理由的地方。

@@ -491,7 +491,7 @@ def test_a_case_the_judge_could_not_read_goes_to_the_human_rather_than_being_dro
 # call the judge claimed to support raised UnknownDimension. It failed closed, so it was safe
 # and useless. Nothing here uses a double.
 ROOT = Path(__file__).resolve().parents[1]
-EVALUATORS = ROOT / "evaluators"
+EVALUATORS = ROOT / "assets" / "evaluators"
 GATE = E.precedence_gate()          # the REAL registry, in the shape judge() requires
 PRICES = {"trace_only": 0.01, "reads_documents": 0.25, "reruns_searches": 0.40}
 

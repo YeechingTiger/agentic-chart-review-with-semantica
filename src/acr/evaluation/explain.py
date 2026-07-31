@@ -31,7 +31,7 @@ WHAT IS DETERMINISTIC HERE AND WHAT IS NOT
 Elimination is code. Which causes the ledger rules out is a mechanical reading of counters
 that the agent cannot address and must not be asked to weigh; delegating it reproduces the
 circularity forced sampling exists to prevent — the thing under audit choosing its own
-scope. What remains open goes to an agent plus `skills/non-concordance-triage`, over the
+scope. What remains open goes to an agent plus `assets/skills/non-concordance-triage`, over the
 packet `prepare_case_packet` builds. Same split as everywhere else in this project:
 enforced in code, advisory in skills, declarative in the spec.
 

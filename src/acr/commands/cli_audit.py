@@ -143,8 +143,8 @@ def run(
 def summarize(local_root: str | None = LOCAL_ROOT):
     """Summarize separate audit ledgers."""
     store = _store(local_root)
-    findings = _rows(store.root / "audit/findings.jsonl")
-    incidents = _rows(store.root / "audit/incidents.jsonl")
+    findings = _rows(store.root / "assets/pricing/findings.jsonl")
+    incidents = _rows(store.root / "assets/pricing/incidents.jsonl")
     con.print_json(json.dumps({
         "n_findings": len(findings),
         "n_incidents": len(incidents),
@@ -160,7 +160,7 @@ def summarize(local_root: str | None = LOCAL_ROOT):
 def incidents(local_root: str | None = LOCAL_ROOT):
     """Print high-fidelity audit incidents, never evaluation failures."""
     store = _store(local_root)
-    rows = _rows(store.root / "audit/incidents.jsonl")
+    rows = _rows(store.root / "assets/pricing/incidents.jsonl")
     con.print_json(json.dumps({
         "n_incidents": len(rows),
         "incidents": list(rows),

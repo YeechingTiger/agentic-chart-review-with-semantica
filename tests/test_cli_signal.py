@@ -96,7 +96,7 @@ def test_rule_kind_produces_a_signal_envelope_without_a_model(tmp_path, monkeypa
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
     manifest = _manifest(tmp_path)
     res = runner.invoke(signal_app, ["run", "--kind", "rule", "--run", str(manifest),
-                                     "--spec", "specs/whatever.yaml",
+                                     "--spec", "assets/specs/whatever.yaml",
                                      "--local-root", str(tmp_path)])
     assert res.exit_code == 0, res.output
     payload = json.loads(res.stdout)
@@ -119,7 +119,7 @@ def test_dimensions_exclude_the_unfirable_check(tmp_path, monkeypatch):
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
     manifest = _manifest(tmp_path, "dims")
     res = runner.invoke(signal_app, ["run", "--kind", "rule", "--run", str(manifest),
-                                     "--spec", "specs/whatever.yaml",
+                                     "--spec", "assets/specs/whatever.yaml",
                                      "--local-root", str(tmp_path)])
     assert res.exit_code == 0, res.output
     dims = json.loads(res.stdout)["dimensions"]
@@ -132,7 +132,7 @@ def test_out_writes_the_signal_instead_of_printing_it(tmp_path, monkeypatch):
     manifest = _manifest(tmp_path, "outed")
     out = tmp_path / "signal.json"
     res = runner.invoke(signal_app, ["run", "--kind", "rule", "--run", str(manifest),
-                                     "--spec", "specs/whatever.yaml",
+                                     "--spec", "assets/specs/whatever.yaml",
                                      "--local-root", str(tmp_path), "--out", str(out)])
     assert res.exit_code == 0, res.output
     assert json.loads(out.read_text(encoding="utf-8"))["kind"] == "rule"
@@ -152,7 +152,7 @@ def test_the_posture_vocabulary_is_attributions_own_and_not_a_third_spelling():
 
     第一版在这里发明了 `run-fault` / `key-suspect`，那是同一个概念的**第三种**拼法，而且是
     唯一一种绕过资产层的：`attribution.ATTRIBUTION_MODES` 是 (GOLD, REGISTRY_REFERENCE,
-    BLIND)，`EvaluationTask.truth_mode` 校验的是同一个集合，`module_catalog/**/*.yaml` 里
+    BLIND)，`EvaluationTask.truth_mode` 校验的是同一个集合，`assets/module_catalog/**/*.yaml` 里
     每个模块声明 `truth_modes:`。方法论文档 §4.1 的标题就是"Truth mode 决定结论上限"。
 
     这条断言读 attribution 自己的常量而不是抄一份 —— 抄一份的那天起两份就可以各自漂移。
@@ -213,7 +213,7 @@ def test_every_eval_card_in_the_tree_belongs_to_exactly_one_posture():
     )
     from acr.contract.skills import skill_slot
 
-    skills_dir = Path(__file__).resolve().parents[1] / "skills"
+    skills_dir = Path(__file__).resolve().parents[1] / "assets" / "skills"
     in_tree = {p.name for p in skills_dir.iterdir()
                if (p / "SKILL.md").is_file() and skill_slot(p.name) == "eval"}
     postures = [set(KEY_AGNOSTIC_SKILLS), set(KEY_IS_RIGHT_SKILLS), set(KEY_IS_SUSPECT_SKILLS)]
@@ -336,7 +336,7 @@ def test_the_agent_path_refuses_a_non_eval_skill_before_spending(tmp_path, monke
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
     manifest = _manifest(tmp_path, "agentic")
     res = runner.invoke(signal_app, ["run", "--kind", "agent", "--run", str(manifest),
-                                     "--spec", "specs/whatever.yaml", "--case-id", "CASE1",
+                                     "--spec", "assets/specs/whatever.yaml", "--case-id", "CASE1",
                                      "--eval-skills", "coverage-judgement",
                                      "--local-root", str(tmp_path)])
     assert res.exit_code != 0
@@ -432,7 +432,7 @@ def test_the_rule_batch_records_a_broken_manifest_and_keeps_the_good_one(tmp_pat
     _manifest(tmp_path, "aa")
     (tmp_path / "zz.manifest.json").write_text("{ truncated", encoding="utf-8")
     res = runner.invoke(signal_app, ["batch", "--kind", "rule", "--runs", str(tmp_path),
-                                     "--spec", "specs/whatever.yaml",
+                                     "--spec", "assets/specs/whatever.yaml",
                                      "--local-root", str(tmp_path)])
     assert res.exit_code == 0, res.output
     signals = json.loads(res.stdout)
@@ -453,7 +453,7 @@ def test_batch_stdout_carries_only_the_json_array(tmp_path, monkeypatch):
     _manifest(tmp_path, "aa")
     (tmp_path / "zz.manifest.json").write_text("{ truncated", encoding="utf-8")
     res = runner.invoke(signal_app, ["batch", "--kind", "rule", "--runs", str(tmp_path),
-                                     "--spec", "specs/whatever.yaml",
+                                     "--spec", "assets/specs/whatever.yaml",
                                      "--local-root", str(tmp_path)])
     assert res.exit_code == 0, res.output
     assert isinstance(json.loads(res.stdout), list)      # nothing else got in
@@ -469,7 +469,7 @@ def test_a_batch_where_every_run_failed_is_not_reported_as_success(tmp_path, mon
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
     (tmp_path / "zz.manifest.json").write_text("{ truncated", encoding="utf-8")
     res = runner.invoke(signal_app, ["batch", "--kind", "rule", "--runs", str(tmp_path),
-                                     "--spec", "specs/whatever.yaml",
+                                     "--spec", "assets/specs/whatever.yaml",
                                      "--local-root", str(tmp_path)])
     assert res.exit_code == 2
     assert json.loads(res.stdout)[0]["error"]            # the array is still emitted
@@ -480,7 +480,7 @@ def test_batch_out_writes_the_array_instead_of_printing_it(tmp_path, monkeypatch
     _manifest(tmp_path, "aa")
     out = tmp_path / "signals.json"
     res = runner.invoke(signal_app, ["batch", "--kind", "rule", "--runs", str(tmp_path),
-                                     "--spec", "specs/whatever.yaml",
+                                     "--spec", "assets/specs/whatever.yaml",
                                      "--local-root", str(tmp_path), "--out", str(out)])
     assert res.exit_code == 0, res.output
     assert json.loads(out.read_text(encoding="utf-8"))[0]["kind"] == "rule"

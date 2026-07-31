@@ -50,9 +50,9 @@ def _store(root: str | None) -> LocalArtifactStore:
 
 def _registries() -> tuple[ModuleRegistry, PipelineRegistry, CertificationRegistry]:
     root = repo_root()
-    display_modules = ModuleRegistry.from_directory(root / "module_catalog")
-    pipelines = PipelineRegistry.from_directory(root / "pipeline_catalog")
-    certifications = CertificationRegistry.from_directory(root / "certification_catalog")
+    display_modules = ModuleRegistry.from_directory(root / "assets" / "module_catalog")
+    pipelines = PipelineRegistry.from_directory(root / "assets" / "pipeline_catalog")
+    certifications = CertificationRegistry.from_directory(root / "assets" / "certification_catalog")
     profile = pipelines.resolve("chart-review-quality-v1")
     profile.validate_modules(display_modules)
     certifications.validate_modules(display_modules)

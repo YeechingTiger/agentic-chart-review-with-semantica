@@ -312,7 +312,7 @@ def test_partial_abstention_may_carry_a_malformed_populated_field_and_it_is_reco
     absorbing them silently.
     """
     spec = load_spec(
-        ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+        ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
     )
     verdict = gate_answer(
         spec,
@@ -479,7 +479,7 @@ def test_always_coverage_activates_even_for_complete_positive(monkeypatch):
 
 def test_clinical_contract_prompt_hides_retrieval_experience():
     spec = load_spec(
-        ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+        ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
     )
     full = spec.as_prompt_block()
     clinical = spec.as_prompt_block(view="clinical_contract")
@@ -544,9 +544,9 @@ def test_asset_pipeline_and_certification_are_independent_and_reusable():
 
 
 def test_catalogs_are_physically_separated_and_loadable():
-    modules = ModuleRegistry.from_directory(ROOT / "module_catalog")
-    pipelines = PipelineRegistry.from_directory(ROOT / "pipeline_catalog")
-    suites = CertificationRegistry.from_directory(ROOT / "certification_catalog")
+    modules = ModuleRegistry.from_directory(ROOT / "assets" / "module_catalog")
+    pipelines = PipelineRegistry.from_directory(ROOT / "assets" / "pipeline_catalog")
+    suites = CertificationRegistry.from_directory(ROOT / "assets" / "certification_catalog")
     assert modules.resolve("phi-provider-audit").module_kind == "AUDIT_RULE"
     assert modules.resolve("gate-effectiveness").module_kind == "EVALUATOR"
     assert modules.resolve("causal-attribution").runner_type == "AGENT"
@@ -557,7 +557,7 @@ def test_catalogs_are_physically_separated_and_loadable():
 
 
 def test_module_catalog_cannot_dynamic_import_unregistered_code():
-    registry = ModuleRegistry.from_directory(ROOT / "module_catalog")
+    registry = ModuleRegistry.from_directory(ROOT / "assets" / "module_catalog")
     with pytest.raises(ModuleContractError, match="not explicitly registered"):
         registry.implementation(registry.resolve("gate-effectiveness"))
 

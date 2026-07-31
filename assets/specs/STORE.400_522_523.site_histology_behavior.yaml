@@ -8,7 +8,7 @@ data_source: notes
 
 # WHICH CODE SYSTEM THESE VALUES BELONG TO. A Task Contract declaration: which table a value is
 # coded into is part of what the answer means, and it is not the runtime's guess. Rendered into
-# the prompt (`codes/icdo3_lung.yaml`, 8 topography and 55 morphology terms with what each one
+# the prompt (`assets/codes/icdo3_lung.yaml`, 8 topography and 55 morphology terms with what each one
 # is) and read by the evaluators so an out-of-domain code is counted. Nothing refuses an answer
 # over it.
 #

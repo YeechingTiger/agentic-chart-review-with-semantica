@@ -24,10 +24,10 @@ from acr.contract.registry_catalog import (
 from acr.contract.spec import load_specs
 
 ROOT = Path(__file__).resolve().parents[1]
-SPECS = ROOT / "specs"
-GUIDELINE = ROOT / "guidelines" / "nccn_nsclc_subset.yaml"
+SPECS = ROOT / "assets" / "specs"
+GUIDELINE = ROOT / "assets" / "guidelines" / "nccn_nsclc_subset.yaml"
 
-# Three tests here briefly skipped on UnprovenancedElementError, because specs/*.yaml carried
+# Three tests here briefly skipped on UnprovenancedElementError, because assets/specs/*.yaml carried
 # no `provenance:` records and so would not load at all. They do now, as of 2026-07-27, and
 # the guards are deleted rather than left in place: a catalogue that cannot read the shipped
 # specs is a broken catalogue, and that has to be a failure.
@@ -186,7 +186,7 @@ def test_two_specs_declaring_one_field_is_an_error_naming_both(tmp_path):
 
 
 def test_the_scan_is_not_recursive_and_that_is_why(cat):
-    """`specs/ablation/` holds a second copy of three field names under another spec_id. A
+    """`assets/specs/ablation/` holds a second copy of three field names under another spec_id. A
     recursive scan would make `primary_site`, `histology` and `behavior` permanently
     ambiguous — an ablation arm is selected by path, never by name."""
     assert (SPECS / "ablation").is_dir()

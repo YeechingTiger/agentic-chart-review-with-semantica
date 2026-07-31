@@ -112,7 +112,7 @@ export ACR_MODEL="anthropic/claude-sonnet-4-5" ; export ACR_API_KEY=sk-ant-...
 
 # one run, verbose — should finish in a couple of minutes on a GPU box
 ./.venv/bin/acr run SYN0002 \
-  --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
   --max-steps 30 --max-usd 5 --seed 1234 --out runs/smoke
 ```
 
@@ -149,8 +149,8 @@ EVIDENCE_INSUFFICIENT, SYN0001 whose correct answer is FOUND). Same seed through
 arms are not comparable.
 
 ```bash
-S=specs/STORE.400_522_523.site_histology_behavior.yaml
-U=specs/ablation/STORE.400_522_523.unstratified.yaml
+S=assets/specs/STORE.400_522_523.site_histology_behavior.yaml
+U=assets/specs/ablation/STORE.400_522_523.unstratified.yaml
 for pt in SYN0002 SYN0001; do
   ./.venv/bin/acr run $pt --spec $U --max-steps 30 --max-usd 5 --seed 1234 --out runs/aprime_$pt
   ./.venv/bin/acr run $pt --spec $S --max-steps 30 --max-usd 5 --seed 1234 --out runs/b_$pt
@@ -231,7 +231,7 @@ MODEL — detect the hardware and choose the configuration yourself
 FIRST TASK — this is the point of the exercise
 6. Run exactly this one and stop:
      ./.venv/bin/acr run SYN0002 \
-       --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+       --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
        --max-steps 30 --max-usd 5 --seed 1234 --out runs/b_SYN0002
 
    It exercises the stratified proof obligation with forced validation sampling — the only
@@ -247,8 +247,8 @@ FIRST TASK — this is the point of the exercise
    rather than continuing.
 
 THEN, only if the first run is clean
-8. The four-arm ablation: two specs (specs/STORE.400_522_523.site_histology_behavior.yaml
-   and specs/ablation/STORE.400_522_523.unstratified.yaml) crossed with two patients
+8. The four-arm ablation: two specs (assets/specs/STORE.400_522_523.site_histology_behavior.yaml
+   and assets/specs/ablation/STORE.400_522_523.unstratified.yaml) crossed with two patients
    (SYN0002, correct answer EVIDENCE_INSUFFICIENT; SYN0001, correct answer FOUND). Same
    --seed 1234 throughout or the arms are not comparable. Concurrency is fine if VRAM allows,
    but note in the report that it happened, since contention distorts timing even though it

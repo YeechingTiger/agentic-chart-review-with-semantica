@@ -1,6 +1,6 @@
 ---
 name: store-to-spec
-description: How to turn a registry standard item (CoC STORE, NAACCR, AJCC) into an extraction spec in this repo's specs/*.yaml format. Use when adding a variable the system can extract - deciding which data items become one spec and which must stay apart, writing value domains the runtime can actually enforce, scoping a stratum to the fields it speaks to, choosing what must be proved before an absence claim is accepted, and recording which lines came from the manual and which the model invented. Its sibling guideline-to-rules writes RULES over variables; this one writes the VARIABLES those rules are keyed on.
+description: How to turn a registry standard item (CoC STORE, NAACCR, AJCC) into an extraction spec in this repo's assets/specs/*.yaml format. Use when adding a variable the system can extract - deciding which data items become one spec and which must stay apart, writing value domains the runtime can actually enforce, scoping a stratum to the fields it speaks to, choosing what must be proved before an absence claim is accepted, and recording which lines came from the manual and which the model invented. Its sibling guideline-to-rules writes RULES over variables; this one writes the VARIABLES those rules are keyed on.
 slot: task
 license: MIT
 ---
@@ -80,7 +80,7 @@ The rule: a stratum name is prose for the reader, `establishes:` is the claim. W
 disagree the agent follows the name. So for every (stratum, field) pair, ask whether a
 document of that class can establish **that field** — not the criterion, the field. The
 answers differ per field, which is the entire subject of
-`skills/store-to-spec/references/proof-obligations.md`.
+`assets/skills/store-to-spec/references/proof-obligations.md`.
 
 ## 3. Split or merge: one data item, or one agent pass?
 
@@ -164,7 +164,7 @@ answer_checks:
 ```
 
 The NOS *ladder* — which unspecified code sits above which, and why `8000` and `8010` are not
-interchangeable — is in `skills/store-to-spec/references/field-design.md`.
+interchangeable — is in `assets/skills/store-to-spec/references/field-design.md`.
 
 ## 6. Cite the item number you verified, or say you did not
 
@@ -263,8 +263,8 @@ Give the spec its own test file, and pin these five, all of which have failed be
 
 Further reading:
 
-- `skills/store-to-spec/references/field-design.md` — splitting versus merging, value domains
+- `assets/skills/store-to-spec/references/field-design.md` — splitting versus merging, value domains
   that enforce rules for free, NOS ladders and their proof burden.
-- `skills/store-to-spec/references/proof-obligations.md` — choosing strata for a new variable:
+- `assets/skills/store-to-spec/references/proof-obligations.md` — choosing strata for a new variable:
   which document classes can single-handedly establish it, which may merely mention it, which
   are silent, and why those three sets are different for every field.

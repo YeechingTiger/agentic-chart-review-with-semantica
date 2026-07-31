@@ -1,7 +1,7 @@
 # Worked example: one paragraph of guideline prose to one executable rule
 
 The rule built here is `NSCLC-ADJ-SYSTEMIC-II-IIIA`, which ships in
-`guidelines/nccn_nsclc_subset.yaml`. Every choice below is shown with the person who owns
+`assets/guidelines/nccn_nsclc_subset.yaml`. Every choice below is shown with the person who owns
 it. The final block is compared, character-structure for character-structure, against the
 shipped file by `tests/test_guideline_to_rules_skill.py`, so if this page and the file
 disagree the suite goes red rather than teaching you a shape nobody runs.
@@ -213,7 +213,7 @@ required_inputs:
   - {name: histology,             source: extraction_spec, spec_id: STORE.400_522_523.site_histology_behavior, item: "STORE [522]"}
   - {name: behavior,              source: extraction_spec, spec_id: STORE.400_522_523.site_histology_behavior, item: "STORE [523]"}
   - {name: class_of_case,         source: registry_limited_dataset, item: "STORE [610]",
-     why: "not derivable from notes — specs/STORE.610 answers SPEC_INSUFFICIENT / WRONG_DATA_SOURCE by design"}
+     why: "not derivable from notes — assets/specs/STORE.610 answers SPEC_INSUFFICIENT / WRONG_DATA_SOURCE by design"}
   - {name: pathologic_stage_group, source: extraction_spec, spec_id: STORE.700_880.stage, item: "AJCC 8th pathologic stage group"}
   - {name: surgical_resection_extent,   source: not_yet_extractable, item: "NAACCR RX Summ--Surg Prim Site [1290]"}
   - {name: surgical_margins,            source: not_yet_extractable, item: "NAACCR RX Summ--Surgical Margins [1320]"}

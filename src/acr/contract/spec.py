@@ -625,7 +625,7 @@ class ExtractionSpec(BaseModel):
     special_codes_not_mar: list[Any] = Field(default_factory=list)
     boundary_cases: list[Any] = Field(default_factory=list)
     search_hints: list[str] = Field(default_factory=list)
-    #: Which ICD-O-3 code table this variable codes into, by name in `codes/` — e.g.
+    #: Which ICD-O-3 code table this variable codes into, by name in `assets/codes/` — e.g.
     #: `icdo3_lung`. A TASK CONTRACT declaration: which code system a value belongs to is part
     #: of what the answer means, and it is not the runtime's guess to make.
     #:

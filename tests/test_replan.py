@@ -105,7 +105,7 @@ from acr.review.coverage_planner import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-SHB = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+SHB = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
 CORPUS = ROOT / "corpus" / "patients"
 
 #: A type this spec's `cannot_establish` stratum sweeps into `sample`. It is also the exact

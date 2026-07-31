@@ -195,14 +195,14 @@ def test_the_prompt_block_carries_the_exclusions_and_the_safeguards(t):
 
 # ------------------------------------------------------- YAML 的来源纪律
 def test_the_yaml_declares_itself_model_recalled_and_unbound():
-    """和 `specs/` 里那四张表同一个标准：模型回忆来的表必须自己说出来，并写明人该拿什么核对。"""
+    """和 `assets/specs/` 里那四张表同一个标准：模型回忆来的表必须自己说出来，并写明人该拿什么核对。"""
     d = yaml.safe_load((CODES_DIR / "icdo3_colorectal.yaml").read_text(encoding="utf-8"))
     sa = d["source_authority"]
     assert sa["origin"] == "model_recalled"
     assert sa["version_binding"] == "NOT_BOUND"
     assert "no clinical or registrar sign-off" in sa["status"]
     # 读**解析后**的字段，不读文件文本。注释说的是同一件事而 `yaml.safe_load` 会全部丢掉，
-    # 所以一个只有注释作依据的 `origin: model_recalled` 就是 `specs/` 加 `provenance:` 要
+    # 所以一个只有注释作依据的 `origin: model_recalled` 就是 `assets/specs/` 加 `provenance:` 要
     # 取代的那种"有标签没依据"。
     assert "RECALLED BY A LANGUAGE MODEL" in " ".join(sa["basis"].split())
     assert "not a transcription of ICD-O-3" in " ".join(sa["basis"].split())
@@ -338,7 +338,7 @@ def test_the_table_validates_against_every_registry_answer_in_the_corpus(lung):
 def test_the_lung_spec_declares_its_code_table():
     """一个值属于哪个码系统是答案**含义**的一部分，所以由 spec 说。运行时不从语料或字段名猜。"""
     from acr.contract.spec import load_spec as _ls
-    spec = _ls("specs/STORE.400_522_523.site_histology_behavior.yaml")
+    spec = _ls("assets/specs/STORE.400_522_523.site_histology_behavior.yaml")
     assert spec.value_domain == "icdo3_lung"
 
 
@@ -346,7 +346,7 @@ def test_a_spec_with_no_code_system_gets_no_block():
     """日期和 class-of-case 变量没有 ICD-O-3 值域。塞一墙肺形态码给它们忽略是提示词膨胀。"""
     from acr.contract.code_tables import code_domain_block
     from acr.contract.spec import load_specs as _lss
-    blocks = {sid: code_domain_block(sp) for sid, sp in _lss("specs").items()}
+    blocks = {sid: code_domain_block(sp) for sid, sp in _lss("assets/specs").items()}
     assert blocks["STORE.400_522_523.site_histology_behavior"]
     assert not blocks["STORE.390.date_of_initial_diagnosis"]
     assert not blocks["STORE.610.class_of_case"]
@@ -373,7 +373,7 @@ def test_the_rendered_block_contains_the_subsite_facts_a_run_got_wrong():
     """端到端：模型真正会读到的那段文字里，C341 旁边写着 'Upper lobe'。"""
     from acr.contract.code_tables import code_domain_block
     from acr.contract.spec import load_spec as _ls
-    b = code_domain_block(_ls("specs/STORE.400_522_523.site_histology_behavior.yaml"))
+    b = code_domain_block(_ls("assets/specs/STORE.400_522_523.site_histology_behavior.yaml"))
     assert "C341  Upper lobe, lung" in b
     assert "C342  Middle lobe, lung" in b
     assert "C343  Lower lobe, lung" in b

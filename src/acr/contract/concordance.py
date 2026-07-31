@@ -50,7 +50,7 @@ other three beside the rate, so the rate can never be read without its exclusion
 
 NO CLINICAL KNOWLEDGE LIVES IN THIS FILE. Which histologies are NSCLC, which stage groups
 trigger adjuvant therapy, which drug classes count and which exceptions are legitimate are
-declared in `guidelines/*.yaml`, where an oncologist can review them.
+declared in `assets/guidelines/*.yaml`, where an oncologist can review them.
 """
 from __future__ import annotations
 
@@ -225,7 +225,7 @@ class Guideline:
     #: patient whose stage was never established comes out NOT_APPLICABLE — determinately
     #: outside the population — instead of NOT_ASSESSABLE. That is the inflation this whole
     #: layer exists to refuse, arriving disguised as a value. It is the same bug
-    #: `contracts/extensions/note_type_filters.v2.schema.json` was written for: v1 allowed the
+    #: `assets/contracts/extensions/note_type_filters.v2.schema.json` was written for: v1 allowed the
     #: literal `unknown` as a list member, which made "the derivation did not run"
     #: indistinguishable from "there is nothing here" and hid a wiring failure for two months.
     unknown_value_codes: dict[str, tuple[str, ...]] = field(default_factory=dict)

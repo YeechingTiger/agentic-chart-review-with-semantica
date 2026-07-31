@@ -139,7 +139,7 @@ def dimensions(
 ):
     """Print THE FENCE: every evaluable dimension and whether a model judge is allowed on it.
 
-    This is the one namespace. `acr.evaluation.judge` advertises dimensions and `evaluators/*.yaml`
+    This is the one namespace. `acr.evaluation.judge` advertises dimensions and `assets/evaluators/*.yaml`
     declare one each; both are checked against these rows, and they once had zero names in
     common while every test on both sides passed.
     """

@@ -118,4 +118,4 @@ that was never resected **has** no pathologic stage, and a bounded statement lea
 lower bound on the record. Unknown stage is not missing at random — it clusters on patients
 who never reached an oncology consultation and on outside-facility workups.
 
-Further worked cases: `skills/store-staging/references/staging-boundary-cases.md`.
+Further worked cases: `assets/skills/store-staging/references/staging-boundary-cases.md`.

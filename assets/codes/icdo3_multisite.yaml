@@ -6,7 +6,7 @@ source_authority:
   status: model-recalled draft; no clinical or registrar sign-off
   scope: lung/bronchus (C34) and colorectal/anal (C18-C21) primaries
   origin: model_recalled
-  basis: mechanically merged from codes/icdo3_lung.yaml and codes/icdo3_colorectal.yaml on 2026-07-30.
+  basis: mechanically merged from assets/codes/icdo3_lung.yaml and assets/codes/icdo3_colorectal.yaml on 2026-07-30.
     No entry was authored here; every one carries the provenance of the table it came from, and both were
     RECALLED BY A LANGUAGE MODEL rather than transcribed from ICD-O-3.
   what_a_human_must_check: 'the same items the two source tables name, plus the merge itself: a morphology

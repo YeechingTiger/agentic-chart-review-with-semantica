@@ -4,7 +4,7 @@ Third-level detail. Load when you are deciding where one spec ends and the next 
 you are writing a `format` or an `allowable_values` list, or when a value domain has to admit
 an unknown code.
 
-Every example is from a spec in `specs/`. Two of them are defects that are still there.
+Every example is from a spec in `assets/specs/`. Two of them are defects that are still there.
 
 ---
 
@@ -54,7 +54,7 @@ boundary — is a rejection rather than a plausible answer.
 | `STORE.700_880` | 9 fields, 1 spec | nine data items, one staging conversation; the c/p split is the point |
 | `STORE.390` | 2 fields | `month_day_imputed` records *how* the date was obtained, not another date |
 | `STORE.1860_1880` | 2 fields | a recurrence date is meaningless without the type that says a recurrence happened |
-| `STORE.610` | 1 field, never filled | not a property of the chart at all — see `skills/store-to-spec/references/proof-obligations.md` |
+| `STORE.610` | 1 field, never filled | not a property of the chart at all — see `assets/skills/store-to-spec/references/proof-obligations.md` |
 
 `month_day_imputed` is worth copying as a pattern. When a rule says "approximate it if you
 must", the approximation is a second fact about the answer, and a boolean beside the value is

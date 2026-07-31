@@ -1,6 +1,6 @@
 """The authoring skill must not teach a rule the tree has stopped obeying.
 
-`skills/store-to-spec/` tells an engineer how to turn a registry standard item into a spec in
+`assets/skills/store-to-spec/` tells an engineer how to turn a registry standard item into a spec in
 this repo's format. Everything it teaches is a claim about code and specs that live elsewhere
 and are being edited by other people, so every claim here has a second life as a fact this
 file re-checks:
@@ -34,12 +34,12 @@ from acr.contract.spec import ExtractionSpec, load_spec
 from acr.review.coverage import StratumSpec
 
 ROOT = Path(__file__).resolve().parents[1]
-SKILL_DIR = ROOT / "skills" / "store-to-spec"
+SKILL_DIR = ROOT / "assets" / "skills" / "store-to-spec"
 SKILL = SKILL_DIR / "SKILL.md"
 FIELD_DESIGN = SKILL_DIR / "references" / "field-design.md"
 PROOF_OBLIGATIONS = SKILL_DIR / "references" / "proof-obligations.md"
-SPEC_PATHS = sorted((ROOT / "specs").rglob("*.yaml"))
-STAGE = ROOT / "specs" / "STORE.700_880.stage.yaml"
+SPEC_PATHS = sorted((ROOT / "assets" / "specs").rglob("*.yaml"))
+STAGE = ROOT / "assets" / "specs" / "STORE.700_880.stage.yaml"
 
 # --------------------------------------------------------------------- known, current gaps
 #
@@ -53,16 +53,16 @@ _PROOF_OBLIGATIONS_MISSING = not PROOF_OBLIGATIONS.is_file()
 skip_no_proof_obligations = pytest.mark.skipif(
     _PROOF_OBLIGATIONS_MISSING,
     reason=(
-        "skills/store-to-spec/references/proof-obligations.md was never written (build agent "
+        "assets/skills/store-to-spec/references/proof-obligations.md was never written (build agent "
         "killed by org spend limit before authoring it; SKILL.md and field-design.md already "
         "point at this path)"
     ),
 )
 
-# 2. `specs/STORE.700_880.stage.yaml` no longer loads. This is not a store-to-spec skill
+# 2. `assets/specs/STORE.700_880.stage.yaml` no longer loads. This is not a store-to-spec skill
 #    problem: `src/acr/spec.py` is locally modified (not this skill's file, not committed)
 #    to require a provenance record on every enforced element, and this spec was not updated
-#    to match -- that repair belongs to whoever owns specs/ and acr/spec.py, not to this
+#    to match -- that repair belongs to whoever owns assets/specs/ and acr/spec.py, not to this
 #    skill's authors. Recomputed here (rather than hard-coded) so the guard clears itself
 #    the moment the other team's fix lands.
 try:
@@ -73,7 +73,7 @@ except Exception as _e:  # noqa: BLE001 - want to name and skip on *any* load fa
 skip_stage_spec_broken = pytest.mark.skipif(
     _STAGE_SPEC_ERROR is not None,
     reason=(
-        "specs/STORE.700_880.stage.yaml fails load_spec() under acr.contract.spec's provenance "
+        "assets/specs/STORE.700_880.stage.yaml fails load_spec() under acr.contract.spec's provenance "
         f"enforcement (owned by another team, currently mid-edit): {_STAGE_SPEC_ERROR}"
     ),
 )

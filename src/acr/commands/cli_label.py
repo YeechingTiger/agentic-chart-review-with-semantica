@@ -5,7 +5,7 @@ WHY THIS FILE EXISTS AT ALL
 ---------------------------
 `acr.improvement.labelling` is 1292 lines with a test file beside it and, until this module, no way to
 run it. A development tool nobody can invoke is a development tool nobody runs, and the
-keyword lists and read policies in `specs/` stay guesses for exactly as long as that is true.
+keyword lists and read policies in `assets/specs/` stay guesses for exactly as long as that is true.
 
 NOTHING HERE RUNS BY DEFAULT AND NOTHING SPENDS BY DEFAULT
 ----------------------------------------------------------

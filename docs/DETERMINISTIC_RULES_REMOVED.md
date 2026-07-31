@@ -113,7 +113,7 @@ see synoptic 3   amended 1                                            (197 detec
 ```
 
 All but `truncated` are substrings scanned across document text, parsed out of a Markdown table in
-`skills/thread-chasing/SKILL.md`. `addendum` refused 40 times while `read_section("ADDENDUM")`
+`assets/skills/thread-chasing/SKILL.md`. `addendum` refused 40 times while `read_section("ADDENDUM")`
 could address that heading in **0 of the 2,401 documents containing the word** — an obligation
 whose tool could never reach its target.
 
@@ -272,7 +272,7 @@ a refusal, and it also keeps `terminal ⊆ missing` true in both modes.
 
 Coverage obligations produced roughly 150 answer rejections across the recorded traces, **27 of
 which refused a tuple that was exactly the registry's**. The obligation now lives in
-`skills/coverage-judgement/SKILL.md`. `enforce=True` is retained for the diagnostic arm, which
+`assets/skills/coverage-judgement/SKILL.md`. `enforce=True` is retained for the diagnostic arm, which
 COVERAGE_THREE_ARM_PILOT.md already said was not a candidate default.
 
 ## What the gate still enforces

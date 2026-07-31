@@ -1,4 +1,4 @@
-"""Every skill in `skills/` must survive the loader that actually reads it.
+"""Every skill in `assets/skills/` must survive the loader that actually reads it.
 
 deepagents drops a malformed skill silently: missing frontmatter, a non-mapping mapping, an
 empty `name` or `description` all produce a log warning and nothing else, so the model never
@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-SKILLS_DIR = Path(__file__).resolve().parents[1] / "skills"
+SKILLS_DIR = Path(__file__).resolve().parents[1] / "assets" / "skills"
 
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -48,14 +48,14 @@ def _skill_dirs() -> list[Path]:
 # test_skill_loads too.
 _SKILL_LOAD_GAPS = {
     "guideline-to-rules": (
-        "skills/guideline-to-rules/SKILL.md was never written -- only "
+        "assets/skills/guideline-to-rules/SKILL.md was never written -- only "
         "references/worked-example.md landed before the build agent was killed by the org "
         "spend limit; see tests/test_guideline_to_rules_skill.py for the rest of the gap"
     ),
 }
 _REFERENCE_POINTER_GAPS = {
     "store-to-spec": (
-        "skills/store-to-spec/references/proof-obligations.md is pointed at by SKILL.md and "
+        "assets/skills/store-to-spec/references/proof-obligations.md is pointed at by SKILL.md and "
         "field-design.md but was never written -- see tests/test_store_to_spec_skill.py"
     ),
 }
@@ -108,9 +108,11 @@ def test_reference_pointers_resolve(skill_dir: Path):
     404s; repo-relative is what works from the repo root, which is where deep_runner must be
     launched anyway.
     """
-    repo = SKILLS_DIR.parent
+    # SKILLS_DIR 现在是 <root>/assets/skills，所以 repo root 要再上一层。指针本身写成
+    # 仓库根相对的 `assets/skills/…`，两者相接才是真实路径。
+    repo = SKILLS_DIR.parents[1]
     for md in skill_dir.rglob("*.md"):
-        for ref in re.findall(r"`(skills/[A-Za-z0-9_/.-]+\.md)`", md.read_text()):
+        for ref in re.findall(r"`(assets/skills/[A-Za-z0-9_/.-]+\.md)`", md.read_text()):
             assert (repo / ref).is_file(), f"{md} points at missing {ref}"
         for bare in re.findall(r"`(references/[A-Za-z0-9_/.-]+\.md)`", md.read_text()):
             pytest.fail(f"{md}: pointer {bare!r} is cwd-relative; write it repo-relative")

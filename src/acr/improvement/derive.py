@@ -26,7 +26,7 @@ measurement of cost, and neither half was imagined.
 
 THE STRATUM BUG THIS MODULE EXISTS TO UNDO (stage 4)
 ----------------------------------------------------
-`specs/STORE.400_522_523` has a stratum named `cannot_establish`, and that one name bundles
+`assets/specs/STORE.400_522_523` has a stratum named `cannot_establish`, and that one name bundles
 two independent facts:
 
     MAY NOT ESTABLISH the field   — a clinical judgement about a document type's standing

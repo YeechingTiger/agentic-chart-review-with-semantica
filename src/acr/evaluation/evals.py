@@ -30,7 +30,7 @@ split parent naming two rows. A per-dimension fence has to pick one answer for t
 dimension and is wrong either way: it forbids "does this quote actually support this value",
 or it lets a model re-decide admissibility the gate already computed.
 
-THIS REGISTRY IS THE ONE NAMESPACE. `acr.evaluation.judge` advertises dimensions; `evaluators/*.yaml`
+THIS REGISTRY IS THE ONE NAMESPACE. `acr.evaluation.judge` advertises dimensions; `assets/evaluators/*.yaml`
 declare one each; both are checked against these rows. They were not, and the two sides had
 zero names in common (see `unknown_dimensions`, and the seam test in tests/test_judge.py).
 

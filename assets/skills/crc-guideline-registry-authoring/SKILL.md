@@ -29,11 +29,11 @@ Never promote a candidate because it parses. Parsing proves structure, not clini
 - Read [evidence-coverage-contract.md](references/evidence-coverage-contract.md) before
   calculating registry coverage or agent-validation coverage.
 
-When editing an existing repository spec, also load that repository's own spec-authoring skill. In this project that is `skills/store-to-spec/SKILL.md`; its runtime-specific rules take precedence over the portable baseline here.
+When editing an existing repository spec, also load that repository's own spec-authoring skill. In this project that is `assets/skills/store-to-spec/SKILL.md`; its runtime-specific rules take precedence over the portable baseline here.
 
 ## Required bundle
 
-Create or update this shape outside the production `specs/` and `guidelines/` directories:
+Create or update this shape outside the production `assets/specs/` and `assets/guidelines/` directories:
 
 ```text
 <bundle>/
@@ -216,7 +216,7 @@ Run:
 ```bash
 .venv/bin/python <bundle>/intake/build_variable_concept_inventory.py --check
 .venv/bin/python <bundle>/normalization/validate_full_normalization.py <bundle>
-.venv/bin/python skills/crc-guideline-registry-authoring/scripts/validate_bundle.py <bundle>
+.venv/bin/python assets/skills/crc-guideline-registry-authoring/scripts/validate_bundle.py <bundle>
 ```
 
 For an authorized authoring rebuild, additionally run the write-producing commands below.
@@ -224,9 +224,9 @@ For a read-only assessment, do not run them against the checked-in bundle; use a
 copy if deterministic regeneration must be tested.
 
 ```bash
-.venv/bin/python skills/crc-guideline-registry-authoring/scripts/materialize_variable_specs.py <bundle> --replace
-.venv/bin/python skills/crc-guideline-registry-authoring/scripts/compute_universe_coverage.py <bundle>
-.venv/bin/python skills/crc-guideline-registry-authoring/scripts/compute_evidence_coverage.py <bundle>
+.venv/bin/python assets/skills/crc-guideline-registry-authoring/scripts/materialize_variable_specs.py <bundle> --replace
+.venv/bin/python assets/skills/crc-guideline-registry-authoring/scripts/compute_universe_coverage.py <bundle>
+.venv/bin/python assets/skills/crc-guideline-registry-authoring/scripts/compute_evidence_coverage.py <bundle>
 ```
 
 This repository requires Python 3.11+; use its virtual-environment interpreter rather than the system Python. Also run the host repository's native spec loader/tests when available. The portable validator checks authoring integrity; it does not replace clinical review or runtime tests.

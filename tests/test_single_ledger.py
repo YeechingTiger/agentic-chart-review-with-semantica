@@ -55,7 +55,7 @@ def test_the_ledger_reports_which_mode_it_is_in():
 
     strata = acr.review.coverage.strata_from_spec(
         __import__("acr.contract.spec", fromlist=["load_spec"]).load_spec(
-            Path(__file__).resolve().parents[1] / "specs"
+            Path(__file__).resolve().parents[1] / "assets" / "specs"
             / "STORE.400_522_523.site_histology_behavior.yaml"
         )
     )

@@ -98,8 +98,8 @@ from acr.review.coverage import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-SHB = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
-ALL_SPECS = sorted((ROOT / "specs").rglob("*.yaml"))
+SHB = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+ALL_SPECS = sorted((ROOT / "assets" / "specs").rglob("*.yaml"))
 
 
 def test_tracer_serializes_concurrent_event_sequence_and_file_order(tmp_path):
@@ -127,7 +127,7 @@ def _loadable_specs():
     for p in ALL_SPECS:
         try:
             out.append((p, load_spec(p)))
-        except Exception:      # noqa: BLE001 - another team owns specs/; a broken one is
+        except Exception:      # noqa: BLE001 - another team owns assets/specs/; a broken one is
             continue           # their finding, not a reason this module cannot be tested
     return out
 
@@ -696,7 +696,7 @@ def test_the_check_reads_only_what_the_answer_cited():
 
 def _site_checks():
     from acr.contract.spec import load_spec
-    return load_spec("specs/STORE.400_522_523.site_histology_behavior.yaml").answer_checks
+    return load_spec("assets/specs/STORE.400_522_523.site_histology_behavior.yaml").answer_checks
 
 
 def _kinds(ev, code):

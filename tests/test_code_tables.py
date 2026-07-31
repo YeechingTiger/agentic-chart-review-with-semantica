@@ -20,7 +20,7 @@ import pytest
 import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-CODES = ROOT / "codes"
+CODES = ROOT / "assets" / "codes"
 
 #: 一张与肿瘤无关的码表，写成资产该有的样子。两个轴，各自带自己的标题、字段名和码形。
 LIPID_TABLE = {

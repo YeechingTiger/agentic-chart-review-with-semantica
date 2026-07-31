@@ -31,7 +31,7 @@
 写死的、医生签过字的、锁死的。规定这次填哪几项、什么值算对、什么记录够格当依据。
 **机器人只能照办，不能改，也不能不听。**
 
-**二、经验卡**（代码里叫 skill，这个词保留，因为是目录名 `skills/*/SKILL.md`）
+**二、经验卡**（代码里叫 skill，这个词保留，因为是目录名 `assets/skills/*/SKILL.md`）
 不是规定，是"老手怎么干这活"。机器人可以不照做，但要在工作记录里写清为什么。
 
 分三个槽，一个槽装一类：
@@ -151,7 +151,7 @@ trajectory，不是归因。它回答的都是**没有标准答案、也没法�
 2. **观感分只能用来筛查和排序**（哪些 run 值得人先看），永远不能当闸门拦答案，
    也永远不和程序算的分平均。
 
-**扩展方式：加一个评卷角度 = 加一个 `evaluators/` 下的 YAML 文件，不改代码。**
+**扩展方式：加一个评卷角度 = 加一个 `assets/evaluators/` 下的 YAML 文件，不改代码。**
 这是 `judge.py` 自己定的规矩（往内置字典里加镜头 = 改代码 + 部署 + 领域专家没法
 签字确认）。YAML 里声明评哪个维度、问什么问题、需要什么材料；加载时围栏自动核查
 ——一个声称要判"正确性"的评卷 YAML 会被**拒绝加载**，因为正确性有程序在算。
@@ -295,13 +295,13 @@ P05 那个 8046 错误（"特殊染色待出"的结论就在同一份文件往�
 |---|---|
 | 跑病历的模块 | chart agent，`acr run` / `acr batch` / `acr extract` |
 | 评测的模块 | eval，`acr eval` / `acr attribute` / `acr audit` |
-| 填表规定 | spec（`specs/*.yaml`） |
-| 经验卡 | skill（`skills/*/SKILL.md`） |
+| 填表规定 | spec（`assets/specs/*.yaml`） |
+| 经验卡 | skill（`assets/skills/*/SKILL.md`） |
 | 三个槽 | `slot: task / search / general` |
 | 病历怎么翻的卡 | search policy skill |
 | 诊断卡（归因用） | eval skill（`slot: eval`） |
 | 评卷员 | agent-as-a-judge（`judge.py`） |
-| 评卷角度/镜头 | Lens（`judge.LENSES`）；新角度是 `evaluators/*.yaml` |
+| 评卷角度/镜头 | Lens（`judge.LENSES`）；新角度是 `assets/evaluators/*.yaml` |
 | 蒙着答案 | key-blinded（`BlindPacket`，字段上就没地方放答案） |
 | 工作记录 | trace |
 | 标准答案 | gold / ground truth |

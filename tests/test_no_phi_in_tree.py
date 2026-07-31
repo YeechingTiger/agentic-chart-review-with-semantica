@@ -2,7 +2,7 @@
 
 The corpus under `/N/project/computable_phenotype/acr_real/` is real PHI. The repo is not a
 safe place for any of it, and the leak this guards against already happened: real
-`person_id`s were pasted into `skills/` write-ups and into `src/` docstrings as evidence for
+`person_id`s were pasted into `assets/skills/` write-ups and into `src/` docstrings as evidence for
 design decisions ("patient <id> was coded C349 when 'right upper lobe' was documented").
 They were accurate, they were useful, and they were sixteen digits of protected health
 information sitting in source control.
@@ -25,7 +25,7 @@ Two scopes, because the leak and the commit are different events:
     tracked file is a file that gets pushed. It covers content AND path, since
     `runs/azure_real_<person_id>/` carries the identifier in its name as well as inside
     the manifest.
-  * The SOURCE directories in the working tree, tracked or not. `skills/` and half of
+  * The SOURCE directories in the working tree, tracked or not. `assets/skills/` and half of
     `src/acr/` were untracked when the ids were found in them, so a tracked-only check
     would have reported all clear on the exact files that were leaking.
 
@@ -48,7 +48,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PERSON_ID = re.compile(rb"1168[0-9]{12}")
 
 #: Directories that belong to the repo and must be clean whether or not they are committed.
-SOURCE_DIRS = ("src", "skills", "specs", "tests", "contracts", "tools", "guidelines")
+SOURCE_DIRS = ("src", "assets", "tests", "tools")
 
 #: Not scanned. `.venv*` vendors third parties -- google-genai ships a GCP dataset resource
 #: id that matches the pattern by coincidence and is not PHI. `corpus/` is the fabricated
@@ -142,7 +142,7 @@ def test_no_run_output_is_tracked():
 
 @pytest.mark.parametrize("directory", SOURCE_DIRS)
 def test_no_real_person_id_in_the_source_tree(directory: str):
-    """Untracked source counts too: `skills/` and much of `src/acr/` were untracked at the
+    """Untracked source counts too: `assets/skills/` and much of `src/acr/` were untracked at the
     moment the ids were found sitting in them."""
     base = ROOT / directory
     if not base.is_dir():

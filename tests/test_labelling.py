@@ -1,6 +1,6 @@
 """Acceptance tests for the full-scan labeller. EVERY TEST RUNS OFFLINE, ON FIXTURES HERE.
 
-No test reads the real corpus, no test reads `specs/*.yaml`, and no test makes a model call:
+No test reads the real corpus, no test reads `assets/specs/*.yaml`, and no test makes a model call:
 `no_network` is autouse and detonates `litellm.completion`, so a test that quietly acquires a
 real client fails loudly instead of billing somebody.
 

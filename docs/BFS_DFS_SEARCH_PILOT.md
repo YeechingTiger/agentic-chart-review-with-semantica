@@ -29,7 +29,7 @@ Everything else is held: same spec, same corpus, same model, same `--seed 1234`,
 
 ## Which spec, and why not the obvious one
 
-**`specs/STORE.390.date_of_initial_diagnosis.yaml`**, on all twelve synthetic patients.
+**`assets/specs/STORE.390.date_of_initial_diagnosis.yaml`**, on all twelve synthetic patients.
 
 The first attempt used `STORE.400_522_523.site_histology_behavior`, and it had to be abandoned
 five charts in. That spec declares `value_domain: icdo3_lung` — eight lung topography codes and
@@ -89,14 +89,14 @@ tree that was only modified by the pilot's own output.
 
 ```bash
 for skill in search-native search-breadth-first search-depth-first search-breadth-then-depth; do
-  acr batch --spec specs/STORE.390.date_of_initial_diagnosis.yaml \
+  acr batch --spec assets/specs/STORE.390.date_of_initial_diagnosis.yaml \
             --skills "search=$skill" --seed 1234 --max-usd 1.0 \
             --out "runs/pilot/${skill#search-}"
 done
 
 for skill in search-native search-breadth-first search-depth-first search-breadth-then-depth; do
   acr signal batch --kind rule --runs "runs/pilot/${skill#search-}"* \
-                   --spec specs/STORE.390.date_of_initial_diagnosis.yaml \
+                   --spec assets/specs/STORE.390.date_of_initial_diagnosis.yaml \
                    --out "signals/pilot-${skill#search-}.json"
 done
 ```
@@ -171,7 +171,7 @@ finding arrives only after seeing one.
 Run 2026-07-31, twelve synthetic patients per arm, `--seed 1234`, `gpt-5.6-luna` via
 OpenRouter, `STORE.390` spec hash unchanged across arms, `task` and `general` skill slots
 identical across arms. Accuracy from `acr eval score`; operational columns read from the
-manifests and traces; cost priced post hoc from recorded `usage` against `audit/prices.json`
+manifests and traces; cost priced post hoc from recorded `usage` against `assets/pricing/prices.json`
 (the runs predate that table, so their own `spend.usd` is null).
 
 | | native | breadth-first | depth-first | breadth-then-depth |

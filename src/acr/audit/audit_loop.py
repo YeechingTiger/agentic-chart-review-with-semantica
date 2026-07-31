@@ -372,7 +372,7 @@ class AuditStore:
             asset = by_ref[finding.rule_ref]
             signal = finding.to_signal(asset.asset_ref)
             self.local_store.append_jsonl(
-                "audit/findings.jsonl",
+                "assets/pricing/findings.jsonl",
                 signal.to_dict(),
                 idempotency_key=signal.signal_id,
             )
@@ -380,7 +380,7 @@ class AuditStore:
             asset = by_ref[incident.rule_ref]
             signal = incident.to_signal(asset.asset_ref)
             self.local_store.append_jsonl(
-                "audit/incidents.jsonl",
+                "assets/pricing/incidents.jsonl",
                 signal.to_dict(),
                 idempotency_key=signal.signal_id,
             )

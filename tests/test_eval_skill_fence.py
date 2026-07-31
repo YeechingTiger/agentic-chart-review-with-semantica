@@ -20,7 +20,7 @@ from acr.contract.skills import (
     skill_slot,
 )
 
-SKILLS_DIR = Path(__file__).resolve().parents[1] / "skills"
+SKILLS_DIR = Path(__file__).resolve().parents[1] / "assets" / "skills"
 
 
 def _eval_skills() -> list[str]:

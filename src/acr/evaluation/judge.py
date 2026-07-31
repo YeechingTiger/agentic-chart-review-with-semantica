@@ -77,8 +77,8 @@ test_every_dimension_the_judge_advertises_is_known_to_the_registry` fails if tha
 
 AN EVALUATOR IS A SPEC FILE, NOT CODE
 --------------------------------------
-A new evaluation need is met by writing a YAML in `evaluators/`, never by editing this
-module — the same artifact class as `specs/` and `guidelines/`. `load_evaluator()` holds the
+A new evaluation need is met by writing a YAML in `assets/evaluators/`, never by editing this
+module — the same artifact class as `assets/specs/` and `assets/guidelines/`. `load_evaluator()` holds the
 five load-time refusals; see the section at the bottom of this file. The one that matters
 most is that an evaluator ships with a case it MUST FAIL, because an evaluator that scores
 everything the same is indistinguishable from a clean system.
@@ -306,7 +306,7 @@ class Lens:
 
 
 #: The BUILT-IN panels, for the dimensions this module has always exposed through `judge()`.
-#: A NEW evaluation need does not come here: it is a YAML in `evaluators/`, loaded by
+#: A NEW evaluation need does not come here: it is a YAML in `assets/evaluators/`, loaded by
 #: `load_evaluator()` and run by `run_evaluator()`. Adding a lens to this dict is a code
 #: change, a deploy, and a domain expert who cannot read or sign what they asked for.
 LENSES: dict[str, tuple[Lens, ...]] = {
@@ -690,7 +690,7 @@ def screen_for_human(verdicts: Sequence[Verdict], *, flag_at_or_below: float,
 
 
 # ================================================ AN EVALUATOR IS A SPEC FILE, NOT CODE
-# A new evaluation need is a new YAML in `evaluators/`. Nobody deploys code to ask a new
+# A new evaluation need is a new YAML in `assets/evaluators/`. Nobody deploys code to ask a new
 # question, and a domain expert can read and sign the whole evaluator without reading Python.
 #
 # Five refusals happen at LOAD, before a token is spent. Each is a defect this repo has
@@ -790,7 +790,7 @@ class ToolGrant:
 
 @dataclass(frozen=True)
 class EvaluatorSpec:
-    """A loaded `evaluators/*.yaml`. Frozen: nothing widens a grant after the load checks."""
+    """A loaded `assets/evaluators/*.yaml`. Frozen: nothing widens a grant after the load checks."""
 
     evaluator_id: str
     dimension: str
@@ -994,7 +994,7 @@ def parse_evaluator(data: Mapping[str, Any], *, registry: Any, source: str = "",
 
 
 def load_evaluator(path: str | Path, *, registry: Any) -> EvaluatorSpec:
-    """Load one `evaluators/*.yaml`. Refuses rather than degrades."""
+    """Load one `assets/evaluators/*.yaml`. Refuses rather than degrades."""
     import yaml  # local: this module stays importable without a YAML parser present
 
     p = Path(path)

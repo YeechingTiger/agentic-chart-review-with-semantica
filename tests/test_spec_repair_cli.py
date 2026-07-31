@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 from acr.commands.cli import app
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / "specs/STORE.400_522_523.site_histology_behavior.yaml"
+SPEC = ROOT / "assets/specs/STORE.400_522_523.site_histology_behavior.yaml"
 SPEC_ID = "STORE.400_522_523.site_histology_behavior"
 runner = CliRunner()
 

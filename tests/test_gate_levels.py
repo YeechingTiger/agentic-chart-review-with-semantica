@@ -17,7 +17,7 @@ does not exist and for one this patient lacks: a level confusion, not a typo.
 # it still counts strata, samples and residual bounds identically, but routes its sentences to
 # `advisories` instead of `missing` so they inform the model rather than refuse its answer.
 # "Have I looked at enough of this chart?" is a clinical judgement and now lives in
-# `skills/coverage-judgement/SKILL.md`; measured over every recorded trace, coverage obligations
+# `assets/skills/coverage-judgement/SKILL.md`; measured over every recorded trace, coverage obligations
 # produced ~150 answer rejections and 27 of them refused a tuple that was exactly the registry's.
 #
 # These tests are about the ARITHMETIC, which is unchanged and still worth pinning: a bound that
@@ -34,7 +34,7 @@ from acr.contract.spec import load_spec
 from acr.review.coverage import CoverageLedger, ForcedSampler, evaluate_gate, strata_from_spec
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+SPEC = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
 
 
 @pytest.fixture(scope="module")

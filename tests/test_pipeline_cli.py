@@ -34,7 +34,7 @@ from acr.contract.concordance import variables_from_answer
 from acr.core.llm import LLMClient, LLMConfig, LLMResponse
 
 ROOT = Path(__file__).resolve().parents[1]
-GUIDELINE = ROOT / "guidelines" / "nccn_nsclc_subset.yaml"
+GUIDELINE = ROOT / "assets" / "guidelines" / "nccn_nsclc_subset.yaml"
 runner = CliRunner()
 
 SHB = "STORE.400_522_523.site_histology_behavior"
@@ -115,7 +115,7 @@ def pipeline(tmp_path: Path) -> Path:
     """Six patients chosen so every L4 outcome and both L5 verdict families appear."""
     doc = {
         "schema": EXTRACT_SCHEMA, "created_utc": "2026-07-26T21:00:00+00:00",
-        "code_sha": "test", "corpus": "corpus/patients", "specs_dir": "specs",
+        "code_sha": "test", "corpus": "corpus/patients", "specs_dir": "assets/specs",
         "cohort": "cohort.csv", "model": "test", "sample_seed": 7, "n_failed_runs": 0,
         "resolution": {"requested": ["primary_site", "histology", "behavior", "stage"],
                        "variables": [], "spec_ids": [SHB, STG]},

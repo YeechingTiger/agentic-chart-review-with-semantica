@@ -21,7 +21,7 @@ from acr.contract.spec import load_spec
 from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+SPEC = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
 
 
 @pytest.fixture

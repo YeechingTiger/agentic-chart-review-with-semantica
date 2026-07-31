@@ -73,7 +73,7 @@ app.add_typer(site_mapping_app, name="site-mapping")
 # run depends on — the keyword lists and the strata — against a complete per-note labelling of
 # a small dev set, and refuses to certify one on data the search has seen. Mounted here rather
 # than kept as a private entry point because the loop it implements (measure -> propose ->
-# evolve -> certify -> adopt) is the only way anything in `specs/` stops being a guess, and a
+# evolve -> certify -> adopt) is the only way anything in `assets/specs/` stops being a guess, and a
 # development tool nobody can find is a development tool nobody runs.
 from ..improvement.assetdev import assets_app
 

@@ -144,7 +144,7 @@ What was built instead:
   seven portable concept descriptions and the patient's own type list; it decides what to open.
   No ordering, no keyword list, no measurement claimed. A certified prior would render under its
   own heading with its measurement attached and remain declinable; there is none yet.
-- **The stopping rule is the model's.** `skills/coverage-judgement/SKILL.md` carries the
+- **The stopping rule is the model's.** `assets/skills/coverage-judgement/SKILL.md` carries the
   questions to settle before claiming absence. `evaluate_gate` still counts and now advises.
 - **Search got notation tolerance instead of a plan.** Folding whitespace and hyphens found
   +225 documents on `non-small cell` (+10.0%) and +1.6% over ten phrases. Synonyms stay out: the

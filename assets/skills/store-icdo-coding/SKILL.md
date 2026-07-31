@@ -91,5 +91,5 @@ what that biopsy showed. Answer `EVIDENCE_INSUFFICIENT` for histology and behavi
 plainly that the diagnosis is radiographic or clinical without tissue confirmation — and
 still report `primary_site` if the site of origin is documented.
 
-Further worked cases: `skills/store-icdo-coding/references/boundary-cases.md`. The bare
+Further worked cases: `assets/skills/store-icdo-coding/references/boundary-cases.md`. The bare
 relative form resolves against the process cwd and 404s; this path is the one that opens.

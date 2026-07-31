@@ -107,4 +107,4 @@ slice as though it were the whole.
    field's column was actually searched and that no result was left truncated.
 
 Measured stem-yield tables and the per-field worksheet:
-`skills/keyword-strategy/references/stem-yields.md`.
+`assets/skills/keyword-strategy/references/stem-yields.md`.

@@ -99,7 +99,7 @@ KEY_AGNOSTIC_SKILLS: tuple[str, ...] = ("eval-contrast-traces", "eval-cluster-fa
 #: WHICH CARDS EACH TRUTH MODE LICENSES. Keyed by `attribution.ATTRIBUTION_MODES`, because the
 #: posture toward the key IS the truth mode and that vocabulary already exists in two places:
 #: `EvaluationTask.truth_mode` validates the same three values, and every
-#: `module_catalog/**/*.yaml` declares `truth_modes:`. The methodology doc's §4.1 is titled
+#: `assets/module_catalog/**/*.yaml` declares `truth_modes:`. The methodology doc's §4.1 is titled
 #: "Truth mode 决定结论上限" — it is a ceiling on what a diagnosis may CONCLUDE, and the cards
 #: follow from it rather than the other way round.
 #:

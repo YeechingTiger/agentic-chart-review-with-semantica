@@ -27,7 +27,7 @@ Python decides it. Every CONSEQUENCE is code:
     term naming a field or a value no spec produces refuses the whole predicate.
   * whether a variable is answerable from notes is read off `spec.data_source`, never off the
     model's opinion. A classifier that calls `class_of_case` an ordinary extraction is
-    overruled by `specs/STORE.610.class_of_case.yaml`, which exists precisely to refuse.
+    overruled by `assets/specs/STORE.610.class_of_case.yaml`, which exists precisely to refuse.
   * everything left over becomes a `Gap` carrying a named remedy. Never a default, never an
     invented variable.
 
@@ -38,7 +38,7 @@ already exists to prevent, one layer up, for the same reason.
 
 WHY THE GAP LIST IS THE PRODUCT
 -------------------------------
-Routing `guidelines/nccn_nsclc_subset.yaml` resolves 6 of its 22 distinct inputs. The other
+Routing `assets/guidelines/nccn_nsclc_subset.yaml` resolves 6 of its 22 distinct inputs. The other
 16 are declared `not_yet_extractable` or `registry_limited_dataset` in the guideline itself.
 An intake layer that reported "3 recommendations routed" and stopped would be technically
 true and operationally a lie: nothing can be scored. The honest unit of output here is the
@@ -143,7 +143,7 @@ PLACEHOLDER = "PLACEHOLDER_REQUIRES_HUMAN_INPUT"
 #: Where a NEW_VARIABLE route sends the human. Checked for existence at route time, because a
 #: route to a skill that is not in the tree is the "declared but never run" failure this repo
 #: keeps finding — a constraint written down, wired to nothing, and believed for months.
-SPEC_AUTHORING_SKILL = "skills/spec-authoring"
+SPEC_AUTHORING_SKILL = "assets/skills/spec-authoring"
 
 
 class IntakeError(ValueError):
@@ -600,7 +600,7 @@ def check_predicate(terms: Sequence[dict], catalog: VariableCatalog, *,
     Four checks, and each one closes a failure this repo has already paid for:
 
       1. the variable must be an EXACT field name of exactly one spec. `check_guideline_bindings`
-         exists because `guidelines/` once named `ajcc_pathologic_stage` where the spec's field
+         exists because `assets/guidelines/` once named `ajcc_pathologic_stage` where the spec's field
          is `pathologic_stage_group`. Nothing errored; the variable simply never arrived, every
          case came back NOT_ASSESSABLE naming a variable the operator believed was requested,
          and the concordance denominator went quietly to zero.
@@ -1244,7 +1244,7 @@ def route(question: str, catalog: VariableCatalog, *, classifier: Classifier | N
 def _skill_gaps(gaps: Sequence[Gap], skills_dir: str | Path) -> list[Gap]:
     """One extra gap when a route points at a skill that is not in the tree.
 
-    Every NEW_VARIABLE outcome tells a human to go to `skills/spec-authoring`. If that
+    Every NEW_VARIABLE outcome tells a human to go to `assets/skills/spec-authoring`. If that
     directory does not exist the instruction is decoration, and decoration that looks like a
     process is this repo's most-repeated failure: a constraint written down, wired to nothing,
     and believed. Checked once per decision, not once per gap.

@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-BUNDLE = ROOT / "authoring" / "crc" / "core_v1"
+BUNDLE = ROOT / "assets" / "usecase" / "crc" / "core_v1"
 NORMALIZATION = BUNDLE / "normalization"
 
 

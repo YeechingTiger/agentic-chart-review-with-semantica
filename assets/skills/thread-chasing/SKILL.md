@@ -64,7 +64,7 @@ results came back `truncated: true` and only 11 (10%) were ever continued.**
 | `outside facility`, `outside hospital`, `outside institution` | the document is not in this chart | **you cannot discharge this by reading.** See below |
 
 Base rates and the false-positive traps for each marker are in
-`skills/thread-chasing/references/marker-catalogue.md` — consult it before spending several
+`assets/skills/thread-chasing/references/marker-catalogue.md` — consult it before spending several
 steps on a marker, because most instances of `pending` and `deferred` in this corpus are
 ordinary clinic chatter, not a lab thread.
 

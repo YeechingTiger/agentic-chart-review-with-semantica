@@ -23,10 +23,10 @@ from acr.contract.skills import (
     skills_manifest,
 )
 
-SKILLS_DIR = Path(__file__).resolve().parents[1] / "skills"
+SKILLS_DIR = Path(__file__).resolve().parents[1] / "assets" / "skills"
 _FM = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 
-# `skills/guideline-to-rules/SKILL.md` 从未写过——见 tests/test_skills_load.py:49-55。
+# `assets/skills/guideline-to-rules/SKILL.md` 从未写过——见 tests/test_skills_load.py:49-55。
 _NO_SKILL_MD = {"guideline-to-rules"}
 
 
@@ -155,7 +155,7 @@ def test_unknown_profile_still_falls_back_to_coverage_judgement():
 # --- Task 3: `--skills` swaps one card without minting a profile -----------------------------
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+SPEC = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
 CORPUS = ROOT / "corpus" / "patients"
 
 

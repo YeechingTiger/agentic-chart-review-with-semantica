@@ -205,11 +205,11 @@ class Trigger:
 
 
 # ================================================================== the marker catalogue
-#: The catalogue is NOT written here. It lives in `skills/thread-chasing/`, it was measured
+#: The catalogue is NOT written here. It lives in `assets/skills/thread-chasing/`, it was measured
 #: over 7,965 real documents, and it already knows which markers are low precision. A second
 #: hand-written list in src/ would drift from it within a week and the two would disagree
 #: about what blocks an answer.
-SKILL_DIR = asset_dir("skills") / "thread-chasing"
+SKILL_DIR = asset_dir("assets/skills") / "thread-chasing"
 MARKER_OBLIGATION_TABLE = SKILL_DIR / "SKILL.md"
 MARKER_BASE_RATE_TABLE = SKILL_DIR / "references" / "marker-catalogue.md"
 
@@ -231,7 +231,7 @@ MARKER_TRUNCATED = "truncated"
 #:
 #: EVERY OTHER MARKER IN THE CATALOGUE NAMES A DOCUMENT, NOT AN OFFSET, and the runtime
 #: cannot tell whether the document it names was found. Taken from the obligation table in
-#: `skills/thread-chasing/SKILL.md`, marker kind by marker kind:
+#: `assets/skills/thread-chasing/SKILL.md`, marker kind by marker kind:
 #:
 #:   * `pending`, `results pending`, `stains pending`, `additional sections`, `recut`
 #:     — the lab had not finished. Discharged by "a LATER report of the same type", which is
@@ -268,7 +268,7 @@ MECHANICALLY_DISCHARGEABLE_MARKERS = frozenset({MARKER_TRUNCATED})
 #: about the corpus, and the agent can always discharge it by reading to the end.
 #:
 #: The other twenty markers are MATCHED -- substrings scanned across document text, parsed out
-#: of a Markdown table in `skills/thread-chasing/SKILL.md`. Measured over every recorded trace
+#: of a Markdown table in `assets/skills/thread-chasing/SKILL.md`. Measured over every recorded trace
 #: on 2026-07-30: 39 thread refusals, of which 11 (28%) refused a tuple that was exactly the
 #: registry's answer. `addendum` alone refused 40 times while `read_section("ADDENDUM")` could
 #: address the heading in 0 of the 2,401 documents that contain the word -- an obligation whose

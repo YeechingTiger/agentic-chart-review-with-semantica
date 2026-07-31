@@ -34,7 +34,7 @@ Four consequences run through everything:
 2. **Enforced / advisory / declarative.** What the runtime may REFUSE an answer over is a fact
    about the run: evidence exists, every quote re-reads at its offsets, a read stopped short,
    patient scope, spend. What an answer MEANS is judgement, and it reaches the model as
-   instruction (`specs/`) and as **skills** it may decline (`skills/`). Clinical knowledge never
+   instruction (`assets/specs/`) and as **skills** it may decline (`assets/skills/`). Clinical knowledge never
    lives in Python — and as of 2026-07-30 no clinical rule is enforced by Python either:
    every deterministic check that judged an answer's content was measured and removed, because
    **60 of 254 recorded rejections (24%) refused a tuple that was exactly the registry's**. See
@@ -61,7 +61,7 @@ you which one to fix.
 ## 1. The pipeline
 
 ```
-                    specs/*.yaml            corpus/patients/<id>/*.txt
+                    assets/specs/*.yaml            corpus/patients/<id>/*.txt
                     (the question)          (the chart)
                           │                        │
    L0  acr ask ───────────┤                        │      route a question to a spec,
@@ -78,7 +78,7 @@ you which one to fix.
                              per patient x spec: value, status, evidence,
                              coverage ledger, provenance, spend, trace path
                           │
-   L4     acr concord ────┤  + guidelines/*.yaml   a rule engine, NO model
+   L4     acr concord ────┤  + assets/guidelines/*.yaml   a rule engine, NO model
                           ▼  concord.json          ← acr.concord/1
                              per recommendation: CONCORDANT / NON_CONCORDANT /
                              INDETERMINATE, and which variable decided it
@@ -115,7 +115,7 @@ Line counts are the current tree. "No model" means the module *cannot* reach a p
 |---|---|
 | `agent.py` | **The agent.** `create_agent` from LangChain plus deepagents middleware; our rules live in hooks. Replaced a 1,197-line hand-written ReAct loop. |
 | `tool_surface.py` | The whitelist. Refuses an agent carrying a tool nobody declared. |
-| `spend.py` | The cost ceiling, priced from `audit/prices.json`. |
+| `spend.py` | The cost ceiling, priced from `assets/pricing/prices.json`. |
 | `usage_telemetry.py` | Optional LiteLLM/LangChain token and cost callbacks; separate from post-run Audit. |
 | `corpus.py` | `PatientChart` — the only thing that touches note files. |
 | `state.py` | `EvidenceLedger`, `Budget`. |
@@ -240,7 +240,7 @@ runtime under `acr attribute`.
 **One entry point:** `acr signal run` / `acr signal batch` is where a finished run is asked for
 signals, whichever way the signal is produced — `--kind rule` runs the deterministic checks and
 imports no provider at all, `--kind judge` runs the fenced trajectory judge below, `--kind
-agent` runs the diagnostic attribution agent under the `skills/eval-*` cards. It is a new group
+agent` runs the diagnostic attribution agent under the `assets/skills/eval-*` cards. It is a new group
 rather than a flag on `acr eval` precisely because that group promises it calls no model, and a
 test keeps provider imports out of the dispatcher's module scope so the promise stays true in
 practice.
@@ -293,7 +293,7 @@ the git tree. Keep it that way.**
   --out runs/
 ```
 
-- **in:** a cohort file, a variable list, `specs/`, a corpus
+- **in:** a cohort file, a variable list, `assets/specs/`, a corpus
 - **out:** `runs/extract__<utc>__<sha>/extract.json`, plus one `.jsonl` trace and one
   `.manifest.json` per (patient × spec)
 - The unit of work is the **spec**, not the variable. `--variables primary_site,histology` is
@@ -304,14 +304,14 @@ the git tree. Keep it that way.**
 - `--temperature` defaults to **1.0**: `gpt-5.6-luna` rejects any other value and 400s on the
   first call.
 
-Single chart, for debugging: `acr chart run SYN0001 --spec specs/….yaml`.
+Single chart, for debugging: `acr chart run SYN0001 --spec assets/specs/….yaml`.
 Same chart N times, to measure self-consistency (which is *stability, not validity*):
 `acr chart consistency SYN0001 --spec … --n 3`.
 
 Optional conflict refinement on one hard chart:
 
 ```bash
-.venv/bin/acr run SYN0001 --spec specs/….yaml \
+.venv/bin/acr run SYN0001 --spec assets/specs/….yaml \
   --conflict-refine --conflict-candidates 3 --conflict-rounds 2 \
   --conflict-max-usd 15
 ```
@@ -325,7 +325,7 @@ degradation remain.
 ### L4 · concordance — no model
 
 ```bash
-.venv/bin/acr concord --guideline guidelines/….yaml -i runs/…/extract.json -o concord.json
+.venv/bin/acr concord --guideline assets/guidelines/….yaml -i runs/…/extract.json -o concord.json
 ```
 
 ### L5 · explanation — no model
@@ -337,8 +337,8 @@ degradation remain.
 ### The spec, in front of a clinician
 
 ```bash
-.venv/bin/acr spec review   --spec specs/….yaml     # prose + provenance + measurements
-.venv/bin/acr spec signoff  --spec specs/….yaml     # records reviewer, date, element hash
+.venv/bin/acr spec review   --spec assets/specs/….yaml     # prose + provenance + measurements
+.venv/bin/acr spec signoff  --spec assets/specs/….yaml     # records reviewer, date, element hash
 ```
 
 ### The eval plane — no model
@@ -373,19 +373,19 @@ signals consumes one thing.
 # deterministic checks over the trace and the manifest — CALLS NO MODEL
 .venv/bin/acr signal run --kind rule \
   --run runs/arm-native/SYN0001.manifest.json \
-  --spec specs/STORE.400_522_523.site_histology_behavior.yaml
+  --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml
 
 # the fenced trajectory judge: was the PROCESS any good. Costs money, three calls per run.
 .venv/bin/acr signal run --kind judge --dimension trajectory_quality \
   --run runs/arm-native/SYN0001.manifest.json \
-  --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
   --usd-per-call 0.05 --max-usd 0.5 --model openrouter/openai/gpt-5.6-luna
 
 # the diagnostic agent: WHY did this run come out the way it did. Costs money.
 # Run `--kind rule` first to learn WHICH cases were wrong; hand only those to the agent.
 .venv/bin/acr signal run --kind agent \
   --run runs/arm-native/SYN0001.manifest.json \
-  --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
   --gold gold/store400.csv --case-id CASE-001
 ```
 
@@ -434,17 +434,17 @@ reading queue**. It never gates, and it is never averaged with a deterministic s
 
 ```bash
 .venv/bin/acr signal batch --kind rule --runs runs/arm-native \
-  --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
   --out signals/native-rule.json
 
 .venv/bin/acr signal batch --kind judge --dimension step_efficiency.judged \
   --runs runs/arm-native \
-  --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
   --usd-per-call 0.05 --max-usd 0.5 --model openrouter/openai/gpt-5.6-luna \
   --out signals/native-judge.json
 
 .venv/bin/acr signal batch --kind agent --runs runs/arm-native \
-  --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
   --gold gold/store400.csv --case-map case-map.json \
   --out signals/native-agent.json
 ```
@@ -460,9 +460,9 @@ it, a run's own `patient_id` is used as its case id, which the develop plane's p
 check refuses on a real corpus and accepts on a synthetic one.
 
 **Two ways to add an evaluation angle, neither of which is Python.** A new *diagnostic* angle
-for `--kind agent` is one `skills/eval-*/SKILL.md` with `slot: eval` and a `judges:` list —
+for `--kind agent` is one `assets/skills/eval-*/SKILL.md` with `slot: eval` and a `judges:` list —
 `tests/test_eval_skill_fence.py` checks it carries no scoring instruction. A new *judged* angle
-is one `evaluators/*.yaml`, checked against the precedence registry at load time so an
+is one `assets/evaluators/*.yaml`, checked against the precedence registry at load time so an
 evaluator claiming to score `correctness` refuses to load. Different formats, same idea: add a
 file, not a branch.
 
@@ -480,8 +480,8 @@ versioned module discovery and typed post-run quality pipelines:
 .venv/bin/acr evaluation summarize --local-root /secure/local-acr
 ```
 
-Assets under `module_catalog/`, compositions under `pipeline_catalog/`, and suites under
-`certification_catalog/` are independently versioned. Audit incidents are queried through
+Assets under `assets/module_catalog/`, compositions under `assets/pipeline_catalog/`, and suites under
+`assets/certification_catalog/` are independently versioned. Audit incidents are queried through
 `acr audit incidents`, not through Evaluation.
 
 The generic capability broker rejects undeclared tools, cross-patient access and chart reads
@@ -533,7 +533,7 @@ export ACR_LOCAL_ARTIFACT_ROOT=/secure/local-acr
 .venv/bin/acr gold audit --gold gold.json --out gold-audit.json
 
 # 3. Three runs per case; only unstable/ungrounded cases expand to five.
-.venv/bin/acr repair sample --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+.venv/bin/acr repair sample --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
   --gold gold.json --case-map secure-case-map.json \
   --initial-runs 3 --hard-runs 5 --max-usd 5 --out spec-repair
 
@@ -541,13 +541,13 @@ export ACR_LOCAL_ARTIFACT_ROOT=/secure/local-acr
 .venv/bin/acr repair cluster --runs spec-repair__… \
   --gold gold.json --case-map secure-case-map.json --out clusters.json
 .venv/bin/acr repair diagnose --runs spec-repair__… \
-  --gold gold.json --case-map secure-case-map.json --spec specs/….yaml \
+  --gold gold.json --case-map secure-case-map.json --spec assets/specs/….yaml \
   --out failure-packets.json
 
 # 5. One proposal, one registered parameter. This validates a supplied proposal and
 #    does not edit the spec; omit --proposal to use the one-call proposer.
 .venv/bin/acr repair propose --packet failure-packets.json --case CASE001 \
-  --spec specs/….yaml --proposal proposed-edit.json --max-usd 1 \
+  --spec assets/specs/….yaml --proposal proposed-edit.json --max-usd 1 \
   --out validated-proposal.json
 
 # 6. Replay frozen baseline/candidate runs on the same validation cases and seeds.
@@ -586,7 +586,7 @@ production RUN jobs carry neither registry values nor chart-observable gold.
 ```bash
 # All runs are screened deterministically; only abnormal cases call the model.
 .venv/bin/acr attribute batch \
-  --runs runs/extract__… --spec specs/STORE.400_522_523.site_histology_behavior.yaml \
+  --runs runs/extract__… --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
   --case-map case-map.json --mode REGISTRY_REFERENCE \
   --registry-reference registry-reference.json \
   --corpus /N/project/computable_phenotype/acr_real/patients \
@@ -687,7 +687,7 @@ that *both* front ends go through the shared builders — extend that assertion 
   question is untouched: whether a hedged "favor squamous" over a NOS final-diagnosis line codes
   8070 or 8046 is a registrar's ruling, it is now stated only as prose in the spec's
   `conflict_rules`, and nobody has signed it.
-- **`cached_input_per_1m = $0.10`** in `audit/prices.json` was stated, not measured against an
+- **`cached_input_per_1m = $0.10`** in `assets/pricing/prices.json` was stated, not measured against an
   invoice. Every cost conclusion's magnitude depends on it — at full price the same tokens cost
   4.3× more.
 - **All 90 provenance records are `model_authored`, all `draft`, zero `store_manual`.** No
@@ -705,7 +705,7 @@ that *both* front ends go through the shared builders — extend that assertion 
 ### 5.5 Never run on data
 
 The develop plane (`labelling` / `derive` / `assetdev`, 3,608 lines) has a CLI and tests and
-**has never performed a single real scan**. Until it does, every keyword list in `specs/` is
+**has never performed a single real scan**. Until it does, every keyword list in `assets/specs/` is
 model-authored and unmeasured — which is exactly what `develop_plane_candidates` exists to fix.
 
 The offline attribution layer has now been exercised on the ten-patient local registry-reference
@@ -756,8 +756,8 @@ added.
 3. `/N/project/computable_phenotype/acr_real/` is the real corpus. `corpus/patients/` is
    synthetic and PHI-free — develop against it.
 4. Never `rm -rf` under `runs/`; use `tools/archive_runs.sh`.
-5. **Another team works in this tree.** Do not touch `authoring/`,
-   `skills/crc-guideline-registry-authoring/`, `tests/test_crc_*.py`. **Do not run
+5. **Another team works in this tree.** Do not touch `assets/usecase/`,
+   `assets/skills/crc-guideline-registry-authoring/`, `tests/test_crc_*.py`. **Do not run
    `git stash -u`** — it stashes their untracked work. I did, and it looked like I had broken
    four of their tests.
 6. Write run outputs outside the repo (`/N/project/computable_phenotype/llm/run/`). `/N/slate/`

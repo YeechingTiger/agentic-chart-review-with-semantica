@@ -1,4 +1,4 @@
-"""把 `codes/*.yaml` 从写死三个轴的旧形状迁到声明式 `axes:` 形状。
+"""把 `assets/codes/*.yaml` 从写死三个轴的旧形状迁到声明式 `axes:` 形状。
 
 机械迁移，因为手改会掉行：三张表一共 48 个 topography、161 个 morphology、18 个 behavior
 条目，加上 34 条 not_reportable。`tests/test_code_tables.py` 按迁移前的实测条目数钉住了每
@@ -18,7 +18,7 @@
 三句原先写在 `prompt_block()` Python 里的话搬进每张表的 `warnings:`。它们是**关于这张表**
 的断言（模型回忆而来、未经登记员核对、行为位是单独字段），本来就该跟着表走。
 
-用法：`.venv/bin/python tools/migrate_code_tables.py`（就地改写 codes/*.yaml）
+用法：`.venv/bin/python tools/migrate_code_tables.py`（就地改写 assets/codes/*.yaml）
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ import sys
 
 import yaml
 
-CODES = pathlib.Path(__file__).resolve().parents[1] / "codes"
+CODES = pathlib.Path(__file__).resolve().parents[1] / "assets" / "codes"
 
 #: 旧 `prompt_block()` 硬编码的提醒，现在是每张 ICD-O-3 表自己的断言。
 ICDO3_WARNINGS = [

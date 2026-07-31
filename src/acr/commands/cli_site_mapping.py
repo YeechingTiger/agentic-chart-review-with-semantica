@@ -81,7 +81,7 @@ def build_cmd(
     corpus: str = typer.Option(..., help="corpus root"),
     spec_id: str = typer.Option(..., "--spec", help="spec whose strata define the concepts"),
     out: str = typer.Option(..., help="where to write the mapping JSON"),
-    spec_dir: str = typer.Option("specs", help="directory of spec YAML"),
+    spec_dir: str = typer.Option("assets/specs", help="directory of spec YAML"),
     built_at: str = typer.Option(..., help="ISO timestamp to stamp; passed in so the "
                                           "artifact is reproducible rather than clock-dependent"),
     batch_size: int = typer.Option(120, help="type names per model call"),
@@ -163,7 +163,7 @@ def diff_cmd(
     mapping_path: str = typer.Option(..., "--mapping", help="mapping JSON from `build`"),
     spec_id: str = typer.Option(..., "--spec", help="spec to compare against"),
     corpus: str = typer.Option(..., help="corpus root, for document counts"),
-    spec_dir: str = typer.Option("specs", help="directory of spec YAML"),
+    spec_dir: str = typer.Option("assets/specs", help="directory of spec YAML"),
     out: str = typer.Option("", help="write the full diff here as JSON"),
     legacy_from: str = typer.Option("", help="spec YAML holding the retired doc_type_matches "
                                             "lists, if the spec has already been migrated"),

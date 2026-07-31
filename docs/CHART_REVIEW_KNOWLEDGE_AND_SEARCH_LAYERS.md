@@ -113,7 +113,7 @@ questions to settle are:
 6. what would change the answer, and whether it was looked for.
 
 **These are asked of the model, not enforced against it.** The list above is
-`skills/coverage-judgement/SKILL.md`; the runtime counts what happened —
+`assets/skills/coverage-judgement/SKILL.md`; the runtime counts what happened —
 strata, reviewed counts, Clopper-Pearson residual bounds — and hands the counts back as
 `advisories`. Five earlier versions of this section were enforced instead, and all five cost more
 correct answers than they saved: coverage obligations produced roughly 150 answer rejections across

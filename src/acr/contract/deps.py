@@ -409,7 +409,7 @@ def _enforce_exception_declaration(doc: dict, where: str) -> None:
                 f"only thing a clinical reviewer can disagree with.")
 
 
-def load_guideline_deps(path: str | Path, *, specs_dir: str | Path = "specs",
+def load_guideline_deps(path: str | Path, *, specs_dir: str | Path = "assets/specs",
                         catalog: VariableCatalog | None = None) -> GuidelineDeps:
     """Load a guideline for dependency analysis, refusing an undeclared exception list.
 

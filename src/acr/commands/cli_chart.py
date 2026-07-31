@@ -50,7 +50,7 @@ def chart(patient: str, corpus: str = CORPUS):
 
 
 @chart_app.command("specs")
-def specs_cmd(directory: str = "specs"):
+def specs_cmd(directory: str = "assets/specs"):
     """List available extraction specs with their freeze hashes."""
     t = Table("spec_id", "version", "hash", "source", "question")
     for s in load_specs(directory).values():

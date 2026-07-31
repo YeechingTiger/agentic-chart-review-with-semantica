@@ -7,7 +7,7 @@ SYN0002 wrong that way. What this reads is behaviour that no answer key can sett
 documents an arm opened, how many reads it issued, how much of its reading it explained, and
 what it cost.
 
-Cost is computed POST HOC from `usage` against `audit/prices.json`, because the runs were made
+Cost is computed POST HOC from `usage` against `assets/pricing/prices.json`, because the runs were made
 before that table existed and their manifests therefore carry `"priced": false, "usd": null`.
 Same table, same arithmetic as `spend.py` — but say so in the table, because a number recomputed
 downstream and a number the runtime recorded are not the same evidence.

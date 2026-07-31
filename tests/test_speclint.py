@@ -1,6 +1,6 @@
 """The linter has to fail on the specs we shipped, or it is decoration.
 
-Every test below is written against a fault that is either still live in `specs/` today or
+Every test below is written against a fault that is either still live in `assets/specs/` today or
 was live in this repository's history. Two of them are load-bearing:
 
   * `format: CCYYMMDD` COMPILES. It is a valid Python regex that matches exactly one string,
@@ -27,12 +27,12 @@ from acr.commands.cli import app
 from acr.contract.spec import ExtractionSpec, load_spec
 
 ROOT = Path(__file__).resolve().parents[1]
-SPECS = sorted((ROOT / "specs").glob("*.yaml")) + sorted((ROOT / "specs" / "ablation").glob("*.yaml"))
-DIAG = ROOT / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
-RECUR = ROOT / "specs" / "STORE.1860_1880.first_recurrence.yaml"
-STAGE = ROOT / "specs" / "STORE.700_880.stage.yaml"
-SHB = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
-COC = ROOT / "specs" / "STORE.610.class_of_case.yaml"
+SPECS = sorted((ROOT / "assets" / "specs").glob("*.yaml")) + sorted((ROOT / "assets" / "specs" / "ablation").glob("*.yaml"))
+DIAG = ROOT / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
+RECUR = ROOT / "assets" / "specs" / "STORE.1860_1880.first_recurrence.yaml"
+STAGE = ROOT / "assets" / "specs" / "STORE.700_880.stage.yaml"
+SHB = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+COC = ROOT / "assets" / "specs" / "STORE.610.class_of_case.yaml"
 
 runner = CliRunner()
 
@@ -382,7 +382,7 @@ def test_the_cli_exits_non_zero_on_a_tier1_failure():
 
 
 def test_the_cli_lints_a_directory_and_prints_the_gate_table():
-    r = runner.invoke(app, ["spec", "lint", str(ROOT / "specs")])
+    r = runner.invoke(app, ["spec", "lint", str(ROOT / "assets" / "specs")])
     assert "GATE SATISFIABILITY" in r.stdout
     assert "0.1129" in r.stdout, "the bound actually earned by the declared n must be printed"
 
@@ -443,7 +443,7 @@ def test_every_shipped_spec_that_still_uses_substrings_is_named_by_the_lint():
     """Four specs still carry the retired expression. The lint is how that stays visible
     until each one has a Site Mapping built for it, instead of being silently wrong."""
     from acr.contract.spec import load_specs
-    offenders = {sid for sid, sp in load_specs(ROOT / "specs").items()
+    offenders = {sid for sid, sp in load_specs(ROOT / "assets" / "specs").items()
                  if checks(speclint.lint_spec(sp), speclint.F10)}
     assert "STORE.400_522_523.site_histology_behavior" in offenders
     assert "STORE.700_880.stage" in offenders

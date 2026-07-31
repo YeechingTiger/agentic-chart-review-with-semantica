@@ -1079,7 +1079,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         #
         # Content hashes, not versions. All three are files a human is invited to edit — each
         # code table carries a `what_a_human_must_check` field, and `refine` treats
-        # `skills/*/SKILL.md` as a tunable — so a corrected table under an unchanged
+        # `assets/skills/*/SKILL.md` as a tunable — so a corrected table under an unchanged
         # `table_version` would otherwise masquerade as the one an earlier run used. The lung
         # table gained eleven morphologies from one validation pass; manifests written either
         # side of that must not compare as equal.
@@ -1525,7 +1525,7 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
                        + "\n\n" + anchor_block()
                        # METHOD GUIDANCE. Until now nothing in this tree read a SKILL.md body
                        # into a prompt, so moving the coverage obligation into
-                       # `skills/coverage-judgement/` deleted it rather than relocating it. The
+                       # `assets/skills/coverage-judgement/` deleted it rather than relocating it. The
                        # profile chooses which skills load; see `acr.contract.skills`.
                        + (f"\n\n{sk}" if (sk := skills_block(effective_stack)) else "")
                        + (f"\n\n{additional_task_context.strip()}"

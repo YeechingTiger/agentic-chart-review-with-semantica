@@ -22,7 +22,7 @@ source_authority:
 value_sets:
 
   # ICD-O-3 morphology, 4 digits without the behaviour digit, matching STORE [522] and the
-  # `histology` field of specs/STORE.400_522_523.site_histology_behavior.yaml.
+  # `histology` field of assets/specs/STORE.400_522_523.site_histology_behavior.yaml.
   #
   # 8000 (neoplasm, malignant NOS) and 8010 (carcinoma, NOS) are DELIBERATELY ABSENT, and
   # they are additionally declared under `unknown_value_codes` below. Neither distinguishes
@@ -49,7 +49,7 @@ value_sets:
     ["8052", "8070", "8071", "8072", "8073", "8074", "8083", "8084"]
 
   # AJCC 8th edition group labels, as declared in the allowable_values of
-  # specs/STORE.700_880.stage.yaml, plus the bare roman-numeral roll-ups a registry feed may
+  # assets/specs/STORE.700_880.stage.yaml, plus the bare roman-numeral roll-ups a registry feed may
   # carry instead. Both are accepted because either source can supply the variable. Matching
   # is case- and whitespace-insensitive.
   #
@@ -127,7 +127,7 @@ recommendations:
       - {name: histology,             source: extraction_spec, spec_id: STORE.400_522_523.site_histology_behavior, item: "STORE [522]"}
       - {name: behavior,              source: extraction_spec, spec_id: STORE.400_522_523.site_histology_behavior, item: "STORE [523]"}
       - {name: class_of_case,         source: registry_limited_dataset, item: "STORE [610]",
-         why: "not derivable from notes — specs/STORE.610 answers SPEC_INSUFFICIENT / WRONG_DATA_SOURCE by design"}
+         why: "not derivable from notes — assets/specs/STORE.610 answers SPEC_INSUFFICIENT / WRONG_DATA_SOURCE by design"}
       - {name: pathologic_stage_group, source: extraction_spec, spec_id: STORE.700_880.stage, item: "AJCC 8th pathologic stage group"}
       - {name: surgical_resection_extent,   source: not_yet_extractable, item: "NAACCR RX Summ--Surg Prim Site [1290]"}
       - {name: surgical_margins,            source: not_yet_extractable, item: "NAACCR RX Summ--Surgical Margins [1320]"}

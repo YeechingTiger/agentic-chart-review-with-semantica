@@ -31,8 +31,8 @@ ASK_SCHEMA = "acr.routing/1"
 def ask(
     question: str = typer.Argument(..., help="a question, a variable name, a spec id, a STORE "
                                              "item, a guideline id or a recommendation id"),
-    specs_dir: str = typer.Option("specs", "--specs", help="directory scanned for specs"),
-    guidelines_dir: str = typer.Option("guidelines", "--guidelines",
+    specs_dir: str = typer.Option("assets/specs", "--specs", help="directory scanned for specs"),
+    guidelines_dir: str = typer.Option("assets/guidelines", "--guidelines",
                                        help="directory scanned for guideline YAMLs"),
     skills_dir: str = typer.Option("skills", "--skills-dir",
                                    help="checked so a route to a skill that is not there is "
@@ -214,7 +214,7 @@ def _render_deps(doc: dict, impact) -> None:
 @plan_app.command("deps")
 def deps_cmd(
     guideline: str = typer.Option(..., "--guideline", help="path to a guideline YAML"),
-    specs_dir: str = typer.Option("specs", "--specs", help="directory scanned for specs"),
+    specs_dir: str = typer.Option("assets/specs", "--specs", help="directory scanned for specs"),
     spec: str = typer.Option("", "--spec",
                              help="report what editing this spec invalidates under --runs"),
     runs: str = typer.Option("runs", "--runs", help="tree scanned for concordance artifacts"),

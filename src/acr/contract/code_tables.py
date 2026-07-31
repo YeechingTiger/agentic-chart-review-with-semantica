@@ -12,7 +12,7 @@
     这是 `tests/test_layering.py` 登记的三条倒挂依赖中的全部。
 
 肿瘤登记是这套框架的**一个** use case。所以轴的名字、章节标题、码形正则和记法折叠规则
-全部下沉到 `codes/*.yaml`，本模块只知道"表有若干个有序的轴，每个轴有码和名字"。
+全部下沉到 `assets/codes/*.yaml`，本模块只知道"表有若干个有序的轴，每个轴有码和名字"。
 
 保留下来的三件事，一件都不是 gate
 --------------------------------
@@ -39,7 +39,7 @@ import yaml
 
 from ..core.repo_paths import asset_dir
 
-CODES_DIR = asset_dir("codes")
+CODES_DIR = asset_dir("assets/codes")
 
 #: 问题类型。是名字而不是布尔，因为"这不是一个码"、"这个码属于别的范围"和"这个码不可采纳"
 #: 是三种不同的发现，分不清的调用方会报错那一种。

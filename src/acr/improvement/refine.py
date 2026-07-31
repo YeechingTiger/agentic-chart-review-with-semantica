@@ -108,7 +108,7 @@ class TextParameter:
 PARAMETER_REGISTRY: tuple[TextParameter, ...] = (
     TextParameter(
         id="keyword_list",
-        file="specs/*.yaml",
+        file="assets/specs/*.yaml",
         path_within="proof_obligation.for_negative.strata[*].required_keywords",
         kind="keyword_list",
         update_policy=AUTO_ON_CERTIFICATION,
@@ -119,7 +119,7 @@ PARAMETER_REGISTRY: tuple[TextParameter, ...] = (
     ),
     TextParameter(
         id="document_type_policy",
-        file="specs/*.yaml",
+        file="assets/specs/*.yaml",
         path_within="proof_obligation.for_negative.strata[*].match.doc_type_matches",
         kind="doc_type_policy",
         update_policy=CLINICIAN_SIGNS,
@@ -129,7 +129,7 @@ PARAMETER_REGISTRY: tuple[TextParameter, ...] = (
     ),
     TextParameter(
         id="skill",
-        file="skills/*/SKILL.md",
+        file="assets/skills/*/SKILL.md",
         path_within="(whole document)",
         kind="prose_procedure",
         update_policy=AUTO_ON_HELDOUT_GAIN,
@@ -139,7 +139,7 @@ PARAMETER_REGISTRY: tuple[TextParameter, ...] = (
     ),
     TextParameter(
         id="spec_rules",
-        file="specs/*.yaml",
+        file="assets/specs/*.yaml",
         path_within="decision_rule | evidence_rules | conflict_rules | abstention",
         kind="prose_rule",
         update_policy=CLINICIAN_SIGNS,
@@ -161,7 +161,7 @@ PARAMETER_REGISTRY: tuple[TextParameter, ...] = (
     ),
     TextParameter(
         id="answer_check_rejection_messages",
-        file="specs/*.yaml",
+        file="assets/specs/*.yaml",
         path_within="answer_checks[*].message",
         kind="rejection_message",
         update_policy=ENGINEER,
@@ -178,7 +178,7 @@ PARAMETER_REGISTRY: tuple[TextParameter, ...] = (
         # last leaf routes "mechanically decidable" here, and a destination the registry does
         # not know is a gradient with nowhere to land.
         id="answer_check_rule",
-        file="specs/*.yaml",
+        file="assets/specs/*.yaml",
         path_within="answer_checks[*] (kind, nos_values, contradicted_by, required_searches)",
         kind="answer_check_rule",
         update_policy=CLINICIAN_SIGNS,

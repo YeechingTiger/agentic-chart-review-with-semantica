@@ -160,7 +160,7 @@ def evaluators(
     directory: str = typer.Option("evaluators", "--dir", help="directory of evaluator YAMLs"),
     out: str = typer.Option("", "--out", help="write the load report JSON here"),
 ):
-    """Load every `evaluators/*.yaml` against the REAL precedence gate. Free, no model.
+    """Load every `assets/evaluators/*.yaml` against the REAL precedence gate. Free, no model.
 
     `load_evaluators` refuses the whole directory on one bad file rather than skipping it: a
     load that silently drops the evaluator with the failing case and keeps the three that
@@ -280,7 +280,7 @@ def panel(
 
 @judge_app.command("run")
 def run_evaluator_cmd(
-    evaluator: str = typer.Option(..., "--evaluator", help="evaluator_id, as in evaluators/"),
+    evaluator: str = typer.Option(..., "--evaluator", help="evaluator_id, as in assets/evaluators/"),
     directory: str = typer.Option("evaluators", "--dir"),
     context: str = typer.Option(..., "--context",
                                 help="JSON of everything the harness can supply; exactly the "

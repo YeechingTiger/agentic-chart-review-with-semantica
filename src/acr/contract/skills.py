@@ -2,15 +2,15 @@
 
 WHY THIS EXISTS
 ---------------
-`skills/` held six skills and NOTHING READ ANY OF THEM INTO A PROMPT. The only path from that
+`assets/skills/` held six skills and NOTHING READ ANY OF THEM INTO A PROMPT. The only path from that
 directory into the runtime was `coverage_planner.load_marker_catalogue`, which parses the
 thread-chasing skill's Markdown TABLES into a marker set — it extracts data, not instruction.
-`refine.py` treats `skills/*/SKILL.md` as a tunable develop-plane file. `cli_plan` checks a
+`refine.py` treats `assets/skills/*/SKILL.md` as a tunable develop-plane file. `cli_plan` checks a
 skills directory only so that a route to a missing skill is reported rather than printed as
 advice.
 
 So on 2026-07-30, when the coverage obligation was moved out of `evaluate_gate` and into
-`skills/coverage-judgement/SKILL.md`, it was not moved. It was deleted, and the commit message
+`assets/skills/coverage-judgement/SKILL.md`, it was not moved. It was deleted, and the commit message
 said moved. That is the mirror image of the failure this project already names — a check that
 cannot fail — and it is worse, because "the guidance is in a skill" reads like a design decision
 while the model receives nothing.
@@ -46,7 +46,7 @@ import yaml
 
 from ..core.repo_paths import asset_dir
 
-SKILLS_DIR = asset_dir("skills")
+SKILLS_DIR = asset_dir("assets/skills")
 
 #: A skill bigger than this is refused rather than truncated. Roughly 3k tokens: enough for real
 #: guidance, small enough that three of them do not dominate a prompt.
@@ -297,7 +297,7 @@ def skills_manifest(stack: SkillStack, skills_dir: Path | str | None = None) -> 
     """What was actually rendered, per skill and per slot, for the run manifest.
 
     Content-hashed rather than named. A skill is prose the model acts on, so editing a sentence
-    changes the run without changing its name or version — and `refine` treats `skills/*/SKILL.md`
+    changes the run without changing its name or version — and `refine` treats `assets/skills/*/SKILL.md`
     as a tunable file. The slot is recorded beside the hash because "which search policy ran" is
     the question a paired ablation asks, and a flat list cannot answer it.
     """

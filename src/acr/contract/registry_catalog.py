@@ -166,11 +166,11 @@ class VariableCatalog:
     directory: str = ""
 
     @classmethod
-    def from_directory(cls, directory: str | Path = "specs") -> "VariableCatalog":
+    def from_directory(cls, directory: str | Path = "assets/specs") -> "VariableCatalog":
         """Load `<directory>/*.yaml`, NON-recursively, exactly as `load_specs` does.
 
         The non-recursion is load-bearing, not an oversight inherited from `load_specs`:
-        `specs/ablation/STORE.400_522_523.unstratified.yaml` declares the same three field
+        `assets/specs/ablation/STORE.400_522_523.unstratified.yaml` declares the same three field
         names (`primary_site`, `histology`, `behavior`) under a different spec_id. A
         recursive scan would make all three ambiguous and every ordinary request would fail.
         An ablation arm is a second copy of a variable on purpose; it is selected by path,

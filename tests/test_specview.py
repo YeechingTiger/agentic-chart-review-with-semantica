@@ -66,12 +66,12 @@ from acr.usecase.specview import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-SPECS = sorted((ROOT / "specs").glob("*.yaml"))
-SHB = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
-STAGE = ROOT / "specs" / "STORE.700_880.stage.yaml"
-DXDATE = ROOT / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
-RECUR = ROOT / "specs" / "STORE.1860_1880.first_recurrence.yaml"
-COC = ROOT / "specs" / "STORE.610.class_of_case.yaml"
+SPECS = sorted((ROOT / "assets" / "specs").glob("*.yaml"))
+SHB = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+STAGE = ROOT / "assets" / "specs" / "STORE.700_880.stage.yaml"
+DXDATE = ROOT / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
+RECUR = ROOT / "assets" / "specs" / "STORE.1860_1880.first_recurrence.yaml"
+COC = ROOT / "assets" / "specs" / "STORE.610.class_of_case.yaml"
 
 runner = CliRunner()
 

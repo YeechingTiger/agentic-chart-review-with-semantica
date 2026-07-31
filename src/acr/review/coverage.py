@@ -773,7 +773,7 @@ def evaluate_gate(gate_spec: dict, strata: Sequence[StratumResult],
       - one run submitted the conflict-resolving gold answer ten times and was rejected into a
         model-call-limit failure.
 
-    The obligation now lives in `skills/coverage-judgement/SKILL.md` and reaches the model as
+    The obligation now lives in `assets/skills/coverage-judgement/SKILL.md` and reaches the model as
     prose it can act on and decline. What it may not do is decline silently: `advisories` is
     recorded in the manifest, so "the reviewer decided the chart was adequately searched" and
     "the reviewer never looked" stay distinguishable after the fact — which was always the real
