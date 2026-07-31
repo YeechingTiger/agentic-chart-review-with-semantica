@@ -25,7 +25,7 @@ READ_TOOLS = ("read_document", "read_documents_batch")
 
 def _rates() -> dict:
     sys.path.insert(0, str(REPO / "src"))
-    from acr.spend import _rates_for
+    from acr.core.spend import _rates_for
     return _rates_for("gpt-5.6-luna")
 
 

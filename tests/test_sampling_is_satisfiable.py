@@ -16,9 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from acr.corpus import Corpus
-from acr.coverage import CoverageLedger, ForcedSampler, strata_from_spec
-from acr.spec import load_spec
+from acr.chartstore.corpus import Corpus
+from acr.contract.spec import load_spec
+from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
@@ -76,7 +76,7 @@ def test_the_obligation_fits_in_a_realistic_step_budget():
     """50 documents at one read per step cannot fit in a 20-step budget. The obligation is a
     statistical result and should not bend to tool granularity; the batch read is what makes
     it affordable."""
-    from acr.tools import TOOL_SCHEMAS
+    from acr.review.tools import TOOL_SCHEMAS
     names = {t["function"]["name"] for t in TOOL_SCHEMAS}
     assert "read_documents_batch" in names, (
         "without a batched read the sampling obligation costs one step per document and "
@@ -90,5 +90,5 @@ def test_gate_validated_is_a_declared_state_channel():
     """An undeclared channel is dropped by LangGraph with no error, so a node can set it, the
     downstream read returns the falsy default, and an accepted answer comes out labelled
     ungated. That happened; this pins it."""
-    from acr.state import RunState
+    from acr.core.state import RunState
     assert "gate_validated" in RunState.__annotations__

@@ -14,9 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-
-
-from acr.tool_surface import LIBRARY_TOOLS, ToolSurfaceError, assert_tool_surface
+from acr.core.tool_surface import LIBRARY_TOOLS, ToolSurfaceError, assert_tool_surface
 
 
 class _FakeTool:

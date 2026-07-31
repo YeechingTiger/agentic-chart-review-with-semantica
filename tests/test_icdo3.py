@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from acr.code_tables import (
+from acr.contract.code_tables import (
     CODES_DIR,
     EXCLUDED_BY_SPEC,
     MALFORMED,
@@ -337,15 +337,15 @@ def test_the_table_validates_against_every_registry_answer_in_the_corpus(lung):
 # ==========================================================================================
 def test_the_lung_spec_declares_its_code_table():
     """一个值属于哪个码系统是答案**含义**的一部分，所以由 spec 说。运行时不从语料或字段名猜。"""
-    from acr.spec import load_spec as _ls
+    from acr.contract.spec import load_spec as _ls
     spec = _ls("specs/STORE.400_522_523.site_histology_behavior.yaml")
     assert spec.value_domain == "icdo3_lung"
 
 
 def test_a_spec_with_no_code_system_gets_no_block():
     """日期和 class-of-case 变量没有 ICD-O-3 值域。塞一墙肺形态码给它们忽略是提示词膨胀。"""
-    from acr.code_tables import code_domain_block
-    from acr.spec import load_specs as _lss
+    from acr.contract.code_tables import code_domain_block
+    from acr.contract.spec import load_specs as _lss
     blocks = {sid: code_domain_block(sp) for sid, sp in _lss("specs").items()}
     assert blocks["STORE.400_522_523.site_histology_behavior"]
     assert not blocks["STORE.390.date_of_initial_diagnosis"]
@@ -355,8 +355,8 @@ def test_a_spec_with_no_code_system_gets_no_block():
 def test_a_declared_table_that_does_not_exist_stops_the_spec_from_loading(tmp_path):
     """打错就 FAIL CLOSED。缺表否则会渲染出空值域，运行看起来就和被给过码表一模一样 ——
     和一个静默不提供任何指导却在 manifest 里报告提供了的 skill 是同一个失败。"""
-    from acr.code_tables import CodeTableError as CTE
-    from acr.spec import load_spec as _ls
+    from acr.contract.code_tables import CodeTableError as CTE
+    from acr.contract.spec import load_spec as _ls
     p = tmp_path / "S.2.yaml"
     p.write_text(
         "spec_id: S.2\nspec_version: 0.1.0\ndata_source: notes\nquestion: q\n"
@@ -371,8 +371,8 @@ def test_a_declared_table_that_does_not_exist_stops_the_spec_from_loading(tmp_pa
 
 def test_the_rendered_block_contains_the_subsite_facts_a_run_got_wrong():
     """端到端：模型真正会读到的那段文字里，C341 旁边写着 'Upper lobe'。"""
-    from acr.code_tables import code_domain_block
-    from acr.spec import load_spec as _ls
+    from acr.contract.code_tables import code_domain_block
+    from acr.contract.spec import load_spec as _ls
     b = code_domain_block(_ls("specs/STORE.400_522_523.site_histology_behavior.yaml"))
     assert "C341  Upper lobe, lung" in b
     assert "C342  Middle lobe, lung" in b

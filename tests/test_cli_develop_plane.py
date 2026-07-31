@@ -18,8 +18,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from acr import labelling as lab
-from acr.cli import app
+from acr.commands.cli import app
+from acr.improvement import labelling as lab
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = str(ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml")
@@ -131,7 +131,7 @@ def test_label_scan_dry_run_and_progress_agree_on_the_store_key(tmp_path, no_cli
 def test_label_progress_counts_a_store_and_leaks_no_note_text(tmp_path):
     """Counts, never rows. A label carries a person_id, a note date and a verbatim quote."""
     terms = lab.TermConfig(max_terms_per_note=8, min_term_chars=4)
-    req = lab.Requirement.from_spec(__import__("acr.spec", fromlist=["x"]).load_spec(SPEC))
+    req = lab.Requirement.from_spec(__import__("acr.contract.spec", fromlist=["x"]).load_spec(SPEC))
     store = lab.LabelStore(str(tmp_path / "labels"), model=f"openai/{lab.DEPLOYMENT}",
                            requirement=req, terms=terms)
     store.append(lab.NoteLabel(

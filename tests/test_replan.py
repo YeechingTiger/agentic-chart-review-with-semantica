@@ -73,23 +73,36 @@ from pathlib import Path
 
 import pytest
 
-from acr import answer_gate as G
-from acr.corpus import Corpus
-from acr.coverage import CoverageLedger, ForcedSampler, strata_from_spec
-from acr.coverage_planner import (POLICY_RANK, REFUSED_BUDGET, REFUSED_NOT_MONOTONE,
-                                  REFUSED_REDUNDANT_TERM, REFUSED_UNKNOWN_TYPE,
-                                  TRIGGER_GATE_OBLIGATION_UNREACHABLE,
-                                  TRIGGER_UNLISTED_ANSWER_TERM, TRIGGER_UNSETTLED_THREAD,
-                                  TRIGGER_ZERO_HIT_SEARCH, CoveragePlan, ExpansionBudget,
-                                  OpenThreadLedger, PlanRevision, PlanSnapshot,
-                                  check_monotone, documents_by_type, gate_obligation_triggers,
-                                  load_marker_catalogue, normalise_term, plan_from_spec,
-                                  redundant_against, spec_declared_keywords,
-                                  triggers_from_tool_result)
-from acr.answer_gate import check_gate, check_threads, gate_answer
-from acr.llm import LLMClient, LLMConfig, LLMResponse
-from acr.spec import load_spec
-from acr.state import Budget, EvidenceLedger
+from acr.chartstore.corpus import Corpus
+from acr.contract.spec import load_spec
+from acr.core.llm import LLMClient, LLMConfig, LLMResponse
+from acr.core.state import EvidenceLedger
+from acr.review.answer_gate import check_threads, gate_answer
+from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
+from acr.review.coverage_planner import (
+    POLICY_RANK,
+    REFUSED_BUDGET,
+    REFUSED_NOT_MONOTONE,
+    REFUSED_REDUNDANT_TERM,
+    REFUSED_UNKNOWN_TYPE,
+    TRIGGER_GATE_OBLIGATION_UNREACHABLE,
+    TRIGGER_UNLISTED_ANSWER_TERM,
+    TRIGGER_UNSETTLED_THREAD,
+    TRIGGER_ZERO_HIT_SEARCH,
+    ExpansionBudget,
+    OpenThreadLedger,
+    PlanRevision,
+    PlanSnapshot,
+    check_monotone,
+    documents_by_type,
+    gate_obligation_triggers,
+    load_marker_catalogue,
+    normalise_term,
+    plan_from_spec,
+    redundant_against,
+    spec_declared_keywords,
+    triggers_from_tool_result,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 SHB = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
@@ -144,7 +157,7 @@ def test_the_prose_plan_is_gone_and_the_coverage_plan_is_wired_in():
     reintroducing a "planning prompt" beside the real plan. Asserted on the runtime that holds
     the plan now.
     """
-    import acr.agent as A
+    import acr.review.agent as A
 
     src = inspect.getsource(A)
     assert not re.search(r"^\w*PLAN_PROMPT\s*=", src, re.M), (
@@ -154,7 +167,7 @@ def test_the_prose_plan_is_gone_and_the_coverage_plan_is_wired_in():
         assert token in src, f"the runtime must consult the coverage plan; {token!r} is absent"
     # `may_open` is deliberately NOT in this list any more. The runtime used to consult it to
     # REFUSE A READ, and that hook was removed on 2026-07-30: see `_out_of_plan: REMOVED` in
-    # acr.agent. Which documents to open is the model's decision.
+    # acr.review.agent. Which documents to open is the model's decision.
     assert "_out_of_plan" not in src or "REMOVED" in src, (
         "the read refusal is back. It fired 138 times over the recorded traces, and the bucket "
         "it enforced came from a substring over local type names that missed the FNA and "
@@ -379,7 +392,7 @@ def test_the_monotonicity_note_states_what_is_true_and_not_what_is_comfortable()
     was not a code path anybody exercised, it was a sentence everybody believed. The way it
     comes back is somebody restoring the reassuring version of it.
     """
-    from acr import coverage_planner as CP
+    from acr.review import coverage_planner as CP
 
     src = inspect.getsource(CP)
     for gone in ("THE BOUND CANNOT BE GAMED DOWNWARD", "Expansion never decreases n_s"):
@@ -476,7 +489,7 @@ def test_the_initial_list_is_the_specs_and_survives_expansion(spec, chart, plan,
 def test_the_planners_own_terms_are_additions_not_baseline(spec, chart):
     """A term the coverage planner proposed is a term the SPEC did not declare. Folding it
     into the baseline would erase the gap at the moment it is created."""
-    from acr.coverage_planner import plan_coverage
+    from acr.review.coverage_planner import plan_coverage
 
     class _Planner:
         def chat(self, messages, tools=None):
@@ -616,7 +629,7 @@ def test_a_text_matched_marker_opens_a_thread_and_advises_without_blocking(spec,
     threads = OpenThreadLedger()
     ev, cov = EvidenceLedger(), _ledger(spec, chart)
     nid = _first_note_of_type(chart, "Surgical-Pathology-Document")
-    from acr.state import Evidence
+    from acr.core.state import Evidence
     ev.add(Evidence(nid, "Surgical-Pathology-Document", "2019-01-01", 0, 5, "xxxxx",
                     "histology"))
     submitted = {"status": "FOUND", "value": {"histology": "8046"}, "reasoning": "coded"}
@@ -646,7 +659,7 @@ def test_a_computed_truncated_marker_still_blocks_the_answer(spec, chart, plan, 
     means; it cannot be wrong about the corpus; and the agent discharges it by reading to the
     end.
     """
-    from acr.coverage_planner import MARKER_TRUNCATED, marker_blocks_answer
+    from acr.review.coverage_planner import MARKER_TRUNCATED, marker_blocks_answer
     assert marker_blocks_answer(MARKER_TRUNCATED)
     assert not marker_blocks_answer("stains pending")
     assert not marker_blocks_answer("addendum")
@@ -654,7 +667,7 @@ def test_a_computed_truncated_marker_still_blocks_the_answer(spec, chart, plan, 
     threads = OpenThreadLedger()
     ev, cov = EvidenceLedger(), _ledger(spec, chart)
     nid = _first_note_of_type(chart, "Surgical-Pathology-Document")
-    from acr.state import Evidence
+    from acr.core.state import Evidence
     ev.add(Evidence(nid, "Surgical-Pathology-Document", "2019-01-01", 0, 5, "xxxxx",
                     "histology"))
     submitted = {"status": "FOUND", "value": {"histology": "8046"}, "reasoning": "coded"}
@@ -743,7 +756,7 @@ def test_budget_exhausted_with_obligations_outstanding_is_an_honest_dead_end(spe
     small its budget — otherwise a tight budget would end a run that had asked for nothing. So a
     dead end is: it asked, it was refused, and an obligation is still outstanding.
     """
-    from acr.plan_expansion import expansion_is_spent
+    from acr.review.plan_expansion import expansion_is_spent
 
     zero = ExpansionBudget(max_terms_added=0, max_type_promotions=0,
                            max_documents_opened_by_promotion=0, max_revisions=6)
@@ -761,7 +774,7 @@ def test_budget_exhausted_with_obligations_outstanding_is_an_honest_dead_end(spe
     assert agent._outstanding_obligations(), "fixture assumption: the gate is not yet met"
 
     # And the runtime says so rather than merely stopping at the call limit.
-    import acr.agent as A
+    import acr.review.agent as A
     src = inspect.getsource(A.AuditMiddleware._expansion_spent_with_obligations)
     assert "expansion_is_spent" in src and "outstanding" in src
 
@@ -1064,11 +1077,11 @@ def _agent(spec, chart, llm=None):
     `declared` is populated because `_undeclared` refuses anything outside it, and an empty set
     means every tool is undeclared.
     """
-    from acr.agent import AuditMiddleware, RunContext
-    from acr.coverage_planner import OpenThreadLedger, load_marker_catalogue
-    from acr.plan_expansion import expansion_is_spent, price_expansion_budget
-    from acr.trace import Tracer
-    from acr.tools import Toolbox
+    from acr.contract.trace import Tracer
+    from acr.review.agent import AuditMiddleware, RunContext
+    from acr.review.coverage_planner import OpenThreadLedger, load_marker_catalogue
+    from acr.review.plan_expansion import expansion_is_spent, price_expansion_budget
+    from acr.review.tools import Toolbox
 
     evidence = EvidenceLedger()
     coverage = _ledger(spec, chart)
@@ -1089,7 +1102,7 @@ def _agent(spec, chart, llm=None):
     mw._expansion_budget = price_expansion_budget(plan, docs_by_type, max_revisions=6,
                                                   supplied=None, planner_terms=len(plan.keywords))
     # `_plan_refusal` is gone with `AuditMiddleware._out_of_plan`: the runtime no longer refuses
-    # a read because of the bucket its document type is in. See the REMOVED note in acr.agent.
+    # a read because of the bucket its document type is in. See the REMOVED note in acr.review.agent.
 
     def _spent():
         ctx.plan = mw.plan
@@ -1143,7 +1156,7 @@ def _first_note_of_type(chart, doc_type: str) -> str:
 #
 # No provider is called and no chart text is written here.
 # ==========================================================================================
-from acr.run_manifest import replan_from_trace
+from acr.review.run_manifest import replan_from_trace
 
 
 def _events(path) -> list[dict]:

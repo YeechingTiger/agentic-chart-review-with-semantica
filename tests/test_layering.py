@@ -15,7 +15,7 @@
 
 十层，自下而上。前三层是共享的 I/O 契约，其余是干活的平面：
 
-  0 kernel       跨任务稳定的公共物：AssetRef/Trajectory/SignalEnvelope、本地 artifact
+  0 core         跨任务稳定的公共物：AssetRef/Trajectory/SignalEnvelope、本地 artifact
                  边界、模型客户端、花费、状态、module protocol。不含任何领域语义。
   0 chartstore   病历数据访问。和 kernel 同 rank 但分开命名：kernel 是抽象词汇，这一层是
                  "怎么把一个病人的文档读出来"，而三个平面都要读。
@@ -54,39 +54,23 @@ SRC = ROOT / "src" / "acr"
 
 #: (rank, 层名, 模块). rank 相同 = 同层，互相不限制；rank 小的不许 import rank 大的。
 LAYERS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
-    (0, "kernel", (
-        "kernel", "local_artifacts", "llm", "spend", "state", "modules", "tool_surface",
-        "cli_common", "usage_telemetry")),
-    # 病历数据访问。**不是** kernel：kernel 是 AssetRef/Trajectory/SignalEnvelope 那套抽象
-    # 词汇，而这一层是"怎么把一个病人的文档读出来"。`corpus.py` 零内部依赖 —— 它此前被归进
-    # review 只因为 agent 是第一个用它的人，而 speclint/derive/labelling 也都要读病历。
-    (0, "chartstore", ("corpus",)),
-    (1, "contract", (
-        "spec", "answer_contract", "answer_checks", "concordance", "skills",
-        "registry_catalog", "deps", "spec_repair", "trace",
-        # 分层声明与匹配。从 spec 的 proof_obligation 推导出来的，不是运行时策略 ——
-        # 放在 coverage 里就意味着任何想按 spec 分层的模块都得 import 运行时平面。
-        "strata",
-        # 本地文档类型名 -> 可移植概念的冻结映射。名字里的 "site" 指**院区**不是解剖部位。
-        # 它是 strata 的 `means:` 所依赖的词表，所以属于合同层。
-        "site_mapping",
-        # 值域加载器。在 contract 层而不是 usecase 层，因为泛化之后它只知道"表有若干个有序
-        # 的轴"—— 轴名、章节标题、码形正则和记法折叠规则全部在 `codes/*.yaml` 里。癌症的
-        # 部分现在是纯资产，`tests/test_icdo3.py` 测那些资产。
-        "code_tables")),
-    (2, "review", (
-        "agent", "answer_gate", "coverage", "coverage_planner", "plan_expansion",
-        "conflict_refinement", "runtime_controls", "runtime_profiles", "document_concepts",
-        "tools.toolbox", "mcp_server", "run_triggers", "run_manifest")),
-    (3, "audit", ()),          # 已搬进 src/acr/audit/
-    (3, "evaluation", ()),     # 已搬进 src/acr/evaluation/
-    # 已搬进 `src/acr/diagnosis/`，层由路径决定，所以这里不再列模块。
+    # 搬迁已完成：每个模块都住在自己平面的目录里，层由**路径**决定，所以这些清单全部为空。
+    # 保留元组的第三位不是形式：一个新增的顶层模块（还没决定属于哪个平面）会落在这里，
+    # 而 `test_every_module_is_assigned_to_a_layer` 要求它被明确归位。
+    #
+    # 目录名 `core` 而不是 `kernel`：包会遮蔽同名的 `kernel.py`，而那是这一层的核心词汇，
+    # 不该为了目录名改名。`commands` 而不是 `cli`：同理，且 `acr.commands.cli:app` 是
+    # console 入口。
+    (0, "core", ()),
+    (0, "chartstore", ()),
+    (1, "contract", ()),
+    (2, "review", ()),
+    (3, "audit", ()),
+    (3, "evaluation", ()),
     (3, "diagnosis", ()),
-    (4, "improvement", ("repair_loop", "refine", "assetdev", "labelling", "derive")),
-    (4, "authoring", ("intake", "speclint")),
-    (5, "usecase", (
-        "specview.basis", "specview.decisions", "specview.measurements", "specview.prose",
-        "specview.render", "specview.signoff", "specview.statements")),
+    (4, "improvement", ()),
+    (4, "authoring", ()),
+    (5, "usecase", ()),
 )
 
 #: 框架反过来依赖某一个 use case 的边。每条写明哪项工作会删掉它。
@@ -100,10 +84,10 @@ LAYERS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
 KNOWN_DOMAIN_COUPLING: dict[tuple[str, str], str] = {}
 
 
-#: 允许被跨平面共享的两层。它们承载的正是"输入输出的形式"：`kernel` 是 AssetRef /
+#: 允许被跨平面共享的两层。它们承载的正是"输入输出的形式"：`core` 是 AssetRef /
 #: Trajectory / SignalEnvelope，`contract` 是 spec 与其词表。一个工作平面通过这两层认识
 #: 另一个平面的产物，是设计要求；直接 import 对方的函数，是代码耦合。
-SHARED_LAYERS = ("kernel", "chartstore", "contract")
+SHARED_LAYERS = ("core", "chartstore", "contract")
 
 #: 干活的平面。它们之间**只能**通过 SHARED_LAYERS 的类型和落盘的 artifact 相见。
 WORK_LAYERS = ("review", "audit", "evaluation", "diagnosis", "improvement", "authoring",
@@ -126,7 +110,7 @@ def _modules() -> dict[str, pathlib.Path]:
 #:
 #: 搬迁完成时 `LAYERS` 的模块清单会全部空掉，而这份 rank 表留下：它是那条唯一规则要的
 #: 顺序，也是目录名的权威来源。分片搬迁因此不需要每片都改这个文件。
-PLANE_RANK: dict[str, int] = {name: r for r, name, _ in LAYERS} | {"cli": 6}
+PLANE_RANK: dict[str, int] = {name: r for r, name, _ in LAYERS} | {"commands": 6}
 
 
 def _layer_of() -> tuple[dict[str, str], dict[str, int]]:
@@ -169,8 +153,7 @@ def test_every_module_is_assigned_to_a_layer():
     """
     plane, _ = _layer_of()
     mods = set(_modules())
-    cli = {m for m in mods if m == "cli" or m.startswith("cli_")}
-    unassigned = mods - set(plane) - cli
+    unassigned = mods - set(plane)
     assert not unassigned, f"未分层: {sorted(unassigned)}"
     stale = set(plane) - mods
     assert not stale, f"LAYERS 里的模块已不存在: {sorted(stale)}"
@@ -180,9 +163,6 @@ def test_no_layer_imports_a_higher_one():
     """唯一的规则。违反它的每一条都必须先登记在 KNOWN_DOMAIN_COUPLING 里。"""
     plane, rank = _layer_of()
     # cli 是入口，rank 高于一切，且不许被依赖 —— 后者由下一个测试单独断言。
-    for m in _modules():
-        if m == "cli" or m.startswith("cli_"):
-            plane[m], rank[m] = "cli", 6
     bad = []
     for src, targets in _edges().items():
         for dst in targets:
@@ -196,9 +176,11 @@ def test_no_layer_imports_a_higher_one():
 
 def test_nothing_depends_on_the_cli():
     """CLI 是入口。任何一层 import 它，就意味着那层的行为取决于有没有人从命令行进来。"""
+    def is_cli(m: str) -> bool:
+        return m.startswith("commands.")
+
     offenders = [f"{s} -> {t}" for s, ts in _edges().items() for t in ts
-                 if (t == "cli" or t.startswith("cli_"))
-                 and not (s == "cli" or s.startswith("cli_"))]
+                 if is_cli(t) and not is_cli(s)]
     assert not offenders, f"非 CLI 模块依赖 CLI: {sorted(offenders)}"
 
 
@@ -260,11 +242,11 @@ def test_the_declared_work_and_shared_layers_are_real():
 
     `plane.get(src) not in work` 对一个拼错的层名永远为真，于是测试通过而什么都没查。
     """
-    declared = {name for _, name, _ in LAYERS} | {"cli"}
+    declared = {name for _, name, _ in LAYERS} | {"commands"}
     for name in SHARED_LAYERS + WORK_LAYERS:
         assert name in declared, f"{name!r} 不是 LAYERS 里的层名"
     assert not set(SHARED_LAYERS) & set(WORK_LAYERS)
-    assert declared == set(SHARED_LAYERS) | set(WORK_LAYERS) | {"cli"}, (
+    assert declared == set(SHARED_LAYERS) | set(WORK_LAYERS) | {"commands"}, (
         "有层既不共享也不干活 —— 它属于哪一类必须被明确决定")
 
 
@@ -326,17 +308,17 @@ def _clinical_hits(path: pathlib.Path) -> list[str]:
     return hits
 
 
-def test_the_kernel_names_no_clinical_concept():
-    """kernel 的 docstring 说它"deliberately knows nothing about tumour registries"。断言它。
+def test_the_core_layer_names_no_clinical_concept():
+    """core 层里 `kernel.py` 的 docstring 说它"deliberately knows nothing about tumour registries"。断言它。
 
-    只查 kernel 层，因为这是唯一一层可以要求零领域词的：contract 层会合法地出现字段名，
+    只查 core 层，因为这是唯一一层可以要求零领域词的：contract 层会合法地出现字段名，
     review 层的 prompt 里会出现文档类型。领域中立的完整检查是另一件事，这里只钉最里层 ——
     一条能通过的窄断言，胜过一条必须靠豁免清单才能通过的宽断言。
     """
     plane, _ = _layer_of()
     hits = {m: h for m, path in _modules().items()
-            if plane.get(m) == "kernel" and (h := _clinical_hits(path))}
-    assert not hits, f"kernel 层的可执行代码里出现临床概念: {hits}"
+            if plane.get(m) == "core" and (h := _clinical_hits(path))}
+    assert not hits, f"core 层的可执行代码里出现临床概念: {hits}"
 
 
 def test_the_clinical_word_check_can_actually_fail(tmp_path: pathlib.Path):

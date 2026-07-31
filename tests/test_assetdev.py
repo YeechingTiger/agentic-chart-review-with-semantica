@@ -27,8 +27,8 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from acr import assetdev as A
-from acr.spec import load_spec
+from acr.contract.spec import load_spec
+from acr.improvement import assetdev as A
 
 runner = CliRunner()
 FIELD = "histology"
@@ -131,8 +131,8 @@ def test_the_plan_read_off_the_spec_is_the_one_the_runtime_would_run(spec_path, 
     measures a system nobody is going to run."""
     from datetime import date
 
-    from acr.corpus import DocMeta
-    from acr.coverage import assign_strata, strata_from_spec
+    from acr.chartstore.corpus import DocMeta
+    from acr.review.coverage import assign_strata, strata_from_spec
 
     docs = [DocMeta(t, t, date(2021, 1, 1), 1, 10) for t in (PATH, CYTO, PROG, IMG, ADD)]
     runtime = {d.note_id: name for name, group

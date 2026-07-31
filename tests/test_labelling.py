@@ -43,7 +43,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from acr import labelling as L
+from acr.improvement import labelling as L
 
 # ============================================================================
 # TWO REQUIREMENTS, NEITHER OF THEM THIS MODULE'S BUSINESS
@@ -160,7 +160,7 @@ def no_network(monkeypatch):
 
 @pytest.fixture
 def corpus(tmp_path: Path):
-    from acr.corpus import Corpus
+    from acr.chartstore.corpus import Corpus
 
     for pid, docs in CORPUS_TEXT.items():
         (tmp_path / "patients" / pid).mkdir(parents=True)
@@ -669,7 +669,7 @@ def test_the_reason_classes_are_the_ones_derive_aggregates():
     """The two modules are coupled by this vocabulary and by nothing else. If they drift, every
     term the labeller emits lands in `Aggregate.unknown_reason_classes` and the derivation is
     silently a derivation of nothing."""
-    from acr import derive as D
+    from acr.improvement import derive as D
 
     assert set(L.TERM_REASONS) == set(D.REASON_CLASSES)
 

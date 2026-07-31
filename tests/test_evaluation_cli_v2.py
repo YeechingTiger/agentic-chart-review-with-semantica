@@ -4,7 +4,7 @@ import json
 
 from typer.testing import CliRunner
 
-from acr.cli import app
+from acr.commands.cli import app
 
 runner = CliRunner()
 

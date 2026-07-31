@@ -78,26 +78,37 @@ from pathlib import Path
 
 import pytest
 
-from acr import run_triggers
-from acr.corpus import Corpus
-from acr.coverage_planner import (MECHANICALLY_DISCHARGEABLE_MARKERS,
-                                  OPEN_REQUEST_ALREADY_OPEN, OPEN_REQUEST_ALREADY_SETTLED,
-                                  OPEN_REQUEST_DISCHARGED_ON_READ, OPEN_REQUEST_OPENED,
-                                  OPEN_REQUEST_STATUSES, READ_STATE_COMPLETE,
-                                  READ_STATE_INCOMPLETE, READ_STATE_LENGTH_UNKNOWN,
-                                  READ_STATE_UNREAD, REFUSED_BUDGET,
-                                  REFUSED_THREAD_NOOP, SETTLED_BY_READING_TO_THE_END,
-                                  TRIGGER_GATE_OBLIGATION_UNREACHABLE,
-                                  TRIGGER_UNLISTED_ANSWER_TERM, TRIGGER_UNSETTLED_THREAD,
-                                  TRIGGER_ZERO_HIT_SEARCH, ExpansionBudget, OpenRequest,
-                                  OpenThreadLedger,
-                                  PlanRevision, Trigger, load_marker_catalogue, plan_from_spec,
-                                  spec_declared_keywords)
-from acr.answer_gate import check_threads
-from acr.llm import LLMClient, LLMConfig, LLMResponse
-from acr.spec import load_spec
-from acr.state import Budget
-from acr.trace import Tracer
+from acr.chartstore.corpus import Corpus
+from acr.contract.spec import load_spec
+from acr.contract.trace import Tracer
+from acr.core.llm import LLMClient, LLMConfig, LLMResponse
+from acr.review import run_triggers
+from acr.review.answer_gate import check_threads
+from acr.review.coverage_planner import (
+    MECHANICALLY_DISCHARGEABLE_MARKERS,
+    OPEN_REQUEST_ALREADY_OPEN,
+    OPEN_REQUEST_ALREADY_SETTLED,
+    OPEN_REQUEST_DISCHARGED_ON_READ,
+    OPEN_REQUEST_OPENED,
+    OPEN_REQUEST_STATUSES,
+    READ_STATE_COMPLETE,
+    READ_STATE_INCOMPLETE,
+    READ_STATE_LENGTH_UNKNOWN,
+    READ_STATE_UNREAD,
+    REFUSED_THREAD_NOOP,
+    SETTLED_BY_READING_TO_THE_END,
+    TRIGGER_GATE_OBLIGATION_UNREACHABLE,
+    TRIGGER_UNLISTED_ANSWER_TERM,
+    TRIGGER_UNSETTLED_THREAD,
+    TRIGGER_ZERO_HIT_SEARCH,
+    ExpansionBudget,
+    OpenRequest,
+    OpenThreadLedger,
+    PlanRevision,
+    Trigger,
+    load_marker_catalogue,
+    plan_from_spec,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 SHB = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
@@ -228,7 +239,7 @@ def _run(spec, chart, llm, tmp_path, run_id, *, max_steps=8, expansion_budget=No
     sys.path.insert(0, str(Path(__file__).parent))
     from hooks_harness import run_with_script
 
-    from acr.corpus import Corpus
+    from acr.chartstore.corpus import Corpus
     corpus = Corpus(ROOT / "corpus" / "patients")
     ctx_out = []
     manifest, events = run_with_script(spec, corpus, chart.patient_id, tmp_path, llm,
@@ -252,7 +263,7 @@ def _triggers(events, kind=None):
 def _ledger(spec, chart):
     """A real stratified coverage ledger for this chart. The downgrade rule asks the gate what
     is still missing, so it needs the genuine ledger rather than a stub."""
-    from acr.coverage import CoverageLedger, ForcedSampler, strata_from_spec
+    from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
     docs, _ = chart.list_documents(limit=100_000)
     return CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(7))
 
@@ -473,7 +484,7 @@ def test_a_gate_obligation_the_plan_forbids_is_reported_as_a_deadlock(spec, char
     the detector against a plan that genuinely forbids the type holding the hits, because
     manufacturing that state through a scripted run makes the test about the script.
     """
-    from acr.run_triggers import detect_gate_obligations
+    from acr.review.run_triggers import detect_gate_obligations
 
     blocked_type = sorted(_plan_of(spec, chart).sample)[0]
     llm = ScriptedLLM(acts=[("search_notes", {"query": "right upper lobe"}),
@@ -525,8 +536,8 @@ def test_the_up_front_planners_own_terms_are_not_charged_to_the_agent(spec, char
     of 12. There is no LLM planner now; the plan comes from the spec. The RULE survives and is
     asserted where it lives, in the pricing function's `planner_terms` argument.
     """
-    from acr.coverage_planner import documents_by_type, plan_from_spec
-    from acr.plan_expansion import price_expansion_budget
+    from acr.review.coverage_planner import documents_by_type, plan_from_spec
+    from acr.review.plan_expansion import price_expansion_budget
 
     plan = plan_from_spec(spec, chart)
     docs_by_type = documents_by_type(chart)
@@ -535,7 +546,7 @@ def test_the_up_front_planners_own_terms_are_not_charged_to_the_agent(spec, char
     assert priced.max_terms_added >= len(plan.keywords), (
         "the cap is counted against EVERY term_provenance row, so a cap priced below the "
         "rows already present is negative allowance before the agent has asked for anything")
-    from acr.plan_expansion import headroom
+    from acr.review.plan_expansion import headroom
     assert headroom(plan, priced)["terms"] >= 0, "the agent must start with a non-negative allowance"
 
 
@@ -558,7 +569,7 @@ def _revise(tool, **kwargs):
 
 
 def _plan_of(spec, chart):
-    from acr.coverage_planner import plan_from_spec
+    from acr.review.coverage_planner import plan_from_spec
     return plan_from_spec(spec, chart)
 
 
@@ -596,7 +607,7 @@ def test_thread_work_survives_a_retrieval_half_that_is_refused_outright(spec, ch
 
 def test_a_term_overrun_alone_does_not_end_the_run_while_promotions_remain(spec, chart):
     """Terms spent is not expansion spent. A type promotion is still affordable."""
-    from acr.plan_expansion import expansion_is_spent
+    from acr.review.plan_expansion import expansion_is_spent
 
     budget = _tight()
     tool, ctx = _revise_tool(spec, chart, expansion_budget=budget)
@@ -854,7 +865,7 @@ def test_a_run_that_stops_owing_an_obligation_cannot_ship_a_value(spec, chart, t
     """
     import inspect
 
-    import acr.agent as A
+    import acr.review.agent as A
 
     assigns = re.findall(r"ctx\.answer\s*=\s*(\S+)", inspect.getsource(A))
     assert assigns == ["submitted"], (
@@ -888,7 +899,7 @@ def test_a_positive_that_owes_nothing_keeps_its_ungated_label(spec, chart, monke
     Owing nothing is a run that finished. And a gate-validated FOUND cleared the thread check
     and the decision rules — nothing here has standing to overrule it.
     """
-    import acr.agent as A
+    import acr.review.agent as A
 
     # "Owing nothing" is BOTH ledgers clear — the gate's misses and the threads. An empty
     # thread ledger is not enough, because a fresh coverage ledger still owes the gate, and

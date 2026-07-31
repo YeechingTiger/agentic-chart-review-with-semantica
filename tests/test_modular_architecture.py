@@ -6,11 +6,30 @@ from types import SimpleNamespace
 
 import pytest
 
-from acr.answer_gate import gate_answer
 from acr.audit.audit_loop import (
     AuditContext,
     AuditRunner,
     builtin_audit_registry,
+)
+from acr.contract.spec import load_spec
+from acr.core.kernel import (
+    KernelContractError,
+    TargetRef,
+    TrajectoryAdapter,
+    digest,
+)
+from acr.core.modules import (
+    CapabilityRequest,
+    CertificationRegistry,
+    CertificationSuite,
+    ModuleAsset,
+    ModuleContractError,
+    ModuleRegistry,
+    PipelineNode,
+    PipelineProfile,
+    PipelineRegistry,
+    TaskBudget,
+    effective_capabilities,
 )
 from acr.evaluation.evaluation_modules import builtin_evaluation_module_registry
 from acr.evaluation.evaluation_pipeline import (
@@ -25,32 +44,14 @@ from acr.evaluation.evaluation_pipeline import (
     TruthContext,
     make_result,
 )
-from acr.kernel import (
-    KernelContractError,
-    TargetRef,
-    TrajectoryAdapter,
-    digest,
-)
-from acr.modules import (
-    CapabilityRequest,
-    CertificationRegistry,
-    CertificationSuite,
-    ModuleAsset,
-    ModuleContractError,
-    ModuleRegistry,
-    PipelineNode,
-    PipelineProfile,
-    PipelineRegistry,
-    TaskBudget,
-    effective_capabilities,
-)
-from acr.repair_loop import RepairSignalRouter
-from acr.runtime_controls import (
+from acr.improvement.repair_loop import RepairSignalRouter
+from acr.review.answer_gate import gate_answer
+from acr.review.runtime_controls import (
     ProposedAction,
     RunControlState,
     builtin_runtime_control_registry,
 )
-from acr.runtime_profiles import (
+from acr.review.runtime_profiles import (
     ALWAYS_COVERAGE_PROFILE,
     CONDITIONAL_COVERAGE_PROFILE,
     DEFAULT_RUNTIME_PROFILE,
@@ -64,7 +65,6 @@ from acr.runtime_profiles import (
     starts_with_coverage_assets,
     uses_clinical_contract_view,
 )
-from acr.spec import load_spec
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -353,7 +353,7 @@ def test_conditional_profile_does_not_activate_for_complete_non_nos_positive(
     def forbidden(*args, **kwargs):
         raise AssertionError("coverage was activated for a wholly positive answer")
 
-    monkeypatch.setattr("acr.answer_gate._coverage_verdict", forbidden)
+    monkeypatch.setattr("acr.review.answer_gate._coverage_verdict", forbidden)
     verdict = gate_answer(
         spec,
         {
@@ -421,7 +421,7 @@ def test_conditional_profile_activates_only_for_negative_shaped_claims(
             "missing": ["synthetic coverage obligation"],
         }
 
-    monkeypatch.setattr("acr.answer_gate._coverage_verdict", capture)
+    monkeypatch.setattr("acr.review.answer_gate._coverage_verdict", capture)
     state = {}
     verdict = gate_answer(
         spec,
@@ -460,7 +460,7 @@ def test_always_coverage_activates_even_for_complete_positive(monkeypatch):
             "missing": [],
         }
 
-    monkeypatch.setattr("acr.answer_gate._coverage_verdict", capture)
+    monkeypatch.setattr("acr.review.answer_gate._coverage_verdict", capture)
     state = {}
     verdict = gate_answer(
         spec,
@@ -492,7 +492,7 @@ def test_clinical_contract_prompt_hides_retrieval_experience():
 
 
 def test_patient_inventory_plan_contains_no_task_retrieval_prior():
-    from acr.coverage_planner import plan_from_patient_inventory
+    from acr.review.coverage_planner import plan_from_patient_inventory
 
     chart = SimpleNamespace(
         list_documents=lambda limit: (

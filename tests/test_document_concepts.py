@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 
-from acr.document_concepts import (
+from acr.review.document_concepts import (
     BASELINE_CONCEPTS,
     DocumentConcept,
     baseline_block,

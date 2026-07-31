@@ -22,10 +22,16 @@ import pytest
 import typer
 from typer.testing import CliRunner
 
-from acr.cli import (CONCORD_SCHEMA, EXPLAIN_SCHEMA, EXTRACT_SCHEMA, _variable_records, app,
-                     read_cohort)
-from acr.concordance import variables_from_answer
-from acr.llm import LLMClient, LLMConfig, LLMResponse
+from acr.commands.cli import (
+    CONCORD_SCHEMA,
+    EXPLAIN_SCHEMA,
+    EXTRACT_SCHEMA,
+    _variable_records,
+    app,
+    read_cohort,
+)
+from acr.contract.concordance import variables_from_answer
+from acr.core.llm import LLMClient, LLMConfig, LLMResponse
 
 ROOT = Path(__file__).resolve().parents[1]
 GUIDELINE = ROOT / "guidelines" / "nccn_nsclc_subset.yaml"
@@ -216,7 +222,7 @@ def test_a_populated_field_survives_an_abstaining_answer():
 
 def test_flattened_rows_are_what_the_rule_engine_accepts():
     """A row without a status is rejected by `_coerce` — extract must not emit one."""
-    from acr.concordance import Guideline, _bind
+    from acr.contract.concordance import Guideline, _bind
     rows = _variable_records(_found(NSCLC), SHB, SHB_F, gate_validated=True)
     bound = _bind(rows, Guideline("g"))
     assert bound["primary_site"].value == "C341"
@@ -349,7 +355,7 @@ def scripted(monkeypatch):
     from hooks_harness import LitellmScriptAdapter
 
     llm = ScriptedLLM({"primary_site": "C341", "histology": "8140", "behavior": "3"})
-    monkeypatch.setattr("acr.cli_common.chat_model",
+    monkeypatch.setattr("acr.core.cli_common.chat_model",
                         lambda *a, **k: LitellmScriptAdapter(inner=llm))
     return llm
 
@@ -507,7 +513,7 @@ def test_concord_records_the_identity_of_everything_it_used(pipeline):
     _concord(pipeline)
     doc = json.loads((pipeline / "concord.json").read_text(encoding="utf-8"))
     assert doc["schema"] == CONCORD_SCHEMA
-    assert doc["engine"] == "acr.concordance/deterministic"
+    assert doc["engine"] == "acr.contract.concordance/deterministic"
     assert len(doc["guideline"]["guideline_hash"]) == 16
     assert doc["extract_input"].endswith("extract.json")
     assert doc["guideline_binding_warnings"] == []
@@ -694,7 +700,7 @@ def test_the_existing_commands_still_work():
 def test_the_plan_cannot_accumulate_in_the_transcript(tmp_path, scripted):
     import inspect
 
-    import acr.agent as A
+    import acr.review.agent as A
     hook = inspect.getsource(A.AuditMiddleware.wrap_model_call)
     assert "override(system_message=" in hook, (
         "the plan must ride the system message, which is replaced wholesale each call")
@@ -730,7 +736,7 @@ def test_the_call_budget_reaches_the_run_and_lands_in_the_manifest(tmp_path, scr
 # prompt. Uniqueness AND position are both load-bearing, so both are pinned.
 
 def test_only_one_plan_block_survives_and_it_is_the_last_message():
-    from acr.plan_expansion import install_plan_block, is_plan_block
+    from acr.review.plan_expansion import install_plan_block, is_plan_block
     msgs = [{"role": "system", "content": "sys"},
             {"role": "user", "content": "PLAN:\nrevision zero"},
             {"role": "assistant", "content": "read something"},
@@ -749,7 +755,7 @@ def test_nothing_but_a_plan_block_is_dropped():
     The bare prefix "PLAN" matches "PLANNING the next read", so a marker chosen carelessly
     deletes the agent's own words and presents as the model forgetting.
     """
-    from acr.plan_expansion import install_plan_block
+    from acr.review.plan_expansion import install_plan_block
     msgs = [{"role": "system", "content": "sys"},
             {"role": "user", "content": "PLANNING my next move"},   # prose, not a block
             {"role": "assistant", "content": "PLAN: I will read the path report"},

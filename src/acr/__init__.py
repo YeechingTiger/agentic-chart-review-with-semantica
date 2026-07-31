@@ -2,18 +2,18 @@
 
 from typing import TYPE_CHECKING, Any
 
-from .corpus import Corpus, PatientChart
-from .kernel import AssetRef, SignalEnvelope, TargetRef, Trajectory, TrajectoryAdapter
-from .modules import (
+from .chartstore.corpus import Corpus, PatientChart
+from .contract.spec import ExtractionSpec, load_spec, load_specs
+from .core.kernel import AssetRef, SignalEnvelope, TargetRef, Trajectory, TrajectoryAdapter
+from .core.modules import (
     CertificationSuite,
     ModuleAsset,
     PipelineProfile,
 )
-from .spec import ExtractionSpec, load_spec, load_specs
-from .state import Budget
+from .core.state import Budget
 
 if TYPE_CHECKING:
-    from .agent import run_patient
+    from .core.llm import LLMClient, LLMConfig
     from .diagnosis.attribution import (
         AdjudicationEvent,
         AttributionPacket,
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
         ErrorCaseEvent,
         ErrorCluster,
     )
-    from .llm import LLMClient, LLMConfig
+    from .review.agent import run_patient
 
 __version__ = "0.1.0"
 __all__ = [
@@ -57,10 +57,10 @@ __all__ = [
 def __getattr__(name: str) -> Any:
     """Keep the public API lazy so metadata-only commands do not import model SDKs."""
     if name == "run_patient":
-        from .agent import run_patient
+        from .review.agent import run_patient
         return run_patient
     if name in {"LLMClient", "LLMConfig"}:
-        from .llm import LLMClient, LLMConfig
+        from .core.llm import LLMClient, LLMConfig
         return {"LLMClient": LLMClient, "LLMConfig": LLMConfig}[name]
     if name in {
             "AttributionPacket", "AttributionProbe", "CauseFinding", "AttributionReport",

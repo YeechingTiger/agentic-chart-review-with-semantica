@@ -14,9 +14,8 @@ from datetime import date
 
 import pytest
 
-from acr.corpus import DocMeta
-from acr.coverage import StratumSpec, assign_strata, unmapped_doc_types
-from acr.site_mapping import (
+from acr.chartstore.corpus import DocMeta
+from acr.contract.site_mapping import (
     UNMAPPED,
     Concept,
     SiteMapping,
@@ -26,6 +25,7 @@ from acr.site_mapping import (
     concepts_from_strata,
     concepts_hash,
 )
+from acr.review.coverage import StratumSpec, assign_strata, unmapped_doc_types
 
 PATH_MEANS = ("a report in which a pathologist or cytopathologist states a diagnosis "
               "from tissue or cells, including its addenda and amendments")
@@ -68,7 +68,7 @@ def test_substring_expression_that_was_replaced():
     """The real type names the retired expression got wrong, both directions.
 
     Not a style complaint. Each name below is a real document type in this corpus and the
-    counts in `acr.site_mapping` say how many documents each one carries.
+    counts in `acr.contract.site_mapping` say how many documents each one carries.
     """
     pats = ["pathology", "cytology"]
     hit = lambda t: any(p in t.lower() for p in pats)

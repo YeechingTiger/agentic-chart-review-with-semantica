@@ -49,7 +49,7 @@ import re
 
 import pytest
 
-from acr import refine as R
+from acr.improvement import refine as R
 
 # --------------------------------------------------------------------------- fixtures
 #: A miniature spec, standing in for the rendered prose the citation mask checks against.

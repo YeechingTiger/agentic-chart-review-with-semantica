@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-from acr.mcp_server import (
+from acr.review.mcp_server import (
     MCP_TOOLS,
     STEERING_ARGS,
     ChartReviewService,
@@ -392,7 +392,7 @@ def test_validated_has_exactly_one_origin_in_the_source():
     """
     import re
 
-    body = (ROOT / "src" / "acr" / "mcp_server.py").read_text(encoding="utf-8")
+    body = (ROOT / "src" / "acr" / "review" / "mcp_server.py").read_text(encoding="utf-8")
     code = "\n".join(ln for ln in body.splitlines() if not ln.strip().startswith("#"))
     assignments = re.findall(r"\.validated\s*=\s*True", code)
     assert len(assignments) == 1, (
@@ -789,7 +789,7 @@ def test_the_quarantine_ledger_is_known_to_this_module_and_no_other():
     # And nothing in this module carries the ledger off the heap. Checked line by line rather
     # than by grepping the file for write verbs, which matches `json.dumps` in the MCP shim
     # and would pass or fail for reasons that have nothing to do with the ledger.
-    body = (src / "mcp_server.py").read_text(encoding="utf-8").splitlines()
+    body = (src / "review" / "mcp_server.py").read_text(encoding="utf-8").splitlines()
     writes = [ln.strip() for ln in body
               if ("truth_served" in ln or "extraction_touched" in ln)
               and any(w in ln for w in ("write", "dump", "json.", "Path(", "sqlite", "redis"))]
@@ -1106,7 +1106,7 @@ def test_the_gate_is_the_agent_s_gate_and_not_a_second_copy():
     """
     import inspect
 
-    from acr import agent, answer_gate, mcp_server
+    from acr.review import agent, answer_gate, mcp_server
     assert mcp_server.gate_answer is answer_gate.gate_answer
     assert "gate_answer(" in inspect.getsource(mcp_server.ChartReviewService._h_gate_check)
     assert "gate_answer(" in inspect.getsource(agent.run_patient), (
@@ -1129,7 +1129,7 @@ def test_the_mcp_adapter_is_a_shim_over_the_same_entry_point():
 def test_the_service_works_without_the_mcp_sdk_installed():
     """The SDK is an optional extra, so the import has to stay inside `build_mcp_server`.
 
-    Hoisting it to module scope would make `acr.mcp_server` unimportable wherever the extra
+    Hoisting it to module scope would make `acr.review.mcp_server` unimportable wherever the extra
     is not installed, and the failure would land on `acr.graph`'s importers rather than on
     whoever wanted a server. Checked by actually blocking the import, not by reading the
     source: a transitive import through any other acr module would be just as fatal.
@@ -1144,7 +1144,7 @@ def test_the_service_works_without_the_mcp_sdk_installed():
         "sys.meta_path.insert(0, type('Block', (), {'find_module': None, 'find_spec':\n"
         "    staticmethod(lambda name, path=None, target=None: (_ for _ in ()).throw(\n"
         "        ImportError('mcp blocked')) if name.split('.')[0] == 'mcp' else None)})())\n"
-        "from acr.mcp_server import ChartReviewService\n"
+        "from acr.review.mcp_server import ChartReviewService\n"
         f"svc = ChartReviewService({str(CORPUS)!r}, {str(SPECS)!r}, seed_secret=b's')\n"
         "out = svc.call('coverage.pending_samples', {'run_id': 'x', 'seed': 1})\n"
         "assert out['error'] == 'UNKNOWN_RUN_ID', out\n"

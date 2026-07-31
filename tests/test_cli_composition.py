@@ -17,15 +17,17 @@ from pathlib import Path
 
 import typer.main
 
-from acr.cli import app
+from acr.commands.cli import app
 
-SRC = Path(__file__).resolve().parents[1] / "src" / "acr"
+SRC = Path(__file__).resolve().parents[1] / "src" / "acr" / "commands"
 CLI_MODULES = sorted(p.stem for p in SRC.glob("cli*.py"))
 
 
 def _first_party_imports(module: str) -> set[str]:
     """Sibling `acr.*` modules this one imports, however it spells the import."""
-    known = {p.stem for p in SRC.glob("*.py")} | {p.name for p in SRC.iterdir() if p.is_dir()}
+    ACR = SRC.parent
+    known = ({p.stem for p in SRC.glob("*.py")}
+             | {p.name for p in ACR.iterdir() if p.is_dir() and p.name != "__pycache__"})
     tree = ast.parse((SRC / f"{module}.py").read_text(encoding="utf-8"))
     out: set[str] = set()
     for node in ast.walk(tree):
@@ -104,8 +106,8 @@ def test_every_group_mounted_in_cli_is_reachable_from_the_command_line():
 def test_help_does_not_import_model_runtimes():
     """Metadata-only CLI use must not pay the model stack's startup and memory cost."""
     code = (
-        "import sys; import acr.cli; "
-        "assert 'acr.agent' not in sys.modules; "
+        "import sys; import acr.commands.cli; "
+        "assert 'acr.review.agent' not in sys.modules; "
         "assert 'litellm' not in sys.modules"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
@@ -115,7 +117,7 @@ def test_runtime_dependencies_are_declared_directly():
     """A fresh base install must contain everything `acr run` imports."""
     import tomllib
 
-    project = tomllib.loads((SRC.parents[1] / "pyproject.toml").read_text(encoding="utf-8"))
+    project = tomllib.loads((SRC.parents[2] / "pyproject.toml").read_text(encoding="utf-8"))
     names = {d.split("[", 1)[0].split("<", 1)[0].split(">", 1)[0].split("=", 1)[0]
              for d in project["project"]["dependencies"]}
     assert {"deepagents", "langchain", "langchain-openai"} <= names

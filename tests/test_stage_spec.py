@@ -66,11 +66,16 @@ from pathlib import Path
 
 import pytest
 
-from acr.answer_checks import check_answer, check_field_formats
-from acr.corpus import Corpus, DocMeta
-from acr.coverage import (CoverageLedger, ForcedSampler, assign_strata, evaluate_gate,
-                          strata_from_spec)
-from acr.spec import load_spec
+from acr.chartstore.corpus import Corpus, DocMeta
+from acr.contract.answer_checks import check_answer, check_field_formats
+from acr.contract.spec import load_spec
+from acr.review.coverage import (
+    CoverageLedger,
+    ForcedSampler,
+    assign_strata,
+    evaluate_gate,
+    strata_from_spec,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC_PATH = ROOT / "specs" / "STORE.700_880.stage.yaml"
@@ -408,7 +413,7 @@ def test_the_runtime_gate_no_longer_refuses_over_an_unsearched_term(spec, ledger
     What `check_gate` still enforces is the one thing it can compute without a vocabulary: you
     must have listed the patient's documents before asserting absence.
     """
-    from acr.answer_gate import check_gate
+    from acr.review.answer_gate import check_gate
 
     _work_the_obligation(ledger, chart)
     assert check_gate(spec, ledger).verdict == "PASS"

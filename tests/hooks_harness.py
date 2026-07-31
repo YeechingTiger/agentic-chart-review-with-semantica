@@ -33,7 +33,7 @@ from langchain_core.language_models.chat_models import BaseChatModel  # noqa: E4
 from langchain_core.messages import AIMessage, BaseMessage  # noqa: E402
 from langchain_core.outputs import ChatGeneration, ChatResult  # noqa: E402
 
-from acr.agent import run_patient  # noqa: E402
+from acr.review.agent import run_patient  # noqa: E402
 
 
 class ToolScript(BaseChatModel):
@@ -177,13 +177,17 @@ def revise_plan_tool(spec, chart, *, expansion_budget=None, threads=None):
     tool call now, so it can be invoked directly. That is shorter and it is also a better test:
     a full run can fail for a dozen unrelated reasons before it reaches the arithmetic.
     """
-    from acr.agent import RunContext, make_revise_plan_tool
-    from acr.coverage import CoverageLedger, ForcedSampler, strata_from_spec
-    from acr.coverage_planner import (ExpansionBudget, OpenThreadLedger, load_marker_catalogue,
-                                      plan_from_spec)
-    from acr.state import EvidenceLedger
-    from acr.tools import Toolbox
-    from acr.trace import Tracer
+    from acr.contract.trace import Tracer
+    from acr.core.state import EvidenceLedger
+    from acr.review.agent import RunContext, make_revise_plan_tool
+    from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
+    from acr.review.coverage_planner import (
+        ExpansionBudget,
+        OpenThreadLedger,
+        load_marker_catalogue,
+        plan_from_spec,
+    )
+    from acr.review.tools import Toolbox
 
     docs, _ = chart.list_documents(limit=100_000)
     evidence = EvidenceLedger()

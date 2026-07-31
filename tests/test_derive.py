@@ -33,8 +33,8 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from acr import derive as D
-from acr.spec import load_spec
+from acr.contract.spec import load_spec
+from acr.improvement import derive as D
 
 runner = CliRunner()
 
@@ -401,7 +401,7 @@ def test_the_key_the_labeller_writes_is_the_key_derive_reads():
     number downstream was quietly a number about no terms at all. So the test does not compare
     two string constants — it builds a real `labelling.NoteLabel`, serialises it exactly as
     `LabelStore.append` does, and fails if the derivation cannot find what is in it."""
-    from acr import labelling as L
+    from acr.improvement import labelling as L
 
     assert D.TERMS_FIELD in L.NoteLabel.__dataclass_fields__, \
         f"derive reads {D.TERMS_FIELD!r}; NoteLabel has no such field"
@@ -428,7 +428,7 @@ def test_the_collapsed_verdict_the_labeller_exports_is_not_mistaken_for_the_old_
     """`NoteLabel.to_dict` writes a note-level `verdict` beside the per-field map, for readers
     that have not learned to ask per field. This one has. Reading the collapse — or refusing
     the row for carrying it — would undo the whole change while every row still looked right."""
-    from acr import labelling as L
+    from acr.improvement import labelling as L
 
     row = L.NoteLabel(patient_id="P1", note_id="n1", doc_type=PATH,
                       admissibility=L.Admissibility(
@@ -443,7 +443,7 @@ def test_the_collapsed_verdict_the_labeller_exports_is_not_mistaken_for_the_old_
 
 def test_a_labelling_the_derivation_can_read_is_one_the_labeller_can_read_back():
     """Both modules refuse the pre-per-field row, and neither may be the only one that does."""
-    from acr import labelling as L
+    from acr.improvement import labelling as L
 
     old = {"patient_id": "P1", "note_id": "n1", "doc_type": PATH,
            "admissibility": {"verdict": "can_establish", "quote": "q"}}
@@ -853,7 +853,7 @@ def labels_path(tmp_path) -> Path:
 
 
 def test_the_cli_exposes_every_command():
-    from acr.cli import app
+    from acr.commands.cli import app
     out = runner.invoke(app, ["derive", "--help"]).output
     for cmd in ("terms", "policy", "show-curve", "groups"):
         assert cmd in out
@@ -922,6 +922,6 @@ def test_groups_emits_a_proposal_only_when_asked(tmp_path, labels_path, spec_pat
     assert r.exit_code == 0, r.output
     (written,) = list(out.glob("*_field_groups.yaml"))
     body = yaml.safe_load(written.read_text())
-    assert body["kind"] == "acr.derive.grouping_proposal/1"
+    assert body["kind"] == "acr.improvement.derive.grouping_proposal/1"
     assert body["spec_id"] == "SYNTH.998.derive_fixture"
     assert body["groups"] == [[HISTO, BEHAV], [SITE]]

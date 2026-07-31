@@ -24,7 +24,6 @@ tolerated fewer would be pressure to hide them.
 """
 from __future__ import annotations
 
-import copy
 import json
 import shutil
 from pathlib import Path
@@ -36,13 +35,12 @@ from typer.testing import CliRunner
 # src/acr/deps.py landed on 2026-07-27; the `pytest.importorskip` guard that stood here while
 # it did not exist is gone, as its own comment instructed. A skipped specification is a
 # specification nobody is held to.
-import acr.deps as D
-
-from acr.cli import CONCORD_SCHEMA as CLI_CONCORD_SCHEMA
-from acr.cli import EXTRACT_SCHEMA as CLI_EXTRACT_SCHEMA
-from acr.cli import app
-from acr.concordance import _VAR_KEYS, load_guideline, parse_guideline
-from acr.registry_catalog import VariableCatalog
+import acr.contract.deps as D
+from acr.commands.cli import CONCORD_SCHEMA as CLI_CONCORD_SCHEMA
+from acr.commands.cli import EXTRACT_SCHEMA as CLI_EXTRACT_SCHEMA
+from acr.commands.cli import app
+from acr.contract.concordance import _VAR_KEYS, load_guideline, parse_guideline
+from acr.contract.registry_catalog import VariableCatalog
 
 ROOT = Path(__file__).resolve().parents[1]
 SPECS = ROOT / "specs"
@@ -405,7 +403,7 @@ def test_a_determinate_not_applicable_survives_a_gap_and_says_the_gap_was_there(
 def test_gated_assess_agrees_with_the_engine_when_there_are_no_gaps(cat):
     """The gate adds a refusal; it must not add an opinion. With every input resolved the
     verdict has to be byte-for-byte the engine's."""
-    from acr.concordance import assess
+    from acr.contract.concordance import assess
     doc = _toy_guideline(required_inputs=[
         {"name": "histology", "source": "extraction_spec",
          "spec_id": "STORE.400_522_523.site_histology_behavior", "item": "STORE [522]"},
@@ -458,7 +456,7 @@ def _fake_pipeline(tmp_path: Path, specs_dir: Path, guideline_path: Path,
     Patient ids are P01..P05. No real id, date or note text goes into a file, in the repo or
     out of it.
     """
-    from acr.spec import load_specs
+    from acr.contract.spec import load_specs
     specs = load_specs(specs_dir)
     g = load_guideline(guideline_path)
     run = tmp_path / "run"
@@ -699,7 +697,7 @@ def test_deps_reaches_no_model(shipped):
     model can be reached from here, someone will eventually ask it to guess a binding."""
     import importlib
     import sys
-    seen, stack = set(), ["acr.deps"]
+    seen, stack = set(), ["acr.contract.deps"]
     while stack:
         name = stack.pop()
         if name in seen:
@@ -710,4 +708,4 @@ def test_deps_reaches_no_model(shipped):
             m = getattr(attr, "__module__", None) or getattr(attr, "__name__", None)
             if isinstance(m, str) and m.startswith("acr."):
                 stack.append(m)
-    assert "acr.llm" not in seen and "acr.graph" not in seen
+    assert "acr.core.llm" not in seen and "acr.graph" not in seen

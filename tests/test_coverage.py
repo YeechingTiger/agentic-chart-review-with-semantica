@@ -24,11 +24,19 @@ from pathlib import Path
 
 import pytest
 
-from acr.corpus import Corpus
-from acr.coverage import (CoverageLedger, ForcedSampler, StratumResult, clip_and_judge,
-                          clopper_pearson_upper, enumerate_windows, evaluate_gate,
-                          strata_from_spec, summarise_windows)
-from acr.spec import load_spec
+from acr.chartstore.corpus import Corpus
+from acr.contract.spec import load_spec
+from acr.review.coverage import (
+    CoverageLedger,
+    ForcedSampler,
+    StratumResult,
+    clip_and_judge,
+    clopper_pearson_upper,
+    enumerate_windows,
+    evaluate_gate,
+    strata_from_spec,
+    summarise_windows,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 CORPUS = ROOT / "corpus" / "patients"

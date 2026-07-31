@@ -12,11 +12,16 @@ from pathlib import Path
 import pytest
 import yaml
 
-from acr.concordance import load_guideline, variables_from_answer
-from acr.registry_catalog import (AmbiguousVariableError, UnknownVariableError,
-                                  VariableCatalog, VariableResolutionError,
-                                  check_guideline_bindings, normalise_name)
-from acr.spec import load_specs
+from acr.contract.concordance import load_guideline, variables_from_answer
+from acr.contract.registry_catalog import (
+    AmbiguousVariableError,
+    UnknownVariableError,
+    VariableCatalog,
+    VariableResolutionError,
+    check_guideline_bindings,
+    normalise_name,
+)
+from acr.contract.spec import load_specs
 
 ROOT = Path(__file__).resolve().parents[1]
 SPECS = ROOT / "specs"

@@ -13,7 +13,7 @@ import pytest
 import typer
 from typer.testing import CliRunner
 
-from acr.cli_signal import KINDS, signal_app
+from acr.commands.cli_signal import KINDS, signal_app
 
 SRC = Path(__file__).resolve().parents[1] / "src"
 runner = CliRunner()
@@ -52,7 +52,7 @@ def test_module_imports_no_provider_at_module_scope():
     `acr eval` 组承诺不调模型。如果这个新组在模块层面就 import 了 litellm，任何人 import
     cli 都会把 provider 拖进来，那条承诺在实践中就没了。
     """
-    tree = ast.parse((SRC / "acr" / "cli_signal.py").read_text(encoding="utf-8"))
+    tree = ast.parse((SRC / "acr" / "commands" / "cli_signal.py").read_text(encoding="utf-8"))
     top: set[str] = set()
     for node in tree.body:                      # 只看模块层，函数体内的延迟 import 不算
         if isinstance(node, ast.Import):
@@ -64,8 +64,8 @@ def test_module_imports_no_provider_at_module_scope():
 
 
 def test_signal_envelope_shape_is_the_contract():
-    from acr.cli_signal import SIGNAL_TYPE_FOR_KIND
-    from acr.kernel import SIGNAL_TYPES
+    from acr.commands.cli_signal import SIGNAL_TYPE_FOR_KIND
+    from acr.core.kernel import SIGNAL_TYPES
     assert set(SIGNAL_TYPE_FOR_KIND.values()) <= SIGNAL_TYPES
     assert set(SIGNAL_TYPE_FOR_KIND) == set(KINDS)
 
@@ -109,8 +109,8 @@ def test_the_premise_of_the_rule_compliance_exclusion_still_holds():
     """`rule_compliance` is deterministic in the registry and unfirable since 2026-07-30, when
     `answer_checks.ANSWER_CHECK_KINDS` was emptied. The dispatcher drops it from the advertised
     dimensions for that reason and no other — if the kinds ever refill, the drop is wrong."""
+    from acr.contract.answer_checks import ANSWER_CHECK_KINDS
     from acr.evaluation import evals
-    from acr.answer_checks import ANSWER_CHECK_KINDS
     assert not ANSWER_CHECK_KINDS
     assert evals.REGISTRY["rule_compliance"].deterministic
 
@@ -157,8 +157,8 @@ def test_the_posture_vocabulary_is_attributions_own_and_not_a_third_spelling():
 
     这条断言读 attribution 自己的常量而不是抄一份 —— 抄一份的那天起两份就可以各自漂移。
     """
+    from acr.commands.cli_signal import EVAL_MODES
     from acr.diagnosis.attribution import ATTRIBUTION_MODES
-    from acr.cli_signal import EVAL_MODES
     assert tuple(EVAL_MODES) == ATTRIBUTION_MODES
 
 
@@ -170,7 +170,7 @@ def test_no_truth_mode_puts_both_postures_in_one_prompt():
     不是"更多方法"，是一个没有立场的提示词 —— 每个难解的失败都能从"key 可能有问题"退出，
     每个不可达的 key 都能记成 agent 的错，而它在两者之间的选择不被记录在任何地方。
     """
-    from acr.cli_signal import EVAL_MODES, KEY_IS_RIGHT_SKILLS, KEY_IS_SUSPECT_SKILLS
+    from acr.commands.cli_signal import EVAL_MODES, KEY_IS_RIGHT_SKILLS, KEY_IS_SUSPECT_SKILLS
     for mode, cards in EVAL_MODES.items():
         believes = set(cards) & set(KEY_IS_RIGHT_SKILLS)
         doubts = set(cards) & set(KEY_IS_SUSPECT_SKILLS)
@@ -187,7 +187,7 @@ def test_each_truth_mode_gets_the_posture_its_boundary_licenses():
     NEEDS_ADJUDICATION —— 那正是 eval-key-challenge 要问的。
     BLIND 根本没有 truth，所以两种立场都不适用：只给与 key 无关的卡。
     """
-    from acr.cli_signal import (
+    from acr.commands.cli_signal import (
         EVAL_MODES,
         KEY_AGNOSTIC_SKILLS,
         KEY_IS_RIGHT_SKILLS,
@@ -202,16 +202,16 @@ def test_each_truth_mode_gets_the_posture_its_boundary_licenses():
 def test_every_eval_card_in_the_tree_belongs_to_exactly_one_posture():
     """分不到立场的卡就是没有任何 truth mode 会加载的卡，也就是没人会收到的卡。
 
-    这正是 `acr.skills` 存在要防的那个失败，高一层：运行时报告提供了方法而模型什么也没拿到。
+    这正是 `acr.contract.skills` 存在要防的那个失败，高一层：运行时报告提供了方法而模型什么也没拿到。
     """
     from pathlib import Path
 
-    from acr.cli_signal import (
+    from acr.commands.cli_signal import (
         KEY_AGNOSTIC_SKILLS,
         KEY_IS_RIGHT_SKILLS,
         KEY_IS_SUSPECT_SKILLS,
     )
-    from acr.skills import skill_slot
+    from acr.contract.skills import skill_slot
 
     skills_dir = Path(__file__).resolve().parents[1] / "skills"
     in_tree = {p.name for p in skills_dir.iterdir()
@@ -231,7 +231,7 @@ def test_blind_is_the_default_because_a_key_must_be_asked_for():
     BLIND)` 让**光是传了 --gold** 就把归因升到 GOLD，而 GOLD 的边界宣称那份 key 人工裁定过。
     按 §4.1 那是 HUMAN 权限才能赋予的。现在必须有人把 --truth-mode GOLD 打出来。
     """
-    from acr.cli_signal import DEFAULT_TRUTH_MODE, _eval_skill_names
+    from acr.commands.cli_signal import DEFAULT_TRUTH_MODE, _eval_skill_names
     assert DEFAULT_TRUTH_MODE == "BLIND"
     assert "eval-key-challenge" not in _eval_skill_names("")
     assert "eval-missed-evidence" not in _eval_skill_names("")
@@ -239,7 +239,7 @@ def test_blind_is_the_default_because_a_key_must_be_asked_for():
 
 def test_an_explicit_eval_skills_list_still_overrides_the_truth_mode():
     """逃生口保留：truth mode 是一对命名默认，不是白名单。"""
-    from acr.cli_signal import _eval_skill_names
+    from acr.commands.cli_signal import _eval_skill_names
     assert _eval_skill_names("eval-overconfidence, eval-missed-evidence") == (
         "eval-overconfidence", "eval-missed-evidence")
 
@@ -280,7 +280,7 @@ def test_both_commands_name_the_truth_modes_in_their_help(cmd: str):
     `--model` 含有子串 `--mode`，所以这条测试最显然的写法会在 flag 还不存在时就通过 —— 第一版
     就是这样，而 CLI 当时回的是 `No such option: --mode`。
     """
-    from acr.cli_signal import EVAL_MODES
+    from acr.commands.cli_signal import EVAL_MODES
     res = runner.invoke(signal_app, [cmd, "--help"])
     assert res.exit_code == 0
     flat = _flat(res)
@@ -295,7 +295,7 @@ def test_the_truth_mode_decides_the_cards_and_reaches_attribution(monkeypatch, t
     `attribute_case_payload` —— 否则归因会自己按 `--gold` 推导，卡片和边界指令又会矛盾。
     """
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
-    import acr.cli_attribute as CA
+    import acr.commands.cli_attribute as CA
     seen: dict = {}
 
     def fake(**kw):
@@ -322,8 +322,8 @@ def test_every_mode_renders_and_names_only_cards_that_exist(mode: str):
     Per mode, not over one merged list: a card that only the unused mode names would otherwise
     be validated by whichever mode happened to include it.
     """
-    from acr.cli_signal import EVAL_MODES
-    from acr.skills import eval_skills_block
+    from acr.commands.cli_signal import EVAL_MODES
+    from acr.contract.skills import eval_skills_block
     cards = EVAL_MODES[mode]
     block = eval_skills_block(list(cards))
     for name in cards:
@@ -368,7 +368,7 @@ def test_batch_help_names_the_runs_option():
 
 
 def test_batch_collects_manifests_from_a_directory(tmp_path: Path):
-    from acr.cli_signal import _manifest_paths
+    from acr.commands.cli_signal import _manifest_paths
     (tmp_path / "a.manifest.json").write_text("{}", encoding="utf-8")
     (tmp_path / "b.manifest.json").write_text("{}", encoding="utf-8")
     (tmp_path / "notes.txt").write_text("x", encoding="utf-8")
@@ -377,20 +377,20 @@ def test_batch_collects_manifests_from_a_directory(tmp_path: Path):
 
 
 def test_batch_accepts_a_single_file(tmp_path: Path):
-    from acr.cli_signal import _manifest_paths
+    from acr.commands.cli_signal import _manifest_paths
     f = tmp_path / "only.manifest.json"
     f.write_text("{}", encoding="utf-8")
     assert _manifest_paths(str(f)) == [f]
 
 
 def test_batch_refuses_an_empty_directory(tmp_path: Path):
-    from acr.cli_signal import _manifest_paths
+    from acr.commands.cli_signal import _manifest_paths
     with pytest.raises(typer.BadParameter, match=r"no \*\.manifest\.json"):
         _manifest_paths(str(tmp_path))
 
 
 def test_batch_refuses_a_path_that_is_neither(tmp_path: Path):
-    from acr.cli_signal import _manifest_paths
+    from acr.commands.cli_signal import _manifest_paths
     with pytest.raises(typer.BadParameter, match="not a file or directory"):
         _manifest_paths(str(tmp_path / "nowhere"))
 
@@ -402,7 +402,7 @@ def test_one_failure_does_not_abort_the_batch(tmp_path: Path, monkeypatch):
     money already spent producing them. The failure belongs in the output array beside the
     successes, where a reader counts both without re-running anything.
     """
-    import acr.cli_signal as cs
+    import acr.commands.cli_signal as cs
     ok = tmp_path / "ok.manifest.json"
     ok.write_text("{}", encoding="utf-8")
     bad = tmp_path / "bad.manifest.json"
@@ -493,7 +493,7 @@ def test_the_batch_case_id_comes_from_the_same_case_map_acr_attribute_takes(tmp_
     flag name in one CLI is a trap, and the stem of `SYN0001.manifest.json` is
     `SYN0001.manifest`, so the wrong shape also produces case ids with a file extension in them.
     """
-    from acr.cli_signal import _case_id_for
+    from acr.commands.cli_signal import _case_id_for
     manifest = _manifest(tmp_path, "SYN0001")
     assert _case_id_for(manifest, {"SYN0001": "CASE-001"}) == "CASE-001"
     # No map: the manifest's own patient id, which `attribution.safe_case_id` refuses
@@ -511,7 +511,7 @@ class _StubReply:
 
 
 class _StubClient:
-    """An `acr.llm` client that answers every judge prompt with the same usable JSON."""
+    """An `acr.core.llm` client that answers every judge prompt with the same usable JSON."""
 
     def __init__(self, content: str = '{"score": 0.7, "observation": "saw it", "concerns": []}'):
         self.content, self.prompts = content, []
@@ -562,7 +562,7 @@ def test_judge_signal_builds_a_blind_packet_for_blinded_dimensions(tmp_path: Pat
     leaked" and "the judge can see what the run itself concluded" would look identical, and the
     second is not a leak — a trajectory judge is supposed to see the run's own output.
     """
-    import acr.cli_signal as cs
+    import acr.commands.cli_signal as cs
     from acr.evaluation import judge as J
     m = _traced(tmp_path)
     g = tmp_path / "gold.json"
@@ -576,7 +576,7 @@ def test_judge_signal_builds_a_blind_packet_for_blinded_dimensions(tmp_path: Pat
 
 
 def test_judge_signal_allows_the_key_only_for_triage(tmp_path: Path):
-    import acr.cli_signal as cs
+    import acr.commands.cli_signal as cs
     from acr.evaluation import judge as J
     m = _traced(tmp_path, "t")
     g = tmp_path / "gold.json"
@@ -601,7 +601,7 @@ def test_the_manifest_does_not_crowd_the_trace_out_of_the_packet(tmp_path: Path)
     alone can — so the naive packet shows a trajectory judge no trajectory, and it still
     returns three confident scores.
     """
-    import acr.cli_signal as cs
+    import acr.commands.cli_signal as cs
     from acr.evaluation import judge as J
     m = _traced(tmp_path, "big", develop_plane_candidates={"terms": ["x" * 40] * 400})
     packet = cs._packet_from_run(run=str(m), gold="", dimension="trajectory_quality",
@@ -644,7 +644,7 @@ def test_the_panel_is_priced_before_the_first_call(tmp_path, monkeypatch):
     stub client must never have been reached."""
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
     client = _StubClient()
-    monkeypatch.setattr("acr.cli_common.llm_client", lambda *a, **k: client)
+    monkeypatch.setattr("acr.core.cli_common.llm_client", lambda *a, **k: client)
     m = _traced(tmp_path, "pricey")
     res = runner.invoke(signal_app, ["run", "--kind", "judge", "--dimension",
                                      "trajectory_quality", "--run", str(m), "--spec", "s.yaml",
@@ -660,7 +660,7 @@ def test_the_judge_envelope_is_stamped_judged(tmp_path, monkeypatch):
     deterministic score, and the envelope has to say so where a consumer reads it."""
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
     client = _StubClient()
-    monkeypatch.setattr("acr.cli_common.llm_client", lambda *a, **k: client)
+    monkeypatch.setattr("acr.core.cli_common.llm_client", lambda *a, **k: client)
     m = _traced(tmp_path, "judged")
     res = runner.invoke(signal_app, ["run", "--kind", "judge", "--dimension",
                                      "trajectory_quality", "--run", str(m), "--spec", "s.yaml",
@@ -683,7 +683,7 @@ def test_the_judge_envelope_is_stamped_judged(tmp_path, monkeypatch):
 
 def test_the_judge_kind_batches_and_one_refusal_is_not_the_cohort(tmp_path, monkeypatch):
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
-    monkeypatch.setattr("acr.cli_common.llm_client", lambda *a, **k: _StubClient())
+    monkeypatch.setattr("acr.core.cli_common.llm_client", lambda *a, **k: _StubClient())
     _traced(tmp_path, "aa")
     (tmp_path / "zz.manifest.json").write_text("{ truncated", encoding="utf-8")
     res = runner.invoke(signal_app, ["batch", "--kind", "judge", "--dimension",
@@ -701,7 +701,7 @@ def test_the_judge_kind_batches_and_one_refusal_is_not_the_cohort(tmp_path, monk
 def test_the_json_judge_model_is_public_and_the_old_name_still_resolves():
     """`cli_signal` needs the same JSON-mode adapter `acr judge panel` uses. A second one
     would be a second place for the parsing rules to drift."""
-    from acr import cli_judge
+    from acr.commands import cli_judge
     assert cli_judge._JsonModel is cli_judge.JsonJudgeModel
 
 
@@ -715,15 +715,15 @@ def test_the_agent_kind_gets_more_turns_than_acr_attribute_case_defaults_to():
     提到 24 之后同一个案例跑完了八段，`gate_rejections` 为空，结论仍是 UNRESOLVED——但换成了
     "独立的唱反调模型不接受这个因果链"，也就是对抗性检查在起作用，而不是预算撞墙。
     """
-    from acr.cli_signal import DEFAULT_AGENT_CHART_READS, DEFAULT_AGENT_MODEL_CALLS
+    from acr.commands.cli_signal import DEFAULT_AGENT_CHART_READS, DEFAULT_AGENT_MODEL_CALLS
     assert DEFAULT_AGENT_MODEL_CALLS > 12
     assert DEFAULT_AGENT_CHART_READS >= 12
 
 
 def test_both_agent_budgets_reach_the_attribution_payload(monkeypatch):
     """参数必须真的穿到底 —— 加了 flag 却没接线，和没加一样。"""
-    import acr.cli_attribute as CA
-    import acr.cli_signal as cs
+    import acr.commands.cli_attribute as CA
+    import acr.commands.cli_signal as cs
     seen = {}
 
     def fake(**kw):
@@ -756,7 +756,7 @@ def test_the_agent_batch_reaches_the_diagnosis_at_all(tmp_path, monkeypatch):
     这是两个模式跑一个 cohort 的必经之路，所以在这里补上。
     """
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
-    import acr.cli_attribute as CA
+    import acr.commands.cli_attribute as CA
     seen: list[dict] = []
 
     def fake(**kw):

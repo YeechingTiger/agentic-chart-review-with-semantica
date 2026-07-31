@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import pytest
 
-from acr.evaluation.evals import Finding, RunRecord, detect_uncaused_reads, run_detectors
-from acr.tools.toolbox import CAUSE_PARAM, TOOL_SCHEMAS
+from acr.evaluation.evals import RunRecord, detect_uncaused_reads, run_detectors
+from acr.review.tools.toolbox import CAUSE_PARAM, TOOL_SCHEMAS
 
 #: The corpus filename convention is `<DocType>_<YYYY-MM-DD>[__<n>].txt` and the note_id IS the
-#: stem — see `acr.corpus.FILENAME_RE`. A name that does not parse is skipped rather than
+#: stem — see `acr.chartstore.corpus.FILENAME_RE`. A name that does not parse is skipped rather than
 #: guessed at, so getting this wrong builds an EMPTY chart and every read below fails as
 #: "unknown note_id" instead of as the thing under test.
 NOTE_ID = "pathology_2024-01-01"
@@ -22,10 +22,10 @@ NOTE_ID = "pathology_2024-01-01"
 
 @pytest.fixture
 def toolbox_with_one_doc(tmp_path):
-    from acr.corpus import Corpus
-    from acr.coverage import CoverageLedger, ForcedSampler
-    from acr.state import EvidenceLedger
-    from acr.tools.toolbox import Toolbox
+    from acr.chartstore.corpus import Corpus
+    from acr.core.state import EvidenceLedger
+    from acr.review.coverage import CoverageLedger, ForcedSampler
+    from acr.review.tools.toolbox import Toolbox
     d = tmp_path / "patients" / "SYN01"
     d.mkdir(parents=True)
     (d / f"{NOTE_ID}.txt").write_text("final diagnosis: adenocarcinoma\n", encoding="utf-8")
@@ -37,7 +37,7 @@ def toolbox_with_one_doc(tmp_path):
 
 @pytest.fixture
 def tracer(tmp_path):
-    from acr.trace import Tracer
+    from acr.contract.trace import Tracer
     return Tracer.create(tmp_path, "t1")
 
 

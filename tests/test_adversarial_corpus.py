@@ -303,7 +303,7 @@ def test_k03_both_readings_are_present_in_the_chart():
 
 
 def test_the_key_challenge_skill_exists_and_a_named_mode_offers_it():
-    """A card nobody loads is guidance nobody receives — the defect `acr.skills` was written
+    """A card nobody loads is guidance nobody receives — the defect `acr.contract.skills` was written
     to prevent, one level up.
 
     It is deliberately NOT in the default truth mode. These three charts are the reason the
@@ -316,8 +316,8 @@ def test_the_key_challenge_skill_exists_and_a_named_mode_offers_it():
     UNRESOLVED reference, not truth" whose disagreement may only be NEEDS_ADJUDICATION — which
     is exactly `key_dispute.correct_eval_verdict` on K03.
     """
-    from acr.cli_signal import DEFAULT_TRUTH_MODE, EVAL_MODES
-    from acr.skills import eval_skill_judges, skill_slot
+    from acr.commands.cli_signal import DEFAULT_TRUTH_MODE, EVAL_MODES
+    from acr.contract.skills import eval_skill_judges, skill_slot
 
     assert "eval-key-challenge" in EVAL_MODES["REGISTRY_REFERENCE"]
     assert "eval-key-challenge" not in EVAL_MODES[DEFAULT_TRUTH_MODE]
@@ -336,7 +336,7 @@ def test_no_unparseable_document_is_sitting_in_the_corpus():
 
     So the skip stays silent and this makes the population visible instead.
     """
-    from acr.corpus import FILENAME_RE
+    from acr.chartstore.corpus import FILENAME_RE
 
     unparseable = [p for p in CORPUS.rglob("*.txt") if not FILENAME_RE.match(p.stem)]
     assert not unparseable, (

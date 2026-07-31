@@ -10,8 +10,8 @@ from collections import Counter
 from collections.abc import Mapping
 from typing import Any
 
-from ..kernel import SignalEvidenceRef, TargetRef
-from ..modules import ModuleAsset, ModuleRegistry
+from ..core.kernel import SignalEvidenceRef, TargetRef
+from ..core.modules import ModuleAsset, ModuleRegistry
 from .evaluation_pipeline import (
     EvaluationInvocation,
     EvaluationResult,

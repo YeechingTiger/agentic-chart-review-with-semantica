@@ -26,7 +26,7 @@ from langchain_core.language_models.chat_models import BaseChatModel  # noqa: E4
 from langchain_core.messages import AIMessage, BaseMessage  # noqa: E402
 from langchain_core.outputs import ChatGeneration, ChatResult  # noqa: E402
 
-from acr.cli import app  # noqa: E402
+from acr.commands.cli import app  # noqa: E402
 
 runner = CliRunner()
 ROOT = Path(__file__).resolve().parents[1]
@@ -90,7 +90,7 @@ class ScriptedChatModel(BaseChatModel):
 def scripted_chat(monkeypatch):
     m = ScriptedChatModel(value={"primary_site": "C341", "histology": "8140", "behavior": "3"})
     m.seen = []
-    monkeypatch.setattr("acr.cli_common.chat_model", lambda *a, **k: m)
+    monkeypatch.setattr("acr.core.cli_common.chat_model", lambda *a, **k: m)
     return m
 
 
@@ -155,7 +155,7 @@ def test_chat_model_adapts_litellm_openai_prefix_for_openai_compatible_endpoint(
     """The shared ACR_MODEL may be LiteLLM-qualified; ChatOpenAI needs a deployment name."""
     import langchain_openai
 
-    from acr import cli_common
+    from acr.core import cli_common
 
     captured = {}
 
@@ -177,9 +177,9 @@ def test_runtime_provider_error_is_visible_in_manifest_degradation(tmp_path):
     """A failed first model call is runtime failure, not a clean clinical NO_ANSWER."""
     from langchain_core.language_models.chat_models import BaseChatModel
 
-    from acr.agent import run_patient
-    from acr.corpus import Corpus
-    from acr.spec import load_spec
+    from acr.chartstore.corpus import Corpus
+    from acr.contract.spec import load_spec
+    from acr.review.agent import run_patient
 
     class BrokenProvider(BaseChatModel):
         @property

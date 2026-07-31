@@ -29,19 +29,54 @@ from pathlib import Path
 import pytest
 
 from acr.evaluation import evals as E
-from acr.evaluation.judge import (CONTEXT_VARIABLES, COST_CLASSES, DECISION_FIELD_NAMES,
-                       DIM_BAD_CASE_TRIAGE, DIM_EVIDENCE_SUPPORT_JUDGED,
-                       DIM_L5_EXPLANATION_QUALITY, DIM_TRAJECTORY_QUALITY, EV_DETERMINISTIC,
-                       EV_JUDGED, EVALUATOR_TOOLS, FORBIDDEN_USES, JUDGEABLE_DIMENSIONS,
-                       LENSES, NOT_VALIDATED, PERMITTED_USES,
-                       AnswerKeyLeak, BlindPacket, DeterministicEvaluatorExists,
-                       DimensionNotJudgeable, EvaluatorCannotFail, EvaluatorSpecInvalid,
-                       JudgeBudgetExceeded, JudgeCannotGate, JudgeLedger, JudgeRefusal,
-                       Measurement, MixedEvidence, RegistryUnavailable, ToolScopeViolation,
-                       Verdict, aggregate, apply_verdict, blind_packet, build_context,
-                       certify_evaluator, combine_explicitly, deterministic_measurement,
-                       judge, keyed_packet, load_evaluator, load_evaluators, parse_evaluator,
-                       rank, run_evaluator, scoped_tool_broker, screen_for_human)
+from acr.evaluation.judge import (
+    CONTEXT_VARIABLES,
+    COST_CLASSES,
+    DECISION_FIELD_NAMES,
+    DIM_BAD_CASE_TRIAGE,
+    DIM_EVIDENCE_SUPPORT_JUDGED,
+    DIM_L5_EXPLANATION_QUALITY,
+    DIM_TRAJECTORY_QUALITY,
+    EV_DETERMINISTIC,
+    EV_JUDGED,
+    EVALUATOR_TOOLS,
+    FORBIDDEN_USES,
+    JUDGEABLE_DIMENSIONS,
+    LENSES,
+    NOT_VALIDATED,
+    PERMITTED_USES,
+    AnswerKeyLeak,
+    BlindPacket,
+    DeterministicEvaluatorExists,
+    DimensionNotJudgeable,
+    EvaluatorCannotFail,
+    EvaluatorSpecInvalid,
+    JudgeBudgetExceeded,
+    JudgeCannotGate,
+    JudgeLedger,
+    JudgeRefusal,
+    Measurement,
+    MixedEvidence,
+    RegistryUnavailable,
+    ToolScopeViolation,
+    Verdict,
+    aggregate,
+    apply_verdict,
+    blind_packet,
+    build_context,
+    certify_evaluator,
+    combine_explicitly,
+    deterministic_measurement,
+    judge,
+    keyed_packet,
+    load_evaluator,
+    load_evaluators,
+    parse_evaluator,
+    rank,
+    run_evaluator,
+    scoped_tool_broker,
+    screen_for_human,
+)
 
 # A truth value that must never reach a blinded judge's prompt. Not a patient id, not note
 # text — a synthetic sentinel, so the assertion is exact.
@@ -99,7 +134,7 @@ def test_the_three_no_ground_truth_dimensions_are_judgeable(dim):
 
 def test_a_dimension_with_a_deterministic_evaluator_is_refused():
     """L4 concordance is a rule engine. Asking a model to re-score it is the whole hazard."""
-    reg = Registry(guideline_concordance="acr.concordance.score_guideline")
+    reg = Registry(guideline_concordance="acr.contract.concordance.score_guideline")
     with pytest.raises(DeterministicEvaluatorExists, match="concordance"):
         judge("guideline_concordance", blind_packet(TRACE), registry=reg, model=StubJudge())
 
@@ -339,7 +374,7 @@ def test_a_verdict_is_frozen_so_its_stamp_cannot_be_edited():
 
 def test_a_judged_number_cannot_be_silently_averaged_into_a_deterministic_one():
     det = deterministic_measurement("histology_accuracy", 0.9, registry=Registry(
-        histology_accuracy="acr.answer_checks"))
+        histology_accuracy="acr.contract.answer_checks"))
     jud = Measurement.from_verdict(_verdict(0.4))
     with pytest.raises(MixedEvidence, match="combine_explicitly"):
         aggregate([det, jud])
@@ -485,7 +520,7 @@ def test_the_real_registry_answers_the_protocol_the_judge_requires():
     assert isinstance(GATE, E.PrecedenceGate)
     for dim in JUDGEABLE_DIMENSIONS:
         assert GATE.deterministic_evaluator_for(dim) is None, dim
-    assert GATE.deterministic_evaluator_for("task_completion") == "acr.answer_gate.check_gate"
+    assert GATE.deterministic_evaluator_for("task_completion") == "acr.review.answer_gate.check_gate"
 
 
 @pytest.mark.parametrize("dim", JUDGEABLE_DIMENSIONS)

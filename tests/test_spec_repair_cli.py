@@ -6,7 +6,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from acr.cli import app
+from acr.commands.cli import app
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "specs/STORE.400_522_523.site_histology_behavior.yaml"
@@ -185,7 +185,7 @@ def test_compare_refinement_reports_compute_without_claiming_correctness(tmp_pat
     row.update({"spend": {"usd": 0.2}, "steps": 4})
     write(baseline / "run.manifest.json", row)
     refined = write(tmp_path / "refined" / "conflict-refinement.json", {
-        "schema": "acr.conflict_refinement/1",
+        "schema": "acr.review.conflict_refinement/1",
         "enabled": True,
         "status": "CONVERGED",
         "n_rounds": 2,

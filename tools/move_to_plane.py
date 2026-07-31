@@ -81,6 +81,18 @@ def rewrite(text: str, plane: str, moved: set[str]) -> str:
         return "\n".join(lines)
 
     text = re.sub(r"(?m)^(\s*)from (\.+|acr) import ([^\n(]+)$", split_bare, text)
+
+    # 顶层单位本身（一个**包**的名字）。搬 `specview` / `tools` 这两个包时，
+    # `acr.specview.basis` 被上面的按模块规则改到了，但 `from acr.specview import JARGON`
+    # —— 引用包自己的 `__init__` 再导出 —— 没有，于是 test_specview 与 test_value_domains
+    # 在收集期 ModuleNotFoundError。放在按模块规则**之后**：那时长名字已经变成
+    # `acr.<plane>.specview.basis`，负向前视保证不会被再匹配一次。
+    for top in sorted(tops, key=len, reverse=True):
+        text = re.sub(rf"\bacr\.{re.escape(top)}\b(?!\.\w)", f"acr.{plane}.{top}", text)
+        text = re.sub(rf"(?m)^(\s*)from \.{re.escape(top)} import ",
+                      rf"\1from .{plane}.{top} import ", text)
+        text = re.sub(rf"(?m)^(\s*)from \.\.{re.escape(top)} import ",
+                      rf"\1from ..{plane}.{top} import ", text)
     return text
 
 
@@ -163,11 +175,16 @@ def main(argv: list[str]) -> int:
         return 2
     plane, names = argv[0], argv[1:]
     tree = modules_in_tree()
-    if plane in {m.split(".")[0] for m in tree}:
-        print(f"refusing: plane {plane!r} collides with a module of the same name — the package "
-              f"would shadow acr/{plane}.py", file=sys.stderr)
+    # 撞名的判据是"存在 `acr/<plane>.py` 这个文件"，不是"某个模块路径首段等于 plane"。
+    # 后者在**续跑**时必然成立 —— `core/` 已经存在，模块名就都以 `core.` 开头 —— 于是守卫
+    # 会把一次正常的收尾当成撞名拒掉。
+    if (SRC / f"{plane}.py").is_file():
+        print(f"refusing: plane {plane!r} collides with acr/{plane}.py — the package would "
+              f"shadow that module", file=sys.stderr)
         return 1
-    missing = [n for n in names if n not in tree]
+    missing = [n for n in names
+               if n not in tree and f"{plane}.{n}" not in tree
+               and not any(m.startswith(f"{plane}.{n.split('.')[0]}.") for m in tree)]
     if missing:
         print(f"no such module(s): {missing}", file=sys.stderr)
         return 1
@@ -192,6 +209,10 @@ def main(argv: list[str]) -> int:
             subprocess.run(["git", "mv", str(src), str(dest / src.name)], check=True, cwd=ROOT)
         elif pkg.is_dir():
             subprocess.run(["git", "mv", str(pkg), str(dest / unit)], check=True, cwd=ROOT)
+        elif (dest / f"{unit}.py").is_file() or (dest / unit).is_dir():
+            # 已经在目标位置。允许，因为一次中断的搬迁（`git mv` 在未被跟踪的新文件上失败过）
+            # 必须能靠重跑同一条命令收尾 —— 而 `git mv` 是原子的一批里的一步，不是全部。
+            print(f"  {unit}: already under {plane}/, rewriting references only")
         else:
             print(f"refusing: {unit!r} is neither a module nor a package", file=sys.stderr)
             return 1

@@ -38,18 +38,23 @@ from pathlib import Path
 
 import pytest
 
-import acr.answer_contract as AC
-from acr import answer_gate as G
-from acr.concordance import variables_from_answer
-from acr.corpus import Corpus
-from acr.coverage import CoverageLedger, ForcedSampler, strata_from_spec
-from acr.answer_contract import (SPEC_SECTIONS, CoverageClaimError, SpecGapError,
-                                 assert_answer_is_reportable, assert_spec_gap_is_reported,
-                                 build_spec_gap)
-from acr.answer_gate import gate_answer
-from acr.llm import LLMClient, LLMConfig, LLMResponse
-from acr.spec import load_spec
-from acr.state import Budget, EvidenceLedger
+import acr.contract.answer_contract as AC
+from acr.chartstore.corpus import Corpus
+from acr.contract.answer_contract import (
+    SPEC_SECTIONS,
+    CoverageClaimError,
+    SpecGapError,
+    assert_answer_is_reportable,
+    assert_spec_gap_is_reported,
+    build_spec_gap,
+)
+from acr.contract.concordance import variables_from_answer
+from acr.contract.spec import load_spec
+from acr.core.llm import LLMClient, LLMConfig, LLMResponse
+from acr.core.state import EvidenceLedger
+from acr.review import answer_gate as G
+from acr.review.answer_gate import gate_answer
+from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
 
 ROOT = Path(__file__).resolve().parents[1]
 SHB = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
@@ -154,7 +159,7 @@ def _run(spec, chart, tmp_path, submit_args, finalize=None, max_steps=4):
     sys.path.insert(0, str(Path(__file__).parent))
     from hooks_harness import run_with_script
 
-    from acr.corpus import Corpus
+    from acr.chartstore.corpus import Corpus
     llm = ScriptedLLM(submit_args or finalize or {"status": "EVIDENCE_INSUFFICIENT", "value": {},
                                                  "reasoning": "nothing established"},
                       finalize or {"status": "EVIDENCE_INSUFFICIENT", "value": {},
@@ -251,10 +256,10 @@ def test_an_unroutable_report_is_refused_rather_than_filed(shb, chart, tmp_path)
     is strictly stronger: the half-working state cannot be reached, rather than being labelled
     once it has been.
     """
-    from acr.answer_gate import gate_answer
-    from acr.coverage import CoverageLedger, ForcedSampler, strata_from_spec
-    from acr.coverage_planner import OpenThreadLedger, plan_from_spec
-    from acr.state import EvidenceLedger
+    from acr.core.state import EvidenceLedger
+    from acr.review.answer_gate import gate_answer
+    from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
+    from acr.review.coverage_planner import OpenThreadLedger, plan_from_spec
 
     docs, _ = chart.list_documents(limit=100_000)
     verdict = gate_answer(
@@ -323,7 +328,7 @@ def test_finalize_does_not_route_spec_insufficient_into_the_coverage_branch():
     branch and was handed a coverage ledger it may not carry. Asserted on `run_chart_review`,
     which owns the ordering now.
     """
-    import acr.agent as A
+    import acr.review.agent as A
 
     fin = inspect.getsource(A.run_chart_review)
     i_spec = fin.index('answer.get("status") == "SPEC_INSUFFICIENT"')
@@ -492,7 +497,7 @@ def test_evidence_insufficient_still_needs_the_gate(shb, chart):
 def test_the_mcp_surface_reports_it_too(shb, chart, tmp_path):
     """The MCP path never crashed — it signed a bare status code, and on the forced path it
     signed the caller's value with it. Different symptom, same missing channel."""
-    from acr.mcp_server import ChartReviewService
+    from acr.review.mcp_server import ChartReviewService
 
     svc = ChartReviewService(str(CORPUS), str(ROOT / "specs"))
     plan = svc.call("coverage.plan", {"patient": "SYN0002", "spec_id": shb.spec_id})
@@ -517,7 +522,7 @@ def test_the_mcp_surface_will_not_sign_a_caller_supplied_gap_block(shb):
     """The block is ASSEMBLED by the server from inputs it validated. A caller-supplied one
     would be a report whose quote nobody checked, which is precisely what the citation mask
     downstream assumes has happened."""
-    from acr.mcp_server import ChartReviewService
+    from acr.review.mcp_server import ChartReviewService
 
     svc = ChartReviewService(str(CORPUS), str(ROOT / "specs"))
     rid = svc.call("coverage.plan", {"patient": "SYN0002",
@@ -532,7 +537,7 @@ def test_the_mcp_surface_will_not_sign_a_caller_supplied_gap_block(shb):
 def test_the_mcp_forced_path_also_strips_the_value(outside):
     """The forced rewrite runs after the gate on this surface too, so the gate's refusal is
     unavailable and the value has to be taken away at emission."""
-    from acr.mcp_server import ChartReviewService
+    from acr.review.mcp_server import ChartReviewService
 
     svc = ChartReviewService(str(CORPUS), str(ROOT / "specs"))
     rid = svc.call("coverage.plan", {"patient": "SYN0002",
@@ -563,8 +568,8 @@ def test_both_front_ends_use_the_one_builder_and_the_one_assertion():
     copies today are copies free to drift tomorrow, and the drift is invisible from inside any
     one of them.
     """
-    import acr.agent as A
-    import acr.mcp_server as M
+    import acr.review.agent as A
+    import acr.review.mcp_server as M
 
     for mod in (A, M):
         src = inspect.getsource(mod)
@@ -581,14 +586,14 @@ def test_the_manifest_no_longer_attests_coverage_unconditionally():
     statement about this chart at all. Same category error as the crash, silent because nothing
     checked it. Asserted against `agent.run_chart_review`, which is where the branch now lives.
     """
-    import acr.agent as A
-
     # STRUCTURALLY, not by scraping a character window. This used to read src[i-400 : i+200]
     # around the call and look for the guard's text in it; on 2026-07-28 four lines of comment
     # pushed the `if` past 400 characters and the test failed while the guard sat right there.
     # A property worth asserting is worth asserting in a way that survives a comment.
     import ast
     import textwrap
+
+    import acr.review.agent as A
 
     tree = ast.parse(textwrap.dedent(inspect.getsource(A.run_chart_review)))
 
@@ -621,22 +626,22 @@ def test_the_manifest_no_longer_attests_coverage_unconditionally():
 def test_every_front_end_offers_the_reporting_fields_to_the_model():
     """A gate that demands `spec_section` from a model that was never given the parameter is an
     unwinnable loop: it would be rejected forever for omitting something it cannot send."""
-    from acr.tools.toolbox import TOOL_SCHEMAS
+    from acr.review.tools.toolbox import TOOL_SCHEMAS
 
     submit = next(s for s in TOOL_SCHEMAS if s["function"]["name"] == "submit_answer")
     props = submit["function"]["parameters"]["properties"]
     for k in ("spec_section", "spec_quote", "uncovered_fields"):
         assert k in props, f"the toolbox cannot send {k}"
 
-    from acr.mcp_server import MCP_TOOLS
+    from acr.review.mcp_server import MCP_TOOLS
     desc = next(t for t in MCP_TOOLS if t["name"] == "gate.check")["inputSchema"]
     assert "spec_section" in json.dumps(desc), "the MCP caller is never told to send it"
 
 
 def test_the_toolbox_passes_the_fields_through_rather_than_dropping_them():
     """Dropping them silently would make the gate's rejection unanswerable."""
-    from acr.corpus import Corpus as C
-    from acr.tools import Toolbox
+    from acr.chartstore.corpus import Corpus as C
+    from acr.review.tools import Toolbox
 
     ch = C(CORPUS).chart("SYN0002")
     spec = load_spec(SHB)
@@ -653,11 +658,11 @@ def test_the_toolbox_passes_the_fields_through_rather_than_dropping_them():
 def test_extract_writes_the_gap_into_the_artifact_and_exits_clean(monkeypatch, tmp_path):
     """`cli.extract` caught the crash and wrote the run off as an error, so the cohort artifact
     the §6b loop reads never contained a single spec gap."""
+    import sys
+
     from typer.testing import CliRunner
 
-    from acr.cli import app
-
-    import sys
+    from acr.commands.cli import app
     sys.path.insert(0, str(Path(__file__).parent))
     from hooks_harness import LitellmScriptAdapter
 
@@ -666,7 +671,7 @@ def test_extract_writes_the_gap_into_the_artifact_and_exits_clean(monkeypatch, t
     # `chat_model`, not `llm_client`: extract runs the library graph and reaches the provider
     # through the other seam. Patching the one it no longer calls let a real client be built,
     # and the run died on "Missing credentials" rather than on anything under test.
-    monkeypatch.setattr("acr.cli_common.chat_model",
+    monkeypatch.setattr("acr.core.cli_common.chat_model",
                         lambda *a, **k: LitellmScriptAdapter(inner=llm))
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
 
@@ -696,13 +701,13 @@ def test_a_crashed_run_is_distinguishable_from_one_that_never_happened(monkeypat
     record that something was attempted and died."""
     from typer.testing import CliRunner
 
-    from acr.cli import app
+    from acr.commands.cli import app
 
     class Boom(ScriptedLLM):
         def chat(self, messages, tools=None):
             raise RuntimeError("simulated provider failure")
 
-    monkeypatch.setattr("acr.cli_common.llm_client", lambda *a, **k: Boom(None, {}))
+    monkeypatch.setattr("acr.core.cli_common.llm_client", lambda *a, **k: Boom(None, {}))
     (tmp_path / "c.csv").write_text("patient_id\nSYN0001\n", encoding="utf-8")
 
     r = CliRunner().invoke(app, ["extract", "--cohort", str(tmp_path / "c.csv"),

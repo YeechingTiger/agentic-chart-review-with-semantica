@@ -15,10 +15,10 @@ from pathlib import Path
 
 import pytest
 
-from acr.corpus import Corpus
-from acr.coverage import CoverageLedger
-from acr.state import EvidenceLedger
-from acr.tools import Toolbox
+from acr.chartstore.corpus import Corpus
+from acr.core.state import EvidenceLedger
+from acr.review.coverage import CoverageLedger
+from acr.review.tools import Toolbox
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus" / "patients"
 

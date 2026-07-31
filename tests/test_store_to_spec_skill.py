@@ -29,9 +29,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from acr.answer_checks import check_field_formats, check_field_formats_detail
-from acr.coverage import StratumSpec
-from acr.spec import ExtractionSpec, load_spec
+from acr.contract.answer_checks import check_field_formats, check_field_formats_detail
+from acr.contract.spec import ExtractionSpec, load_spec
+from acr.review.coverage import StratumSpec
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_DIR = ROOT / "skills" / "store-to-spec"
@@ -73,7 +73,7 @@ except Exception as _e:  # noqa: BLE001 - want to name and skip on *any* load fa
 skip_stage_spec_broken = pytest.mark.skipif(
     _STAGE_SPEC_ERROR is not None,
     reason=(
-        "specs/STORE.700_880.stage.yaml fails load_spec() under acr.spec's provenance "
+        "specs/STORE.700_880.stage.yaml fails load_spec() under acr.contract.spec's provenance "
         f"enforcement (owned by another team, currently mid-edit): {_STAGE_SPEC_ERROR}"
     ),
 )
@@ -186,7 +186,7 @@ def test_the_field_scoping_key_the_skill_teaches_is_the_key_coverage_reads():
 
 
 def _implemented_policies() -> set[str]:
-    src = inspect.getsource(__import__("acr.coverage", fromlist=["coverage"]))
+    src = inspect.getsource(__import__("acr.review.coverage", fromlist=["coverage"]))
     out = set(re.findall(r'\.policy == "([a-z_]+)"', src))
     for grp in re.findall(r'\.policy in \(([^)]*)\)', src):
         out |= set(re.findall(r'"([a-z_]+)"', grp))
@@ -241,7 +241,7 @@ def test_every_yaml_key_the_skill_tells_an_author_to_write_is_read_by_something(
     specview_tests = (ROOT / "tests" / "test_specview.py").read_text(encoding="utf-8")
     assert "provenance" in specview_tests
     assert "witness" in inspect.getsource(ExtractionSpec.__module__ and __import__(
-        "acr.spec", fromlist=["spec"]))
+        "acr.contract.spec", fromlist=["spec"]))
     known |= {"provenance", "witness"}
 
     for path, text in _docs().items():

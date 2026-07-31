@@ -14,7 +14,7 @@ the honest rate is 1/2, and both naive alternatives (4/5 and 1/5) are asserted t
 The other thing under test is that this layer is a rule engine at all. L2 and L3 spend their
 entire budget earning the right to say "we proved it is not documented"; a model asked to
 judge concordance in free text would hand that back. `test_no_model_is_reachable` walks the
-first-party import closure of `acr.concordance` and fails if a provider SDK, `acr.llm` or
+first-party import closure of `acr.contract.concordance` and fails if a provider SDK, `acr.core.llm` or
 `acr.graph` appears anywhere in it.
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 
-from acr.concordance import (
+from acr.contract.concordance import (
     ConcordanceInputError,
     ConcordanceResult,
     Guideline,
@@ -39,7 +39,7 @@ from acr.concordance import (
     validate_guideline,
     variables_from_answer,
 )
-from acr.spec import load_spec
+from acr.contract.spec import load_spec
 
 ROOT = Path(__file__).resolve().parents[1]
 GUIDELINE = ROOT / "guidelines" / "nccn_nsclc_subset.yaml"
@@ -495,7 +495,7 @@ def test_a_malformed_code_falls_out_of_the_population_and_that_is_l3s_job(guidel
     it before it can reach this layer — this test exists to record that the seam is load
     bearing, so that turning that check off has a visible cost here.
     """
-    from acr.answer_checks import check_field_formats
+    from acr.contract.answer_checks import check_field_formats
     spec = load_spec(ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml")
     assert check_field_formats(spec.fields, {"primary_site": "C3412"}), \
         "L3 must still reject the malformed code that L4 would silently drop"
@@ -519,7 +519,7 @@ def test_assess_is_pure(guideline):
     assert first == second == shuffled
     assert v == before
     assert [r["recommendation_id"] for r in first] == [ADJ, BIO, LOCAL]
-    assert all(r["engine"] == "acr.concordance/deterministic" for r in first)
+    assert all(r["engine"] == "acr.contract.concordance/deterministic" for r in first)
 
 
 def test_every_result_carries_the_guideline_it_was_scored_under(guideline):
@@ -542,7 +542,7 @@ FORBIDDEN_MODULES = {
 
 
 def _first_party_closure(start: Path) -> dict[str, set[str]]:
-    """Every module `acr.concordance` reaches, and what each one imports."""
+    """Every module `acr.contract.concordance` reaches, and what each one imports."""
     seen: dict[str, set[str]] = {}
     queue = [start]
     while queue:
@@ -574,11 +574,11 @@ def test_no_model_is_reachable_from_this_module():
     the verdict would stop being reproducible from the recorded inputs, and there would be
     no way to tell a rule change from a model change when a rate moved.
     """
-    closure = _first_party_closure(ROOT / "src" / "acr" / "concordance.py")
+    closure = _first_party_closure(ROOT / "src" / "acr" / "contract" / "concordance.py")
     assert "concordance.py" in closure
     offenders = {mod: sorted(imports & FORBIDDEN_MODULES)
                  for mod, imports in closure.items() if imports & FORBIDDEN_MODULES}
-    assert not offenders, f"a model or network is reachable from acr.concordance: {offenders}"
+    assert not offenders, f"a model or network is reachable from acr.contract.concordance: {offenders}"
 
 
 # ------------------------------------------------------------------- the guideline itself

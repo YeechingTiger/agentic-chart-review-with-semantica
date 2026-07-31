@@ -26,14 +26,13 @@ import json
 from pathlib import Path
 
 import pytest
-import yaml
 from typer.testing import CliRunner
 
-import acr.intake as I
-from acr.cli import app
-from acr.concordance import _validate_condition, load_guideline, parse_guideline
-from acr.registry_catalog import VariableCatalog
-from acr.spec import load_spec
+import acr.authoring.intake as I
+from acr.commands.cli import app
+from acr.contract.concordance import _validate_condition, parse_guideline
+from acr.contract.registry_catalog import VariableCatalog
+from acr.contract.spec import load_spec
 
 ROOT = Path(__file__).resolve().parents[1]
 SPECS = ROOT / "specs"
@@ -79,7 +78,7 @@ def test_intake_cannot_reach_a_patient_chart():
     src = inspect.getsource(I)
     for forbidden in ("from .corpus", "import corpus", "PatientChart", "read_text("):
         assert forbidden not in src, (
-            f"acr.intake mentions {forbidden!r}; this layer plans and must not be able to read PHI"
+            f"acr.authoring.intake mentions {forbidden!r}; this layer plans and must not be able to read PHI"
         )
     assert "patient" not in {p for p in inspect.signature(I.route).parameters}
 

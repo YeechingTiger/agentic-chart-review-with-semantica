@@ -38,7 +38,7 @@ from pathlib import Path
 
 import pytest
 
-from acr.corpus import Corpus, _notation_tolerant
+from acr.chartstore.corpus import Corpus, _notation_tolerant
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus" / "patients"
 
@@ -161,7 +161,7 @@ def test_dates_and_types_come_back_so_the_model_can_choose_reading_order():
 
 import re
 
-from acr.corpus import _notation_tolerant
+from acr.chartstore.corpus import _notation_tolerant
 
 
 def found(query: str, text: str) -> bool:

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from acr.answer_contract import CoverageClaimError, assert_coverage_claim_is_earned
+from acr.contract.answer_contract import CoverageClaimError, assert_coverage_claim_is_earned
 
 
 def test_gate_validated_negative_may_carry_the_ledger():
@@ -91,7 +91,7 @@ def test_nothing_can_report_gate_validated_alongside_coverage_unreachable():
     """
     import inspect
 
-    import acr.agent as A
+    import acr.review.agent as A
 
     ctx = A.RunContext.__new__(A.RunContext)
     for accepted, unreachable, expect in [(False, [], False), (True, [], True),

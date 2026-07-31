@@ -67,7 +67,7 @@ scores them side by side.
 
 `score()` READS manifests and traces and runs nothing: no model, no corpus, no tool.
 `tests/test_evals.py::test_no_model_is_reachable_from_this_module` walks the first-party
-import closure and fails if `acr.llm`, `acr.graph` or a provider SDK ever appears here.
+import closure and fails if `acr.core.llm`, `acr.graph` or a provider SDK ever appears here.
 
 It emits per-field rates AND PER-INSTANCE rows, and `compare()` returns REGRESSION on any
 per-instance or per-subgroup drop even when every headline rate rose — a change that lifts
@@ -139,22 +139,22 @@ class Dimension:
 REGISTRY: dict[str, Dimension] = {d.name: d for d in (
     Dimension("hallucination", True, "exact substring: the quote is sliced out of the "
               "document by offset, so it cannot be model-authored",
-              "acr.tools.toolbox.Toolbox._t_record_evidence", "faithfulness judge",
+              "acr.review.tools.toolbox.Toolbox._t_record_evidence", "faithfulness judge",
               "enforced at the tool boundary, before an estimator could be wrong"),
     Dimension("correctness", True, "exact match of the coded value against the key value",
               "acr.evaluation.evals.score", "answer-correctness judge",
               "a judge calling C341 'basically right' against a key of C349 has absorbed "
               "the entire error being measured"),
     Dimension("task_completion", True, "the gate verdict recorded on the run",
-              "acr.answer_gate.check_gate", "task-completion / goal-achievement judge",
+              "acr.review.answer_gate.check_gate", "task-completion / goal-achievement judge",
               "THE LOAD-BEARING ROW: a completion judge scores a correct abstention as a "
               "failure, and correct abstentions are not missing at random"),
     Dimension("answer_format_validity", True, "the spec's declared per-field `format` regex "
-              "and `allowable_values`", "acr.answer_checks.check_field_formats",
+              "and `allowable_values`", "acr.contract.answer_checks.check_field_formats",
               "schema-adherence judge",
               "primary_site='C3412' shipped gate-validated against a declared C\\d{3}"),
     Dimension("rule_compliance", True, "the spec's declared answer_checks",
-              "acr.answer_checks.check_answer", "instruction-following judge",
+              "acr.contract.answer_checks.check_answer", "instruction-following judge",
               "these rules were in the prompt when the model broke them; a second model "
               "reading them back is not the fix"),
     Dimension("abstention_correctness", True, "abstained-vs-key cross tabulation; a null "
@@ -172,7 +172,7 @@ REGISTRY: dict[str, Dimension] = {d.name: d for d in (
               sub_questions=("evidence_support.deterministic", "evidence_support.judged")),
     Dimension("evidence_support.deterministic", True,
               "the stratum's `establishes` rule — the spec's evidence_rules in the form code "
-              "reads", "acr.coverage.admissibility_for_citations", "groundedness judge",
+              "reads", "acr.review.coverage.admissibility_for_citations", "groundedness judge",
               "'Radiology can localise a mass; it cannot establish histology' is a rule the "
               "gate already applied; asking a model to reapply it is a downgrade"),
     Dimension("step_efficiency", False, "SPLIT — name a sub-question", None, None,
@@ -222,7 +222,7 @@ REGISTRY: dict[str, Dimension] = {d.name: d for d in (
               "a matter of reading, and it makes no claim about the patient"),
     Dimension("spec_ambiguity_triage", False, "judge permitted; routes spec-vs-behaviour",
               None, None, "whether a miscode came from an ambiguous rule or an ignored one "
-              "requires reading the rule; acr.refine treats the verdict as a proposal"),
+              "requires reading the rule; acr.improvement.refine treats the verdict as a proposal"),
 )}
 
 #: THE RECONCILIATION TABLE. Two names for one question is how the two halves of this plane

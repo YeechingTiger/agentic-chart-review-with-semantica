@@ -34,7 +34,7 @@ from pathlib import Path
 
 import pytest
 
-from acr.answer_checks import (
+from acr.contract.answer_checks import (
     ANSWER_CHECK_KINDS,
     answer_check_rule_id,
     check_answer,
@@ -43,7 +43,7 @@ from acr.answer_checks import (
     check_field_formats_detail,
     field_rule_id,
 )
-from acr.spec import ProvenanceError, load_spec
+from acr.contract.spec import ProvenanceError, load_spec
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"

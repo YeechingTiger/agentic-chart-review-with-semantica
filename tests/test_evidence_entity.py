@@ -17,8 +17,8 @@ DETERMINISTIC_RULES_REMOVED.md 记录过的那个错误。
 """
 from __future__ import annotations
 
+from acr.core.state import Evidence, EvidenceLedger
 from acr.evaluation.evals import DetectorConfig, RunRecord, run_detectors
-from acr.state import Evidence, EvidenceLedger
 
 
 def test_evidence_carries_an_optional_entity():
@@ -90,7 +90,7 @@ def test_no_detector_reads_the_anchor():
 
 
 def test_the_anchor_is_offered_and_never_required():
-    from acr.tools.toolbox import TOOL_SCHEMAS
+    from acr.review.tools.toolbox import TOOL_SCHEMAS
     schema = next(s for s in TOOL_SCHEMAS
                   if s["function"]["name"] == "record_evidence")["function"]["parameters"]
     assert "entity" in schema["properties"]
@@ -98,14 +98,14 @@ def test_the_anchor_is_offered_and_never_required():
 
 
 #: The corpus filename convention is `<DocType>_<YYYY-MM-DD>[__<n>].txt` and the note_id IS the
-#: stem — see `acr.corpus.FILENAME_RE`, and the same note in tests/test_read_causality.py.
+#: stem — see `acr.chartstore.corpus.FILENAME_RE`, and the same note in tests/test_read_causality.py.
 _NOTE_ID = "pathology_2024-01-01"
 
 
 def _toolbox(tmp_path):
-    from acr.corpus import Corpus
-    from acr.coverage import CoverageLedger, ForcedSampler
-    from acr.tools.toolbox import Toolbox
+    from acr.chartstore.corpus import Corpus
+    from acr.review.coverage import CoverageLedger, ForcedSampler
+    from acr.review.tools.toolbox import Toolbox
     d = tmp_path / "patients" / "SYN01"
     d.mkdir(parents=True)
     (d / f"{_NOTE_ID}.txt").write_text("final diagnosis: adenocarcinoma\n", encoding="utf-8")

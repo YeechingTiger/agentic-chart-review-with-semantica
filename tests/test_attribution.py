@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
+from acr.chartstore.corpus import Corpus
+from acr.core.local_artifacts import LocalArtifactError, LocalArtifactStore
 from acr.diagnosis import attribution as A
-from acr.corpus import Corpus
-from acr.local_artifacts import LocalArtifactError, LocalArtifactStore
 
 ROOT = Path(__file__).resolve().parents[1]
 

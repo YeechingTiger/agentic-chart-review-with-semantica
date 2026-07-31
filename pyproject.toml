@@ -28,8 +28,8 @@ reports = ["openpyxl>=3.1"]
 mcp = ["mcp[cli]>=1.28"]
 
 [project.scripts]
-acr = "acr.cli:app"
-acr-mcp = "acr.mcp_server:main"
+acr = "acr.commands.cli:app"
+acr-mcp = "acr.review.mcp_server:main"
 
 [build-system]
 requires = ["hatchling"]

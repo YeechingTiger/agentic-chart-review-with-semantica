@@ -22,9 +22,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from acr import speclint
-from acr.cli import app
-from acr.spec import ExtractionSpec, load_spec
+from acr.authoring import speclint
+from acr.commands.cli import app
+from acr.contract.spec import ExtractionSpec, load_spec
 
 ROOT = Path(__file__).resolve().parents[1]
 SPECS = sorted((ROOT / "specs").glob("*.yaml")) + sorted((ROOT / "specs" / "ablation").glob("*.yaml"))
@@ -233,7 +233,7 @@ def test_a_conflict_rule_naming_both_sources_discharges_the_pair():
 
 # -------------------------------------------------------- F8 formal: gate satisfiability
 def test_the_zero_hit_bound_is_the_closed_form_the_ledger_uses():
-    from acr.coverage import clopper_pearson_upper
+    from acr.review.coverage import clopper_pearson_upper
     for n in (10, 24, 25, 29):
         assert speclint.bound_at_n(n, 0.95) == pytest.approx(clopper_pearson_upper(0, n, 0.95))
 
@@ -442,7 +442,7 @@ def test_a_means_stratum_and_a_rest_stratum_are_not_reported():
 def test_every_shipped_spec_that_still_uses_substrings_is_named_by_the_lint():
     """Four specs still carry the retired expression. The lint is how that stays visible
     until each one has a Site Mapping built for it, instead of being silently wrong."""
-    from acr.spec import load_specs
+    from acr.contract.spec import load_specs
     offenders = {sid for sid, sp in load_specs(ROOT / "specs").items()
                  if checks(speclint.lint_spec(sp), speclint.F10)}
     assert "STORE.400_522_523.site_histology_behavior" in offenders

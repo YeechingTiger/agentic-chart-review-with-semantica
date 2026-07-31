@@ -65,18 +65,37 @@ from pathlib import Path
 
 import pytest
 
-from acr.answer_checks import (Violation, answer_check_rule_id, check_answer,
-                               check_answer_detail, check_field_formats,
-                               check_field_formats_detail)
-from acr.corpus import Corpus
-from acr.coverage import (ADMITTED, REFUSED, UNDECLARED, CoverageLedger, ForcedSampler,
-                          admissibility_for_citations, strata_from_spec)
-from acr.answer_gate import gate_answer
-from acr.spec import load_spec
-from acr.state import Budget, Evidence, EvidenceLedger
-from acr.trace import (MAX_KEPT_UNRECOGNISED, PROV_DETERMINISTIC, PROV_SELF_REPORTED, Tracer,
-                       parse_rule_citations, rule_catalog, rule_catalog_hash,
-                       rule_citation_block, rule_index)
+from acr.chartstore.corpus import Corpus
+from acr.contract.answer_checks import (
+    Violation,
+    check_answer,
+    check_answer_detail,
+    check_field_formats,
+    check_field_formats_detail,
+)
+from acr.contract.spec import load_spec
+from acr.contract.trace import (
+    MAX_KEPT_UNRECOGNISED,
+    PROV_DETERMINISTIC,
+    PROV_SELF_REPORTED,
+    Tracer,
+    parse_rule_citations,
+    rule_catalog,
+    rule_catalog_hash,
+    rule_citation_block,
+    rule_index,
+)
+from acr.core.state import Evidence, EvidenceLedger
+from acr.review.answer_gate import gate_answer
+from acr.review.coverage import (
+    ADMITTED,
+    REFUSED,
+    UNDECLARED,
+    CoverageLedger,
+    ForcedSampler,
+    admissibility_for_citations,
+    strata_from_spec,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 SHB = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
@@ -264,7 +283,7 @@ def test_a_clean_evaluation_between_two_rejections_breaks_the_streak(tmp_path):
 def test_truncating_the_rejection_rows_never_truncates_the_loop_signal(tmp_path):
     """A run that resubmitted the same refused answer forty times is forty copies of one
     message. The rows are capped; the counts that make the loop visible are not."""
-    from acr.trace import MAX_KEPT_REJECTION_ROWS
+    from acr.contract.trace import MAX_KEPT_REJECTION_ROWS
     t = Tracer.create(tmp_path, "cap")
     t.bind_spec(_spec())
     rid = "answer_check.primary_site.not_less_specific.C349"
@@ -488,7 +507,7 @@ class _ScriptedLLM:
     """
 
     def __init__(self, value: dict, reasoning: str):
-        from acr.llm import LLMClient, LLMConfig
+        from acr.core.llm import LLMClient, LLMConfig
         self._c = LLMClient(LLMConfig(model="scripted/none", api_key="none"))
         self.cfg = self._c.cfg
         self.value = value
@@ -501,7 +520,7 @@ class _ScriptedLLM:
         return {"prompt": 0, "completion": 0}
 
     def _reply(self, obj, calls=None):
-        from acr.llm import LLMResponse
+        from acr.core.llm import LLMResponse
         return LLMResponse(content=json.dumps(obj), tool_calls=calls or [],
                            prompt_tokens=10, completion_tokens=5)
 
@@ -542,7 +561,7 @@ def _run(tmp_path, value, reasoning, run_id):
     sys.path.insert(0, str(Path(__file__).parent))
     from hooks_harness import run_with_script
 
-    from acr.corpus import Corpus
+    from acr.chartstore.corpus import Corpus
     manifest, trace = run_with_script(_spec(), Corpus(ROOT / "corpus" / "patients"), "SYN0001",
                                       tmp_path, llm, run_id=run_id, max_model_calls=6)
     return llm, manifest, manifest, trace
@@ -676,7 +695,7 @@ def test_the_check_reads_only_what_the_answer_cited():
 
 
 def _site_checks():
-    from acr.spec import load_spec
+    from acr.contract.spec import load_spec
     return load_spec("specs/STORE.400_522_523.site_histology_behavior.yaml").answer_checks
 
 

@@ -1,7 +1,7 @@
 """The `guideline-to-rules` skill must stay true to the engine it teaches.
 
 A skill is prose, and prose about executable rules rots silently. The reader of this one has
-a guideline PDF open and is about to write YAML that `acr.concordance` will run against real
+a guideline PDF open and is about to write YAML that `acr.contract.concordance` will run against real
 patients; every claim the skill makes is a claim about `validate_guideline` and `assess_one`
 that can be checked here rather than discovered when a rule loads wrong.
 
@@ -42,8 +42,8 @@ from typing import Any, get_args
 import pytest
 import yaml
 
-from acr import concordance as C
-from acr.spec import Status
+from acr.contract import concordance as C
+from acr.contract.spec import Status
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_DIR = ROOT / "skills" / "guideline-to-rules"

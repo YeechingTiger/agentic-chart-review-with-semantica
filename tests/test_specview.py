@@ -48,11 +48,22 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from acr.cli import app
-from acr.spec import load_spec
-from acr.specview import (JARGON, MODEL_AUTHORED, SECTION_TITLES, SIGNED, STALE, UNSIGNED,
-                          decisions, elements, load_signoffs, record_signoff, render_review,
-                          signoff_status)
+from acr.commands.cli import app
+from acr.contract.spec import load_spec
+from acr.usecase.specview import (
+    JARGON,
+    MODEL_AUTHORED,
+    SECTION_TITLES,
+    SIGNED,
+    STALE,
+    UNSIGNED,
+    decisions,
+    elements,
+    load_signoffs,
+    record_signoff,
+    render_review,
+    signoff_status,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 SPECS = sorted((ROOT / "specs").glob("*.yaml"))
@@ -191,7 +202,7 @@ def test_an_unattributed_element_is_model_authored_and_appears_in_what_we_made_u
 #     asserts the exact behaviour the deleted test demanded, refused.
 # So there was nothing left to rewrite it into. A permanently red test is worse than a missing
 # one: it teaches the room that red is background noise, and this suite found five real
-# defects today. `acr.spec` now answers all three refusals in words, at the point of refusal,
+# defects today. `acr.contract.spec` now answers all three refusals in words, at the point of refusal,
 # so the next author who reaches for the enforced channel is told which one to use instead.
 
 
@@ -222,7 +233,7 @@ def test_a_label_with_no_locator_does_not_shrink_what_we_made_up(tmp_path):
 
     `source_authority` -- a bare unverified label naming the document at the top of the file
     -- was the ONLY marking these specs had, and letting it take a sentence off this list is
-    the laundering both this module and `acr.spec` exist to stop. It stays on the list, and
+    the laundering both this module and `acr.contract.spec` exist to stop. It stays on the list, and
     the bad attribution is reported rather than honoured.
     """
     p = _fixture(tmp_path, {"editorial_provenance": [{
@@ -255,8 +266,8 @@ def test_a_missing_editorial_record_is_reported_as_a_finding(tmp_path):
     """Missing is the normal state and it must still be visible. `origin_not_recorded` is not
     the same claim as `model_authored`: one says nobody wrote anything down, the other says
     somebody wrote down that a model did it."""
-    from acr.spec import ORIGIN_NOT_RECORDED
-    from acr.specview import element_ids, provenance_findings
+    from acr.contract.spec import ORIGIN_NOT_RECORDED
+    from acr.usecase.specview import element_ids, provenance_findings
     p = _fixture(tmp_path)
     spec = load_spec(p)
     ids = element_ids(spec, source_path=p)
@@ -272,8 +283,8 @@ def test_the_findings_agree_with_the_document(path: Path):
     `origin not recorded` must be exactly the ones section 6 tags that way — the enforced
     block attributes a keyword list under a runtime path, and the document shows it under an
     id of its own."""
-    from acr.spec import ORIGIN_NOT_RECORDED
-    from acr.specview import provenance_findings
+    from acr.contract.spec import ORIGIN_NOT_RECORDED
+    from acr.usecase.specview import provenance_findings
     spec = load_spec(path)
     els = elements(spec, source_path=path)
     reported = {f.element for f in provenance_findings(spec, source_path=path)

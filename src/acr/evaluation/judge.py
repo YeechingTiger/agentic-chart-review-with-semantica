@@ -339,7 +339,7 @@ LENSES: dict[str, tuple[Lens, ...]] = {
              "both over- and under-spend, which a quality-only lens scores identically"),
     ),
     # The judged half of a SPLIT dimension. Admissibility — may this document class establish
-    # this field — is already decided by acr.coverage.admissibility_for_citations and is
+    # this field — is already decided by acr.review.coverage.admissibility_for_citations and is
     # forbidden here. What is left is what no exact check can pose.
     DIM_EVIDENCE_SUPPORT_JUDGED: (
         Lens("quote_states_the_value",

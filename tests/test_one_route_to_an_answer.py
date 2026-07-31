@@ -20,8 +20,8 @@ import pytest
 
 pytest.importorskip("langchain.agents")
 
-import acr.agent as A  # noqa: E402
-from acr.answer_contract import NO_COVERAGE_CLAIM, attach_coverage_claim  # noqa: E402
+import acr.review.agent as A  # noqa: E402
+from acr.contract.answer_contract import NO_COVERAGE_CLAIM, attach_coverage_claim  # noqa: E402
 
 SRC = inspect.getsource(A)
 
@@ -108,5 +108,5 @@ def test_the_read_recorder_exists_and_is_called_before_detection():
 def test_only_truncated_may_be_discharged_by_machine():
     """The recorder hands spans to the ledger; the ledger decides. `truncated` is the only
     marker whose predicate the runtime owns both sides of."""
-    from acr.coverage_planner import MECHANICALLY_DISCHARGEABLE_MARKERS
+    from acr.review.coverage_planner import MECHANICALLY_DISCHARGEABLE_MARKERS
     assert set(MECHANICALLY_DISCHARGEABLE_MARKERS) == {"truncated"}

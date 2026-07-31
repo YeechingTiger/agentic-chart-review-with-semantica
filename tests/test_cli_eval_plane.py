@@ -17,8 +17,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from acr.evaluation import evals, judge as J
-from acr.cli import app
+from acr.commands.cli import app
+from acr.evaluation import evals
+from acr.evaluation import judge as J
 
 ROOT = Path(__file__).resolve().parents[1]
 EVALUATORS = str(ROOT / "evaluators")

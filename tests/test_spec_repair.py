@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from acr import spec_repair as S
-from acr.spec import load_spec
+from acr.contract import spec_repair as S
+from acr.contract.spec import load_spec
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "specs/STORE.400_522_523.site_histology_behavior.yaml"

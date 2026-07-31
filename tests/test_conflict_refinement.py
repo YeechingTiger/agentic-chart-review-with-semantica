@@ -5,8 +5,8 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from acr import conflict_refinement as C
-from acr.cli import app
+from acr.commands.cli import app
+from acr.review import conflict_refinement as C
 
 SPEC_ID = "STORE.400_522_523.site_histology_behavior"
 ROOT = Path(__file__).resolve().parents[1]
@@ -173,8 +173,8 @@ def test_run_without_feature_flag_calls_deepagents_once_and_directly(tmp_path, m
             "open_threads": {},
         }
 
-    monkeypatch.setattr("acr.agent.run_patient", fake_run_patient)
-    monkeypatch.setattr("acr.cli_common.chat_model", lambda *args, **kwargs: object())
+    monkeypatch.setattr("acr.review.agent.run_patient", fake_run_patient)
+    monkeypatch.setattr("acr.core.cli_common.chat_model", lambda *args, **kwargs: object())
     result = CliRunner().invoke(app, [
         "run", "SYN0001",
         "--spec", str(ROOT / "specs/STORE.400_522_523.site_histology_behavior.yaml"),

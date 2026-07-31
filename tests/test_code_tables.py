@@ -65,7 +65,7 @@ def _write(tmp_path: pathlib.Path, doc: dict, name: str) -> pathlib.Path:
 # ============================================================ THE POINT OF THE WHOLE CHANGE
 def test_a_code_system_with_no_cancer_axes_loads(tmp_path):
     """今天 `icdo3.load_table` 会在这里抛 CodeTableError。"""
-    from acr.code_tables import load_table
+    from acr.contract.code_tables import load_table
     _write(tmp_path, LIPID_TABLE, "loinc_lipid_panel")
     t = load_table("loinc_lipid_panel", codes_dir=str(tmp_path))
     assert t.table_id == "loinc_lipid_panel"
@@ -80,7 +80,7 @@ def test_the_prompt_block_uses_the_tables_own_axis_labels(tmp_path):
     "if a diagnosis has no ICD-O-3 morphology then the finding is not a reportable neoplasm"。
     一张血脂表拿到那些标题就是胡说。
     """
-    from acr.code_tables import load_table, prompt_block
+    from acr.contract.code_tables import load_table, prompt_block
     _write(tmp_path, LIPID_TABLE, "loinc_lipid_panel")
     block = prompt_block(load_table("loinc_lipid_panel", codes_dir=str(tmp_path)))
     assert "ANALYTE (LOINC)" in block and "INTERPRETATION" in block
@@ -92,7 +92,7 @@ def test_the_prompt_block_uses_the_tables_own_axis_labels(tmp_path):
 
 def test_an_axis_order_declared_in_yaml_is_the_render_order(tmp_path):
     """轴的顺序是资产的决定。反过来会让"先看部位再看形态"这类阅读顺序无法表达。"""
-    from acr.code_tables import load_table, prompt_block
+    from acr.contract.code_tables import load_table, prompt_block
     doc = {**LIPID_TABLE, "axes": {k: LIPID_TABLE["axes"][k]
                                    for k in ("interpretation", "analyte")}}
     _write(tmp_path, doc, "reordered")
@@ -106,7 +106,7 @@ def test_normalization_is_declared_by_the_table_not_by_the_module(tmp_path):
     血脂表的 LOINC 码里那个连字符是**码的一部分**，一个写死了 `[.\\s]` 加 `split_on='/'`
     的规范化函数会把别的系统的码改坏 —— 所以规则跟着表走。
     """
-    from acr.code_tables import load_table
+    from acr.contract.code_tables import load_table
     _write(tmp_path, LIPID_TABLE, "loinc_lipid_panel")
     t = load_table("loinc_lipid_panel", codes_dir=str(tmp_path))
     assert t.normalize("13457-7") == "13457-7"          # 连字符保留
@@ -117,16 +117,16 @@ def test_normalization_is_declared_by_the_table_not_by_the_module(tmp_path):
 def test_a_table_with_no_axes_is_refused(tmp_path):
     """空表比缺表更危险：它会渲染出一个空值域，而运行看起来就像被给过码表。
 
-    和 `acr.skills` 拒绝缺失的 skill 是同一个理由。
+    和 `acr.contract.skills` 拒绝缺失的 skill 是同一个理由。
     """
-    from acr.code_tables import CodeTableError, load_table
+    from acr.contract.code_tables import CodeTableError, load_table
     _write(tmp_path, {"table_id": "empty", "axes": {}}, "empty")
     with pytest.raises(CodeTableError, match="no axes"):
         load_table("empty", codes_dir=str(tmp_path))
 
 
 def test_a_missing_table_names_what_is_available(tmp_path):
-    from acr.code_tables import CodeTableError, load_table
+    from acr.contract.code_tables import CodeTableError, load_table
     _write(tmp_path, LIPID_TABLE, "loinc_lipid_panel")
     with pytest.raises(CodeTableError, match="loinc_lipid_panel"):
         load_table("nope", codes_dir=str(tmp_path))
@@ -138,7 +138,7 @@ def test_check_values_is_keyed_by_axis_not_by_cancer_field_names(tmp_path):
 
     泛化后调用方按**轴名**传值，字段名从轴的 `field` 读，于是同一个函数能检查血脂面板。
     """
-    from acr.code_tables import check_values, load_table
+    from acr.contract.code_tables import check_values, load_table
     _write(tmp_path, LIPID_TABLE, "loinc_lipid_panel")
     t = load_table("loinc_lipid_panel", codes_dir=str(tmp_path))
 
@@ -161,7 +161,7 @@ def test_check_values_is_keyed_by_axis_not_by_cancer_field_names(tmp_path):
 
 def test_an_unknown_axis_name_is_refused_rather_than_ignored(tmp_path):
     """静默忽略一个拼错的轴名，等于报告"检查通过"而什么都没检查。"""
-    from acr.code_tables import CodeTableError, check_values, load_table
+    from acr.contract.code_tables import CodeTableError, check_values, load_table
     _write(tmp_path, LIPID_TABLE, "loinc_lipid_panel")
     t = load_table("loinc_lipid_panel", codes_dir=str(tmp_path))
     with pytest.raises(CodeTableError, match="analytee"):
@@ -177,7 +177,7 @@ REAL = {"icdo3_lung": {"topography": 8, "morphology": 55, "behavior": 6},
 @pytest.mark.parametrize("name", sorted(REAL))
 def test_the_real_tables_survive_migration_with_every_code(name: str):
     """机械迁移也会掉行。每个轴的条目数按迁移前的实测值钉住。"""
-    from acr.code_tables import load_table
+    from acr.contract.code_tables import load_table
     t = load_table(name)
     got = {ax: len(a.codes) for ax, a in t.axes.items()}
     assert got == REAL[name], f"{name} 迁移后条目数变了: {got}"
@@ -186,7 +186,7 @@ def test_the_real_tables_survive_migration_with_every_code(name: str):
 @pytest.mark.parametrize("name", sorted(REAL))
 def test_the_real_tables_keep_their_icdo3_notation_folding(name: str):
     """`C18.7 -> C187`、`8140/3 -> 8140` 必须还在 —— 它是 4 of 6 有用的旧 firing。"""
-    from acr.code_tables import load_table
+    from acr.contract.code_tables import load_table
     t = load_table(name)
     assert t.normalize("C18.7") == "C187"
     assert t.normalize("c34.1") == "C341"
@@ -198,14 +198,14 @@ def test_the_lung_table_still_knows_which_lobe_c341_is():
 
     这是整个码表存在的理由之一，泛化不能把它丢掉。
     """
-    from acr.code_tables import load_table
+    from acr.contract.code_tables import load_table
     t = load_table("icdo3_lung")
     assert "upper" in (t.axes["topography"].codes["C341"].get("name") or "").lower()
 
 
 def test_the_cancer_prompt_block_still_carries_its_own_warnings():
     """表自己的提醒（未经登记员核对、行为位单独一个字段）现在住在 YAML 里，必须还在提示词里。"""
-    from acr.code_tables import load_table, prompt_block
+    from acr.contract.code_tables import load_table, prompt_block
     block = prompt_block(load_table("icdo3_lung"))
     assert "TOPOGRAPHY" in block and "MORPHOLOGY" in block
     assert "C341" in block

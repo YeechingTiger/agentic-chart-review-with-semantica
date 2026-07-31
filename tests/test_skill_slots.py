@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from acr.skills import (
+from acr.contract.skills import (
     SLOTS,
     SkillError,
     SkillStack,
@@ -125,7 +125,7 @@ def test_default_profile_renders_exactly_what_it_rendered_before():
     历史上每一次 run 都是在 `coverage-judgement` 这一张卡下跑的。如果重构顺手多塞了两张，
     过去的 run 和以后的 run 就不可比，而存档单不会说这件事——它只记得当时渲染了什么。
     """
-    from acr.runtime_profiles import DEFAULT_RUNTIME_PROFILE, runtime_policy_skills
+    from acr.review.runtime_profiles import DEFAULT_RUNTIME_PROFILE, runtime_policy_skills
     stack = runtime_policy_skills(DEFAULT_RUNTIME_PROFILE)
     assert stack.names() == ("coverage-judgement",)
     assert skills_block(stack).endswith(load_skill_body("coverage-judgement"))
@@ -148,7 +148,7 @@ def test_default_profile_renders_exactly_what_it_rendered_before():
 
 
 def test_unknown_profile_still_falls_back_to_coverage_judgement():
-    from acr.runtime_profiles import runtime_policy_skills
+    from acr.review.runtime_profiles import runtime_policy_skills
     assert runtime_policy_skills("not-a-profile").names() == ("coverage-judgement",)
 
 
@@ -222,9 +222,9 @@ def _scripted_system_prompt(tmp_path: Path, **run_kwargs) -> str:
     pytest.importorskip("deepagents")
     from hooks_harness import ToolScript
 
-    from acr.agent import run_patient
-    from acr.corpus import Corpus
-    from acr.spec import load_spec
+    from acr.chartstore.corpus import Corpus
+    from acr.contract.spec import load_spec
+    from acr.review.agent import run_patient
 
     model = ToolScript(script=[], submit={"status": "EVIDENCE_INSUFFICIENT", "value": {},
                                           "reasoning": "the script submits at once"})
@@ -272,9 +272,9 @@ def _scripted_manifest_skills(tmp_path: Path, **run_kwargs) -> list[dict]:
     pytest.importorskip("deepagents")
     from hooks_harness import ToolScript
 
-    from acr.agent import run_patient
-    from acr.corpus import Corpus
-    from acr.spec import load_spec
+    from acr.chartstore.corpus import Corpus
+    from acr.contract.spec import load_spec
+    from acr.review.agent import run_patient
 
     model = ToolScript(script=[], submit={"status": "EVIDENCE_INSUFFICIENT", "value": {},
                                           "reasoning": "the script submits at once"})
@@ -321,8 +321,8 @@ def _invoke(monkeypatch, tmp_path: Path, *args):
     """Run a CLI command with the model client wired to explode if it is ever built."""
     from typer.testing import CliRunner
 
-    from acr import cli_common
-    from acr.cli import app
+    from acr.commands.cli import app
+    from acr.core import cli_common
 
     def refuse(*a, **kw):
         raise AssertionError("a model client was built before --skills was validated")
@@ -368,7 +368,7 @@ def test_the_skills_help_documents_every_form_of_the_syntax(command: str):
     """
     from typer.testing import CliRunner
 
-    from acr.cli import app
+    from acr.commands.cli import app
 
     out = CliRunner().invoke(app, [command, "--help"]).output
     flat = " ".join(out.split())

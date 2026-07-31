@@ -29,9 +29,9 @@ from pathlib import Path
 
 import pytest
 
-from acr.corpus import Corpus
-from acr.coverage import CoverageLedger, ForcedSampler, evaluate_gate, strata_from_spec
-from acr.spec import load_spec
+from acr.chartstore.corpus import Corpus
+from acr.contract.spec import load_spec
+from acr.review.coverage import CoverageLedger, ForcedSampler, evaluate_gate, strata_from_spec
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"

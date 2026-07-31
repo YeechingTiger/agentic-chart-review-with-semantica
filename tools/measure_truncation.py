@@ -32,7 +32,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
-from acr.corpus import Corpus  # noqa: E402
+from acr.chartstore.corpus import Corpus  # noqa: E402
 
 CORPUS = REPO / "corpus" / "patients"
 SPEC_KEY = "STORE.390.date_of_initial_diagnosis"

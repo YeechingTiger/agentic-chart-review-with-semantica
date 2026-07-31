@@ -27,17 +27,14 @@ written from scratch: a hand-built spec would drift from the real ones and stop 
 """
 from __future__ import annotations
 
-import copy
 import json
 from pathlib import Path
 
 import pytest
 import yaml
 
-from acr.corpus import Corpus
-from acr.state import Budget
-from acr.llm import LLMClient, LLMConfig, LLMResponse
-from acr.spec import (
+from acr.chartstore.corpus import Corpus
+from acr.contract.spec import (
     ExtractionSpec,
     ProvenanceError,
     StaleProvenanceError,
@@ -46,6 +43,7 @@ from acr.spec import (
     load_spec,
     weakest_status,
 )
+from acr.core.llm import LLMClient, LLMConfig, LLMResponse
 
 ROOT = Path(__file__).resolve().parents[1]
 SPECS = ROOT / "specs"

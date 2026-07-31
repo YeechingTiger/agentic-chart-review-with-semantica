@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from acr.skills import (
+from acr.contract.skills import (
     EVAL_FORBIDDEN_VERBS,
     SkillError,
     eval_skill_judges,

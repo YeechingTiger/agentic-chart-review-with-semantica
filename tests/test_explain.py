@@ -29,15 +29,32 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from acr.cli import app
-from acr.corpus import Corpus
-from acr.coverage import CoverageLedger, ForcedSampler, clopper_pearson_upper, evaluate_gate
-from acr.evaluation.explain import (A_CARE_GAP, B_DOCUMENTATION_GAP, BOUND_BY_DIGEST, BOUND_BY_REFERENCE,
-                         C_EXTRACTION_ERROR, CANNOT_DISTINGUISH, D_JUSTIFIED_EXCEPTION,
-                         DEFAULT_MAX_ELUSION_UPPER, ELIMINATED, OPEN, SUPPORTED, UNBOUND,
-                         ArtifactBindingError, ExplanationClaimError, VariableResult,
-                         artifact_digest, assert_cause_is_earned, assess_coverage_proof,
-                         mark_binding, resolve_bound_extract, scaffold_explanation)
+from acr.chartstore.corpus import Corpus
+from acr.commands.cli import app
+from acr.evaluation.explain import (
+    A_CARE_GAP,
+    B_DOCUMENTATION_GAP,
+    BOUND_BY_DIGEST,
+    BOUND_BY_REFERENCE,
+    C_EXTRACTION_ERROR,
+    CANNOT_DISTINGUISH,
+    D_JUSTIFIED_EXCEPTION,
+    DEFAULT_MAX_ELUSION_UPPER,
+    ELIMINATED,
+    OPEN,
+    SUPPORTED,
+    UNBOUND,
+    ArtifactBindingError,
+    ExplanationClaimError,
+    VariableResult,
+    artifact_digest,
+    assert_cause_is_earned,
+    assess_coverage_proof,
+    mark_binding,
+    resolve_bound_extract,
+    scaffold_explanation,
+)
+from acr.review.coverage import CoverageLedger, ForcedSampler, clopper_pearson_upper, evaluate_gate
 
 ROOT = Path(__file__).resolve().parents[1]
 runner = CliRunner()
@@ -376,7 +393,7 @@ def _extract_doc(answer: dict, *, created_utc: str = STAMP, pid: str = "P1") -> 
 def _concord_doc(extract_path: Path, *, created_utc: str = STAMP, pid: str = "P1") -> dict:
     return {
         "schema": "acr.concord/1", "created_utc": "2026-07-26T22:00:00+00:00",
-        "code_sha": "test", "engine": "acr.concordance/deterministic",
+        "code_sha": "test", "engine": "acr.contract.concordance/deterministic",
         "guideline": {"path": "g.yaml", "guideline_id": "G", "guideline_version": "1",
                       "guideline_hash": "0" * 16},
         "guideline_binding_warnings": [],
