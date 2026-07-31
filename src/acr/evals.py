@@ -725,6 +725,23 @@ def audit_evidence_set(run: RunRecord) -> list[Finding]:
     equivalent. Each finding carries a RATE, not a flag, because a check that can only say
     "there is duplication" cannot be compared against a baseline or tracked across arms.
 
+    WHAT THIS DELIBERATELY DOES NOT CHECK, AND WHY — measured 2026-07-31
+    --------------------------------------------------------------------
+    The first version of this function grouped evidence by `supports` and reported, per group,
+    an orphaned contradiction and a single-witness field. It rested on reading `supports` as a
+    FIELD KEY. It is not one: `record_evidence` declares it as "which field **or assertion**
+    this backs", and on twelve real runs the model wrote a sentence every time — "2023-04-12
+    cytology was suspicious for adenocarcinoma but recommended tissue confirmation". The model
+    was following the contract; the checks were not reading it.
+
+    Grouped on free prose, every group holds exactly one row, so `single_witness_field` fired on
+    12 of 12 runs and `orphan_contradiction` on 8 — not because anything was wrong but because
+    the grouping key is unique by construction. A check that cannot come back clean measures
+    nothing and trains a reader to skip its whole severity class. Both are gone rather than
+    softened: with no machine-readable link from a span to a spec field, neither question is
+    computable from what a manifest records, and a check that guesses at one is the mistake
+    `DETERMINISTIC_RULES_REMOVED.md` already costed out once.
+
     Silent on an empty ledger: that is the gate's case, and it already refuses the answer.
     """
     items = _evidence_of(run)
@@ -732,94 +749,67 @@ def audit_evidence_set(run: RunRecord) -> list[Finding]:
         return []
     out: list[Finding] = []
 
-    # 1. Overlapping spans supporting the SAME field. The ledger de-duplicates identical
-    #    (note, start, end, supports) tuples; it cannot see that chars 0-40 and 10-50 of one
-    #    note are largely the same sentence recorded twice. Per field, because one sentence
-    #    legitimately supports both a site and a histology.
-    by_field: dict[str, list[dict]] = {}
+    # OVERLAPPING SPANS IN ONE DOCUMENT. Grouped by note, NOT by `supports` — two char ranges
+    # that overlap inside one document are the same text recorded twice whatever prose each row
+    # carries, and grouping by prose made this under-fire for the same reason the deleted checks
+    # over-fired. The ledger de-duplicates identical (note, start, end, supports, entity)
+    # tuples; it cannot see that chars 0-40 and 10-50 are largely one sentence.
+    by_note: dict[str, list[dict]] = {}
     for e in items:
-        by_field.setdefault(str(e.get("supports") or ""), []).append(e)
+        by_note.setdefault(str(e.get("note_id") or ""), []).append(e)
     pairs = 0
-    for field_items in by_field.values():
-        for i, a in enumerate(field_items):
-            for b in field_items[i + 1:]:
-                if a.get("note_id") != b.get("note_id"):
-                    continue
+    for rows in by_note.values():
+        for i, a in enumerate(rows):
+            for b in rows[i + 1:]:
                 if int(a.get("start", 0)) < int(b.get("end", 0)) and \
                    int(b.get("start", 0)) < int(a.get("end", 0)):
                     pairs += 1
     if pairs:
         out.append(Finding(
             "evidence_span_overlap", WARN,
-            f"{pairs} overlapping span pair(s) support the same field; the same sentence is "
-            f"recorded more than once",
+            f"{pairs} overlapping span pair(s) within one document; the same text is recorded "
+            f"more than once",
             {"n_evidence": len(items), "n_overlapping_pairs": pairs,
-             "overlap_rate": round(pairs / len(items), 3)}))
-
-    # 2. A contradiction with nothing to contradict. `stance=contradicts` beside a supporting
-    #    span is a conflict in the record — a real state, reported honestly. Alone, it means
-    #    the run recorded what argues AGAINST a field and never recorded what argues for it,
-    #    and the answer is resting on something outside the ledger.
-    supported = {str(e.get("supports") or "") for e in items
-                 if e.get("stance") != "contradicts"}
-    orphans = sorted({str(e.get("supports") or "") for e in items
-                      if e.get("stance") == "contradicts"} - supported)
-    if orphans:
-        out.append(Finding(
-            "orphan_contradiction", WARN,
-            f"{len(orphans)} field(s) carry contradicting evidence and no supporting "
-            f"evidence: {', '.join(orphans)}",
-            {"fields": orphans, "n_evidence": len(items)}))
-
-    # 3. A field resting on a single document. Not a defect — a chart may document a value
-    #    once — but it is the shape in which "the right document, the wrong specimen" survives
-    #    to submission, because there is no second witness to disagree with.
-    docs_per_field: dict[str, set] = {}
-    for e in items:
-        if e.get("stance") == "contradicts":
-            continue
-        docs_per_field.setdefault(str(e.get("supports") or ""), set()).add(e.get("note_id"))
-    singles = sorted(f for f, docs in docs_per_field.items() if len(docs) == 1 and f)
-    if singles:
-        out.append(Finding(
-            "single_witness_field", WARN,
-            f"{len(singles)} field(s) rest on one document: {', '.join(singles)}",
-            {"fields": singles,
-             "single_witness_rate": round(len(singles) / max(1, len(docs_per_field)), 3)}))
+             "overlap_rate": round(pairs / len(items), 3), "source": run.source}))
     return out
 
 
-def detect_entity_answer_mismatch(run: RunRecord) -> list[Finding]:
-    """Evidence anchored to one lesion, an answer reported about another.
-
-    Silent unless BOTH sides recorded an anchor. An entity-less ledger is not a defect — the
-    field is optional and most runs will not use it at first — and a detector that fires on
-    absent data teaches people to switch it off, which costs the cases where it was right.
-
-    CRITICAL rather than WARN, but still only a detector: it does not enter the gate and it
-    refuses no answer. Same reason as the five clinical rules this tree measured and removed —
-    a deterministic rule that judges the CONTENT of an answer refused the registry's own
-    answers. What this judges is whether the RECORD agrees with itself, which is a fact about
-    the run and may be reported. Promoting it to a gate would need a measurement first.
-    """
-    items = [e for e in _evidence_of(run) if str(e.get("entity") or "").strip()]
-    reported = str(run.answer.get("reported_lesion") or "").strip()
-    if not items or not reported:
-        return []
-    entities = sorted({str(e["entity"]).strip() for e in items})
-    # EXACT string comparison, deliberately. "right lower lobe" and "RLL" will be called a
-    # mismatch. That is preferred to an approximate match here: synonym judgement is clinical
-    # knowledge, and putting clinical knowledge into Python is the mistake this tree has
-    # already made five times (see `answer_checks.py`). A false positive costs somebody a
-    # second look; a false negative is a quote about another specimen that nobody hears about.
-    if reported in entities:
-        return []
-    return [Finding(
-        "entity_answer_mismatch", CRITICAL,
-        f"the answer reports lesion {reported!r} but every anchored span is about "
-        f"{', '.join(repr(x) for x in entities)}",
-        {"reported_lesion": reported, "evidence_entities": entities,
-         "n_anchored": len(items)})]
+#: NO DETECTOR READS `entity`, AND THAT IS A MEASURED DECISION — 2026-07-31.
+#:
+#: Two were written and both were removed after one twelve-run batch.
+#:
+#: `entity_answer_mismatch` compared each anchor against the answer's `reported_lesion` by
+#: exact equality and raised CRITICAL when none matched. It raised CRITICAL on 12 of 12 runs,
+#: wrongly every time: the two sides are not the same kind of string. An anchor is a label
+#: ("Right upper-lobe lung adenocarcinoma"); `reported_lesion` is prose the model writes to
+#: explain its choice ("…, the sole documented reportable primary. The 2023-04-12 aspirate and
+#: 2023-04-27 biopsy describe one lesion."). Equality there can only fail.
+#:
+#: `multiple_anchored_entities` then counted DISTINCT anchor labels instead, on the theory that
+#: two labels mean two things. It fired on 12 of 12 and was right about 1:
+#:
+#:     SYN0001  Right upper-lobe lung adenocarcinoma / …lung mass/adenocarcinoma   one lesion
+#:     SYN0002  sigmoid colon carcinoma / …lesion / …mass                          one lesion
+#:     SYN0003  Pancreatic head adenocarcinoma / Pancreatic head mass              one lesion
+#:     SYN0005  Urinary bladder mass / …mucosal lesion / …carcinoma in situ        one lesion
+#:     SYN0004  Left breast UOQ primary tumour / Pulmonary metastases              TWO, real
+#:
+#: Four in five are one lesion under a name that moved as the workup did — which is how a chart
+#: is written: the mass becomes a carcinoma when pathology returns. So the count measures
+#: PHRASING DRIFT, not entity count, and a check that cannot come back clean on a correct run
+#: measures nothing while training a reader to skip its severity class.
+#:
+#: Separating "sigmoid colon mass" from "sigmoid colon carcinoma" requires deciding that two
+#: phrasings name one thing. That is clinical judgement, and `DETERMINISTIC_RULES_REMOVED.md`
+#: is this tree's record of what writing clinical judgement into Python costs.
+#:
+#: The FIELD stays and earns its place without a detector: SYN0004's two labels tell a reader
+#: at a glance that the answer's evidence spans a primary and its metastases, and the
+#: attribution agent reads the same thing. A prerequisite for any future check here is a tool
+#: contract that asks for a STABLE label per thing rather than a fresh description per quote —
+#: `record_evidence` does not ask for that today, and until it does, distinct-label count is
+#: not a measurement of anything.
+_ENTITY_HAS_NO_DETECTOR = True
 
 
 @dataclass(frozen=True)
@@ -851,7 +841,6 @@ def run_detectors(run: RunRecord, *, config: DetectorConfig,
     out += detect_resource_band(run, token_band=config.token_band, turn_band=config.turn_band)
     out += detect_uncaused_reads(run)
     out += audit_evidence_set(run)
-    out += detect_entity_answer_mismatch(run)
     return sorted(out, key=lambda f: _SEVERITY_ORDER.get(f.severity, 9))
 
 
