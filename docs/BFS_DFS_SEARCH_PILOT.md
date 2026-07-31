@@ -168,5 +168,76 @@ finding arrives only after seeing one.
 
 ## Results
 
-Not yet complete. The first attempt was abandoned for the spec reason above; the `STORE.390`
-run is in progress.
+Run 2026-07-31, twelve synthetic patients per arm, `--seed 1234`, `gpt-5.6-luna` via
+OpenRouter, `STORE.390` spec hash unchanged across arms, `task` and `general` skill slots
+identical across arms. Accuracy from `acr eval score`; operational columns read from the
+manifests and traces; cost priced post hoc from recorded `usage` against `audit/prices.json`
+(the runs predate that table, so their own `spend.usd` is null).
+
+| | native | breadth-first | depth-first | breadth-then-depth |
+|---|---:|---:|---:|---:|
+| exact match | 11/12 (91.7%) | **12/12 (100%)** | 10/12 (83.3%) | **12/12 (100%)** |
+| abstained where the key has a date | 1 | 0 | 1 | 0 |
+| gate-valid | 12/12 | 12/12 | 12/12 | 12/12 |
+| `SPEC_INSUFFICIENT` | 0 | 0 | 0 | 0 |
+| searches / patient | 10.5 | **31.8** | **8.6** | 22.4 |
+| documents opened / patient | **22.4** | 8.6 | 9.2 | **7.8** |
+| read calls / patient | 4.2 | 2.7 | 3.2 | 3.3 |
+| tokens (mean) | 258k | 223k | **195k** | 257k |
+| USD / patient | 0.0148 | 0.0122 | **0.0106** | 0.0139 |
+| caused-read fraction | 1.00 | 1.00 | 1.00 | 1.00 |
+| `evidence_span_overlap` findings | 1 | 6 | 1 | 4 |
+
+Total spend across all 48 runs: $0.62.
+
+### What this pilot DID establish
+
+**The traversal skills change behaviour, sharply and in the direction each card describes.**
+Breadth-first issues 3.7× the searches of depth-first (31.8 vs 8.6) and opens a third of the
+documents native does (8.6 vs 22.4). Depth-first is the cheapest arm on every operational axis.
+Those gaps are large, monotone across the arms that share a mechanism, and far outside anything
+twelve charts could produce by chance. Before this run, `_PROFILE_SKILLS` was an empty dict and
+no recorded experiment had ever varied the guidance a run received — so the first thing worth
+knowing is that the slot mechanism does what it claims.
+
+**A behavioural signature falls out of it.** `evidence_span_overlap` fires on 6 of 12
+breadth-first runs against 1 of 12 for native and depth-first. That is what sweeping wide looks
+like in the ledger: one passage surfaced by several search terms and recorded more than once.
+The arms differ in a way an audit can see without being told which arm it is reading.
+
+### What this pilot did NOT establish, and cannot
+
+**Which traversal is more accurate.** The whole spread is two cases — 10, 11, 12, 12 out of 12.
+The powering section above committed, before any number existed, to reporting a one- or two-case
+difference as underpowered, and that is what this is. `eval compare` calls depth-first a
+REGRESSION against native, and its per-subgroup output is worth reading for what it is:
+
+```
+REGRESSED SYN0004  EXACT -> MISMATCH
+REGRESSED SYN0005  EXACT -> ABSTAINED_MISSED
+SUBGROUP pattern:documented recurrence after a disease-free interval  1.0 -> 0.0  (n=1)
+SUBGROUP pattern:in situ disease — behavior 2                         1.0 -> 0.0  (n=1)
+```
+
+Two subgroups of ONE going from 1.0 to 0.0 is the same two cases counted a second way, not
+independent corroboration. The tool is right to flag it — a subgroup collapse is exactly what
+an aggregate hides, and it must surface — but "n=1" is doing all the work in those rows.
+
+**Whether the combination beats either alone.** `breadth-then-depth` matched `breadth-first` at
+12/12 while spending 15% more per patient. On twelve charts with one case of headroom that is
+consistent with the DeepEvidence ablation, with the opposite, and with neither.
+
+### The ceiling problem, and what to run next
+
+Native already scores 91.7%. **There is one case of headroom in the entire cohort**, so this
+design can detect an arm that is grossly worse and essentially nothing else — which is what it
+did. Two ways forward, and the first is cheaper:
+
+1. **A task with headroom.** `STORE.1860_1880.first_recurrence` has a FOUND key for 7 of 12 and
+   is a harder retrieval problem (a recurrence has to be distinguished from the initial disease
+   across a timeline). `STORE.400_522_523` is unusable here for the value-domain reason above.
+2. **More charts.** `MIN_PATIENTS_FOR_SUPPORT` is 20 in `assetdev.py`, and at ~$0.013 per
+   patient-arm, 40 patients × 4 arms is about $2. The corpus generator is `tools/generate_corpus.py`.
+
+Until one of those runs, the honest summary is: **the mechanism works and is measurable; the
+accuracy question is open.**
