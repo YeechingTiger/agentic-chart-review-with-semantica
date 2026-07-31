@@ -80,6 +80,16 @@ DEFAULT_EVAL_SKILLS: tuple[str, ...] = (
     "eval-overconfidence",
 )
 
+#: Turns the attribution agent gets. `acr attribute case` defaults to 12 and this dispatcher
+#: copied that, which turned out to be structurally too few HERE: the pipeline has eight stages,
+#: and the eval-skills block this seam adds is ~7.5 kB of method the plain command never carries.
+#: The first live attribution stopped at 11 of 12 with `cause: UNRESOLVED` and the rationale
+#: "model-call limit reached without a gate-valid attribution", having skipped the counterfactual
+#: test and the skeptic review — which the report gate then, correctly, refused to call resolved.
+#: A default under which the deliverable cannot be produced is not a budget, it is a wall.
+DEFAULT_AGENT_MODEL_CALLS = 24
+DEFAULT_AGENT_CHART_READS = 12
+
 #: Detector thresholds for the screening pass the agent kind runs before it spends. They are
 #: named here rather than defaulted inside `DetectorConfig`, whose docstring refuses defaults on
 #: the grounds that "thresholds belong where a reviewer reads them, not buried here where they
@@ -177,6 +187,14 @@ def signal_run(
     eval_skills: str = typer.Option(
         "", "--eval-skills",
         help="comma list of eval skills to offer the agent; default is all four"),
+    max_model_calls: int = typer.Option(
+        DEFAULT_AGENT_MODEL_CALLS, "--max-model-calls", min=1,
+        help="agent kind only: turns the attribution pipeline gets. Its eight stages plus the "
+             "eval-skills block do not fit in `acr attribute case`'s 12, and a run that stops "
+             "short is refused resolution rather than shipped half-diagnosed"),
+    max_chart_reads: int = typer.Option(
+        DEFAULT_AGENT_CHART_READS, "--max-chart-reads", min=0,
+        help="agent kind only: chart reads allowed for discriminating rival causes"),
     dimension: str = DIMENSION,
     usd_per_call: float | None = USD_PER_CALL,
     max_usd: float | None = MAX_USD,
@@ -202,7 +220,9 @@ def signal_run(
     else:
         payload = _agent_signal(run=run, spec=spec, gold=gold, case_id=case_id,
                                 eval_skills=_eval_skill_names(eval_skills),
-                                max_usd=max_usd, local_root=local_root)
+                                max_usd=max_usd, local_root=local_root,
+                                max_model_calls=max_model_calls,
+                                max_chart_reads=max_chart_reads)
     text = json.dumps(payload, indent=2, ensure_ascii=False, default=str)
     if out:
         Path(out).write_text(text, encoding="utf-8")
@@ -243,7 +263,9 @@ def _rule_signal(*, run: str, spec: str, subject_id: str = "",
 
 def _agent_signal(*, run: str, spec: str, gold: str, case_id: str,
                   eval_skills: tuple[str, ...], case_map: str = "",
-                  max_usd: float | None = None, local_root: str | None = None) -> dict:
+                  max_usd: float | None = None, local_root: str | None = None,
+                  max_model_calls: int = DEFAULT_AGENT_MODEL_CALLS,
+                  max_chart_reads: int = DEFAULT_AGENT_CHART_READS) -> dict:
     """The diagnostic agent over one run. Provider imports live here, not at module scope."""
     from .skills import SkillError, eval_skills_block
 
@@ -266,6 +288,7 @@ def _agent_signal(*, run: str, spec: str, gold: str, case_id: str,
         # is shared with the judge kind, where it is required, so an unset flag here has to mean
         # "the budget `acr attribute case` would have used" and not "no budget".
         max_usd=1.0 if max_usd is None else max_usd,
+        max_model_calls=max_model_calls, max_chart_reads=max_chart_reads,
         **DEFAULT_DETECTOR_ARGS)
 
 
@@ -471,7 +494,8 @@ def _batch_signals(*, kind: str, paths: list[Path], spec: str, gold: str,
                 out.append(_agent_signal(
                     run=str(path), spec=spec, gold=gold,
                     case_id=_case_id_for(path, patient_to_case),
-                    eval_skills=eval_skills, case_map=case_map, local_root=local_root))
+                    eval_skills=eval_skills, case_map=case_map, local_root=local_root,
+                    max_model_calls=max_model_calls, max_chart_reads=max_chart_reads))
         except Exception as exc:                # noqa: BLE001 - one bad run is not the batch
             _err.print(f"[red]{path.name}: {type(exc).__name__}: {exc}[/]")
             out.append({"schema": "acr.signal/1", "run": str(path), "kind": kind,
@@ -493,6 +517,14 @@ def signal_batch(
              "agent kind only. Without it a run's own patient_id is used as its case id."),
     eval_skills: str = typer.Option("", "--eval-skills",
                                     help="comma list; default is all four"),
+    max_model_calls: int = typer.Option(
+        DEFAULT_AGENT_MODEL_CALLS, "--max-model-calls", min=1,
+        help="agent kind only: turns the attribution pipeline gets. Its eight stages plus the "
+             "eval-skills block do not fit in `acr attribute case`'s 12, and a run that stops "
+             "short is refused resolution rather than shipped half-diagnosed"),
+    max_chart_reads: int = typer.Option(
+        DEFAULT_AGENT_CHART_READS, "--max-chart-reads", min=0,
+        help="agent kind only: chart reads allowed for discriminating rival causes"),
     dimension: str = DIMENSION,
     usd_per_call: float | None = USD_PER_CALL,
     max_usd: float | None = MAX_USD,

@@ -528,3 +528,43 @@ def test_the_json_judge_model_is_public_and_the_old_name_still_resolves():
     would be a second place for the parsing rules to drift."""
     from acr import cli_judge
     assert cli_judge._JsonModel is cli_judge.JsonJudgeModel
+
+
+def test_the_agent_kind_gets_more_turns_than_acr_attribute_case_defaults_to():
+    """回归：12 次调用装不下八段流程加四张复盘卡。
+
+    第一次真实归因停在 11/12，`cause: UNRESOLVED`，理由是"model-call limit reached without a
+    gate-valid attribution"——反事实检验和唱反调复核都没做，报告门控于是（正确地）拒绝把它
+    标为已解决。一个产不出交付物的默认值不是预算，是墙。
+
+    提到 24 之后同一个案例跑完了八段，`gate_rejections` 为空，结论仍是 UNRESOLVED——但换成了
+    "独立的唱反调模型不接受这个因果链"，也就是对抗性检查在起作用，而不是预算撞墙。
+    """
+    from acr.cli_signal import DEFAULT_AGENT_CHART_READS, DEFAULT_AGENT_MODEL_CALLS
+    assert DEFAULT_AGENT_MODEL_CALLS > 12
+    assert DEFAULT_AGENT_CHART_READS >= 12
+
+
+def test_both_agent_budgets_reach_the_attribution_payload(monkeypatch):
+    """参数必须真的穿到底 —— 加了 flag 却没接线，和没加一样。"""
+    import acr.cli_attribute as CA
+    import acr.cli_signal as cs
+    seen = {}
+
+    def fake(**kw):
+        seen.update(kw)
+        return {"schema": "acr.signal/1", "kind": "agent", "report": {}}
+
+    monkeypatch.setattr(CA, "attribute_case_payload", fake)
+    cs._agent_signal(run="r.manifest.json", spec="s.yaml", gold="", case_id="C1",
+                     eval_skills=(), max_model_calls=31, max_chart_reads=7)
+    assert seen["max_model_calls"] == 31
+    assert seen["max_chart_reads"] == 7
+
+
+@pytest.mark.parametrize("cmd", ["run", "batch"])
+def test_both_budget_flags_are_offered_on_both_commands(cmd: str):
+    res = runner.invoke(signal_app, [cmd, "--help"])
+    assert res.exit_code == 0
+    flat = _flat(res)
+    assert "--max-model-calls" in flat and "--max-chart-reads" in flat
