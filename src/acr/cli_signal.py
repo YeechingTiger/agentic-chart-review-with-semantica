@@ -96,17 +96,34 @@ KEY_IS_SUSPECT_SKILLS: tuple[str, ...] = ("eval-key-challenge",)
 #: their own opening lines, so they carry no assumption to conflict with, and both modes get them.
 KEY_AGNOSTIC_SKILLS: tuple[str, ...] = ("eval-contrast-traces", "eval-cluster-failures")
 
-#: The posture is an INPUT, chosen per invocation. Two modes and no third: a mode that mixed the
-#: groups would be the merged default this replaced, wearing a name.
+#: WHICH CARDS EACH TRUTH MODE LICENSES. Keyed by `attribution.ATTRIBUTION_MODES`, because the
+#: posture toward the key IS the truth mode and that vocabulary already exists in two places:
+#: `EvaluationTask.truth_mode` validates the same three values, and every
+#: `module_catalog/**/*.yaml` declares `truth_modes:`. The methodology doc's §4.1 is titled
+#: "Truth mode 决定结论上限" — it is a ceiling on what a diagnosis may CONCLUDE, and the cards
+#: follow from it rather than the other way round.
+#:
+#: An earlier version of this file invented `run-fault` / `key-suspect` here. That was a THIRD
+#: spelling of one concept, and the only one that bypassed the asset layer — worse, it left
+#: `--gold` alone deriving GOLD inside `cli_attribute`, so the cards could say "the key is a
+#: suspect" while the boundary instruction said the key was human adjudicated.
+#:
+#: GOLD                the packet's gold was human adjudicated, so doubting it is not on the
+#:                     table and the cause is in the run.
+#: REGISTRY_REFERENCE  "an UNRESOLVED reference, not truth"; a disagreement may only be
+#:                     NEEDS_ADJUDICATION — exactly what eval-key-challenge asks.
+#: BLIND               no truth at all, so neither posture applies. Key-agnostic cards only.
 EVAL_MODES: dict[str, tuple[str, ...]] = {
-    "run-fault": KEY_AGNOSTIC_SKILLS + KEY_IS_RIGHT_SKILLS,
-    "key-suspect": KEY_AGNOSTIC_SKILLS + KEY_IS_SUSPECT_SKILLS,
+    "GOLD": KEY_AGNOSTIC_SKILLS + KEY_IS_RIGHT_SKILLS,
+    "REGISTRY_REFERENCE": KEY_AGNOSTIC_SKILLS + KEY_IS_SUSPECT_SKILLS,
+    "BLIND": KEY_AGNOSTIC_SKILLS,
 }
 
-#: Believing the key is the right default: it is true far more often than not, and the diagnosis
-#: it yields is actionable — a fix aimed at the run. Doubt has to be asked for, per run, which is
-#: also what makes "we doubted the key here" a legible decision afterwards.
-DEFAULT_EVAL_MODE = "run-fault"
+#: BLIND by default, matching `acr attribute case`'s own explicit default. Any claim about a key
+#: has to be ASKED for: `cli_attribute` used to derive GOLD from the mere presence of `--gold`,
+#: and GOLD's boundary asserts the key was human adjudicated — authority that §4.1 gives to the
+#: HUMAN plane alone, never to a file path.
+DEFAULT_TRUTH_MODE = "BLIND"
 
 #: Turns the attribution agent gets. `acr attribute case` defaults to 12 and this dispatcher
 #: copied that, which turned out to be structurally too few HERE: the pipeline has eight stages,
@@ -177,37 +194,42 @@ def _check_kind(kind: str) -> str:
     return kind
 
 
-def _check_mode(mode: str) -> str:
-    """Reject an unknown mode AS THE OPTION IS PARSED, for `_check_kind`'s reason.
+def _check_truth_mode(mode: str) -> str:
+    """Reject an unknown truth mode AS THE OPTION IS PARSED, for `_check_kind`'s reason.
 
-    The message names the modes, because the whole point of the flag is that a posture is a
-    choice somebody makes on purpose — and a refusal that does not say what the choices are
-    sends the operator to the source.
+    Checked against `attribution.ATTRIBUTION_MODES` rather than against the local table, so the
+    two cannot drift: the day this file keeps its own list is the day a mode can be accepted here
+    and refused by `_mode_inputs` after the operator has waited for a batch to start. Imported
+    lazily because this module's contract is that no analysis stack loads on the rule path.
     """
-    if mode not in EVAL_MODES:
+    from .attribution import ATTRIBUTION_MODES
+    if mode not in ATTRIBUTION_MODES:
         raise typer.BadParameter(
-            f"unknown mode {mode!r}; expected one of {list(EVAL_MODES)}")
+            f"unknown truth mode {mode!r}; expected one of {list(ATTRIBUTION_MODES)}")
     return mode
 
 
 # Shared verbatim between `run` and `batch`, for the reason the judge options are: two spellings
 # of one posture is how a cohort ends up half-diagnosed under each. Declared here rather than
 # beside LOCAL_ROOT because the callback has to exist by the time this line is evaluated.
-MODE = typer.Option(
-    DEFAULT_EVAL_MODE, "--mode", callback=_check_mode,
-    help="agent kind only, but CHECKED ON EVERY KIND: which posture toward the answer key. "
-         "`run-fault` believes the key and looks for the cause in the run; `key-suspect` asks "
-         "whether the key was derivable from this chart at all. Overridden by --eval-skills.")
+TRUTH_MODE = typer.Option(
+    DEFAULT_TRUTH_MODE, "--truth-mode", callback=_check_truth_mode,
+    help="agent kind only, but CHECKED ON EVERY KIND: what the diagnosis may assume about the "
+         "answer key, which bounds what it may conclude. GOLD = human-adjudicated truth, so the "
+         "cause is in the run; REGISTRY_REFERENCE = an unresolved reference, so the key is also "
+         "a suspect and a disagreement may only be NEEDS_ADJUDICATION; BLIND = no truth. "
+         "Selects the eval cards, which --eval-skills can still override.")
 
 
-def _eval_skill_names(raw: str, mode: str = DEFAULT_EVAL_MODE) -> tuple[str, ...]:
-    """Which diagnostic skills to offer. Empty string means the mode's set.
+def _eval_skill_names(raw: str, mode: str = DEFAULT_TRUTH_MODE) -> tuple[str, ...]:
+    """Which diagnostic skills to offer. Empty string means the truth mode's set.
 
     An explicit list still wins: a mode is a named pair of defaults, not a whitelist. Somebody
     diagnosing a one-off has to be able to name three cards without inventing a mode for it.
     """
     if not raw.strip():
-        return EVAL_MODES[_check_mode(mode)]
+        _check_truth_mode(mode)
+        return EVAL_MODES[mode]
     return tuple(s.strip() for s in raw.split(",") if s.strip())
 
 
@@ -242,7 +264,7 @@ def signal_run(
     eval_skills: str = typer.Option(
         "", "--eval-skills",
         help="comma list of eval skills to offer the agent; default is the --mode's set"),
-    mode: str = MODE,
+    truth_mode: str = TRUTH_MODE,
     max_model_calls: int = typer.Option(
         DEFAULT_AGENT_MODEL_CALLS, "--max-model-calls", min=1,
         help="agent kind only: turns the attribution pipeline gets. Its eight stages plus the "
@@ -275,7 +297,8 @@ def signal_run(
                                   api_base=api_base, local_root=local_root)
     else:
         payload = _agent_signal(run=run, spec=spec, gold=gold, case_id=case_id,
-                                eval_skills=_eval_skill_names(eval_skills, mode),
+                                eval_skills=_eval_skill_names(eval_skills, truth_mode),
+                                truth_mode=truth_mode,
                                 max_usd=max_usd, local_root=local_root,
                                 max_model_calls=max_model_calls,
                                 max_chart_reads=max_chart_reads)
@@ -318,7 +341,8 @@ def _rule_signal(*, run: str, spec: str, subject_id: str = "",
 
 
 def _agent_signal(*, run: str, spec: str, gold: str, case_id: str,
-                  eval_skills: tuple[str, ...], case_map: str = "",
+                  eval_skills: tuple[str, ...], truth_mode: str = DEFAULT_TRUTH_MODE,
+                  case_map: str = "",
                   max_usd: float | None = None, local_root: str | None = None,
                   max_model_calls: int = DEFAULT_AGENT_MODEL_CALLS,
                   max_chart_reads: int = DEFAULT_AGENT_CHART_READS) -> dict:
@@ -340,6 +364,11 @@ def _agent_signal(*, run: str, spec: str, gold: str, case_id: str,
     return attribute_case_payload(
         run=run, spec=spec, gold=gold, case_id=case_id, eval_skills_prompt=block,
         signal_type=SIGNAL_TYPE_FOR_KIND["agent"], case_map=case_map, local_root=local_root,
+        # PASSED, not left to be derived. `cli_attribute` falls back to
+        # `mode or (GOLD if gold else BLIND)`, so an unset mode turns the mere presence of
+        # `--gold` into a claim that the key was human adjudicated — and then the cards selected
+        # above and the boundary instruction the model reads would disagree about the same key.
+        mode=truth_mode,
         # `attribute_case_payload`'s own default, restated rather than routed around: the flag
         # is shared with the judge kind, where it is required, so an unset flag here has to mean
         # "the budget `acr attribute case` would have used" and not "no budget".
@@ -522,6 +551,7 @@ def _case_id_for(path: Path, patient_to_case: dict[str, str]) -> str:
 
 def _batch_signals(*, kind: str, paths: list[Path], spec: str, gold: str,
                    patient_to_case: dict[str, str], eval_skills: tuple[str, ...],
+                   truth_mode: str = DEFAULT_TRUTH_MODE,
                    case_map: str = "", dimension: str = "",
                    usd_per_call: float | None = None, max_usd: float | None = None,
                    model: str | None = None, api_base: str | None = None,
@@ -557,7 +587,8 @@ def _batch_signals(*, kind: str, paths: list[Path], spec: str, gold: str,
                 out.append(_agent_signal(
                     run=str(path), spec=spec, gold=gold,
                     case_id=_case_id_for(path, patient_to_case),
-                    eval_skills=eval_skills, case_map=case_map, local_root=local_root,
+                    eval_skills=eval_skills, truth_mode=truth_mode, case_map=case_map,
+                    local_root=local_root,
                     max_model_calls=max_model_calls, max_chart_reads=max_chart_reads))
         except Exception as exc:                # noqa: BLE001 - one bad run is not the batch
             _err.print(f"[red]{path.name}: {type(exc).__name__}: {exc}[/]")
@@ -580,7 +611,7 @@ def signal_batch(
              "agent kind only. Without it a run's own patient_id is used as its case id."),
     eval_skills: str = typer.Option("", "--eval-skills",
                                     help="comma list; default is the --mode's set"),
-    mode: str = MODE,
+    truth_mode: str = TRUTH_MODE,
     max_model_calls: int = typer.Option(
         DEFAULT_AGENT_MODEL_CALLS, "--max-model-calls", min=1,
         help="agent kind only: turns the attribution pipeline gets. Its eight stages plus the "
@@ -614,7 +645,8 @@ def signal_batch(
     signals = _batch_signals(
         kind=kind, paths=paths, spec=spec, gold=gold,
         patient_to_case=_patient_to_case(case_map, local_root) if kind == "agent" else {},
-        eval_skills=_eval_skill_names(eval_skills, mode), case_map=case_map, dimension=dimension,
+        eval_skills=_eval_skill_names(eval_skills, truth_mode), truth_mode=truth_mode,
+        case_map=case_map, dimension=dimension,
         usd_per_call=usd_per_call, max_usd=max_usd, model=model, api_base=api_base,
         local_root=local_root,
         max_model_calls=max_model_calls, max_chart_reads=max_chart_reads)

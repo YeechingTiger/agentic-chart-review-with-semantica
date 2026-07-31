@@ -306,16 +306,21 @@ def test_the_key_challenge_skill_exists_and_a_named_mode_offers_it():
     """A card nobody loads is guidance nobody receives — the defect `acr.skills` was written
     to prevent, one level up.
 
-    It is deliberately NOT in the default mode. These three charts are the reason the doubting
-    posture exists, and the reason it is opt-in: on a chart whose key IS derivable, an agent
-    holding this card can book every hard failure as a bad key. What must be true is that the
-    card is reachable by naming a mode, not that every diagnosis receives it.
+    It is deliberately NOT in the default truth mode. These three charts are the reason the
+    doubting posture exists, and the reason it is opt-in: on a chart whose key IS derivable, an
+    agent holding this card can book every hard failure as a bad key. What must be true is that
+    the card is reachable by naming a truth mode, not that every diagnosis receives it.
+
+    `REGISTRY_REFERENCE` is the mode that licenses it, and that is not a coincidence: these keys
+    ARE registry values, and attribution's boundary for that mode says a registry value is "an
+    UNRESOLVED reference, not truth" whose disagreement may only be NEEDS_ADJUDICATION — which
+    is exactly `key_dispute.correct_eval_verdict` on K03.
     """
-    from acr.cli_signal import DEFAULT_EVAL_MODE, EVAL_MODES
+    from acr.cli_signal import DEFAULT_TRUTH_MODE, EVAL_MODES
     from acr.skills import eval_skill_judges, skill_slot
 
-    assert "eval-key-challenge" in EVAL_MODES["key-suspect"]
-    assert "eval-key-challenge" not in EVAL_MODES[DEFAULT_EVAL_MODE]
+    assert "eval-key-challenge" in EVAL_MODES["REGISTRY_REFERENCE"]
+    assert "eval-key-challenge" not in EVAL_MODES[DEFAULT_TRUTH_MODE]
     assert skill_slot("eval-key-challenge") == "eval"
     assert "key_derivability" in eval_skill_judges("eval-key-challenge")
 

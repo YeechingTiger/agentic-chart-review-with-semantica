@@ -147,29 +147,62 @@ def test_out_writes_the_signal_instead_of_printing_it(tmp_path, monkeypatch):
 # can be booked as an agent error. The modes exist so that the posture is an input.
 
 
-def test_the_two_modes_never_put_both_postures_in_one_prompt():
-    """The property the old five-card default violated, and the only one here that matters.
+def test_the_posture_vocabulary_is_attributions_own_and_not_a_third_spelling():
+    """立场就是 truth mode，而 truth mode 已经存在于两处。
 
-    `eval-key-challenge` opens with "the key is also a suspect". `eval-missed-evidence` opens
-    with "Confirm from the scorer and the answer key that the value is genuinely documented
-    before you start". Both sentences in one system prompt is not more method, it is a prompt
-    with no posture — and the agent's choice between them stops being recorded anywhere.
+    第一版在这里发明了 `run-fault` / `key-suspect`，那是同一个概念的**第三种**拼法，而且是
+    唯一一种绕过资产层的：`attribution.ATTRIBUTION_MODES` 是 (GOLD, REGISTRY_REFERENCE,
+    BLIND)，`EvaluationTask.truth_mode` 校验的是同一个集合，`module_catalog/**/*.yaml` 里
+    每个模块声明 `truth_modes:`。方法论文档 §4.1 的标题就是"Truth mode 决定结论上限"。
+
+    这条断言读 attribution 自己的常量而不是抄一份 —— 抄一份的那天起两份就可以各自漂移。
+    """
+    from acr.attribution import ATTRIBUTION_MODES
+    from acr.cli_signal import EVAL_MODES
+    assert tuple(EVAL_MODES) == ATTRIBUTION_MODES
+
+
+def test_no_truth_mode_puts_both_postures_in_one_prompt():
+    """原来的缺陷，用正确的词表重述一遍。
+
+    `eval-key-challenge` 开篇是"the key is also a suspect"，`eval-missed-evidence` 开篇是
+    "confirm the value is genuinely documented before you start"。两句话进同一个系统提示词
+    不是"更多方法"，是一个没有立场的提示词 —— 每个难解的失败都能从"key 可能有问题"退出，
+    每个不可达的 key 都能记成 agent 的错，而它在两者之间的选择不被记录在任何地方。
     """
     from acr.cli_signal import EVAL_MODES, KEY_IS_RIGHT_SKILLS, KEY_IS_SUSPECT_SKILLS
     for mode, cards in EVAL_MODES.items():
         believes = set(cards) & set(KEY_IS_RIGHT_SKILLS)
         doubts = set(cards) & set(KEY_IS_SUSPECT_SKILLS)
         assert not (believes and doubts), (
-            f"mode {mode!r} carries both postures: believes={sorted(believes)} "
+            f"truth mode {mode!r} carries both postures: believes={sorted(believes)} "
             f"doubts={sorted(doubts)}")
 
 
-def test_every_eval_card_in_the_tree_belongs_to_exactly_one_posture():
-    """A card assigned to no posture is a card no mode offers, which is a card nobody receives.
+def test_each_truth_mode_gets_the_posture_its_boundary_licenses():
+    """卡组跟着 truth mode 的结论上限走，而不是反过来。
 
-    This is the failure `acr.skills` exists to prevent, one level up: the runtime reports that
-    method was supplied and the model gets nothing. Adding a sixth eval card must therefore be a
-    decision about its posture, made here, rather than something a reviewer notices later.
+    GOLD 的边界说 packet 里的 gold 是**人工裁定过**的，所以怀疑 key 不在选项里，因在 run。
+    REGISTRY_REFERENCE 的边界说登记值是"an UNRESOLVED reference, not truth"，分歧只能是
+    NEEDS_ADJUDICATION —— 那正是 eval-key-challenge 要问的。
+    BLIND 根本没有 truth，所以两种立场都不适用：只给与 key 无关的卡。
+    """
+    from acr.cli_signal import (
+        EVAL_MODES,
+        KEY_AGNOSTIC_SKILLS,
+        KEY_IS_RIGHT_SKILLS,
+        KEY_IS_SUSPECT_SKILLS,
+    )
+    assert set(EVAL_MODES["GOLD"]) == set(KEY_AGNOSTIC_SKILLS) | set(KEY_IS_RIGHT_SKILLS)
+    assert set(EVAL_MODES["REGISTRY_REFERENCE"]) == (
+        set(KEY_AGNOSTIC_SKILLS) | set(KEY_IS_SUSPECT_SKILLS))
+    assert set(EVAL_MODES["BLIND"]) == set(KEY_AGNOSTIC_SKILLS)
+
+
+def test_every_eval_card_in_the_tree_belongs_to_exactly_one_posture():
+    """分不到立场的卡就是没有任何 truth mode 会加载的卡，也就是没人会收到的卡。
+
+    这正是 `acr.skills` 存在要防的那个失败，高一层：运行时报告提供了方法而模型什么也没拿到。
     """
     from pathlib import Path
 
@@ -191,81 +224,75 @@ def test_every_eval_card_in_the_tree_belongs_to_exactly_one_posture():
             assert not a & b, f"card in two postures: {sorted(a & b)}"
 
 
-def test_run_fault_is_the_default_and_it_does_not_doubt_the_key():
-    """Believing the key is the right default: it is true far more often than not, and the
-    diagnosis it produces is actionable. Doubt has to be ASKED for, per run."""
-    from acr.cli_signal import DEFAULT_EVAL_MODE, EVAL_MODES, _eval_skill_names
-    assert DEFAULT_EVAL_MODE == "run-fault"
-    assert "eval-key-challenge" not in EVAL_MODES["run-fault"]
-    assert _eval_skill_names("") == EVAL_MODES["run-fault"]
-    assert _eval_skill_names("  ") == EVAL_MODES["run-fault"]
+def test_blind_is_the_default_because_a_key_must_be_asked_for():
+    """默认 BLIND，和 `acr attribute case` 显式的默认值一致。
+
+    这修掉了一处真实隐患：`cli_attribute` 的 `resolved_mode = mode or (GOLD if gold else
+    BLIND)` 让**光是传了 --gold** 就把归因升到 GOLD，而 GOLD 的边界宣称那份 key 人工裁定过。
+    按 §4.1 那是 HUMAN 权限才能赋予的。现在必须有人把 --truth-mode GOLD 打出来。
+    """
+    from acr.cli_signal import DEFAULT_TRUTH_MODE, _eval_skill_names
+    assert DEFAULT_TRUTH_MODE == "BLIND"
+    assert "eval-key-challenge" not in _eval_skill_names("")
+    assert "eval-missed-evidence" not in _eval_skill_names("")
 
 
-def test_key_suspect_mode_offers_the_challenge_card_and_drops_the_believing_ones():
-    from acr.cli_signal import EVAL_MODES, KEY_IS_RIGHT_SKILLS
-    cards = EVAL_MODES["key-suspect"]
-    assert "eval-key-challenge" in cards
-    assert not set(cards) & set(KEY_IS_RIGHT_SKILLS)
-
-
-def test_an_explicit_eval_skills_list_still_overrides_the_mode():
-    """The escape hatch stays: a mode is a named pair of defaults, not a whitelist."""
+def test_an_explicit_eval_skills_list_still_overrides_the_truth_mode():
+    """逃生口保留：truth mode 是一对命名默认，不是白名单。"""
     from acr.cli_signal import _eval_skill_names
     assert _eval_skill_names("eval-overconfidence, eval-missed-evidence") == (
         "eval-overconfidence", "eval-missed-evidence")
-    assert _eval_skill_names("eval-key-challenge", mode="run-fault") == ("eval-key-challenge",)
 
 
-def test_an_unknown_mode_is_refused_on_a_kind_that_would_have_ignored_it(tmp_path, monkeypatch):
-    """`--kind rule` never reads the mode, and that is exactly why it must still be checked.
-
-    `_check_kind` states the rule this follows: reject as the option is PARSED, not in the
-    command body. A mode validated only on the branch that consumes it means `--mode run-falut`
-    on a deterministic pass is accepted in silence, and the operator learns about the typo on
-    the agent run they queued behind it.
-    """
-    monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
-    m = _manifest(tmp_path, "ruled")
-    res = runner.invoke(signal_app, ["run", "--kind", "rule", "--run", str(m),
-                                     "--spec", "s.yaml", "--mode", "run-falut",
-                                     "--local-root", str(tmp_path)])
-    assert res.exit_code != 0
-    assert "run-falut" in _flat(res)
-
-
-def test_an_unknown_mode_is_refused_and_named(tmp_path, monkeypatch):
+def test_an_unknown_truth_mode_is_refused_and_names_the_real_ones(tmp_path, monkeypatch):
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
     m = _manifest(tmp_path, "moded")
     res = runner.invoke(signal_app, ["run", "--kind", "agent", "--run", str(m),
                                      "--spec", "s.yaml", "--case-id", "C1",
-                                     "--mode", "trust-nobody",
+                                     "--truth-mode", "TRUST_NOBODY",
                                      "--local-root", str(tmp_path)])
     assert res.exit_code != 0
     flat = _flat(res)
-    assert "trust-nobody" in flat and "run-fault" in flat
+    assert "TRUST_NOBODY" in flat and "REGISTRY_REFERENCE" in flat
+
+
+def test_an_unknown_truth_mode_is_refused_on_a_kind_that_would_have_ignored_it(
+        tmp_path, monkeypatch):
+    """`--kind rule` 从不读 truth mode，而这正是它仍然必须被检查的理由。
+
+    `_check_kind` 立的规矩是：在选项**解析时**拒绝，不在命令体里。只在消费它的分支上校验，
+    意味着确定性那一趟上打错的 `--truth-mode GOLDD` 被静默接受，而操作员要等到排在后面的
+    agent 运行才知道。
+    """
+    monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
+    m = _manifest(tmp_path, "ruled")
+    res = runner.invoke(signal_app, ["run", "--kind", "rule", "--run", str(m),
+                                     "--spec", "s.yaml", "--truth-mode", "GOLDD",
+                                     "--local-root", str(tmp_path)])
+    assert res.exit_code != 0
+    assert "GOLDD" in _flat(res)
 
 
 @pytest.mark.parametrize("cmd", ["run", "batch"])
-def test_both_commands_name_both_modes_in_their_help(cmd: str):
-    """Asserted on the mode NAMES, not on the string `--mode`.
+def test_both_commands_name_the_truth_modes_in_their_help(cmd: str):
+    """断言在 mode 的**名字**上，不在字符串 `--mode` 上。
 
-    `--model` contains `--mode`, so the obvious spelling of this test passes before the flag
-    exists — it did, on the first run of this block, while the CLI answered
-    `No such option: --mode`. An operator cannot choose a posture they cannot see named.
+    `--model` 含有子串 `--mode`，所以这条测试最显然的写法会在 flag 还不存在时就通过 —— 第一版
+    就是这样，而 CLI 当时回的是 `No such option: --mode`。
     """
     from acr.cli_signal import EVAL_MODES
     res = runner.invoke(signal_app, [cmd, "--help"])
     assert res.exit_code == 0
     flat = _flat(res)
     for mode in EVAL_MODES:
-        assert mode in flat, f"{cmd} --help never names the {mode!r} mode"
+        assert mode in flat, f"{cmd} --help never names the {mode!r} truth mode"
 
 
-def test_the_mode_decides_what_actually_reaches_the_prompt(monkeypatch, tmp_path):
-    """A flag that is parsed and not wired is the same as no flag.
+def test_the_truth_mode_decides_the_cards_and_reaches_attribution(monkeypatch, tmp_path):
+    """一个被解析而没接线的 flag 等于没有 flag。
 
-    Asserts on the rendered block the attribution agent receives, not on the tuple that was
-    computed on the way there — `eval_skills_prompt` is the only thing the model sees.
+    两件事一起断言：渲染出的卡片块（模型唯一看得见的东西），以及 `mode` 真的到了
+    `attribute_case_payload` —— 否则归因会自己按 `--gold` 推导，卡片和边界指令又会矛盾。
     """
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
     import acr.cli_attribute as CA
@@ -279,15 +306,16 @@ def test_the_mode_decides_what_actually_reaches_the_prompt(monkeypatch, tmp_path
     m = _manifest(tmp_path, "wired")
     res = runner.invoke(signal_app, ["run", "--kind", "agent", "--run", str(m),
                                      "--spec", "s.yaml", "--case-id", "C1",
-                                     "--mode", "key-suspect",
+                                     "--truth-mode", "REGISTRY_REFERENCE",
                                      "--local-root", str(tmp_path)])
     assert res.exit_code == 0, res.output
+    assert seen["mode"] == "REGISTRY_REFERENCE"          # 边界指令跟着走
     block = seen["eval_skills_prompt"]
-    assert "eval skill: eval-key-challenge" in block
+    assert "eval skill: eval-key-challenge" in block     # 卡片也跟着走
     assert "eval skill: eval-missed-evidence" not in block
 
 
-@pytest.mark.parametrize("mode", ["run-fault", "key-suspect"])
+@pytest.mark.parametrize("mode", ["GOLD", "REGISTRY_REFERENCE", "BLIND"])
 def test_every_mode_renders_and_names_only_cards_that_exist(mode: str):
     """A mode that names a card nobody wrote fails at spend time, not at read time.
 
@@ -738,7 +766,7 @@ def test_the_agent_batch_reaches_the_diagnosis_at_all(tmp_path, monkeypatch):
     monkeypatch.setattr(CA, "attribute_case_payload", fake)
     _manifest(tmp_path, "SYN0001")
     res = runner.invoke(signal_app, ["batch", "--kind", "agent", "--runs", str(tmp_path),
-                                     "--spec", "s.yaml", "--mode", "key-suspect",
+                                     "--spec", "s.yaml", "--truth-mode", "REGISTRY_REFERENCE",
                                      "--max-model-calls", "31", "--max-chart-reads", "7",
                                      "--local-root", str(tmp_path)])
     assert res.exit_code == 0, res.output

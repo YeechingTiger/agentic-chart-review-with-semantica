@@ -389,22 +389,29 @@ signals consumes one thing.
   --gold gold/store400.csv --case-id CASE-001
 ```
 
-`--mode` chooses what the agent may assume about the answer key, and it is the one input that
-changes what a diagnosis can conclude:
+`--truth-mode` sets what the diagnosis may assume about the answer key, which is a **ceiling on
+what it may conclude**. The vocabulary is `attribution.ATTRIBUTION_MODES`, not a second one
+invented for this command:
 
-| `--mode` | assumes | the question it can answer |
-|---|---|---|
-| `run-fault` (default) | the key is right | where in the run the cause sits — a term never searched, a type filter that masked the document, a passage read and misjudged |
-| `key-suspect` | the key may be wrong | whether the key was derivable from THIS chart at all |
+| `--truth-mode` | assumes | the question it can answer | cards |
+|---|---|---|---|
+| `BLIND` (default) | no truth at all | process anomalies and competing hypotheses | key-agnostic only |
+| `GOLD` | the key was **human adjudicated** | where in the run the cause sits — a term never searched, a type filter that masked the document, a passage read and misjudged | + `eval-missed-evidence`, `eval-overconfidence` |
+| `REGISTRY_REFERENCE` | the key is an unresolved reference | whether the key was derivable from THIS chart at all; a disagreement may only be `NEEDS_ADJUDICATION` | + `eval-key-challenge` |
 
-The two are separate invocations on purpose, and the cards are disjoint: `eval-key-challenge`
-opens with *"the key is also a suspect"* while `eval-missed-evidence` opens with *"confirm the
-value is genuinely documented before you start"*, and both sentences in one prompt is a prompt
-with no posture — every hard failure can then exit through "the key may be wrong" and every
-unreachable key through "the agent erred", with the choice recorded nowhere. Running BOTH modes
-over the same failed run and getting two non-empty answers is itself the signal that the case
-needs a human. The three `SYNK*` charts are the fixture for the doubting mode; `key_dispute.kind`
-in their `_ground_truth.json` is its answer key.
+The postures are disjoint on purpose. `eval-key-challenge` opens with *"the key is also a
+suspect"* while `eval-missed-evidence` opens with *"confirm the value is genuinely documented
+before you start"*, and both sentences in one prompt is a prompt with no posture — every hard
+failure can then exit through "the key may be wrong" and every unreachable key through "the agent
+erred", with the choice recorded nowhere. Running the same failed run under GOLD and under
+`REGISTRY_REFERENCE` and getting two non-empty answers is itself the signal that the case needs a
+human. The three `SYNK*` charts are the fixture for `REGISTRY_REFERENCE`; `key_dispute.kind` in
+their `_ground_truth.json` is its answer key.
+
+`BLIND` is the default because a claim about a key has to be asked for. Supplying `--gold` alone
+used to derive `GOLD` inside `cli_attribute`, and `GOLD`'s boundary instruction asserts the key
+was human adjudicated — authority that belongs to the `HUMAN` plane (§2.6), never to the presence
+of a file path.
 
 `--eval-skills a,b` overrides the mode outright when you already have a suspicion and want to
 spend less prompt; it is not a required argument. A name that is not a `slot: eval` card is
