@@ -789,6 +789,39 @@ def audit_evidence_set(run: RunRecord) -> list[Finding]:
     return out
 
 
+def detect_entity_answer_mismatch(run: RunRecord) -> list[Finding]:
+    """Evidence anchored to one lesion, an answer reported about another.
+
+    Silent unless BOTH sides recorded an anchor. An entity-less ledger is not a defect — the
+    field is optional and most runs will not use it at first — and a detector that fires on
+    absent data teaches people to switch it off, which costs the cases where it was right.
+
+    CRITICAL rather than WARN, but still only a detector: it does not enter the gate and it
+    refuses no answer. Same reason as the five clinical rules this tree measured and removed —
+    a deterministic rule that judges the CONTENT of an answer refused the registry's own
+    answers. What this judges is whether the RECORD agrees with itself, which is a fact about
+    the run and may be reported. Promoting it to a gate would need a measurement first.
+    """
+    items = [e for e in _evidence_of(run) if str(e.get("entity") or "").strip()]
+    reported = str(run.answer.get("reported_lesion") or "").strip()
+    if not items or not reported:
+        return []
+    entities = sorted({str(e["entity"]).strip() for e in items})
+    # EXACT string comparison, deliberately. "right lower lobe" and "RLL" will be called a
+    # mismatch. That is preferred to an approximate match here: synonym judgement is clinical
+    # knowledge, and putting clinical knowledge into Python is the mistake this tree has
+    # already made five times (see `answer_checks.py`). A false positive costs somebody a
+    # second look; a false negative is a quote about another specimen that nobody hears about.
+    if reported in entities:
+        return []
+    return [Finding(
+        "entity_answer_mismatch", CRITICAL,
+        f"the answer reports lesion {reported!r} but every anchored span is about "
+        f"{', '.join(repr(x) for x in entities)}",
+        {"reported_lesion": reported, "evidence_entities": entities,
+         "n_anchored": len(items)})]
+
+
 @dataclass(frozen=True)
 class DetectorConfig:
     """Every threshold, declared by the caller. No field has a default.
@@ -818,6 +851,7 @@ def run_detectors(run: RunRecord, *, config: DetectorConfig,
     out += detect_resource_band(run, token_band=config.token_band, turn_band=config.turn_band)
     out += detect_uncaused_reads(run)
     out += audit_evidence_set(run)
+    out += detect_entity_answer_mismatch(run)
     return sorted(out, key=lambda f: _SEVERITY_ORDER.get(f.severity, 9))
 
 

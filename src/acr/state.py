@@ -27,6 +27,13 @@ class Evidence:
     quote: str
     supports: str = ""          # which field / assertion this backs
     stance: Literal["supports", "contradicts"] = "supports"
+    #: WHICH THING IN THE CHART this span is about — the specimen, the lesion, the procedure.
+    #: Optional and empty by default, so every recorded run still loads. It exists because a
+    #: flat span list cannot express "this quote is about specimen A and that one about
+    #: specimen B", and "the right document, the wrong specimen" is a failure mode this repo
+    #: has already named. `submit_answer` records `reported_lesion`; with both, the agreement
+    #: between them is machine-checkable instead of something a reader has to notice.
+    entity: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -38,7 +45,11 @@ class EvidenceLedger:
 
     def add(self, e: Evidence) -> None:
         for x in self.items:  # de-duplicate identical spans
-            if (x.note_id, x.start, x.end, x.supports) == (e.note_id, e.start, e.end, e.supports):
+            # `entity` is IN the key: without it, one sentence quoted about two specimens
+            # collapses to one item, and the collapse is silent — exactly the confusion the
+            # field was added to make visible.
+            if (x.note_id, x.start, x.end, x.supports, x.entity) == \
+               (e.note_id, e.start, e.end, e.supports, e.entity):
                 return
         self.items.append(e)
 
@@ -54,9 +65,13 @@ class EvidenceLedger:
         out = []
         for i, e in enumerate(self.items, 1):
             mark = "" if e.stance == "supports" else "  [CONTRADICTS]"
+            # Omitted entirely when empty rather than rendered as "-": an absent anchor is the
+            # field going unused, and a placeholder on every line would train the model to read
+            # past the one line where an anchor was actually recorded.
+            ent = f"\n      entity:   {e.entity}" if e.entity else ""
             out.append(
                 f"[E{i}]{mark} {e.note_id} ({e.doc_type}, {e.date}) chars {e.start}-{e.end}\n"
-                f'      supports: {e.supports or "-"}\n'
+                f'      supports: {e.supports or "-"}{ent}\n'
                 f'      "{e.quote.strip()[:400]}"'
             )
         return "\n".join(out)

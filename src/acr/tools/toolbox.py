@@ -114,6 +114,11 @@ TOOL_SCHEMAS: list[dict] = [
             "end": {"type": "integer", "description": "character offset where the quote ends"},
             "supports": {"type": "string", "description": "which field or assertion this backs"},
             "stance": {"type": "string", "enum": ["supports", "contradicts"]},
+            "entity": {"type": "string",
+                       "description": ("optional: which specimen, lesion or procedure this "
+                                       "quote is ABOUT. Record it when the chart describes "
+                                       "more than one; it is how a reader tells a quote about "
+                                       "the reported lesion from a quote about another.")},
         },
         ["note_id", "start", "end", "supports"],
     ),
@@ -355,7 +360,7 @@ class Toolbox:
         return {"events": self.chart.timeline(doc_type_contains, limit), "type_filter_valid": True}
 
     def _t_record_evidence(self, note_id: str, start: int, end: int, supports: str,
-                           stance: str = "supports") -> dict:
+                           stance: str = "supports", entity: str = "") -> dict:
         meta = self.chart._docs.get(note_id)
         if meta is None:
             return self._unknown_note(note_id)
@@ -366,7 +371,9 @@ class Toolbox:
         if not quote.strip():
             return {"error": "that span is empty; re-check the offsets from your search hit"}
         self.evidence.add(Evidence(note_id, meta.doc_type, meta.date.isoformat(), start, end,
-                                   quote, supports, "contradicts" if stance == "contradicts" else "supports"))
+                                   quote, supports,
+                                   "contradicts" if stance == "contradicts" else "supports",
+                                   entity=str(entity or "")))
         return {"recorded": True, "n_evidence": len(self.evidence.items), "quote": quote[:300]}
 
     def _t_submit_answer(self, status: str, reasoning: str, value: dict | None = None,
