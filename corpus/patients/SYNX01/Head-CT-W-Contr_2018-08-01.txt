@@ -1,0 +1,9 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: Head CT W Contr
+Service Date: 2018-08-01
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

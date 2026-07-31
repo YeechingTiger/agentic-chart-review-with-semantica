@@ -1,0 +1,20 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Chest CT W Contr
+Service Date: 2020-06-14
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Eval of left lower lobe of lung lesion.
+
+TECHNIQUE:
+  Chest CT W Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the left lower lobe of lung, measuring 34 x 35 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the left lower lobe of lung, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

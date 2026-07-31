@@ -1,0 +1,52 @@
+{
+  "patient_id": "SYNX01",
+  "evidence_pattern": "retrospective diagnosis \u2014 the answer predates the workup by two years",
+  "designer_notes": "The biopsy date 2021-06-08 is where every ordinary path leads and it is WRONG. Reaching 2019-03-12 needs two hops: find the retrospective sentence in a post-diagnosis oncology note, then go back for the CT it names. A sweep that stops at the pathology never sees the sentence; a chase that never opens the follow-up notes never starts.",
+  "n_documents": 303,
+  "date_range": [
+    "2011-06-11",
+    "2022-11-30"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20190312",
+      "status": "FOUND",
+      "why": "An oncology note of 2021-06-15 states that the 8 mm nodule on the 2019-03-12 CT is this same tumour in retrospect. STORE.390 decision_rule: 'If a physician states that in retrospect the patient had cancer at an earlier date, use the earlier date.'"
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C341",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2011-06-11",
+        "end": "2022-11-30"
+      },
+      "expected_through_date": "2022-11-30",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "dx_date": "20190312",
+    "naive_answer": "20210608",
+    "requires": "two hops: retrospective remark -> the imaging it names"
+  }
+}

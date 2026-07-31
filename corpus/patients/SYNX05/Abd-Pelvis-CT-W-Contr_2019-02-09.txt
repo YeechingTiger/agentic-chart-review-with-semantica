@@ -1,0 +1,20 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2019-02-09
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Restaging for pancreatic head lesion.
+
+TECHNIQUE:
+  Abd Pelvis CT W Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the pancreatic head, measuring 42 x 43 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the pancreatic head, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

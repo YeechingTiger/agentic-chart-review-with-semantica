@@ -1,0 +1,12 @@
+MRN: SYNX03
+Patient: Alex Ferris
+DOB: 1972-05-22   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2020-01-17
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2020-01-17   OXYCODONE 5MG TAB                qty 30
+  2020-01-17   PANTOPRAZOLE 40MG TAB            qty 30
+  2020-01-17   LISINOPRIL 10MG TAB              qty 60
+

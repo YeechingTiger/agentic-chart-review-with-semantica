@@ -1,0 +1,12 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2014-08-08
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2014-08-08   LISINOPRIL 10MG TAB              qty 60
+  2014-08-08   ONDANSETRON 8MG TAB              qty 60
+  2014-08-08   METFORMIN HCL 500MG TAB          qty 60
+

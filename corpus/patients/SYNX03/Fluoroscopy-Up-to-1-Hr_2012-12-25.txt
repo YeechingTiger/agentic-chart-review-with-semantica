@@ -1,0 +1,9 @@
+MRN: SYNX03
+Patient: Alex Ferris
+DOB: 1972-05-22   Sex: F
+Document Type: Fluoroscopy Up to 1 Hr
+Service Date: 2012-12-25
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

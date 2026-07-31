@@ -1,0 +1,9 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: EKG
+Service Date: 2013-11-14
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 91. No acute ST-T changes.
+

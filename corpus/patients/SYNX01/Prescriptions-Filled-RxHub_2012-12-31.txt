@@ -1,0 +1,12 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2012-12-31
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2012-12-31   ONDANSETRON 8MG TAB              qty 60
+  2012-12-31   METFORMIN HCL 500MG TAB          qty 90
+  2012-12-31   LISINOPRIL 10MG TAB              qty 90
+

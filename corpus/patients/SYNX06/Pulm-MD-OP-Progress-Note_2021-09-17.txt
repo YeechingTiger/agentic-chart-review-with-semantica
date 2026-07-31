@@ -1,0 +1,14 @@
+MRN: SYNX06
+Patient: Casey Okafor
+DOB: 1965-02-19   Sex: M
+Document Type: Pulm MD OP Progress Note
+Service Date: 2021-09-17
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt in for results. Accompanied by spouse.
+
+ASSESSMENT AND PLAN:
+  1. Bx +ve. Path c/w adenoCA, RUL. D/w pt and spouse at length today.
+     Staging w/u ordered: PET, brain MRI. To med onc next wk.
+  2. Sx control prn. Rx per below.
+

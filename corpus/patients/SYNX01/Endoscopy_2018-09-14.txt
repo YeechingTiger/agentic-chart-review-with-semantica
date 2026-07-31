@@ -1,0 +1,9 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: Endoscopy
+Service Date: 2018-09-14
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the right upper lobe of lung. Biopsies obtained.
+

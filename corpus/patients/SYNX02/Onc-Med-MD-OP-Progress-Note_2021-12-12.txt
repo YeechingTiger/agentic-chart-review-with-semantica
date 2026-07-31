@@ -1,0 +1,15 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2021-12-12
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt doing well. Denies new sx. Completed adjuvant therapy.
+
+ASSESSMENT AND PLAN:
+  1. No evidence of disease on todays exam and recent imaging.
+     Pt is disease free. Continue surveillance q6mo.
+
+MEDS: ondansetron, pantoprazole, lisinopril
+

@@ -1,0 +1,12 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2011-09-09
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2011-09-09   ONDANSETRON 8MG TAB              qty 90
+  2011-09-09   PANTOPRAZOLE 40MG TAB            qty 30
+  2011-09-09   LISINOPRIL 10MG TAB              qty 30
+

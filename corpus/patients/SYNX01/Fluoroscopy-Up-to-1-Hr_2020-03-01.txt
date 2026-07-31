@@ -1,0 +1,9 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: Fluoroscopy Up to 1 Hr
+Service Date: 2020-03-01
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

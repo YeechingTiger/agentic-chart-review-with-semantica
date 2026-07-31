@@ -1,0 +1,9 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: EKG
+Service Date: 2012-10-24
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 62. No acute ST-T changes.
+

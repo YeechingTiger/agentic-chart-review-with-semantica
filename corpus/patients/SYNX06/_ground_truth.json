@@ -1,0 +1,52 @@
+{
+  "patient_id": "SYNX06",
+  "evidence_pattern": "the diagnosis exists only in dictation shorthand",
+  "designer_notes": "No full word appears anywhere: not adenocarcinoma, not carcinoma, not malignant, not diagnosis. A run searching the contract's own vocabulary comes back empty and concludes the chart is silent. 'adeno' hits and 'adenocarcinoma' does not, which is precisely the shorter-stem move the search-native card advises \u2014 so this chart tests whether that advice is followed rather than merely rendered.",
+  "n_documents": 317,
+  "date_range": [
+    "2011-09-20",
+    "2023-03-11"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20210917",
+      "status": "FOUND",
+      "why": "The pulmonary note of 2021-09-17 records 'Bx +ve. Path c/w adenoCA, RUL.' That is a physician's statement of a tissue-confirmed diagnosis and it is the first one in the chart."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C341",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "EVIDENCE_INSUFFICIENT",
+      "why": "No pathology in the record; histology must NOT be inferred from imaging."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2011-09-20",
+        "end": "2023-03-11"
+      },
+      "expected_through_date": "2023-03-11",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "dx_date": "20210917",
+    "naive_answer": "EVIDENCE_INSUFFICIENT",
+    "requires": "widening to a stem after the contract's own words miss"
+  }
+}

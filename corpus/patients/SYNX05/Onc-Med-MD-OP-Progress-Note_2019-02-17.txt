@@ -1,0 +1,16 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2019-02-17
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt seen today to discuss recent imaging of the pancreatic head.
+  Reports fatigue, appetite down. No fevers.
+
+ASSESSMENT AND PLAN:
+  1. Mass, pancreatic head. Clinically this represents malignancy;
+     proceeding to tissue sampling for confirmation.
+
+MEDS: pantoprazole, atorvastatin, ondansetron
+

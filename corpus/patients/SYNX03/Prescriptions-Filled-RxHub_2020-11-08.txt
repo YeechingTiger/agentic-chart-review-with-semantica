@@ -1,0 +1,12 @@
+MRN: SYNX03
+Patient: Alex Ferris
+DOB: 1972-05-22   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2020-11-08
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2020-11-08   ATORVASTATIN 20MG TAB            qty 60
+  2020-11-08   METFORMIN HCL 500MG TAB          qty 90
+  2020-11-08   OXYCODONE 5MG TAB                qty 60
+

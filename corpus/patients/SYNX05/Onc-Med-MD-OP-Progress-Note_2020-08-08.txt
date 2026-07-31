@@ -1,0 +1,15 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2020-08-08
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt doing well. Denies new sx. Completed adjuvant therapy.
+
+ASSESSMENT AND PLAN:
+  1. No evidence of disease on todays exam and recent imaging.
+     Pt is disease free. Continue surveillance q6mo.
+
+MEDS: lisinopril, atorvastatin, pantoprazole
+

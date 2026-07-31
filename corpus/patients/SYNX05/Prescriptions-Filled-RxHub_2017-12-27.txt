@@ -1,0 +1,12 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2017-12-27
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2017-12-27   OXYCODONE 5MG TAB                qty 90
+  2017-12-27   LISINOPRIL 10MG TAB              qty 90
+  2017-12-27   ONDANSETRON 8MG TAB              qty 60
+

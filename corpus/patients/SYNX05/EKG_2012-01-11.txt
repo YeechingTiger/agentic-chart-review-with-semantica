@@ -1,0 +1,9 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: EKG
+Service Date: 2012-01-11
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 83. No acute ST-T changes.
+

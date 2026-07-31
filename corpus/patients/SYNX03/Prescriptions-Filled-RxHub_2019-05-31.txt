@@ -1,0 +1,12 @@
+MRN: SYNX03
+Patient: Alex Ferris
+DOB: 1972-05-22   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2019-05-31
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2019-05-31   ONDANSETRON 8MG TAB              qty 30
+  2019-05-31   OXYCODONE 5MG TAB                qty 30
+  2019-05-31   ATORVASTATIN 20MG TAB            qty 90
+

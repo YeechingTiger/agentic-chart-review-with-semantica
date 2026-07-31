@@ -1,0 +1,14 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Procedure Note
+Service Date: 2020-05-10
+----------------------------------------------------------------
+ADMINISTRATION RECORD:
+  Cycle 1 of planned 4. Carboplatin AUC 5, pemetrexed 500 mg/m2 IV.
+  Pre-medications given per protocol. Infusion completed without reaction.
+
+OBSERVATIONS:
+  Vitals stable throughout. Port accessed and de-accessed without difficulty.
+  Next cycle in 21 days pending counts.
+

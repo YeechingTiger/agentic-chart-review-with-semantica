@@ -1,0 +1,9 @@
+MRN: SYNX06
+Patient: Casey Okafor
+DOB: 1965-02-19   Sex: M
+Document Type: Chest CT W Contr
+Service Date: 2016-11-22
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

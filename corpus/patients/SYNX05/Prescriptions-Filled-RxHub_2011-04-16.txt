@@ -1,0 +1,12 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2011-04-16
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2011-04-16   METFORMIN HCL 500MG TAB          qty 60
+  2011-04-16   OXYCODONE 5MG TAB                qty 90
+  2011-04-16   ATORVASTATIN 20MG TAB            qty 90
+

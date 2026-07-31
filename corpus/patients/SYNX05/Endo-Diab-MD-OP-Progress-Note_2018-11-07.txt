@@ -1,0 +1,21 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: Endo Diab MD OP Progress Note
+Service Date: 2018-11-07
+----------------------------------------------------------------
+SUBJECTIVE:
+  Here for routine diabetes follow-up. Home glucose log reviewed; ranges 110-160.
+  No hypoglycaemic episodes. Adherent to metformin.
+
+OBJECTIVE:
+  A1c 7.1%. Weight down 4 kg since last visit.
+  Feet examined, monofilament intact bilaterally.
+
+ASSESSMENT AND PLAN:
+  1. Type 2 diabetes, adequately controlled. Continue metformin.
+  2. Weight loss. CT abdomen from last week reviewed with radiology today; the
+     pancreatic head lesion is malignant in my assessment and explains the weight loss.
+     Referred to oncology; they will arrange tissue sampling.
+  3. Follow up 3 months or sooner as oncology directs.
+

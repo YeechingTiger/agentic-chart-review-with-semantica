@@ -1,0 +1,9 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Chest CT WWO Contr
+Service Date: 2019-03-10
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

@@ -1,0 +1,14 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2019-08-14
+----------------------------------------------------------------
+SUBJECTIVE:
+  Interval visit. Tolerating therapy. Labs reviewed.
+
+ASSESSMENT AND PLAN:
+  1. Continue current regimen. RTC 4 wks.
+
+MEDS: lisinopril, metformin, dexamethasone
+

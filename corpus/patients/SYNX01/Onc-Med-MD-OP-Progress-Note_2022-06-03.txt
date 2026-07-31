@@ -1,0 +1,15 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2022-06-03
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt doing well. Denies new sx. Completed adjuvant therapy.
+
+ASSESSMENT AND PLAN:
+  1. No evidence of disease on todays exam and recent imaging.
+     Pt is disease free. Continue surveillance q6mo.
+
+MEDS: dexamethasone, metformin, ondansetron
+

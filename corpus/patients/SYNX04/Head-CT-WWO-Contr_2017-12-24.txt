@@ -1,0 +1,9 @@
+MRN: SYNX04
+Patient: Avery Ferris
+DOB: 1970-02-09   Sex: M
+Document Type: Head CT WWO Contr
+Service Date: 2017-12-24
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

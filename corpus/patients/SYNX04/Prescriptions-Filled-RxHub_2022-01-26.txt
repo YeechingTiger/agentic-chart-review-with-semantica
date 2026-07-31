@@ -1,0 +1,12 @@
+MRN: SYNX04
+Patient: Avery Ferris
+DOB: 1970-02-09   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2022-01-26
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2022-01-26   PANTOPRAZOLE 40MG TAB            qty 60
+  2022-01-26   OXYCODONE 5MG TAB                qty 60
+  2022-01-26   ATORVASTATIN 20MG TAB            qty 90
+

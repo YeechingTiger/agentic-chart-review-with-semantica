@@ -1,0 +1,12 @@
+MRN: SYNX04
+Patient: Avery Ferris
+DOB: 1970-02-09   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2019-03-20
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2019-03-20   OXYCODONE 5MG TAB                qty 60
+  2019-03-20   ONDANSETRON 8MG TAB              qty 60
+  2019-03-20   METFORMIN HCL 500MG TAB          qty 90
+

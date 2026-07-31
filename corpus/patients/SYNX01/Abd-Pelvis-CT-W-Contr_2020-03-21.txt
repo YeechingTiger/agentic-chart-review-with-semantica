@@ -1,0 +1,9 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2020-03-21
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

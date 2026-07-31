@@ -1,0 +1,9 @@
+MRN: SYNX03
+Patient: Alex Ferris
+DOB: 1972-05-22   Sex: F
+Document Type: Endoscopy
+Service Date: 2019-12-06
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the right lower lobe of lung. Biopsies obtained.
+

@@ -1,0 +1,9 @@
+MRN: SYNX06
+Patient: Casey Okafor
+DOB: 1965-02-19   Sex: M
+Document Type: Fluoroscopy Up to 1 Hr
+Service Date: 2013-12-30
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

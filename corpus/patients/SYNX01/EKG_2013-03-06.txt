@@ -1,0 +1,9 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: EKG
+Service Date: 2013-03-06
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 70. No acute ST-T changes.
+

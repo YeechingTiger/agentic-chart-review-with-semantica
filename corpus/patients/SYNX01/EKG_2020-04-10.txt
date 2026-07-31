@@ -1,0 +1,9 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: EKG
+Service Date: 2020-04-10
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 102. No acute ST-T changes.
+

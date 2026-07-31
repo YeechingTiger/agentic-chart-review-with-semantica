@@ -1,0 +1,9 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: Fluoroscopy Up to 1 Hr
+Service Date: 2013-04-03
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

@@ -1,0 +1,9 @@
+MRN: SYNX06
+Patient: Casey Okafor
+DOB: 1965-02-19   Sex: M
+Document Type: EKG
+Service Date: 2017-05-07
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 62. No acute ST-T changes.
+

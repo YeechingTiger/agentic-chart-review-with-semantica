@@ -1,0 +1,12 @@
+MRN: SYNX06
+Patient: Casey Okafor
+DOB: 1965-02-19   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2020-08-29
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2020-08-29   PANTOPRAZOLE 40MG TAB            qty 60
+  2020-08-29   ONDANSETRON 8MG TAB              qty 90
+  2020-08-29   LISINOPRIL 10MG TAB              qty 30
+

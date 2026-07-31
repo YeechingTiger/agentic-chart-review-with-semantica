@@ -1,0 +1,14 @@
+MRN: SYNX06
+Patient: Casey Okafor
+DOB: 1965-02-19   Sex: M
+Document Type: Pulm MD OP Progress Note
+Service Date: 2016-10-04
+----------------------------------------------------------------
+SUBJECTIVE:
+  Interval visit. Tolerating therapy. Labs reviewed.
+
+ASSESSMENT AND PLAN:
+  1. Continue current regimen. RTC 4 wks.
+
+MEDS: lisinopril, metformin, pantoprazole
+

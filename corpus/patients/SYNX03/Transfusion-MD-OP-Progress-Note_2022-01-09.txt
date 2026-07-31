@@ -1,0 +1,14 @@
+MRN: SYNX03
+Patient: Alex Ferris
+DOB: 1972-05-22   Sex: F
+Document Type: Transfusion MD OP Progress Note
+Service Date: 2022-01-09
+----------------------------------------------------------------
+SUBJECTIVE:
+  Interval visit. Tolerating therapy. Labs reviewed.
+
+ASSESSMENT AND PLAN:
+  1. Continue current regimen. RTC 4 wks.
+
+MEDS: dexamethasone, atorvastatin, lisinopril
+

@@ -1,0 +1,9 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2016-05-21
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

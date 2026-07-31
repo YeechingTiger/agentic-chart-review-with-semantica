@@ -1,0 +1,16 @@
+MRN: SYNX04
+Patient: Avery Ferris
+DOB: 1970-02-09   Sex: M
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2023-08-28
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt seen today to discuss recent imaging of the right upper lobe of lung.
+  Reports fatigue, appetite down. No fevers.
+
+ASSESSMENT AND PLAN:
+  1. Mass, right upper lobe of lung. Clinically this represents malignancy;
+     proceeding to tissue sampling for confirmation.
+
+MEDS: metformin, dexamethasone, atorvastatin
+

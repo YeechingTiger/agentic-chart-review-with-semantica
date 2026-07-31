@@ -1,0 +1,52 @@
+{
+  "patient_id": "SYNX02",
+  "evidence_pattern": "first-course treatment precedes any documented diagnosis",
+  "designer_notes": "The pathology of 2020-06-20 is the obvious answer and it is WRONG. The infusion record carries no narrative impression \u2014 it is an administration, under Procedure-Note \u2014 so a run that searches diagnostic vocabulary cannot reach it and must instead have swept the document inventory by type.",
+  "n_documents": 330,
+  "date_range": [
+    "2010-06-23",
+    "2021-12-12"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20200510",
+      "status": "FOUND",
+      "why": "Carboplatin/pemetrexed cycle 1 was administered 2020-05-10, six weeks before the first document that establishes a diagnosis. STORE.390 decision_rule: 'If first-course treatment began before a diagnosis was documented, use the treatment start date.'"
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C343",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2010-06-23",
+        "end": "2021-12-12"
+      },
+      "expected_through_date": "2021-12-12",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "dx_date": "20200510",
+    "naive_answer": "20200620",
+    "requires": "sweeping a type that states no diagnosis"
+  }
+}

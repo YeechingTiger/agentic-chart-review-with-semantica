@@ -1,0 +1,9 @@
+MRN: SYNX06
+Patient: Casey Okafor
+DOB: 1965-02-19   Sex: M
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2013-12-28
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

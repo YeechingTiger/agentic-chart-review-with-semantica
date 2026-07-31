@@ -1,0 +1,12 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2018-05-28
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2018-05-28   LISINOPRIL 10MG TAB              qty 60
+  2018-05-28   OXYCODONE 5MG TAB                qty 90
+  2018-05-28   ONDANSETRON 8MG TAB              qty 60
+

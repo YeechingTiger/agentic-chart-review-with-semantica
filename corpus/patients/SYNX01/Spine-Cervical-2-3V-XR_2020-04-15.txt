@@ -1,0 +1,9 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2020-04-15
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

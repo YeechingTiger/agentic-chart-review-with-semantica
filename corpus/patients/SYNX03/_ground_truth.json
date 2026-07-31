@@ -1,0 +1,52 @@
+{
+  "patient_id": "SYNX03",
+  "evidence_pattern": "ambiguous cytology with NO clinical impression \u2014 the biopsy dates it",
+  "designer_notes": "THE MIRROR OF SYN0001, and the branch the corpus has never tested. SYN0001 has the same ambiguous cytology WITH a same-day clinical impression, so its answer is the cytology date. Here the impression is absent and the answer is the biopsy date. A run that has generalised 'ambiguous cytology dates the case' answers 2022-02-14 and is exactly wrong \u2014 the two conflict_rules differ by one document, and only reading both charts distinguishes them.",
+  "n_documents": 312,
+  "date_range": [
+    "2012-03-11",
+    "2023-08-31"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20220309",
+      "status": "FOUND",
+      "why": "Cytology of 2022-02-14 is ambiguous ('suspicious for') and NO physician's clinical impression of cancer accompanies it, so STORE.390's second conflict_rule applies and the biopsy date governs."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C342",
+      "histology": "8070",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2012-03-11",
+        "end": "2023-08-31"
+      },
+      "expected_through_date": "2023-08-31",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "dx_date": "20220309",
+    "naive_answer": "20220214",
+    "requires": "noticing an ABSENT document, not finding a present one"
+  }
+}

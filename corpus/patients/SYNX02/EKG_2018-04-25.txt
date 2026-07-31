@@ -1,0 +1,9 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: EKG
+Service Date: 2018-04-25
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 71. No acute ST-T changes.
+

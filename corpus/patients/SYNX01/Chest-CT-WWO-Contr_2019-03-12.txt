@@ -1,0 +1,16 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: Chest CT WWO Contr
+Service Date: 2019-03-12
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Routine screening. No respiratory complaints.
+
+FINDINGS:
+  An 8 mm nodule is noted in the right upper lobe of lung. Margins are smooth.
+  No lymphadenopathy. No effusion.
+
+IMPRESSION:
+  8 mm nodule, likely benign. Attention on routine follow-up imaging.
+

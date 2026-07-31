@@ -1,0 +1,9 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: Procedure Note
+Service Date: 2011-05-29
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

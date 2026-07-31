@@ -1,0 +1,12 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2017-07-08
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2017-07-08   ONDANSETRON 8MG TAB              qty 60
+  2017-07-08   OXYCODONE 5MG TAB                qty 90
+  2017-07-08   ATORVASTATIN 20MG TAB            qty 90
+

@@ -1,0 +1,9 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Procedure Note
+Service Date: 2018-11-10
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

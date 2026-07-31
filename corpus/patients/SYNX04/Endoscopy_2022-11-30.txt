@@ -1,0 +1,9 @@
+MRN: SYNX04
+Patient: Avery Ferris
+DOB: 1970-02-09   Sex: M
+Document Type: Endoscopy
+Service Date: 2022-11-30
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the right upper lobe of lung. Biopsies obtained.
+

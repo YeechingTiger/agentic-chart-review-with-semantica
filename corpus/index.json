@@ -595,5 +595,317 @@
       "recurrence_date": "20201109",
       "through_date": "last_contact"
     }
+  },
+  {
+    "patient_id": "SYNX01",
+    "evidence_pattern": "retrospective diagnosis \u2014 the answer predates the workup by two years",
+    "designer_notes": "The biopsy date 2021-06-08 is where every ordinary path leads and it is WRONG. Reaching 2019-03-12 needs two hops: find the retrospective sentence in a post-diagnosis oncology note, then go back for the CT it names. A sweep that stops at the pathology never sees the sentence; a chase that never opens the follow-up notes never starts.",
+    "n_documents": 303,
+    "date_range": [
+      "2011-06-11",
+      "2022-11-30"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": "20190312",
+        "status": "FOUND",
+        "why": "An oncology note of 2021-06-15 states that the 8 mm nodule on the 2019-03-12 CT is this same tumour in retrospect. STORE.390 decision_rule: 'If a physician states that in retrospect the patient had cancer at an earlier date, use the earlier date.'"
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C341",
+        "histology": "8140",
+        "behavior": "3",
+        "status": "FOUND",
+        "why": "Tissue diagnosis present in the chart."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "00",
+        "date": null,
+        "status": "FOUND",
+        "observable_period": {
+          "start": "2011-06-11",
+          "end": "2022-11-30"
+        },
+        "expected_through_date": "2022-11-30",
+        "followup_shape": "normal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "dx_date": "20190312",
+      "naive_answer": "20210608",
+      "requires": "two hops: retrospective remark -> the imaging it names"
+    }
+  },
+  {
+    "patient_id": "SYNX02",
+    "evidence_pattern": "first-course treatment precedes any documented diagnosis",
+    "designer_notes": "The pathology of 2020-06-20 is the obvious answer and it is WRONG. The infusion record carries no narrative impression \u2014 it is an administration, under Procedure-Note \u2014 so a run that searches diagnostic vocabulary cannot reach it and must instead have swept the document inventory by type.",
+    "n_documents": 330,
+    "date_range": [
+      "2010-06-23",
+      "2021-12-12"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": "20200510",
+        "status": "FOUND",
+        "why": "Carboplatin/pemetrexed cycle 1 was administered 2020-05-10, six weeks before the first document that establishes a diagnosis. STORE.390 decision_rule: 'If first-course treatment began before a diagnosis was documented, use the treatment start date.'"
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C343",
+        "histology": "8140",
+        "behavior": "3",
+        "status": "FOUND",
+        "why": "Tissue diagnosis present in the chart."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "00",
+        "date": null,
+        "status": "FOUND",
+        "observable_period": {
+          "start": "2010-06-23",
+          "end": "2021-12-12"
+        },
+        "expected_through_date": "2021-12-12",
+        "followup_shape": "normal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "dx_date": "20200510",
+      "naive_answer": "20200620",
+      "requires": "sweeping a type that states no diagnosis"
+    }
+  },
+  {
+    "patient_id": "SYNX03",
+    "evidence_pattern": "ambiguous cytology with NO clinical impression \u2014 the biopsy dates it",
+    "designer_notes": "THE MIRROR OF SYN0001, and the branch the corpus has never tested. SYN0001 has the same ambiguous cytology WITH a same-day clinical impression, so its answer is the cytology date. Here the impression is absent and the answer is the biopsy date. A run that has generalised 'ambiguous cytology dates the case' answers 2022-02-14 and is exactly wrong \u2014 the two conflict_rules differ by one document, and only reading both charts distinguishes them.",
+    "n_documents": 312,
+    "date_range": [
+      "2012-03-11",
+      "2023-08-31"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": "20220309",
+        "status": "FOUND",
+        "why": "Cytology of 2022-02-14 is ambiguous ('suspicious for') and NO physician's clinical impression of cancer accompanies it, so STORE.390's second conflict_rule applies and the biopsy date governs."
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C342",
+        "histology": "8070",
+        "behavior": "3",
+        "status": "FOUND",
+        "why": "Tissue diagnosis present in the chart."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "00",
+        "date": null,
+        "status": "FOUND",
+        "observable_period": {
+          "start": "2012-03-11",
+          "end": "2023-08-31"
+        },
+        "expected_through_date": "2023-08-31",
+        "followup_shape": "normal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "dx_date": "20220309",
+      "naive_answer": "20220214",
+      "requires": "noticing an ABSENT document, not finding a present one"
+    }
+  },
+  {
+    "patient_id": "SYNX04",
+    "evidence_pattern": "pathology deferred to an addendum filed under another type",
+    "designer_notes": "P05's 8046 error given somewhere further to go. The deferred report is the only Surgical-Pathology-Report in the chart, so an arm that sweeps the pathology type finds a document that answers nothing; the addendum is filed under Surgical-Pathology-Document three weeks later. Following the words 'SEE ADDENDUM' is the only cheap route, which is what thread-chasing is for.",
+    "n_documents": 299,
+    "date_range": [
+      "2013-08-05",
+      "2025-01-24"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": "20230824",
+        "status": "FOUND",
+        "why": "The 2023-08-03 report DEFERRED its diagnosis pending stains and therefore established nothing. The 2023-08-24 addendum establishes it."
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C341",
+        "histology": "8140",
+        "behavior": "3",
+        "status": "FOUND",
+        "why": "Tissue diagnosis present in the chart."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "00",
+        "date": null,
+        "status": "FOUND",
+        "observable_period": {
+          "start": "2013-08-05",
+          "end": "2025-01-24"
+        },
+        "expected_through_date": "2025-01-24",
+        "followup_shape": "normal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "dx_date": "20230824",
+      "naive_answer": "20230803",
+      "requires": "following a pointer out of the document that raised it"
+    }
+  },
+  {
+    "patient_id": "SYNX05",
+    "evidence_pattern": "the first diagnosis is a clinical impression buried in a diabetes note",
+    "designer_notes": "The pathology of 2019-02-15 is three months later and is the obvious answer. The real one is one clause inside a routine diabetes visit \u2014 a specialty nobody searches for an oncology diagnosis, in a note type whose prior says it can establish nothing. Rewards sweeping the inventory by type over trusting a type prior.",
+    "n_documents": 287,
+    "date_range": [
+      "2009-02-17",
+      "2020-08-08"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": "20181107",
+        "status": "FOUND",
+        "why": "An endocrinology follow-up of 2018-11-07 records the physician's assessment that the pancreatic head lesion is malignant. STORE.390 takes the FIRST date, clinically or histologically established, and a physician's clinical impression of cancer counts as evidence."
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C250",
+        "histology": "8140",
+        "behavior": "3",
+        "status": "FOUND",
+        "why": "Tissue diagnosis present in the chart."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "00",
+        "date": null,
+        "status": "FOUND",
+        "observable_period": {
+          "start": "2009-02-17",
+          "end": "2020-08-08"
+        },
+        "expected_through_date": "2020-08-08",
+        "followup_shape": "normal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "dx_date": "20181107",
+      "naive_answer": "20190215",
+      "requires": "reading a type the prior calls unable to establish"
+    }
+  },
+  {
+    "patient_id": "SYNX06",
+    "evidence_pattern": "the diagnosis exists only in dictation shorthand",
+    "designer_notes": "No full word appears anywhere: not adenocarcinoma, not carcinoma, not malignant, not diagnosis. A run searching the contract's own vocabulary comes back empty and concludes the chart is silent. 'adeno' hits and 'adenocarcinoma' does not, which is precisely the shorter-stem move the search-native card advises \u2014 so this chart tests whether that advice is followed rather than merely rendered.",
+    "n_documents": 317,
+    "date_range": [
+      "2011-09-20",
+      "2023-03-11"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": "20210917",
+        "status": "FOUND",
+        "why": "The pulmonary note of 2021-09-17 records 'Bx +ve. Path c/w adenoCA, RUL.' That is a physician's statement of a tissue-confirmed diagnosis and it is the first one in the chart."
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C341",
+        "histology": "8140",
+        "behavior": "3",
+        "status": "EVIDENCE_INSUFFICIENT",
+        "why": "No pathology in the record; histology must NOT be inferred from imaging."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "00",
+        "date": null,
+        "status": "FOUND",
+        "observable_period": {
+          "start": "2011-09-20",
+          "end": "2023-03-11"
+        },
+        "expected_through_date": "2023-03-11",
+        "followup_shape": "normal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "dx_date": "20210917",
+      "naive_answer": "EVIDENCE_INSUFFICIENT",
+      "requires": "widening to a stem after the contract's own words miss"
+    }
   }
 ]

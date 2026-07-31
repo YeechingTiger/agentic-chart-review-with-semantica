@@ -1,0 +1,12 @@
+MRN: SYNX03
+Patient: Alex Ferris
+DOB: 1972-05-22   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2017-01-28
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2017-01-28   METFORMIN HCL 500MG TAB          qty 60
+  2017-01-28   PANTOPRAZOLE 40MG TAB            qty 30
+  2017-01-28   OXYCODONE 5MG TAB                qty 90
+

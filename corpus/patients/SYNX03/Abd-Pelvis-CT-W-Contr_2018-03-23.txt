@@ -1,0 +1,9 @@
+MRN: SYNX03
+Patient: Alex Ferris
+DOB: 1972-05-22   Sex: F
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2018-03-23
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

@@ -1,0 +1,12 @@
+MRN: SYNX06
+Patient: Casey Okafor
+DOB: 1965-02-19   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2021-01-31
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2021-01-31   ATORVASTATIN 20MG TAB            qty 90
+  2021-01-31   OXYCODONE 5MG TAB                qty 60
+  2021-01-31   PANTOPRAZOLE 40MG TAB            qty 30
+

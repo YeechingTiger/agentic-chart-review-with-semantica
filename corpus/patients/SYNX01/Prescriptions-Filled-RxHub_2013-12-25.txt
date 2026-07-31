@@ -1,0 +1,12 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2013-12-25
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2013-12-25   PANTOPRAZOLE 40MG TAB            qty 60
+  2013-12-25   LISINOPRIL 10MG TAB              qty 60
+  2013-12-25   ATORVASTATIN 20MG TAB            qty 60
+

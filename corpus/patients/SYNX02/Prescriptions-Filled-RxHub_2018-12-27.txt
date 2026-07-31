@@ -1,0 +1,12 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2018-12-27
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2018-12-27   OXYCODONE 5MG TAB                qty 60
+  2018-12-27   METFORMIN HCL 500MG TAB          qty 60
+  2018-12-27   ATORVASTATIN 20MG TAB            qty 90
+

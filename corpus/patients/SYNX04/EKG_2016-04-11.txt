@@ -1,0 +1,9 @@
+MRN: SYNX04
+Patient: Avery Ferris
+DOB: 1970-02-09   Sex: M
+Document Type: EKG
+Service Date: 2016-04-11
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 74. No acute ST-T changes.
+

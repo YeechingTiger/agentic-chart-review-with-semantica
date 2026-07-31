@@ -1,0 +1,17 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2021-06-15
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt returns to review the biopsy result and discuss systemic therapy.
+  Tolerating symptoms; performance status preserved.
+
+ASSESSMENT AND PLAN:
+  1. Adenocarcinoma, right upper lobe of lung. Biopsy-confirmed.
+     Reviewing the prior imaging with radiology, the 2019-03-12 nodule in the
+     same location represents this same tumour in retrospect; the patient has had this
+     malignancy since at least that date. Interval growth is slow and consistent.
+  2. Staging complete. Begin systemic therapy.
+

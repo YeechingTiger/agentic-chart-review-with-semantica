@@ -1,0 +1,9 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2009-06-21
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

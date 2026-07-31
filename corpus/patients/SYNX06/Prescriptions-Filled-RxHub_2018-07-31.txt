@@ -1,0 +1,12 @@
+MRN: SYNX06
+Patient: Casey Okafor
+DOB: 1965-02-19   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2018-07-31
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2018-07-31   OXYCODONE 5MG TAB                qty 60
+  2018-07-31   ONDANSETRON 8MG TAB              qty 90
+  2018-07-31   LISINOPRIL 10MG TAB              qty 60
+

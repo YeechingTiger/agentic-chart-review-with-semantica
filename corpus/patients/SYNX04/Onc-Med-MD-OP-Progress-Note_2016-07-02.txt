@@ -1,0 +1,14 @@
+MRN: SYNX04
+Patient: Avery Ferris
+DOB: 1970-02-09   Sex: M
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2016-07-02
+----------------------------------------------------------------
+SUBJECTIVE:
+  Interval visit. Tolerating therapy. Labs reviewed.
+
+ASSESSMENT AND PLAN:
+  1. Continue current regimen. RTC 4 wks.
+
+MEDS: metformin, ondansetron, lisinopril
+

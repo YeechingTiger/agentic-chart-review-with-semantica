@@ -1,0 +1,12 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2013-06-06
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2013-06-06   METFORMIN HCL 500MG TAB          qty 30
+  2013-06-06   ATORVASTATIN 20MG TAB            qty 30
+  2013-06-06   LISINOPRIL 10MG TAB              qty 90
+

@@ -1,0 +1,12 @@
+MRN: SYNX03
+Patient: Alex Ferris
+DOB: 1972-05-22   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2014-03-05
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2014-03-05   METFORMIN HCL 500MG TAB          qty 30
+  2014-03-05   OXYCODONE 5MG TAB                qty 90
+  2014-03-05   ATORVASTATIN 20MG TAB            qty 30
+

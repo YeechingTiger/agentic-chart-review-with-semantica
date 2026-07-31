@@ -1,0 +1,14 @@
+MRN: SYNX01
+Patient: Avery Whitaker
+DOB: 1971-11-23   Sex: M
+Document Type: Transfusion MD OP Progress Note
+Service Date: 2021-04-17
+----------------------------------------------------------------
+SUBJECTIVE:
+  Interval visit. Tolerating therapy. Labs reviewed.
+
+ASSESSMENT AND PLAN:
+  1. Continue current regimen. RTC 4 wks.
+
+MEDS: pantoprazole, atorvastatin, lisinopril
+

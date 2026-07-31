@@ -1,0 +1,17 @@
+MRN: SYNX04
+Patient: Avery Ferris
+DOB: 1970-02-09   Sex: M
+Document Type: Surgical Pathology Document
+Service Date: 2023-08-24
+----------------------------------------------------------------
+ADDENDUM to surgical pathology of 2023-08-03.
+
+IMMUNOHISTOCHEMISTRY:
+  TTF-1 positive. Napsin A positive. p40 negative.
+
+ADDENDUM DIAGNOSIS:
+  A. RIGHT UPPER LOBE OF LUNG, CORE BIOPSY — ADENOCARCINOMA.
+     The staining pattern supports the above. The deferred diagnosis is now final.
+
+Electronically signed by Pathology.
+

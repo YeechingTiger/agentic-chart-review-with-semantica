@@ -1,0 +1,9 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2011-08-13
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

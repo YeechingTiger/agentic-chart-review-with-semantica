@@ -1,0 +1,9 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Endoscopy
+Service Date: 2014-09-02
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the left lower lobe of lung. Biopsies obtained.
+

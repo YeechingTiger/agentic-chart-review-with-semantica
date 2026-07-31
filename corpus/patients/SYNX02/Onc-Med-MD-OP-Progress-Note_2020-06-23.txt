@@ -1,0 +1,16 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2020-06-23
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt seen today to discuss recent imaging of the left lower lobe of lung.
+  Reports fatigue, appetite down. No fevers.
+
+ASSESSMENT AND PLAN:
+  1. Mass, left lower lobe of lung. Clinically this represents malignancy;
+     proceeding to tissue sampling for confirmation.
+
+MEDS: ondansetron, dexamethasone, lisinopril
+

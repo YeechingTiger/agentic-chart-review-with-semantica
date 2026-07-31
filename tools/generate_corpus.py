@@ -19,6 +19,7 @@ Deterministic: seeded per patient, so regenerating yields byte-identical output.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 from dataclasses import dataclass, field
@@ -81,6 +82,28 @@ class Blueprint:
     gap_years: tuple[int, int] = (2, 4)     # years after dx that the interior hole spans
     truncate_after_years: float = 2.0       # for followup == "truncated"
     expect: dict = field(default_factory=dict)   # machine-assertable expectations
+
+    # ---- ADVERSARIAL LAYOUT ---------------------------------------------------------
+    #: Which retrieval trap this chart is built around; "" is the ordinary layout above.
+    #:
+    #: The first twelve patients vary the CLINICAL situation — in situ, metastatic at
+    #: presentation, recurrence shapes — and in all of them the establishing document is where
+    #: anyone would look. That is why a run with no retrieval guidance at all scored 11 of 12 on
+    #: `STORE.390` in the 2026-07-31 pilot, leaving ONE case of headroom in the whole cohort and
+    #: no way to tell four traversal arms apart.
+    #:
+    #: These vary WHERE THE ANSWER IS instead. Every trap below is built on a rule the spec
+    #: already states, so a chart tests whether a run can find and follow that rule, never
+    #: whether it happens to know some clinical fact. Each also has a specific WRONG date that a
+    #: naive pass produces — so a failure is a measurable MISMATCH rather than an abstention,
+    #: and the two are different failures with different owners.
+    trap: str = ""
+
+    #: The date the chart is LAID OUT around: index imaging, background years, follow-up arc.
+    #: Defaults to `dx_date`, which is the answer. They come apart exactly when the answer is
+    #: earlier than the workup that found it — `retrospective` is the case — and conflating
+    #: them would put a decade of background notes after the event they precede.
+    index_date: str = ""
 
 
 BLUEPRINTS = [
@@ -241,6 +264,143 @@ BLUEPRINTS = [
         expect={"recurrence_status": "FOUND", "recurrence_type": "54",
                 "recurrence_date": "20201109", "through_date": "last_contact"},
     ),
+
+    # ==================================================================================
+    # RETRIEVAL-ADVERSARIAL CHARTS (SYNX01-X06)
+    #
+    # The twelve above vary the clinical situation and put the establishing document where
+    # anyone would look. On `STORE.390` that left one case of headroom in the whole cohort and
+    # four traversal arms scoring 10, 11, 12 and 12 of 12 — a spread too small to rank.
+    #
+    # These vary WHERE THE ANSWER IS. Each is built on a rule the spec already states, so what
+    # is tested is finding and following that rule, never knowing a clinical fact. Each puts a
+    # plausible WRONG date where a naive pass will read it, so a failure is a MISMATCH the
+    # scorer counts rather than an abstention.
+    #
+    # `expect.naive_answer` is the date a run gets by taking the obvious document. A chart on
+    # which some arm returns exactly that is a chart that trap is working on.
+    # ==================================================================================
+    Blueprint(
+        pid="SYNX01", pattern="retrospective diagnosis — the answer predates the workup by two years",
+        trap="retrospective",
+        site_text="right upper lobe of lung", site_code="C341",
+        histology_text="adenocarcinoma", histology_code="8140", behavior="3",
+        dx_date="20190312", index_date="20210608",
+        dx_date_why=("An oncology note of 2021-06-15 states that the 8 mm nodule on the "
+                     "2019-03-12 CT is this same tumour in retrospect. STORE.390 decision_rule: "
+                     "'If a physician states that in retrospect the patient had cancer at an "
+                     "earlier date, use the earlier date.'"),
+        tissue=True, recurrence_type="00", recurrence_date="",
+        imaging=["Chest-CT-W-Contr"],
+        notes=("The biopsy date 2021-06-08 is where every ordinary path leads and it is WRONG. "
+               "Reaching 2019-03-12 needs two hops: find the retrospective sentence in a "
+               "post-diagnosis oncology note, then go back for the CT it names. A sweep that "
+               "stops at the pathology never sees the sentence; a chase that never opens the "
+               "follow-up notes never starts."),
+        expect={"dx_date": "20190312", "naive_answer": "20210608",
+                "requires": "two hops: retrospective remark -> the imaging it names"},
+    ),
+    Blueprint(
+        pid="SYNX02", pattern="first-course treatment precedes any documented diagnosis",
+        trap="treatment_first",
+        site_text="left lower lobe of lung", site_code="C343",
+        histology_text="adenocarcinoma", histology_code="8140", behavior="3",
+        dx_date="20200510", index_date="20200620",
+        dx_date_why=("Carboplatin/pemetrexed cycle 1 was administered 2020-05-10, six weeks "
+                     "before the first document that establishes a diagnosis. STORE.390 "
+                     "decision_rule: 'If first-course treatment began before a diagnosis was "
+                     "documented, use the treatment start date.'"),
+        tissue=True, recurrence_type="00", recurrence_date="",
+        imaging=["Chest-CT-W-Contr"],
+        notes=("The pathology of 2020-06-20 is the obvious answer and it is WRONG. The infusion "
+               "record carries no narrative impression — it is an administration, under "
+               "Procedure-Note — so a run that searches diagnostic vocabulary cannot reach it "
+               "and must instead have swept the document inventory by type."),
+        expect={"dx_date": "20200510", "naive_answer": "20200620",
+                "requires": "sweeping a type that states no diagnosis"},
+    ),
+    Blueprint(
+        pid="SYNX03", pattern="ambiguous cytology with NO clinical impression — the biopsy dates it",
+        trap="cytology_no_impression",
+        site_text="right lower lobe of lung", site_code="C342",
+        histology_text="squamous cell carcinoma", histology_code="8070", behavior="3",
+        dx_date="20220309", index_date="20220309",
+        dx_date_why=("Cytology of 2022-02-14 is ambiguous ('suspicious for') and NO physician's "
+                     "clinical impression of cancer accompanies it, so STORE.390's second "
+                     "conflict_rule applies and the biopsy date governs."),
+        tissue=True, recurrence_type="00", recurrence_date="",
+        imaging=["Chest-CT-W-Contr"],
+        notes=("THE MIRROR OF SYN0001, and the branch the corpus has never tested. SYN0001 has "
+               "the same ambiguous cytology WITH a same-day clinical impression, so its answer "
+               "is the cytology date. Here the impression is absent and the answer is the "
+               "biopsy date. A run that has generalised 'ambiguous cytology dates the case' "
+               "answers 2022-02-14 and is exactly wrong — the two conflict_rules differ by one "
+               "document, and only reading both charts distinguishes them."),
+        expect={"dx_date": "20220309", "naive_answer": "20220214",
+                "requires": "noticing an ABSENT document, not finding a present one"},
+    ),
+    Blueprint(
+        pid="SYNX04", pattern="pathology deferred to an addendum filed under another type",
+        trap="deferred_addendum",
+        site_text="right upper lobe of lung", site_code="C341",
+        histology_text="adenocarcinoma", histology_code="8140", behavior="3",
+        dx_date="20230824", index_date="20230803",
+        dx_date_why=("The 2023-08-03 report DEFERRED its diagnosis pending stains and therefore "
+                     "established nothing. The 2023-08-24 addendum establishes it."),
+        tissue=True, recurrence_type="00", recurrence_date="",
+        imaging=["Chest-CT-W-Contr"],
+        notes=("P05's 8046 error given somewhere further to go. The deferred report is the only "
+               "Surgical-Pathology-Report in the chart, so an arm that sweeps the pathology type "
+               "finds a document that answers nothing; the addendum is filed under "
+               "Surgical-Pathology-Document three weeks later. Following the words 'SEE "
+               "ADDENDUM' is the only cheap route, which is what thread-chasing is for."),
+        expect={"dx_date": "20230824", "naive_answer": "20230803",
+                "requires": "following a pointer out of the document that raised it"},
+    ),
+    Blueprint(
+        pid="SYNX05", pattern="the first diagnosis is a clinical impression buried in a diabetes note",
+        trap="buried_late",
+        site_text="pancreatic head", site_code="C250",
+        histology_text="adenocarcinoma", histology_code="8140", behavior="3",
+        dx_date="20181107", index_date="20190215",
+        dx_date_why=("An endocrinology follow-up of 2018-11-07 records the physician's "
+                     "assessment that the pancreatic head lesion is malignant. STORE.390 takes "
+                     "the FIRST date, clinically or histologically established, and a "
+                     "physician's clinical impression of cancer counts as evidence."),
+        tissue=True, recurrence_type="00", recurrence_date="",
+        imaging=["Abd-Pelvis-CT-W-Contr"],
+        notes=("The pathology of 2019-02-15 is three months later and is the obvious answer. "
+               "The real one is one clause inside a routine diabetes visit — a specialty nobody "
+               "searches for an oncology diagnosis, in a note type whose prior says it can "
+               "establish nothing. Rewards sweeping the inventory by type over trusting a "
+               "type prior."),
+        expect={"dx_date": "20181107", "naive_answer": "20190215",
+                "requires": "reading a type the prior calls unable to establish"},
+    ),
+    Blueprint(
+        pid="SYNX06", pattern="the diagnosis exists only in dictation shorthand",
+        trap="search_resistant",
+        site_text="right upper lobe of lung", site_code="C341",
+        histology_text="adenocarcinoma", histology_code="8140", behavior="3",
+        dx_date="20210917", index_date="20210917",
+        dx_date_why=("The pulmonary note of 2021-09-17 records 'Bx +ve. Path c/w adenoCA, RUL.' "
+                     "That is a physician's statement of a tissue-confirmed diagnosis and it is "
+                     "the first one in the chart."),
+        tissue=False, recurrence_type="00", recurrence_date="",
+        # NO index imaging. The standard `imaging_note` writes "neoplasm is favored", which
+        # hands a keyword search the foothold this chart exists to withhold — caught by
+        # `tests/test_adversarial_corpus.py`, not by reading the generator. The trap emitter
+        # writes an incidental-nodule study instead: same clinical shape, no diagnostic word.
+        imaging=[],
+        notes=("No full word appears anywhere: not adenocarcinoma, not carcinoma, not "
+               "malignant, not diagnosis. A run searching the contract's own vocabulary comes "
+               "back empty and concludes the chart is silent. 'adeno' hits and "
+               "'adenocarcinoma' does not, which is precisely the shorter-stem move the "
+               "search-native card advises — so this chart tests whether that advice is "
+               "followed rather than merely rendered."),
+        expect={"dx_date": "20210917", "naive_answer": "EVIDENCE_INSUFFICIENT",
+                "requires": "widening to a stem after the contract's own words miss"},
+    ),
 ]
 
 
@@ -324,6 +484,178 @@ def cytology_note(bp, name, sex, dob, d) -> str:
         "",
     ]
     return _hdr(bp, name, sex, dob, "Surgical-Pathology-Document", d) + "\n".join(body) + "\n"
+
+
+# ======================================================================================
+# ADVERSARIAL NOTE BUILDERS
+#
+# One per `Blueprint.trap`. Every one of them writes the answer into the chart in a place a
+# straightforward pass does not reach, and leaves a plausible WRONG date sitting where it does.
+# The wrong date is the point: it makes a failure a MISMATCH the scorer can count, rather than
+# an abstention, which is a different failure with a different owner.
+#
+# House style is deliberate. These read like the notes beside them — same header, same
+# dictation register — because a trap that announces itself typographically is not a trap, it
+# is a label, and a model can learn the label without learning to look.
+# ======================================================================================
+
+
+def incidental_nodule_note(bp, name, sex, dob, dtype, d) -> str:
+    """The scan that turns out, years later, to have been the tumour already.
+
+    Reads as a negative study, because at the time it WAS one. Nothing here establishes a
+    diagnosis; it only fixes a date that a later note reaches back to.
+    """
+    body = [
+        "CLINICAL HISTORY:",
+        "  Routine screening. No respiratory complaints.",
+        "",
+        "FINDINGS:",
+        f"  An 8 mm nodule is noted in the {bp.site_text}. Margins are smooth.",
+        "  No lymphadenopathy. No effusion.",
+        "",
+        "IMPRESSION:",
+        "  8 mm nodule, likely benign. Attention on routine follow-up imaging.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, dtype, d) + "\n".join(body) + "\n"
+
+
+def retrospective_note(bp, name, sex, dob, dtype, d, earlier: date) -> str:
+    """The one sentence that moves the answer years earlier.
+
+    STORE.390 decision_rule: "If a physician states that in retrospect the patient had cancer at
+    an earlier date, use the earlier date." The sentence sits in the middle of an ordinary
+    post-diagnosis oncology note, which is where such a remark actually gets made.
+    """
+    body = [
+        "SUBJECTIVE:",
+        "  Pt returns to review the biopsy result and discuss systemic therapy.",
+        "  Tolerating symptoms; performance status preserved.",
+        "",
+        "ASSESSMENT AND PLAN:",
+        f"  1. {bp.histology_text.capitalize()}, {bp.site_text}. Biopsy-confirmed.",
+        f"     Reviewing the prior imaging with radiology, the {earlier.isoformat()} nodule in the",
+        "     same location represents this same tumour in retrospect; the patient has had this",
+        "     malignancy since at least that date. Interval growth is slow and consistent.",
+        "  2. Staging complete. Begin systemic therapy.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, dtype, d) + "\n".join(body) + "\n"
+
+
+def infusion_note(bp, name, sex, dob, d, cycle: int) -> str:
+    """First-course treatment, administered before anything documents a diagnosis.
+
+    STORE.390 decision_rule: "If first-course treatment began before a diagnosis was documented,
+    use the treatment start date." The note records an administration, not an impression — a
+    narrative diagnosis here would establish the date by the ordinary rule and there would be no
+    trap left.
+    """
+    body = [
+        "ADMINISTRATION RECORD:",
+        f"  Cycle {cycle} of planned 4. Carboplatin AUC 5, pemetrexed 500 mg/m2 IV.",
+        "  Pre-medications given per protocol. Infusion completed without reaction.",
+        "",
+        "OBSERVATIONS:",
+        "  Vitals stable throughout. Port accessed and de-accessed without difficulty.",
+        "  Next cycle in 21 days pending counts.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, "Procedure-Note", d) + "\n".join(body) + "\n"
+
+
+def deferred_pathology_note(bp, name, sex, dob, d) -> str:
+    """A report that defers its own conclusion. Establishes NOTHING and dates nothing."""
+    body = [
+        "SPECIMEN:",
+        f"  A. {bp.site_text} — core biopsy",
+        "",
+        "MICROSCOPIC DESCRIPTION:",
+        "  Sections show an atypical epithelial proliferation. The differential includes a",
+        "  reactive process and a well-differentiated malignancy. Immunohistochemical stains",
+        "  have been ordered and are PENDING at the time of this report.",
+        "",
+        "FINAL DIAGNOSIS:",
+        "  A. DEFERRED pending immunohistochemical stains. SEE ADDENDUM.",
+        "",
+        "Electronically signed by Pathology.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, "Surgical-Pathology-Report", d) + "\n".join(body) + "\n"
+
+
+def addendum_note(bp, name, sex, dob, d, original: date) -> str:
+    """Where the deferred report was actually settled. Different date, different document type.
+
+    Filed under `Surgical-Pathology-Document` rather than `-Report`, which is how an addendum
+    reaches a chart and is also why sweeping the type that carried the preliminary does not find
+    it. This is the P05 8046 error given somewhere further to go.
+    """
+    body = [
+        f"ADDENDUM to surgical pathology of {original.isoformat()}.",
+        "",
+        "IMMUNOHISTOCHEMISTRY:",
+        "  TTF-1 positive. Napsin A positive. p40 negative.",
+        "",
+        "ADDENDUM DIAGNOSIS:",
+        f"  A. {bp.site_text.upper()}, CORE BIOPSY — {bp.histology_text.upper()}.",
+        "     The staining pattern supports the above. The deferred diagnosis is now final.",
+        "",
+        "Electronically signed by Pathology.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, "Surgical-Pathology-Document", d) + "\n".join(body) + "\n"
+
+
+def buried_impression_note(bp, name, sex, dob, dtype, d, rng) -> str:
+    """A clinical diagnosis made in passing, in a note about something else entirely.
+
+    STORE.390 takes the FIRST date, "whether clinically or histologically established", and a
+    physician's impression of cancer counts. Here that impression is one clause inside a
+    diabetes follow-up, months before any pathology — a specialty nobody searches for an
+    oncology diagnosis, in a note whose type prior says it can establish nothing.
+    """
+    body = [
+        "SUBJECTIVE:",
+        "  Here for routine diabetes follow-up. Home glucose log reviewed; ranges 110-160.",
+        "  No hypoglycaemic episodes. Adherent to metformin.",
+        "",
+        "OBJECTIVE:",
+        f"  A1c {rng.choice(['7.1', '7.4', '6.9'])}%. Weight down 4 kg since last visit.",
+        "  Feet examined, monofilament intact bilaterally.",
+        "",
+        "ASSESSMENT AND PLAN:",
+        "  1. Type 2 diabetes, adequately controlled. Continue metformin.",
+        "  2. Weight loss. CT abdomen from last week reviewed with radiology today; the",
+        f"     {bp.site_text} lesion is malignant in my assessment and explains the weight loss.",
+        "     Referred to oncology; they will arrange tissue sampling.",
+        "  3. Follow up 3 months or sooner as oncology directs.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, dtype, d) + "\n".join(body) + "\n"
+
+
+def shorthand_note(bp, name, sex, dob, dtype, d) -> str:
+    """The diagnosis recorded only in dictation shorthand.
+
+    No full word appears: not "adenocarcinoma", not "carcinoma", not "malignant", not
+    "diagnosis". A run that searches the contract's own vocabulary finds nothing and concludes
+    the chart is silent. The `search-native` card's advice to try a shorter stem is exactly what
+    reaches this — "adeno" hits, "adenocarcinoma" does not — so the chart tests that advice
+    rather than merely repeating it.
+    """
+    body = [
+        "SUBJECTIVE:",
+        "  Pt in for results. Accompanied by spouse.",
+        "",
+        "ASSESSMENT AND PLAN:",
+        "  1. Bx +ve. Path c/w adenoCA, RUL. D/w pt and spouse at length today.",
+        "     Staging w/u ordered: PET, brain MRI. To med onc next wk.",
+        "  2. Sx control prn. Rx per below.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, dtype, d) + "\n".join(body) + "\n"
 
 
 def progress_note(bp, name, sex, dob, dtype, d, rng, *, kind: str) -> str:
@@ -424,11 +756,116 @@ def _d(s: str) -> date:
     return date(int(s[:4]), int(s[4:6]), int(s[6:8]))
 
 
+def _emit_trap(bp: Blueprint, emit, name, sex, dob, dx: date, rng) -> None:
+    """Lay out the diagnostic event for an adversarial chart.
+
+    One branch per `Blueprint.trap`. `dx` here is the INDEX date — where the workup happens —
+    which for `retrospective` is two years after the answer.
+
+    An unknown trap raises. A chart that silently fell through to no diagnostic event at all
+    would still generate, still ship a ground truth naming a date, and be unanswerable from its
+    own contents — a corpus bug that reads from the outside exactly like an agent failure.
+    """
+    onc = "Onc-Med-MD-OP-Progress-Note"
+
+    if bp.trap == "retrospective":
+        earlier = _d(bp.dx_date)
+        # The scan that was already the tumour. Emitted at its own date, years before the
+        # index workup, so it sits among the background notes rather than beside the biopsy.
+        emit("Chest-CT-WWO-Contr", earlier,
+             incidental_nodule_note(bp, name, sex, dob, "Chest-CT-WWO-Contr", earlier))
+        emit("Surgical-Pathology-Report", dx,
+             pathology_note(bp, name, sex, dob, "Surgical-Pathology-Report", dx))
+        look_back = dx + timedelta(days=7)
+        emit(onc, look_back, retrospective_note(bp, name, sex, dob, onc, look_back, earlier))
+
+    elif bp.trap == "treatment_first":
+        start = _d(bp.dx_date)
+        for cycle, offset in enumerate((0, 21), start=1):
+            cd = start + timedelta(days=offset)
+            emit("Procedure-Note", cd, infusion_note(bp, name, sex, dob, cd, cycle))
+        emit("Surgical-Pathology-Report", dx,
+             pathology_note(bp, name, sex, dob, "Surgical-Pathology-Report", dx))
+        emit(onc, dx + timedelta(days=3),
+             progress_note(bp, name, sex, dob, onc, dx + timedelta(days=3), rng, kind="initial"))
+
+    elif bp.trap == "cytology_no_impression":
+        # Byte-identical in shape to SYN0001's cytology. The ONLY difference between the two
+        # charts is that no clinical impression is emitted on this date — which is what flips
+        # the conflict rule, and it is an absence, so nothing to search for can reveal it.
+        cyto = dx - timedelta(days=23)
+        emit("Surgical-Pathology-Document", cyto, cytology_note(bp, name, sex, dob, cyto))
+        emit("Surgical-Pathology-Report", dx,
+             pathology_note(bp, name, sex, dob, "Surgical-Pathology-Report", dx))
+        emit(onc, dx + timedelta(days=2),
+             progress_note(bp, name, sex, dob, onc, dx + timedelta(days=2), rng, kind="initial"))
+
+    elif bp.trap == "deferred_addendum":
+        emit("Surgical-Pathology-Report", dx, deferred_pathology_note(bp, name, sex, dob, dx))
+        add = _d(bp.dx_date)
+        emit("Surgical-Pathology-Document", add,
+             addendum_note(bp, name, sex, dob, add, dx))
+        emit(onc, add + timedelta(days=4),
+             progress_note(bp, name, sex, dob, onc, add + timedelta(days=4), rng, kind="initial"))
+
+    elif bp.trap == "buried_late":
+        buried = _d(bp.dx_date)
+        endo = "Endo-Diab-MD-OP-Progress-Note"
+        # The CT the buried impression says it reviewed. Descriptive only: on its own it is a
+        # radiology report of a suspicious mass, which the spec explicitly says does not count.
+        emit("Abd-Pelvis-CT-W-Contr", buried - timedelta(days=6),
+             imaging_note(bp, name, sex, dob, "Abd-Pelvis-CT-W-Contr",
+                          buried - timedelta(days=6), rng, mention_mets=False))
+        emit(endo, buried, buried_impression_note(bp, name, sex, dob, endo, buried, rng))
+        emit("Surgical-Pathology-Report", dx,
+             pathology_note(bp, name, sex, dob, "Surgical-Pathology-Report", dx))
+        emit(onc, dx + timedelta(days=2),
+             progress_note(bp, name, sex, dob, onc, dx + timedelta(days=2), rng, kind="initial"))
+
+    elif bp.trap == "search_resistant":
+        # `tissue=False` on this blueprint, so no pathology_note is written anywhere: the
+        # shorthand note is the ONLY place the diagnosis exists in the chart.
+        #
+        # The imaging is written here rather than by the standard index-imaging loop because
+        # `imaging_note` says "neoplasm is favored" — one word, and a search of the contract's
+        # own vocabulary lands six days from the answer. An incidental-nodule study is the same
+        # clinical shape with nothing to match on: the nodule was seen, and months later a
+        # biopsy nobody filed came back.
+        emit("Chest-CT-W-Contr", dx - timedelta(days=118),
+             incidental_nodule_note(bp, name, sex, dob, "Chest-CT-W-Contr",
+                                    dx - timedelta(days=118)))
+        pulm = "Pulm-MD-OP-Progress-Note"
+        emit(pulm, dx, shorthand_note(bp, name, sex, dob, pulm, dx))
+
+    else:
+        raise ValueError(
+            f"{bp.pid}: unknown trap {bp.trap!r}. Add a branch here, or the chart generates "
+            f"with no diagnostic event and a ground truth nothing in it supports.")
+
+
 def build_patient(bp: Blueprint, out_root: Path) -> dict:
-    rng = random.Random(int(bp.pid[3:]) * 7919)
+    # THE ORIGINAL ARITHMETIC IS PRESERVED FOR NUMERIC IDS, AND THAT IS THE WHOLE POINT.
+    # `int(bp.pid[3:]) * 7919` assumed every id ends in digits; it raised on the first
+    # adversarial chart. Replacing it outright with a digest also "worked" — and silently
+    # regenerated all twelve original charts under new seeds, taking SYN0001 from 321 documents
+    # to 310. Every committed pilot number was measured on the old bytes, so that is not a
+    # refactor, it is quietly invalidating the baseline while the corpus still looks like the
+    # corpus. Numeric ids keep their arithmetic; anything else gets a digest.
+    #
+    # The digest is sha256 and not `hash()`: `hash()` is salted per process unless
+    # PYTHONHASHSEED is pinned, and this module's docstring promises byte-identical
+    # regeneration.
+    tail = bp.pid[3:]
+    seed = (int(tail) * 7919 if tail.isdigit()
+            else int(hashlib.sha256(bp.pid.encode("utf-8")).hexdigest()[:12], 16))
+    rng = random.Random(seed)
     name = f"{rng.choice(FIRST)} {rng.choice(LAST)}"
     sex = rng.choice(["M", "F"])
-    dx = _d(bp.dx_date)
+    # THE LAYOUT DATE IS NOT ALWAYS THE ANSWER. `dx` anchors the decade of background notes,
+    # the index imaging and the follow-up arc; `bp.dx_date` is the ground truth. They differ
+    # exactly when the answer precedes the workup that found it (`retrospective`), and using
+    # one for the other would file ten years of routine care after the event it precedes.
+    dx = _d(bp.index_date or bp.dx_date)
     dob = date(dx.year - rng.randint(48, 82), rng.randint(1, 12), rng.randint(1, 28)).isoformat()
 
     pdir = out_root / bp.pid
@@ -479,7 +916,9 @@ def build_patient(bp: Blueprint, out_root: Path) -> dict:
         emit(itype, idate, imaging_note(bp, name, sex, dob, itype, idate, rng, mention_mets=(bp.pattern.startswith("never disease-free") and i == 0)))
 
     # --- the diagnostic event itself ---
-    if bp.pid == "SYN0001":
+    if bp.trap:
+        _emit_trap(bp, emit, name, sex, dob, dx, rng)
+    elif bp.pid == "SYN0001":
         emit("Surgical-Pathology-Document", dx, cytology_note(bp, name, sex, dob, dx))
         onc = "Onc-Med-MD-OP-Progress-Note"
         emit(onc, dx, progress_note(bp, name, sex, dob, onc, dx, rng, kind="initial"))

@@ -1,0 +1,12 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2019-04-10
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2019-04-10   PANTOPRAZOLE 40MG TAB            qty 90
+  2019-04-10   ONDANSETRON 8MG TAB              qty 90
+  2019-04-10   OXYCODONE 5MG TAB                qty 90
+

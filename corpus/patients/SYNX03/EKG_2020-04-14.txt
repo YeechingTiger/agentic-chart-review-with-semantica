@@ -1,0 +1,9 @@
+MRN: SYNX03
+Patient: Alex Ferris
+DOB: 1972-05-22   Sex: F
+Document Type: EKG
+Service Date: 2020-04-14
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 79. No acute ST-T changes.
+

@@ -1,0 +1,9 @@
+MRN: SYNX06
+Patient: Casey Okafor
+DOB: 1965-02-19   Sex: M
+Document Type: Procedure Note
+Service Date: 2015-07-26
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

@@ -1,0 +1,12 @@
+MRN: SYNX03
+Patient: Alex Ferris
+DOB: 1972-05-22   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2014-02-08
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2014-02-08   METFORMIN HCL 500MG TAB          qty 60
+  2014-02-08   ONDANSETRON 8MG TAB              qty 90
+  2014-02-08   LISINOPRIL 10MG TAB              qty 60
+

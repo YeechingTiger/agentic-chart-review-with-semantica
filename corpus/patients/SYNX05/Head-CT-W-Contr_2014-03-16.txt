@@ -1,0 +1,9 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: Head CT W Contr
+Service Date: 2014-03-16
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

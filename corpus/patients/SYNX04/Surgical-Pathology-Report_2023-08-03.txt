@@ -1,0 +1,19 @@
+MRN: SYNX04
+Patient: Avery Ferris
+DOB: 1970-02-09   Sex: M
+Document Type: Surgical Pathology Report
+Service Date: 2023-08-03
+----------------------------------------------------------------
+SPECIMEN:
+  A. right upper lobe of lung — core biopsy
+
+MICROSCOPIC DESCRIPTION:
+  Sections show an atypical epithelial proliferation. The differential includes a
+  reactive process and a well-differentiated malignancy. Immunohistochemical stains
+  have been ordered and are PENDING at the time of this report.
+
+FINAL DIAGNOSIS:
+  A. DEFERRED pending immunohistochemical stains. SEE ADDENDUM.
+
+Electronically signed by Pathology.
+

@@ -1,0 +1,9 @@
+MRN: SYNX03
+Patient: Alex Ferris
+DOB: 1972-05-22   Sex: F
+Document Type: EKG
+Service Date: 2012-06-11
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 91. No acute ST-T changes.
+

@@ -1,0 +1,9 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Head CT WWO Contr
+Service Date: 2014-08-28
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

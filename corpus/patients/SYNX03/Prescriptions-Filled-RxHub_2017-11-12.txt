@@ -1,0 +1,12 @@
+MRN: SYNX03
+Patient: Alex Ferris
+DOB: 1972-05-22   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2017-11-12
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2017-11-12   LISINOPRIL 10MG TAB              qty 30
+  2017-11-12   ATORVASTATIN 20MG TAB            qty 90
+  2017-11-12   PANTOPRAZOLE 40MG TAB            qty 30
+

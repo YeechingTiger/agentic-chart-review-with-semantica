@@ -1,0 +1,12 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2010-06-20
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2010-06-20   LISINOPRIL 10MG TAB              qty 60
+  2010-06-20   PANTOPRAZOLE 40MG TAB            qty 30
+  2010-06-20   ATORVASTATIN 20MG TAB            qty 60
+

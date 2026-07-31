@@ -1,0 +1,12 @@
+MRN: SYNX06
+Patient: Casey Okafor
+DOB: 1965-02-19   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2018-05-25
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2018-05-25   METFORMIN HCL 500MG TAB          qty 60
+  2018-05-25   OXYCODONE 5MG TAB                qty 90
+  2018-05-25   LISINOPRIL 10MG TAB              qty 60
+

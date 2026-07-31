@@ -1,0 +1,20 @@
+MRN: SYNX05
+Patient: Quinn Baptiste
+DOB: 1962-11-15   Sex: F
+Document Type: Surgical Pathology Report
+Service Date: 2019-02-15
+----------------------------------------------------------------
+SPECIMEN:
+  A. pancreatic head — biopsy
+
+GROSS DESCRIPTION:
+  Received in formalin, multiple tan-pink soft tissue fragments aggregating 1.2 cm.
+
+MICROSCOPIC DESCRIPTION:
+  Sections demonstrate adenocarcinoma.
+
+FINAL DIAGNOSIS:
+  A. PANCREATIC HEAD, BIOPSY — ADENOCARCINOMA.
+
+Electronically signed by Pathology.
+

@@ -1,0 +1,9 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: PET CT Skull Base Thigh
+Service Date: 2016-04-26
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

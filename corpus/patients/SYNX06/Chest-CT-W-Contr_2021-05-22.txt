@@ -1,0 +1,16 @@
+MRN: SYNX06
+Patient: Casey Okafor
+DOB: 1965-02-19   Sex: M
+Document Type: Chest CT W Contr
+Service Date: 2021-05-22
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Routine screening. No respiratory complaints.
+
+FINDINGS:
+  An 8 mm nodule is noted in the right upper lobe of lung. Margins are smooth.
+  No lymphadenopathy. No effusion.
+
+IMPRESSION:
+  8 mm nodule, likely benign. Attention on routine follow-up imaging.
+

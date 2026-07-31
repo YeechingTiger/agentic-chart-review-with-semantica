@@ -1,0 +1,12 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2011-10-01
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2011-10-01   ATORVASTATIN 20MG TAB            qty 60
+  2011-10-01   PANTOPRAZOLE 40MG TAB            qty 60
+  2011-10-01   OXYCODONE 5MG TAB                qty 30
+

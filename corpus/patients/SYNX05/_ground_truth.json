@@ -1,0 +1,52 @@
+{
+  "patient_id": "SYNX05",
+  "evidence_pattern": "the first diagnosis is a clinical impression buried in a diabetes note",
+  "designer_notes": "The pathology of 2019-02-15 is three months later and is the obvious answer. The real one is one clause inside a routine diabetes visit \u2014 a specialty nobody searches for an oncology diagnosis, in a note type whose prior says it can establish nothing. Rewards sweeping the inventory by type over trusting a type prior.",
+  "n_documents": 287,
+  "date_range": [
+    "2009-02-17",
+    "2020-08-08"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20181107",
+      "status": "FOUND",
+      "why": "An endocrinology follow-up of 2018-11-07 records the physician's assessment that the pancreatic head lesion is malignant. STORE.390 takes the FIRST date, clinically or histologically established, and a physician's clinical impression of cancer counts as evidence."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C250",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2009-02-17",
+        "end": "2020-08-08"
+      },
+      "expected_through_date": "2020-08-08",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "dx_date": "20181107",
+    "naive_answer": "20190215",
+    "requires": "reading a type the prior calls unable to establish"
+  }
+}

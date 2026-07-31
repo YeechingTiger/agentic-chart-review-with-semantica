@@ -1,0 +1,12 @@
+MRN: SYNX02
+Patient: Morgan Moreau
+DOB: 1967-08-15   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2017-12-29
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2017-12-29   PANTOPRAZOLE 40MG TAB            qty 60
+  2017-12-29   METFORMIN HCL 500MG TAB          qty 90
+  2017-12-29   ONDANSETRON 8MG TAB              qty 30
+
