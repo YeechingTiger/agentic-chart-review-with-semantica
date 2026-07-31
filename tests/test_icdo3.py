@@ -1,16 +1,19 @@
-"""The ICD-O-3 code table: a fact table, advisory, and honest about its own provenance.
+"""ICD-O-3 码表：一个 use case 的资产，通过通用加载器读取。
 
-The two failures it exists for, both measured on a real run on 2026-07-30 and neither catchable
-by a regex or a word list:
+这个文件测的是**癌症资产**，不是框架。分工：`test_code_tables.py` 断言加载器不认识
+topography/morphology/behavior 也能工作（一张血脂表也能装进去）；这里断言肺表确实说
+C341 是上叶。前者是框架，后者是这个 use case 的事实。
 
-  `C187 / 7205 / 0` — a run found a real sigmoid colon hyperplastic polyp in a lung-cancer
-  patient's chart and coded it. `7205` is not an ICD-O-3 morphology, a hyperplastic polyp has no
-  morphology at all because it is not a neoplasm, and behaviour 0 is not reportable. `\\d{4}`
-  accepted `7205`, so `check_field_formats` passed it and `answer_shape_miss` never fired.
+它存在的两次真实失败，2026-07-30 测得，都不是正则或词表能抓的：
 
-  "ICD-O-3 topography C341 is right middle lobe" — asserted by a run that then coded C341 over
-  evidence reading "right middle lobe". C341 is the upper lobe. A table decides that; a model's
-  recollection did not.
+  `C187 / 7205 / 0` —— 一次运行在肺癌病人的病历里找到一个真实的乙状结肠增生性息肉并把它
+  编码了。`7205` 不是 ICD-O-3 形态码，增生性息肉根本没有形态码（它不是新生物），行为 0
+  不可上报。`\\d{4}` 接受了 `7205`，于是 `check_field_formats` 放它过去，
+  `answer_shape_miss` 从未触发。
+
+  "ICD-O-3 topography C341 is right middle lobe" —— 一次运行这样断言，然后在引用证据写着
+  "right middle lobe" 的情况下编了 C341。C341 是**上**叶。这是表能决定而模型的回忆没能
+  决定的事。
 """
 from __future__ import annotations
 
@@ -19,19 +22,16 @@ from pathlib import Path
 import pytest
 import yaml
 
-from acr.icdo3 import (
-    BEHAVIOR_NOT_IN_TABLE,
+from acr.code_tables import (
     CODES_DIR,
     EXCLUDED_BY_SPEC,
     MALFORMED,
-    NOT_REPORTABLE_BEHAVIOR,
+    NOT_ADMISSIBLE,
+    NOT_IN_TABLE,
     OUT_OF_TABLE_SCOPE,
-    UNKNOWN_MORPHOLOGY,
     CodeTableError,
-    behavior_digit,
-    check_codes,
+    check_values,
     load_table,
-    normalize_code,
     prompt_block,
 )
 
@@ -41,145 +41,169 @@ def t():
     return load_table("icdo3_colorectal")
 
 
+@pytest.fixture(scope="module")
+def lung():
+    return load_table("icdo3_lung")
+
+
 def kinds(problems):
     return {p.kind for p in problems}
 
 
-# ------------------------------------------------------- the answer nothing could catch
+def triple(site=None, histology=None, behavior=None) -> dict:
+    """旧 `check_codes(site, histology, behavior)` 的三个位置参数，现在是三个**轴名**。
+
+    字段名（primary_site / histology / behavior）从每个轴的 `field` 声明读出来，所以问题
+    仍然报在正确的字段上，而函数签名里不再有癌症词。
+    """
+    return {"topography": site, "morphology": histology, "behavior": behavior}
+
+
+# ------------------------------------------------------- 那个什么都抓不住的答案
 def test_the_case004_answer_is_caught_on_all_three_fields(t):
-    """`C187 / 7205 / 0`: out of table scope, not a morphology, not reportable."""
-    ks = kinds(check_codes("C187", "7205", "0", table=t))
-    assert UNKNOWN_MORPHOLOGY in ks, "7205 is not an ICD-O-3 morphology"
-    assert NOT_REPORTABLE_BEHAVIOR in ks, "behaviour 0 is benign and not reportable"
-    # C187 IS a real colorectal code, so it must not be reported as invalid — the error was
-    # answering about the wrong tumour, and this table has no way to know that.
+    """`C187 / 7205 / 0`：不是形态码，行为不可采纳，而 C187 本身没问题。"""
+    ks = kinds(check_values(triple("C187", "7205", "0"), table=t))
+    assert NOT_IN_TABLE in ks, "7205 is not an ICD-O-3 morphology"
+    assert NOT_ADMISSIBLE in ks, "behaviour 0 is benign and not reportable"
+    # C187 是真实的结直肠码，所以绝不能报成无效 —— 那次的错误是答错了肿瘤，而这张表无从知道。
     assert OUT_OF_TABLE_SCOPE not in ks
 
 
 def test_a_four_digit_number_is_not_a_morphology_code(t):
-    """The open gap the removed `field_format` could never close: `\\d{4}` passes anything."""
+    """被删掉的 `field_format` 永远关不上的那个口子：`\\d{4}` 什么都放过。"""
     for invented in ("7205", "9999", "1234", "8999"):
-        assert UNKNOWN_MORPHOLOGY in kinds(check_codes(None, invented, None, table=t)), invented
+        assert NOT_IN_TABLE in kinds(check_values(triple(histology=invented), table=t)), invented
 
 
 def test_a_benign_polyp_is_named_when_its_code_and_behaviour_are_given(t):
-    """8210/0 is a legal ICD-O-3 code and not a reportable neoplasm. Both facts matter."""
-    p = next(x for x in check_codes(None, "8210", "0", table=t)
-             if x.kind == NOT_REPORTABLE_BEHAVIOR)
+    """8210/0 是合法 ICD-O-3 码且不是可上报新生物。两个事实都重要。"""
+    p = next(x for x in check_values(triple(histology="8210", behavior="0"), table=t)
+             if x.kind == NOT_ADMISSIBLE)
     assert "adenomatous polyp" in p.message.lower()
-    assert UNKNOWN_MORPHOLOGY not in kinds(check_codes(None, "8210", "3", table=t)), (
+    assert NOT_IN_TABLE not in kinds(check_values(triple(histology="8210", behavior="3"), table=t)), (
         "8210/3 — carcinoma arising in an adenomatous polyp — IS reportable")
 
 
 def test_hyperplastic_polyp_has_no_code_at_all(t):
-    """Not `code: null` as an oversight — as the finding. It is not a neoplasm."""
-    row = next(r for r in t.not_reportable if r["term"] == "Hyperplastic polyp")
-    assert row["code"] is None
+    """不是漏写 `code: null`，这**就是**那个发现：它不是新生物。
+
+    迁移后表现为这条排除项没有 `axis_values` —— 一条匹配不到任何码的排除项若参与匹配，
+    会匹配上一切。
+    """
+    row = next(r for r in t.exclusions if r["term"] == "Hyperplastic polyp")
+    assert "axis_values" not in row
     assert "not a neoplasm" in row["why"]
 
 
-# ------------------------------------------------------- notation is folded, not refused
+# ------------------------------------------------------- 记法被折叠，而不是被拒绝
 @pytest.mark.parametrize("raw,want", [
     ("C18.7", "C187"), ("c18.7", "C187"), ("C187", "C187"), (" C18.7 ", "C187"),
     ("8140/3", "8140"), ("8140", "8140"), ("C34.11", "C3411"),
 ])
-def test_the_punctuated_form_the_manual_writes_is_folded(raw, want):
-    """4 of the removed `field_format` check's 6 useful firings rejected `C34.9`/`C34.11`/`C34.2`
-    — the form ICD-O-3 itself uses. It was creating the round trips it then resolved."""
-    assert normalize_code(raw) == want
+def test_the_punctuated_form_the_manual_writes_is_folded(t, raw, want):
+    """被删掉的 `field_format` 6 次有用触发里有 4 次在拒绝 `C34.9`/`C34.11`/`C34.2` ——
+    ICD-O-3 自己就是这么写的。它在制造自己再解决的往返。
+
+    规则现在写在表的 `normalization:` 里，不在模块常量里。
+    """
+    assert t.normalize(raw) == want
 
 
-def test_the_behaviour_digit_is_split_out_not_merged():
-    assert behavior_digit("8140/3") == "3"
-    assert behavior_digit("8140") is None
-    assert normalize_code("8140/3") == "8140", "the behaviour digit must not join the morphology"
+def test_the_behaviour_digit_is_split_out_not_merged(t):
+    assert t.trailing_part("8140/3") == "3"
+    assert t.trailing_part("8140") is None
+    assert t.normalize("8140/3") == "8140", "the behaviour digit must not join the morphology"
 
 
-# ------------------------------------------------------- scope is a finding, not an error
+# ------------------------------------------------------- 范围是一个发现，不是一个错误
 def test_a_lung_code_is_out_of_scope_and_not_invalid(t):
-    """This repository's corpus is a LUNG registry — all 1,788 gold topographies are C34x. A
-    colorectal table must say 'wrong table' rather than 'wrong answer', or a missing table looks
-    like a wrong answer on every case."""
-    p = next(x for x in check_codes("C341", "8140", "3", table=t) if x.field == "primary_site")
+    """本仓库的语料是**肺**登记 —— 1,788 个 gold topography 全是 C34x。结直肠表必须说
+    "装错表了"而不是"答错了"，否则一张装错的表会让每个病例都像答错。"""
+    p = next(x for x in check_values(triple("C341", "8140", "3"), table=t)
+             if x.field == "primary_site")
     assert p.kind == OUT_OF_TABLE_SCOPE
     assert "not evidence that" in p.message
     assert "wrong table is loaded" in p.message
 
 
 def test_a_malformed_topography_is_distinguished_from_an_out_of_scope_one(t):
-    assert kinds(check_codes("C18", None, None, table=t)) == {MALFORMED}
-    assert kinds(check_codes("lung", None, None, table=t)) == {MALFORMED}
+    assert kinds(check_values(triple("C18"), table=t)) == {MALFORMED}
+    assert kinds(check_values(triple("lung"), table=t)) == {MALFORMED}
 
 
 def test_a_correct_colorectal_answer_has_no_problems(t):
-    assert check_codes("C187", "8140", "3", table=t) == []
-    assert check_codes("C209", "8480", "3", table=t) == []
-    assert check_codes("C211", "8070", "3", table=t) == []
+    assert check_values(triple("C187", "8140", "3"), table=t) == []
+    assert check_values(triple("C209", "8480", "3"), table=t) == []
+    assert check_values(triple("C211", "8070", "3"), table=t) == []
 
 
 def test_an_absent_field_is_not_a_problem(t):
-    """Abstention is not this module's business."""
-    assert check_codes(None, None, None, table=t) == []
-    assert check_codes("C187", "", "  ", table=t) == []
+    """弃答不是本模块的事。"""
+    assert check_values(triple(), table=t) == []
+    assert check_values(triple("C187", "", "  "), table=t) == []
 
 
 def test_an_unknown_behaviour_digit_is_its_own_finding(t):
-    assert kinds(check_codes(None, None, "7", table=t)) == {BEHAVIOR_NOT_IN_TABLE}
+    assert kinds(check_values(triple(behavior="7"), table=t)) == {NOT_IN_TABLE}
 
 
-# ------------------------------------------------------- NOS codes are real answers
+# ------------------------------------------------------- NOS 码是真实答案
 def test_the_nos_codes_are_in_the_table_and_flagged_not_excluded(t):
-    """8000/8010/8046 together are the registry's own answer for 10.8% of this corpus, and C349
-    for 9.6%. A table that omitted them would recreate the deleted `not_less_specific`."""
+    """8000/8010/8046 合起来是登记面对本语料 10.8% 病例自己的答案，C349 占 9.6%。
+    一张漏掉它们的表会重建已删除的 `not_less_specific`。"""
+    morph = t.axes["morphology"]
     for c in ("8000", "8010", "8046"):
-        assert c in t.morphology
-        assert c in t.nos_morphology
-    assert check_codes(None, "8010", "3", table=t) == [], "coding NOS is not a problem"
+        assert c in morph.codes
+        assert c in morph.unspecified
+    assert check_values(triple(histology="8010", behavior="3"), table=t) == [], \
+        "coding NOS is not a problem"
 
 
 def test_nos_topography_is_marked(t):
-    assert "C189" in t.nos_topography and "C210" in t.nos_topography
-    assert check_codes("C189", None, None, table=t) == []
+    unspec = t.axes["topography"].unspecified
+    assert "C189" in unspec and "C210" in unspec
+    assert check_values(triple("C189"), table=t) == []
 
 
-# ------------------------------------------------------- the prompt rendering
+# ------------------------------------------------------- 提示词渲染
 def test_the_prompt_block_renders_the_whole_domain(t):
-    """A model shown 12 of 40 morphologies codes into the 12."""
+    """一个只被展示 12 of 40 个形态码的模型会往那 12 个里编码。"""
     b = prompt_block(t)
-    for c in t.morphology:
+    for c in t.axes["morphology"].codes:
         assert c in b, f"{c} missing from the prompt block"
-    for c in t.topography:
+    for c in t.axes["topography"].codes:
         assert c in b
 
 
 def test_the_prompt_block_states_its_own_provenance(t):
-    """Recalled, not transcribed, and nobody has signed it. The model has to be able to weigh it
-    against a pathology report it has actually read."""
+    """模型回忆而来、非转录、无人签署。模型必须能拿它和自己真正读过的病理报告掰。
+
+    这三句话迁移后住在表的 `warnings:` 里而不是 Python 里 —— 它们是关于**这张表**的断言。
+    """
     b = " ".join(prompt_block(t).split())
     assert "recalled by a language model, not transcribed" in b
     assert "no registrar has checked it" in b
     assert "say so in your reasoning" in b
 
 
-def test_the_prompt_block_carries_the_not_reportable_list_and_the_safeguards(t):
+def test_the_prompt_block_carries_the_exclusions_and_the_safeguards(t):
     b = prompt_block(t)
-    assert "Hyperplastic polyp" in b and "no ICD-O-3 morphology exists" in b
-    assert "NOT reportable" in b
+    assert "Hyperplastic polyp" in b and "no code exists" in b
+    assert "NOT admissible" in b
     assert "benign polyp is not the reportable tumour" in b
 
 
-# ------------------------------------------------------- provenance discipline in the YAML
+# ------------------------------------------------------- YAML 的来源纪律
 def test_the_yaml_declares_itself_model_recalled_and_unbound():
-    """Same standard the four code tables already in `specs/` are held to: a table recalled by a
-    model must say so and must name what a human should check it against."""
+    """和 `specs/` 里那四张表同一个标准：模型回忆来的表必须自己说出来，并写明人该拿什么核对。"""
     d = yaml.safe_load((CODES_DIR / "icdo3_colorectal.yaml").read_text(encoding="utf-8"))
     sa = d["source_authority"]
     assert sa["origin"] == "model_recalled"
     assert sa["version_binding"] == "NOT_BOUND"
     assert "no clinical or registrar sign-off" in sa["status"]
-    # Read the PARSED fields, not the file text. The comments say the same thing and
-    # `yaml.safe_load` drops all of them, so a bare `origin: model_recalled` with its basis only
-    # in a comment is the labels-without-basis marking `specs/` added `provenance:` to replace.
+    # 读**解析后**的字段，不读文件文本。注释说的是同一件事而 `yaml.safe_load` 会全部丢掉，
+    # 所以一个只有注释作依据的 `origin: model_recalled` 就是 `specs/` 加 `provenance:` 要
+    # 取代的那种"有标签没依据"。
     assert "RECALLED BY A LANGUAGE MODEL" in " ".join(sa["basis"].split())
     assert "not a transcription of ICD-O-3" in " ".join(sa["basis"].split())
     assert "casefinding manual" in " ".join(sa["what_a_human_must_check"].split()), \
@@ -192,34 +216,36 @@ def test_a_missing_table_raises_and_names_what_exists():
     assert "available:" in str(e.value)
 
 
+def test_there_is_no_default_table_any_more():
+    """旧 `load_table(name="icdo3_lung")` 有默认值，于是"忘了声明值域"和"声明了肺"长得一样。
+
+    装错表会让每个病例都像答错（这就是 OUT_OF_TABLE_SCOPE 存在的理由），所以表名必须由
+    spec 说出来。这条替换了原来断言"默认表是肺"的那一条 —— 那个默认被有意去掉了。
+    """
+    with pytest.raises(TypeError):
+        load_table()                                    # type: ignore[call-arg]
+
+
 # ==========================================================================================
-# THE LUNG TABLE — the extraction corpus, and the failures it was built for
+# 肺表 —— 抽取语料，以及它为之而建的那些失败
 # ==========================================================================================
 GT = Path("/N/project/computable_phenotype/acr_real/ground_truth.csv")
 
 
-@pytest.fixture(scope="module")
-def lung():
-    return load_table("icdo3_lung")
-
-
-def test_the_default_table_is_lung_because_that_is_what_this_repo_extracts(lung):
-    assert load_table().table_id == lung.table_id == "ICDO3-LUNG"
-
-
 def test_the_subsite_digits_a_run_got_wrong(lung):
-    """A run asserted "ICD-O-3 topography C341 is right middle lobe" and coded C341 over evidence
-    reading "right middle lobe". C341 is the UPPER lobe. This is the whole reason for a table."""
-    assert lung.topography_name("C341") == "Upper lobe, lung"
-    assert lung.topography_name("C342") == "Middle lobe, lung"
-    assert lung.topography_name("C343") == "Lower lobe, lung"
-    assert lung.topography_name("C340") == "Main bronchus"
-    assert "NOS" in (lung.topography_name("C349") or "")
+    """一次运行断言 "ICD-O-3 topography C341 is right middle lobe"，并在证据写着
+    "right middle lobe" 时编了 C341。C341 是**上**叶。这就是要一张表的全部理由。"""
+    topo = lung.axes["topography"]
+    assert topo.name_of("C341") == "Upper lobe, lung"
+    assert topo.name_of("C342") == "Middle lobe, lung"
+    assert topo.name_of("C343") == "Lower lobe, lung"
+    assert topo.name_of("C340") == "Main bronchus"
+    assert "NOS" in (topo.name_of("C349") or "")
 
 
 def test_the_left_lung_has_no_middle_lobe(lung):
-    """A run coded C342 while its cited evidence read "left lower lobe" nine times; the registry
-    coded C343. Recorded as an anatomical fact, not as a lobe-word regex."""
+    """一次运行在引用证据写着 "left lower lobe" 时编了 C342，九次；登记面编的是 C343。
+    记成解剖事实，不是一个叶名正则。"""
     d = yaml.safe_load((CODES_DIR / "icdo3_lung.yaml").read_text(encoding="utf-8"))
     lat = d["laterality"]
     assert "C342" not in lat["left_lung_lobes"]
@@ -229,73 +255,74 @@ def test_the_left_lung_has_no_middle_lobe(lung):
 
 
 def test_the_two_blastomas_are_different_diseases(lung):
-    """A run coded 8973 where the registry coded 8972. Both are real codes, so only a table with
-    both in it and a note between them can surface the confusion."""
-    assert "pulmonary blastoma" in (lung.morphology_name("8972") or "").lower()
-    assert "pleuropulmonary blastoma" in (lung.morphology_name("8973") or "").lower()
-    assert lung.morphology_name("8972") != lung.morphology_name("8973")
-    # Neither is a code-level error: the run's mistake was reading the pathology, and this table
-    # must not pretend otherwise.
-    assert check_codes("C349", "8973", "3", table=lung) == []
+    """一次运行编了 8973 而登记面编的是 8972。两个都是真码，所以只有一张同时收录两者并在
+    它们之间写下区别的表才能让这次混淆浮出来。"""
+    morph = lung.axes["morphology"]
+    assert "pulmonary blastoma" in (morph.name_of("8972") or "").lower()
+    assert "pleuropulmonary blastoma" in (morph.name_of("8973") or "").lower()
+    assert morph.name_of("8972") != morph.name_of("8973")
+    # 两者都不是码级错误：那次运行错在读病理，这张表不许假装不是。
+    assert check_values(triple("C349", "8973", "3"), table=lung) == []
 
 
 def test_the_solid_adenocarcinoma_code_a_run_missed_is_in_the_table(lung):
-    """CASE003: registry 8230, run coded 8140. Both legal; the table cannot decide which is right
-    but it can stop 8230 from looking invented."""
-    assert lung.morphology_name("8230") is not None
-    assert check_codes("C341", "8230", "3", table=lung) == []
+    """CASE003：登记 8230，运行编了 8140。两个都合法；表无法决定谁对，但能让 8230 不像是
+    编造的。"""
+    assert lung.axes["morphology"].name_of("8230") is not None
+    assert check_values(triple("C341", "8230", "3"), table=lung) == []
 
 
 def test_a_carcinoid_is_malignant_and_reportable(lung):
-    """The clinical habit of calling a typical carcinoid benign is not ICD-O-3's position."""
-    assert check_codes("C341", "8240", "3", table=lung) == []
-    assert lung.reportable_behavior("3") is True
+    """把典型类癌叫作良性是临床习惯，不是 ICD-O-3 的立场。"""
+    assert check_values(triple("C341", "8240", "3"), table=lung) == []
+    assert lung.axes["behavior"].is_admissible("3") is True
 
 
 def test_the_nos_codes_that_the_removed_check_pushed_away_from_are_clean(lung):
-    """8000/8010/8046 are the registry's answer for 10.8% of this corpus and C349 for 9.6%. The
-    deleted `not_less_specific` refused exactly these, 22 firings out of 22."""
+    """8000/8010/8046 是登记面对本语料 10.8% 的答案，C349 占 9.6%。被删掉的
+    `not_less_specific` 拒绝的正是这些，22 次触发全是。"""
     for h in ("8000", "8010", "8046"):
-        assert check_codes("C349", h, "3", table=lung) == []
+        assert check_values(triple("C349", h, "3"), table=lung) == []
 
 
 def test_a_haematopoietic_gold_is_a_scope_boundary_not_a_table_gap(lung):
-    """Six patients in this corpus have a lymphoma gold histology, and the spec's
-    `when_not_to_use` excludes haematopoietic neoplasms. Those are SPEC_INSUFFICIENT cases; a
-    table that reported them as UNKNOWN_MORPHOLOGY would make a scope boundary look like an
-    incomplete table."""
-    p = next(x for x in check_codes("C349", "9680", "3", table=lung) if x.field == "histology")
+    """本语料有六个病人的 gold histology 是淋巴瘤，而 spec 的 `when_not_to_use` 排除了
+    造血系统新生物。那些是 SPEC_INSUFFICIENT 病例；一张把它们报成 NOT_IN_TABLE 的表会把
+    范围边界弄成像是表不完整。"""
+    p = next(x for x in check_values(triple("C349", "9680", "3"), table=lung)
+             if x.field == "histology")
     assert p.kind == EXCLUDED_BY_SPEC
     assert "SPEC_INSUFFICIENT" in p.message
     assert "not a coding error" in p.message
     for c in ("9591", "9699", "9702"):
-        assert {x.kind for x in check_codes(None, c, None, table=lung)} == {EXCLUDED_BY_SPEC}
+        assert {x.kind for x in check_values(triple(histology=c), table=lung)} == {
+            EXCLUDED_BY_SPEC}
 
 
 def test_a_colorectal_code_is_out_of_scope_against_the_lung_table(lung):
-    p = next(x for x in check_codes("C187", "8140", "3", table=lung) if x.field == "primary_site")
+    p = next(x for x in check_values(triple("C187", "8140", "3"), table=lung)
+             if x.field == "primary_site")
     assert p.kind == OUT_OF_TABLE_SCOPE
 
 
 @pytest.mark.skipif(not GT.is_file(), reason="registry gold is outside the repository")
 def test_the_table_validates_against_every_registry_answer_in_the_corpus(lung):
-    """THE REGRESSION TEST THAT MATTERS, and it is free: deterministic string matching against
-    1,788 operator-confirmed registry answers, no model in the loop.
+    """真正要紧的那条回归测试，而且免费：对 1,788 条操作员确认过的登记答案做确定性字符串
+    匹配，回路里没有模型。
 
-    The first draft of this table scored 1762/1788 and the 26 misses were real codes the registry
-    uses — 8033 sarcomatoid carcinoma, 8256/8257 minimally invasive adenocarcinoma, 8550, 8574,
-    8141, 8002, 8023, 8144, 8800, 9180 — plus six haematopoietic cases the spec excludes. This
-    test is what found them, and it is what will find the next omission.
+    这张表的第一稿得分 1762/1788，26 个漏项都是登记面真在用的码 —— 8033 梭形细胞癌、
+    8256/8257 微浸润腺癌、8550、8574、8141、8002、8023、8144、8800、9180 —— 外加六个
+    spec 排除的造血病例。是这条测试找出了它们，也是它会找出下一个漏项。
     """
     import csv
     rows = list(csv.DictReader(GT.open(encoding="utf-8")))
-    problems = {}
+    problems: dict[str, list[str]] = {}
     for r in rows:
-        ps = check_codes(r["gt_primary_site"], r["gt_histology"], r["gt_behavior"], table=lung)
-        for p in ps:
+        for p in check_values(
+                triple(r["gt_primary_site"], r["gt_histology"], r["gt_behavior"]), table=lung):
             problems.setdefault(p.kind, []).append(p.value)
 
-    # Every remaining problem must be the declared scope boundary. Anything else is a real gap.
+    # 剩下的每个问题都必须是那个已声明的范围边界。别的都是真漏洞。
     unexpected = {k: sorted(set(v)) for k, v in problems.items() if k != EXCLUDED_BY_SPEC}
     assert not unexpected, (
         f"the table does not cover codes the registry actually uses: {unexpected}. "
@@ -306,20 +333,18 @@ def test_the_table_validates_against_every_registry_answer_in_the_corpus(lung):
 
 
 # ==========================================================================================
-# THE SEAM: the Task Contract declares the table, the prompt renders it
+# 接缝：Task Contract 声明表，提示词渲染它
 # ==========================================================================================
 def test_the_lung_spec_declares_its_code_table():
-    """Which code system a value belongs to is part of what the answer MEANS, so the spec says
-    it. The runtime does not guess from the corpus or from the field names."""
+    """一个值属于哪个码系统是答案**含义**的一部分，所以由 spec 说。运行时不从语料或字段名猜。"""
     from acr.spec import load_spec as _ls
     spec = _ls("specs/STORE.400_522_523.site_histology_behavior.yaml")
     assert spec.value_domain == "icdo3_lung"
 
 
 def test_a_spec_with_no_code_system_gets_no_block():
-    """The date and class-of-case variables have no ICD-O-3 domain. Handing them a wall of lung
-    morphologies to ignore is prompt bloat, not helpfulness."""
-    from acr.icdo3 import code_domain_block
+    """日期和 class-of-case 变量没有 ICD-O-3 值域。塞一墙肺形态码给它们忽略是提示词膨胀。"""
+    from acr.code_tables import code_domain_block
     from acr.spec import load_specs as _lss
     blocks = {sid: code_domain_block(sp) for sid, sp in _lss("specs").items()}
     assert blocks["STORE.400_522_523.site_histology_behavior"]
@@ -328,10 +353,9 @@ def test_a_spec_with_no_code_system_gets_no_block():
 
 
 def test_a_declared_table_that_does_not_exist_stops_the_spec_from_loading(tmp_path):
-    """FAIL CLOSED ON A TYPO. A missing table would otherwise render an empty domain and the run
-    would look exactly like one that had been given the codes — the same failure as a skill that
-    silently supplies no guidance while the manifest reports that it did."""
-    from acr.icdo3 import CodeTableError
+    """打错就 FAIL CLOSED。缺表否则会渲染出空值域，运行看起来就和被给过码表一模一样 ——
+    和一个静默不提供任何指导却在 manifest 里报告提供了的 skill 是同一个失败。"""
+    from acr.code_tables import CodeTableError as CTE
     from acr.spec import load_spec as _ls
     p = tmp_path / "S.2.yaml"
     p.write_text(
@@ -340,14 +364,14 @@ def test_a_declared_table_that_does_not_exist_stops_the_spec_from_loading(tmp_pa
         "fields:\n  - name: primary_site\n    type: string\n"
         "decision_rule: [r]\nevidence_rules:\n  counts_as_evidence: [anything]\n",
         encoding="utf-8")
-    with pytest.raises(CodeTableError) as e:
+    with pytest.raises(CTE) as e:
         _ls(p)
     assert "available:" in str(e.value)
 
 
 def test_the_rendered_block_contains_the_subsite_facts_a_run_got_wrong():
-    """End to end: the thing the model will actually read has C341 next to 'Upper lobe'."""
-    from acr.icdo3 import code_domain_block
+    """端到端：模型真正会读到的那段文字里，C341 旁边写着 'Upper lobe'。"""
+    from acr.code_tables import code_domain_block
     from acr.spec import load_spec as _ls
     b = code_domain_block(_ls("specs/STORE.400_522_523.site_histology_behavior.yaml"))
     assert "C341  Upper lobe, lung" in b

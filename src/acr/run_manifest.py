@@ -417,7 +417,7 @@ def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None) ->
     used before an override existed.
     """
     from .document_concepts import concepts_manifest
-    from .icdo3 import table_manifest
+    from .code_tables import table_manifest
     from .runtime_profiles import runtime_policy_skills
     from .skills import skills_manifest
 

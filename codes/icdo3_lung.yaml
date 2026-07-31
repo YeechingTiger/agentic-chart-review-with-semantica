@@ -1,321 +1,377 @@
 table_id: ICDO3-LUNG
 table_version: 0.1.0
-
 source_authority:
-  document: "ICD-O-3 (International Classification of Diseases for Oncology, 3rd edition)"
+  document: ICD-O-3 (International Classification of Diseases for Oncology, 3rd edition)
   version_binding: NOT_BOUND
-  status: "model-recalled draft; no clinical or registrar sign-off"
-  scope: "lung and bronchus primaries — ICD-O-3 topography C34, with C33 and C38.4 as adjacent"
+  status: model-recalled draft; no clinical or registrar sign-off
+  scope: lung and bronchus primaries — ICD-O-3 topography C34, with C33 and C38.4 as adjacent
   origin: model_recalled
-
-  basis: >-
-    no external source was consulted. Every topography, morphology, behaviour and reportability
-    entry in this file was RECALLED BY A LANGUAGE MODEL on 2026-07-30 and written directly into
-    YAML. It is not a transcription of ICD-O-3 and no page, section or edition is asserted. The
-    adenocarcinoma subtype codes in particular were renamed between ICD-O-3 and ICD-O-3.2 as the
-    WHO lung classification changed — `8250` was bronchiolo-alveolar adenocarcinoma and is now
-    lepidic adenocarcinoma — and this file does not say which edition it is recalling.
-  what_a_human_must_check: >-
-    the topography and morphology terms against ICD-O-3 in the edition the registry uses, the
-    two blastoma entries (8972 vs 8973) which name different diseases, and every ruling under
-    `not_reportable` against the registry's own casefinding manual — reportability is a REGISTRY
-    POLICY question, not an ICD-O-3 question, and this file has no authority to settle it.
-
-  # WHY THIS EXISTS. Three measured failures, none catchable by a regex or a word list.
-  #
-  #   A run asserted "ICD-O-3 topography C341 is right middle lobe" and coded C341 over cited
-  #   evidence reading "right middle lobe". C341 is the UPPER lobe. The model's own recollection
-  #   of the code table was wrong, and a table is the only thing that fixes that.
-  #
-  #   A run coded histology 7205 for a hyperplastic polyp. `\d{4}` accepts it, so
-  #   `check_field_formats` passed it and `answer_shape_miss` never fired. 7205 is not a
-  #   morphology.
-  #
-  #   A run coded C342 (middle lobe) while its cited evidence said "left lower lobe" nine times.
-  #   The left lung has no middle lobe, so the answer was anatomically impossible — see
-  #   `laterality` below.
-  #
-  # NOT A GATE. This is the value domain, rendered into the prompt so the model codes into a
-  # table it can see rather than one it half-remembers, and read by the evaluators so an
-  # out-of-domain code is COUNTED. See docs/DETERMINISTIC_RULES_REMOVED.md.
-
-# ------------------------------------------------------------------------------- behaviour
-behavior:
-  "0": {meaning: "benign", reportable: false}
-  "1": {meaning: "uncertain whether benign or malignant; borderline", reportable: false}
-  "2": {meaning: "carcinoma in situ; non-invasive; intraepithelial", reportable: true}
-  "3": {meaning: "malignant, primary site", reportable: true}
-  "6":
-    meaning: "malignant, metastatic site"
-    reportable: false
-    note: >-
-      never the answer for a PRIMARY-site abstraction. If the specimen came from a metastasis,
-      the primary site is still the organ of origin and behaviour stays 3.
-  "9":
-    meaning: "malignant, uncertain whether primary or metastatic"
-    reportable: false
-    note: "not used by this repository's specs; recorded so an unexpected 9 is recognisable"
-
-# ------------------------------------------------------------------------------ topography
-# C34. THE SUBSITE DIGITS ARE THE THING RUNS GET WRONG, so each carries the wordings this corpus
-# actually uses. C341 is the UPPER lobe — a run asserted it was the middle lobe and coded
-# accordingly.
-topography:
-  C340:
-    name: "Main bronchus"
-    aliases: ["main bronchus", "mainstem bronchus", "left mainstem", "right mainstem", "carina"]
-    note: >-
-      a specimen taken FROM the main bronchus does not make the main bronchus the origin. A
-      bronchoscopic biopsy of a mass obstructing a lobe is a specimen from the bronchus and a
-      tumour of the lobe.
-  C341:
-    name: "Upper lobe, lung"
-    aliases: ["upper lobe", "RUL", "LUL", "right upper lobe", "left upper lobe", "apex", "apical"]
-  C342:
-    name: "Middle lobe, lung"
-    aliases: ["middle lobe", "RML", "right middle lobe"]
-    note: "RIGHT LUNG ONLY. The left lung has no middle lobe — see `laterality`."
-  C343:
-    name: "Lower lobe, lung"
-    aliases: ["lower lobe", "RLL", "LLL", "right lower lobe", "left lower lobe", "basilar"]
-  C348:
-    name: "Overlapping lesion of lung"
-    note: >-
-      ONE tumour crossing two or more subsites whose point of origin cannot be determined.
-      Multiple separate tumours in different subsites of one lung take C349.
-  C349:
-    name: "Lung, NOS"
-    nos: true
-    note: >-
-      asserts the subsite is not documented. A real registry answer — 9.6% of this corpus — and
-      the right one when the record genuinely does not localise or when it localises
-      inconsistently for one tumour. Radiology and operative notes routinely state the lobe when
-      the pathology says only which lung.
-
-  # Adjacent thoracic primaries. Present so that a tumour that is NOT a lung primary is
-  # recognisable as such rather than forced into C34x.
-  C339:
-    name: "Trachea"
-    note: "a different primary from lung; not a C34 subsite"
-  C384:
-    name: "Pleura"
-    note: "mesothelioma arises here; a pleural primary is not a lung primary"
-
-nos_topography: [C349]
-
-# ------------------------------------------------------------------------------ laterality
-# NOT A CODE FIELD — a statement about which subsites can coexist with which side. STORE carries
-# laterality as its own item; this exists because a lobe code and a side are the same claim
-# written twice and they cannot disagree.
-laterality:
-  left_lung_lobes: [C341, C343]
-  right_lung_lobes: [C341, C342, C343]
-  impossible:
-    - subsite: C342
-      side: left
-      why: >-
-        the left lung has two lobes, upper and lower. There is no left middle lobe. A run coded
-        C342 while its cited evidence read "left lower lobe" nine times; the registry coded C343.
-
-# ------------------------------------------------------------------------------ morphology
-# Four digits, no behaviour digit, matching STORE [522]. Frequencies in comments are this
-# corpus's own gold distribution over 1,788 patients — a fact about the cohort, not about
-# ICD-O-3, and useful because it says which codes actually carry the weight.
-morphology:
-  # -- not-otherwise-specified. REAL ANSWERS. 8000/8010/8046 together are the registry's own
-  #    answer for 10.8% of this corpus, which is why the deleted `not_less_specific` check —
-  #    which pushed the agent away from exactly these three — refused a correct value 22 times
-  #    out of 22.
-  "8000": {name: "Neoplasm, malignant", typical_behavior: "3", nos: true}    # 3.5%
-  "8010": {name: "Carcinoma, NOS", typical_behavior: "3", nos: true}         # 1.8%
-  "8012": {name: "Large cell carcinoma, NOS", typical_behavior: "3"}
-  "8020": {name: "Carcinoma, undifferentiated, NOS", typical_behavior: "3"}
-  "8046":
-    name: "Non-small cell carcinoma"
-    typical_behavior: "3"
-    nos: true
-    note: >-
-      the correct answer when a pathologist says "non-small cell carcinoma" and goes no further.
-      5.5% of this corpus. Not a failure to answer.
-
-  # -- adenocarcinoma family
-  "8140": {name: "Adenocarcinoma, NOS", typical_behavior: "3"}               # 37.7%
-  "8230":
-    name: "Solid carcinoma, NOS"
-    typical_behavior: "3"
-    note: "solid adenocarcinoma of lung. A run coded 8140 where the registry coded this."
-  "8250":
-    name: "Adenocarcinoma, lepidic predominant"
-    typical_behavior: "3"
-    note: "bronchiolo-alveolar adenocarcinoma in ICD-O-3; renamed in ICD-O-3.2"
-  "8252": {name: "Adenocarcinoma, nonmucinous, lepidic", typical_behavior: "3"}
-  "8253": {name: "Invasive mucinous adenocarcinoma", typical_behavior: "3"}
-  "8254": {name: "Mixed invasive mucinous and nonmucinous adenocarcinoma", typical_behavior: "3"}
-  "8255": {name: "Adenocarcinoma with mixed subtypes", typical_behavior: "3"}
-  "8260": {name: "Papillary adenocarcinoma, NOS", typical_behavior: "3"}
-  "8265": {name: "Micropapillary adenocarcinoma", typical_behavior: "3"}
-  "8310": {name: "Clear cell adenocarcinoma, NOS", typical_behavior: "3"}
-  "8333": {name: "Fetal adenocarcinoma", typical_behavior: "3"}
-  "8480": {name: "Mucinous adenocarcinoma", typical_behavior: "3"}
-  "8481": {name: "Mucin-producing adenocarcinoma", typical_behavior: "3"}
-  "8490": {name: "Signet ring cell carcinoma", typical_behavior: "3"}
-  "8551": {name: "Acinar adenocarcinoma", typical_behavior: "3"}             # 1.5%
-  "8570": {name: "Adenocarcinoma with squamous metaplasia", typical_behavior: "3"}
-
-  # -- squamous family
-  "8070": {name: "Squamous cell carcinoma, NOS", typical_behavior: "3"}      # 21.6%
-  "8071": {name: "Squamous cell carcinoma, keratinizing, NOS", typical_behavior: "3"}  # 3.0%
-  "8072": {name: "Squamous cell carcinoma, large cell, nonkeratinizing", typical_behavior: "3"}
-  "8073": {name: "Squamous cell carcinoma, small cell, nonkeratinizing", typical_behavior: "3"}
-  "8074": {name: "Squamous cell carcinoma, spindle cell", typical_behavior: "3"}
-  "8083": {name: "Basaloid squamous cell carcinoma", typical_behavior: "3"}
-  "8123": {name: "Basaloid carcinoma", typical_behavior: "3"}
-
-  # -- neuroendocrine. ICD-O-3 and ICD-O-3.2 differ; a human must check the edition.
-  "8041": {name: "Small cell carcinoma, NOS", typical_behavior: "3"}         # 14.4%
-  "8045": {name: "Combined small cell carcinoma", typical_behavior: "3"}
-  "8013": {name: "Large cell neuroendocrine carcinoma", typical_behavior: "3"}
-  "8240":
-    name: "Carcinoid tumour, NOS / neuroendocrine tumour, grade 1"
-    typical_behavior: "3"
-    note: >-
-      MALIGNANT in ICD-O-3 despite the clinical habit of calling a typical carcinoid benign.
-      Behaviour 3, and reportable. 1.5% of this corpus.
-  "8249": {name: "Atypical carcinoid / neuroendocrine tumour, grade 2", typical_behavior: "3"}
-  "8246": {name: "Neuroendocrine carcinoma, NOS", typical_behavior: "3"}
-
-  # -- adenocarcinoma, minimally invasive and other variants. ADDED after validating the table
-  #    against all 1,788 registry answers: these were the codes the registry uses and the first
-  #    draft of this file had omitted. That validation is the reason to trust the rest of it a
-  #    little more, and the reason not to trust it completely.
-  "8141": {name: "Adenocarcinoma, scirrhous", typical_behavior: "3"}
-  "8144": {name: "Adenocarcinoma, intestinal type", typical_behavior: "3",
-           note: "pulmonary enteric adenocarcinoma"}
-  "8256": {name: "Adenocarcinoma, minimally invasive, nonmucinous", typical_behavior: "3"}
-  "8257": {name: "Adenocarcinoma, minimally invasive, mucinous", typical_behavior: "3"}
-  "8550":
-    name: "Acinar cell carcinoma"
-    typical_behavior: "3"
-    note: >-
-      the registry uses this for "adenocarcinoma, acinar predominant". NOT the same code as 8551
-      acinar adenocarcinoma, and both appear in this corpus — check which the report names.
-  "8574": {name: "Adenocarcinoma with neuroendocrine differentiation", typical_behavior: "3"}
-
-  # -- other epithelial
-  "8002": {name: "Malignant tumour, small cell type", typical_behavior: "3"}
-  "8022": {name: "Pleomorphic carcinoma", typical_behavior: "3"}
-  "8023": {name: "NUT carcinoma", typical_behavior: "3", note: "NUT midline carcinoma"}
-  "8031": {name: "Giant cell carcinoma", typical_behavior: "3"}
-  "8032": {name: "Spindle cell carcinoma, NOS", typical_behavior: "3"}
-  "8033":
-    name: "Pseudosarcomatous carcinoma"
-    typical_behavior: "3"
-    note: "the registry uses this for sarcomatoid carcinoma of lung; 7 cases in this corpus"
-  "8200": {name: "Adenoid cystic carcinoma", typical_behavior: "3"}
-  "8430": {name: "Mucoepidermoid carcinoma", typical_behavior: "3"}
-  "8560": {name: "Adenosquamous carcinoma", typical_behavior: "3"}
-  "8562": {name: "Epithelial-myoepithelial carcinoma", typical_behavior: "3"}
-
-  # -- blastomas. TWO DIFFERENT DISEASES, and a run confused them: it coded 8973 where the
-  #    registry coded 8972.
-  "8972":
-    name: "Pulmonary blastoma"
-    typical_behavior: "3"
-    note: >-
-      the adult biphasic tumour of lung. NOT the same entity as 8973. A run coded 8973 for a case
-      the registry coded 8972.
-  "8973":
-    name: "Pleuropulmonary blastoma"
-    typical_behavior: "3"
-    note: "a childhood tumour, distinct from 8972 pulmonary blastoma"
-
-  # -- mesenchymal. A primary lung sarcoma is rare but codeable.
-  "8800": {name: "Sarcoma, NOS", typical_behavior: "3"}
-  "9180": {name: "Osteosarcoma, NOS", typical_behavior: "3"}
-
-  # -- pleural, for the adjacent primary
-  "9050": {name: "Mesothelioma, NOS", typical_behavior: "3", note: "pleural primary, C384"}
-
-nos_morphology: ["8000", "8010", "8046"]
-
-# ------------------------------------------------------------------------- excluded by spec
-# NOT A TABLE GAP — a scope boundary, and it must not read as the former.
-#
-# `specs/STORE.400_522_523.site_histology_behavior.yaml` says under `when_not_to_use`:
-# "Lymphoma, leukaemia and other haematopoietic neoplasms — those follow the Hematopoietic and
-# Lymphoid Neoplasm rules." So a patient whose neoplasm is one of these is a SPEC_INSUFFICIENT
-# case for that variable, not a case to be coded.
-#
-# THE FINDING THAT PRODUCED THIS SECTION: validating the table against all 1,788 registry answers
-# turned up SIX patients whose gold histology is a haematopoietic code. The benchmark therefore
-# contains six cases the spec states it cannot answer, and any accuracy denominator that includes
-# them is measuring the wrong thing. That matters for cohort sampling more than for any single
-# run — see docs/DETERMINISTIC_RULES_REMOVED.md on baselines.
+  basis: no external source was consulted. Every topography, morphology, behaviour and reportability entry
+    in this file was RECALLED BY A LANGUAGE MODEL on 2026-07-30 and written directly into YAML. It is
+    not a transcription of ICD-O-3 and no page, section or edition is asserted. The adenocarcinoma subtype
+    codes in particular were renamed between ICD-O-3 and ICD-O-3.2 as the WHO lung classification changed
+    — `8250` was bronchiolo-alveolar adenocarcinoma and is now lepidic adenocarcinoma — and this file
+    does not say which edition it is recalling.
+  what_a_human_must_check: the topography and morphology terms against ICD-O-3 in the edition the registry
+    uses, the two blastoma entries (8972 vs 8973) which name different diseases, and every ruling under
+    `not_reportable` against the registry's own casefinding manual — reportability is a REGISTRY POLICY
+    question, not an ICD-O-3 question, and this file has no authority to settle it.
+normalization:
+  strip_pattern: '[.\s]'
+  uppercase: true
+  split_on: /
+warnings:
+- Code into this table. A four-digit number that is not in it is not a morphology code,
+- and if a diagnosis has no ICD-O-3 morphology then the finding is not a reportable
+- neoplasm — say that rather than choosing a number that looks like one.
+- ''
+- This table was recalled by a language model, not transcribed from ICD-O-3, and no
+- registrar has checked it. Where it disagrees with a pathology report you have read,
+- say so in your reasoning rather than silently following either one.
+axes:
+  topography:
+    label: TOPOGRAPHY
+    field: primary_site
+    code_shape: C\d{3}
+    shape_description: letter C and three digits
+    scope_note: Either the tumour is not within lung and bronchus primaries — ICD-O-3 topography C34,
+      with C33 and C38.4 as adjacent or the wrong table is loaded — this is not evidence that the code
+      is invalid.
+    codes:
+      C340:
+        name: Main bronchus
+        aliases:
+        - main bronchus
+        - mainstem bronchus
+        - left mainstem
+        - right mainstem
+        - carina
+        note: a specimen taken FROM the main bronchus does not make the main bronchus the origin. A bronchoscopic
+          biopsy of a mass obstructing a lobe is a specimen from the bronchus and a tumour of the lobe.
+      C341:
+        name: Upper lobe, lung
+        aliases:
+        - upper lobe
+        - RUL
+        - LUL
+        - right upper lobe
+        - left upper lobe
+        - apex
+        - apical
+      C342:
+        name: Middle lobe, lung
+        aliases:
+        - middle lobe
+        - RML
+        - right middle lobe
+        note: RIGHT LUNG ONLY. The left lung has no middle lobe — see `laterality`.
+      C343:
+        name: Lower lobe, lung
+        aliases:
+        - lower lobe
+        - RLL
+        - LLL
+        - right lower lobe
+        - left lower lobe
+        - basilar
+      C348:
+        name: Overlapping lesion of lung
+        note: ONE tumour crossing two or more subsites whose point of origin cannot be determined. Multiple
+          separate tumours in different subsites of one lung take C349.
+      C349:
+        name: Lung, NOS
+        nos: true
+        note: asserts the subsite is not documented. A real registry answer — 9.6% of this corpus — and
+          the right one when the record genuinely does not localise or when it localises inconsistently
+          for one tumour. Radiology and operative notes routinely state the lobe when the pathology says
+          only which lung.
+      C339:
+        name: Trachea
+        note: a different primary from lung; not a C34 subsite
+      C384:
+        name: Pleura
+        note: mesothelioma arises here; a pleural primary is not a lung primary
+    unspecified:
+    - C349
+  morphology:
+    label: MORPHOLOGY (four digits; behaviour is a separate field)
+    field: histology
+    code_shape: \d{4}
+    shape_description: four digits, behaviour reported separately
+    codes:
+      '8000':
+        name: Neoplasm, malignant
+        typical_behavior: '3'
+        nos: true
+      '8010':
+        name: Carcinoma, NOS
+        typical_behavior: '3'
+        nos: true
+      '8012':
+        name: Large cell carcinoma, NOS
+        typical_behavior: '3'
+      '8020':
+        name: Carcinoma, undifferentiated, NOS
+        typical_behavior: '3'
+      '8046':
+        name: Non-small cell carcinoma
+        typical_behavior: '3'
+        nos: true
+        note: the correct answer when a pathologist says "non-small cell carcinoma" and goes no further.
+          5.5% of this corpus. Not a failure to answer.
+      '8140':
+        name: Adenocarcinoma, NOS
+        typical_behavior: '3'
+      '8230':
+        name: Solid carcinoma, NOS
+        typical_behavior: '3'
+        note: solid adenocarcinoma of lung. A run coded 8140 where the registry coded this.
+      '8250':
+        name: Adenocarcinoma, lepidic predominant
+        typical_behavior: '3'
+        note: bronchiolo-alveolar adenocarcinoma in ICD-O-3; renamed in ICD-O-3.2
+      '8252':
+        name: Adenocarcinoma, nonmucinous, lepidic
+        typical_behavior: '3'
+      '8253':
+        name: Invasive mucinous adenocarcinoma
+        typical_behavior: '3'
+      '8254':
+        name: Mixed invasive mucinous and nonmucinous adenocarcinoma
+        typical_behavior: '3'
+      '8255':
+        name: Adenocarcinoma with mixed subtypes
+        typical_behavior: '3'
+      '8260':
+        name: Papillary adenocarcinoma, NOS
+        typical_behavior: '3'
+      '8265':
+        name: Micropapillary adenocarcinoma
+        typical_behavior: '3'
+      '8310':
+        name: Clear cell adenocarcinoma, NOS
+        typical_behavior: '3'
+      '8333':
+        name: Fetal adenocarcinoma
+        typical_behavior: '3'
+      '8480':
+        name: Mucinous adenocarcinoma
+        typical_behavior: '3'
+      '8481':
+        name: Mucin-producing adenocarcinoma
+        typical_behavior: '3'
+      '8490':
+        name: Signet ring cell carcinoma
+        typical_behavior: '3'
+      '8551':
+        name: Acinar adenocarcinoma
+        typical_behavior: '3'
+      '8570':
+        name: Adenocarcinoma with squamous metaplasia
+        typical_behavior: '3'
+      '8070':
+        name: Squamous cell carcinoma, NOS
+        typical_behavior: '3'
+      '8071':
+        name: Squamous cell carcinoma, keratinizing, NOS
+        typical_behavior: '3'
+      '8072':
+        name: Squamous cell carcinoma, large cell, nonkeratinizing
+        typical_behavior: '3'
+      '8073':
+        name: Squamous cell carcinoma, small cell, nonkeratinizing
+        typical_behavior: '3'
+      '8074':
+        name: Squamous cell carcinoma, spindle cell
+        typical_behavior: '3'
+      '8083':
+        name: Basaloid squamous cell carcinoma
+        typical_behavior: '3'
+      '8123':
+        name: Basaloid carcinoma
+        typical_behavior: '3'
+      '8041':
+        name: Small cell carcinoma, NOS
+        typical_behavior: '3'
+      '8045':
+        name: Combined small cell carcinoma
+        typical_behavior: '3'
+      '8013':
+        name: Large cell neuroendocrine carcinoma
+        typical_behavior: '3'
+      '8240':
+        name: Carcinoid tumour, NOS / neuroendocrine tumour, grade 1
+        typical_behavior: '3'
+        note: MALIGNANT in ICD-O-3 despite the clinical habit of calling a typical carcinoid benign. Behaviour
+          3, and reportable. 1.5% of this corpus.
+      '8249':
+        name: Atypical carcinoid / neuroendocrine tumour, grade 2
+        typical_behavior: '3'
+      '8246':
+        name: Neuroendocrine carcinoma, NOS
+        typical_behavior: '3'
+      '8141':
+        name: Adenocarcinoma, scirrhous
+        typical_behavior: '3'
+      '8144':
+        name: Adenocarcinoma, intestinal type
+        typical_behavior: '3'
+        note: pulmonary enteric adenocarcinoma
+      '8256':
+        name: Adenocarcinoma, minimally invasive, nonmucinous
+        typical_behavior: '3'
+      '8257':
+        name: Adenocarcinoma, minimally invasive, mucinous
+        typical_behavior: '3'
+      '8550':
+        name: Acinar cell carcinoma
+        typical_behavior: '3'
+        note: the registry uses this for "adenocarcinoma, acinar predominant". NOT the same code as 8551
+          acinar adenocarcinoma, and both appear in this corpus — check which the report names.
+      '8574':
+        name: Adenocarcinoma with neuroendocrine differentiation
+        typical_behavior: '3'
+      '8002':
+        name: Malignant tumour, small cell type
+        typical_behavior: '3'
+      '8022':
+        name: Pleomorphic carcinoma
+        typical_behavior: '3'
+      '8023':
+        name: NUT carcinoma
+        typical_behavior: '3'
+        note: NUT midline carcinoma
+      '8031':
+        name: Giant cell carcinoma
+        typical_behavior: '3'
+      '8032':
+        name: Spindle cell carcinoma, NOS
+        typical_behavior: '3'
+      '8033':
+        name: Pseudosarcomatous carcinoma
+        typical_behavior: '3'
+        note: the registry uses this for sarcomatoid carcinoma of lung; 7 cases in this corpus
+      '8200':
+        name: Adenoid cystic carcinoma
+        typical_behavior: '3'
+      '8430':
+        name: Mucoepidermoid carcinoma
+        typical_behavior: '3'
+      '8560':
+        name: Adenosquamous carcinoma
+        typical_behavior: '3'
+      '8562':
+        name: Epithelial-myoepithelial carcinoma
+        typical_behavior: '3'
+      '8972':
+        name: Pulmonary blastoma
+        typical_behavior: '3'
+        note: the adult biphasic tumour of lung. NOT the same entity as 8973. A run coded 8973 for a case
+          the registry coded 8972.
+      '8973':
+        name: Pleuropulmonary blastoma
+        typical_behavior: '3'
+        note: a childhood tumour, distinct from 8972 pulmonary blastoma
+      '8800':
+        name: Sarcoma, NOS
+        typical_behavior: '3'
+      '9180':
+        name: Osteosarcoma, NOS
+        typical_behavior: '3'
+      '9050':
+        name: Mesothelioma, NOS
+        typical_behavior: '3'
+        note: pleural primary, C384
+    unspecified:
+    - '8000'
+    - '8010'
+    - '8046'
+  behavior:
+    label: BEHAVIOUR
+    field: behavior
+    codes:
+      '0':
+        name: benign
+        admissible: false
+      '1':
+        name: uncertain whether benign or malignant; borderline
+        admissible: false
+      '2':
+        name: carcinoma in situ; non-invasive; intraepithelial
+        admissible: true
+      '3':
+        name: malignant, primary site
+        admissible: true
+      '6':
+        note: never the answer for a PRIMARY-site abstraction. If the specimen came from a metastasis,
+          the primary site is still the organ of origin and behaviour stays 3.
+        name: malignant, metastatic site
+        admissible: false
+      '9':
+        note: not used by this repository's specs; recorded so an unexpected 9 is recognisable
+        name: malignant, uncertain whether primary or metastatic
+        admissible: false
 excluded_by_spec:
-  "9591": {name: "Malignant lymphoma, NOS", why: "haematopoietic; follows the Heme rules"}
-  "9680": {name: "Diffuse large B-cell lymphoma, NOS", why: "haematopoietic"}
-  "9699": {name: "Extranodal marginal zone lymphoma (MALT)", why: "haematopoietic"}
-  "9702": {name: "Mature T-cell lymphoma, NOS", why: "haematopoietic"}
-
-# --------------------------------------------------------------------------- not reportable
-# The class of failure this section exists for: a run answered `C187 / 7205 / 0` after finding a
-# real sigmoid colon hyperplastic polyp in a lung-cancer patient's chart. Three errors at once —
-# an invented morphology, a non-neoplasm, and a benign behaviour — and only a table catches them.
-#
-# Entries with a code are legal ICD-O-3 morphologies at a non-reportable behaviour. Entries with
-# `code: null` have no ICD-O-3 morphology at all because they are not neoplasms.
-not_reportable:
-  - term: "Granuloma / granulomatous inflammation"
-    code: null
-    why: "not a neoplasm; a common lung nodule finding and a common mimic on imaging"
-  - term: "Organizing pneumonia"
-    code: null
-    why: "not a neoplasm"
-  - term: "Anthracosis / reactive lymph node"
-    code: null
-    why: "not a neoplasm"
-  - term: "Pulmonary hamartoma / chondroid hamartoma"
-    code: null
-    why: "benign malformation, not a reportable neoplasm"
-  - term: "Atypical adenomatous hyperplasia (AAH)"
-    code: null
-    why: "a preinvasive lesion, not reportable; adenocarcinoma in situ IS reportable at 8250/2"
-  - term: "Squamous dysplasia"
-    code: null
-    why: "preinvasive; squamous carcinoma in situ IS reportable at 8070/2"
-  - term: "Hyperplastic polyp (colorectal)"
-    code: null
-    why: >-
-      not a neoplasm and not a lung finding. Recorded here because a run found one in a
-      lung-cancer patient's chart and coded it as the answer.
-  - term: "Squamous papilloma"
-    code: "8052"
-    behavior: "0"
-    why: "benign"
-
-# ------------------------------------------------------------------------------- safeguards
-# Prose, addressed to the model through the prompt. None of this is enforced in code.
-safeguards:
-  - "C341 is the UPPER lobe. C342 is the MIDDLE lobe. C343 is the LOWER lobe."
-  - >-
-    The left lung has no middle lobe. C342 with a left-sided tumour is anatomically impossible.
-  - >-
-    A lobe code and a lobe word are the same claim written twice, so they cannot disagree. If
-    your cited evidence names a lobe, the code must be that lobe's code — or say which statement
-    describes the ORIGIN and why the other does not.
-  - >-
-    Behaviour 0 and 1 are not reportable. A granuloma, a hamartoma or a benign polyp is not the
-    reportable tumour.
-  - >-
-    A four-digit number that is not in the table above is not a morphology code. If the diagnosis
-    has no ICD-O-3 morphology, say the finding is not a reportable neoplasm rather than choosing a
-    number that looks like one.
-  - >-
-    A carcinoid tumour is behaviour 3 in ICD-O-3 and is reportable, whatever the clinical note
-    calls it.
-  - >-
-    A specimen taken from the main bronchus, a lymph node or a metastasis does not make that site
-    the origin. Code the organ of origin with behaviour 3.
-  - >-
-    8972 pulmonary blastoma and 8973 pleuropulmonary blastoma are different diseases. Check which
-    one the pathology names.
+  '9591':
+    name: Malignant lymphoma, NOS
+    why: haematopoietic; follows the Heme rules
+  '9680':
+    name: Diffuse large B-cell lymphoma, NOS
+    why: haematopoietic
+  '9699':
+    name: Extranodal marginal zone lymphoma (MALT)
+    why: haematopoietic
+  '9702':
+    name: Mature T-cell lymphoma, NOS
+    why: haematopoietic
+excluded_by_spec_axis: morphology
+exclusions:
+- term: Granuloma / granulomatous inflammation
+  why: not a neoplasm; a common lung nodule finding and a common mimic on imaging
+- term: Organizing pneumonia
+  why: not a neoplasm
+- term: Anthracosis / reactive lymph node
+  why: not a neoplasm
+- term: Pulmonary hamartoma / chondroid hamartoma
+  why: benign malformation, not a reportable neoplasm
+- term: Atypical adenomatous hyperplasia (AAH)
+  why: a preinvasive lesion, not reportable; adenocarcinoma in situ IS reportable at 8250/2
+- term: Squamous dysplasia
+  why: preinvasive; squamous carcinoma in situ IS reportable at 8070/2
+- term: Hyperplastic polyp (colorectal)
+  why: not a neoplasm and not a lung finding. Recorded here because a run found one in a lung-cancer patient's
+    chart and coded it as the answer.
+- term: Squamous papilloma
+  why: benign
+  axis_values:
+    morphology: '8052'
+    behavior: '0'
+guidance:
+- C341 is the UPPER lobe. C342 is the MIDDLE lobe. C343 is the LOWER lobe.
+- The left lung has no middle lobe. C342 with a left-sided tumour is anatomically impossible.
+- A lobe code and a lobe word are the same claim written twice, so they cannot disagree. If your cited
+  evidence names a lobe, the code must be that lobe's code — or say which statement describes the ORIGIN
+  and why the other does not.
+- Behaviour 0 and 1 are not reportable. A granuloma, a hamartoma or a benign polyp is not the reportable
+  tumour.
+- A four-digit number that is not in the table above is not a morphology code. If the diagnosis has no
+  ICD-O-3 morphology, say the finding is not a reportable neoplasm rather than choosing a number that
+  looks like one.
+- A carcinoid tumour is behaviour 3 in ICD-O-3 and is reportable, whatever the clinical note calls it.
+- A specimen taken from the main bronchus, a lymph node or a metastasis does not make that site the origin.
+  Code the organ of origin with behaviour 3.
+- 8972 pulmonary blastoma and 8973 pleuropulmonary blastoma are different diseases. Check which one the
+  pathology names.
+laterality:
+  left_lung_lobes:
+  - C341
+  - C343
+  right_lung_lobes:
+  - C341
+  - C342
+  - C343
+  impossible:
+  - subsite: C342
+    side: left
+    why: the left lung has two lobes, upper and lower. There is no left middle lobe. A run coded C342
+      while its cited evidence read "left lower lobe" nine times; the registry coded C343.

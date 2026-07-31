@@ -1,240 +1,283 @@
 table_id: ICDO3-COLORECTAL
 table_version: 0.1.0
-
 source_authority:
-  document: "ICD-O-3 (International Classification of Diseases for Oncology, 3rd edition)"
+  document: ICD-O-3 (International Classification of Diseases for Oncology, 3rd edition)
   version_binding: NOT_BOUND
-  # WHAT THIS FILE IS, stated before anything is used, because a fabricated citation is worse
-  # than no citation and this repository has already been bitten by a code table that read like a
-  # transcription and was not one.
-  #
-  # Every code below was RECALLED BY A LANGUAGE MODEL, not copied out of ICD-O-3 or out of the
-  # CoC STORE manual. No page, section or edition is asserted. That is the same standing as the
-  # four code tables already in `specs/`, whose provenance records say so outright:
-  # "recalled by a model, not copied out of the manual -- so they say so, and they name the item
-  # a human should check them against."
-  #
-  # WHAT A HUMAN MUST DO before a number computed from this file is reported: check the
-  # topography and morphology terms against ICD-O-3 (and ICD-O-3.2 where the two differ, which
-  # they do for several of the neuroendocrine entries), and check the reportability rulings in
-  # `not_reportable` against the registry's own casefinding manual. Reportability is a REGISTRY
-  # POLICY question, not an ICD-O-3 question, and this file does not have the authority to
-  # settle it.
-  status: "model-recalled draft; no clinical or registrar sign-off"
-  scope: "colorectal and anal primaries — ICD-O-3 topography C18-C21"
+  status: model-recalled draft; no clinical or registrar sign-off
+  scope: colorectal and anal primaries — ICD-O-3 topography C18-C21
   origin: model_recalled
-
-  # STRUCTURED, not left in the comments above. The comments say the same thing and
-  # `yaml.safe_load` drops every one of them, so a programmatic consumer — the prompt renderer,
-  # an evaluator, a review document — would see `origin: model_recalled` as a bare label with no
-  # basis attached. That is precisely the marking `specs/` added its `provenance:` list to
-  # replace: "an origin with no basis is a label, which is the marking these specs already had
-  # and the reason the field was added."
-  basis: >-
-    no external source was consulted. Every topography, morphology, behaviour and reportability
-    entry in this file was RECALLED BY A LANGUAGE MODEL on 2026-07-30 and written directly into
-    YAML. It is not a transcription of ICD-O-3 and no page, section or edition is asserted.
-    Several neuroendocrine morphologies differ between ICD-O-3 and ICD-O-3.2 and this file does
-    not say which edition it is recalling.
-  what_a_human_must_check: >-
-    the topography and morphology terms against ICD-O-3 in the edition the registry uses, and
-    every ruling under `not_reportable` against the registry's own casefinding manual —
-    reportability is a REGISTRY POLICY question, not an ICD-O-3 question, and this file has no
-    authority to settle it.
-
-  # WHY THIS EXISTS. Two measured failures on 2026-07-30, both of which a shape regex cannot
-  # catch and a word list should not be asked to:
-  #
-  #   `\d{4}` accepts any four digits, so a run coded histology 7205 for a hyperplastic polyp.
-  #   There is no 7205 in ICD-O-3 morphology, and a hyperplastic polyp has no morphology code at
-  #   all because it is not a neoplasm. A code table decides that; a regex cannot.
-  #
-  #   A run asserted "ICD-O-3 topography C341 is right middle lobe" and coded C341 over evidence
-  #   reading "right middle lobe". C341 is the UPPER lobe. The model's own recollection of the
-  #   code table was wrong, which is exactly the thing a table is for.
-  #
-  # NOT A GATE. This is the value domain, rendered into the prompt so the model codes into it,
-  # and read by the evaluators so an out-of-domain code is COUNTED. Nothing here refuses an
-  # answer: see docs/DETERMINISTIC_RULES_REMOVED.md.
-
-# ------------------------------------------------------------------------------- behaviour
-# The fifth digit of a full ICD-O-3 morphology code. STORE item [523] takes it as its own
-# one-digit field, which is why `histology` in this repository's specs is four digits WITHOUT it.
-behavior:
-  "0": {meaning: "benign", reportable: false}
-  "1": {meaning: "uncertain whether benign or malignant; borderline", reportable: false}
-  "2": {meaning: "carcinoma in situ; non-invasive; intraepithelial", reportable: true}
-  "3": {meaning: "malignant, primary site", reportable: true}
-  "6":
-    meaning: "malignant, metastatic site"
-    reportable: false
-    note: >-
-      never the answer for a PRIMARY-site abstraction. If the specimen is from a metastasis, the
-      primary site is still coded to the organ of origin and behaviour stays 3.
-  "9":
-    meaning: "malignant, uncertain whether primary or metastatic"
-    reportable: false
-    note: "not used by this repository's specs; recorded so an unexpected 9 is recognisable"
-
-# ------------------------------------------------------------------------------ topography
-# C18-C21. Note the shape of the C19 and C20 groups: each has exactly one subsite, so C199 and
-# C209 are the codes, not fallbacks.
-topography:
-  C180: {name: "Cecum"}
-  C181: {name: "Appendix"}
-  C182: {name: "Ascending colon", aliases: ["right colon"]}
-  C183: {name: "Hepatic flexure of colon"}
-  C184: {name: "Transverse colon"}
-  C185: {name: "Splenic flexure of colon"}
-  C186: {name: "Descending colon", aliases: ["left colon"]}
-  C187: {name: "Sigmoid colon", aliases: ["sigmoid"]}
-  C188:
-    name: "Overlapping lesion of colon"
-    note: >-
-      one tumour crossing two or more colonic subsites whose point of origin cannot be
-      determined. Subcategory 8 is for ONE overlapping tumour; multiple separate tumours in
-      different subsites of the colon take C189.
-  C189: {name: "Colon, NOS", nos: true}
-  C199: {name: "Rectosigmoid junction"}
-  C209: {name: "Rectum, NOS"}
-  C210: {name: "Anus, NOS", nos: true}
-  C211: {name: "Anal canal"}
-  C212: {name: "Cloacogenic zone"}
-  C218: {name: "Overlapping lesion of rectum, anus and anal canal"}
-
-#: Codes that assert the subsite is unknown. Not errors — a registry codes them when the record
-#: genuinely does not localise — but a positive claim that nothing localised the tumour.
-nos_topography: [C189, C210]
-
-# ------------------------------------------------------------------------------ morphology
-# Reportable malignant and in-situ morphologies seen in colorectal and anal primaries. Four
-# digits, no behaviour digit, matching STORE [522].
-#
-# `typical_behavior` is the behaviour ICD-O-3 lists the term with. It is a DEFAULT and not a
-# constraint: an adenocarcinoma in situ is 8140/2 and perfectly legal.
-morphology:
-  # -- not-otherwise-specified. Real answers, not failures to answer.
-  "8000": {name: "Neoplasm, malignant", typical_behavior: "3", nos: true}
-  "8010": {name: "Carcinoma, NOS", typical_behavior: "3", nos: true}
-  "8020": {name: "Carcinoma, undifferentiated, NOS", typical_behavior: "3"}
-  "8046":
-    name: "Non-small cell carcinoma"
-    typical_behavior: "3"
-    nos: true
-    note: "a lung term; recorded because it appears in this corpus, rarely correct in colorectum"
-
-  # -- adenocarcinoma family, the overwhelming majority of colorectal primaries
-  "8140": {name: "Adenocarcinoma, NOS", typical_behavior: "3"}
-  "8144": {name: "Adenocarcinoma, intestinal type", typical_behavior: "3"}
-  "8210":
-    name: "Adenocarcinoma in adenomatous polyp"
-    typical_behavior: "3"
-    note: "carcinoma arising IN a polyp. The polyp alone is 8210/0 and not reportable."
-  "8211": {name: "Tubular adenocarcinoma", typical_behavior: "3"}
-  "8213": {name: "Serrated adenocarcinoma", typical_behavior: "3"}
-  "8220": {name: "Adenocarcinoma in adenomatous polyposis coli", typical_behavior: "3"}
-  "8221": {name: "Adenocarcinoma in multiple adenomatous polyps", typical_behavior: "3"}
-  "8255": {name: "Adenocarcinoma with mixed subtypes", typical_behavior: "3"}
-  "8261": {name: "Adenocarcinoma in villous adenoma", typical_behavior: "3"}
-  "8263": {name: "Adenocarcinoma in tubulovillous adenoma", typical_behavior: "3"}
-  "8265": {name: "Micropapillary carcinoma, NOS", typical_behavior: "3"}
-  "8480": {name: "Mucinous adenocarcinoma", typical_behavior: "3"}
-  "8481": {name: "Mucin-producing adenocarcinoma", typical_behavior: "3"}
-  "8490": {name: "Signet ring cell carcinoma", typical_behavior: "3"}
-  "8510": {name: "Medullary carcinoma, NOS", typical_behavior: "3"}
-  "8560": {name: "Adenosquamous carcinoma", typical_behavior: "3"}
-  "8574": {name: "Adenocarcinoma with neuroendocrine differentiation", typical_behavior: "3"}
-
-  # -- squamous family. Anus and anal canal, not colon.
-  "8070": {name: "Squamous cell carcinoma, NOS", typical_behavior: "3"}
-  "8071": {name: "Squamous cell carcinoma, keratinizing, NOS", typical_behavior: "3"}
-  "8072": {name: "Squamous cell carcinoma, large cell, nonkeratinizing", typical_behavior: "3"}
-  "8074": {name: "Squamous cell carcinoma, spindle cell", typical_behavior: "3"}
-  "8077":
-    name: "Squamous intraepithelial neoplasia, high grade"
-    typical_behavior: "2"
-    note: "anal HSIL / AIN 2-3. In situ by definition; behaviour 2."
-  "8083": {name: "Basaloid squamous cell carcinoma", typical_behavior: "3"}
-
-  # -- neuroendocrine. ICD-O-3 and ICD-O-3.2 differ here; a human must check these against the
-  #    edition the registry uses before any of them is relied on.
-  "8240": {name: "Neuroendocrine tumour, grade 1 / carcinoid tumour, NOS", typical_behavior: "3"}
-  "8243": {name: "Goblet cell carcinoid", typical_behavior: "3", note: "appendix"}
-  "8244": {name: "Mixed adenoneuroendocrine carcinoma", typical_behavior: "3"}
-  "8246": {name: "Neuroendocrine carcinoma, NOS", typical_behavior: "3"}
-  "8249": {name: "Neuroendocrine tumour, grade 2 / atypical carcinoid", typical_behavior: "3"}
-  "8041": {name: "Small cell carcinoma, NOS", typical_behavior: "3"}
-
-  # -- mesenchymal and other
-  "8936": {name: "Gastrointestinal stromal tumour (GIST)", typical_behavior: "3"}
-  "8800": {name: "Sarcoma, NOS", typical_behavior: "3"}
-  "8890": {name: "Leiomyosarcoma, NOS", typical_behavior: "3"}
-  "9120": {name: "Angiosarcoma", typical_behavior: "3"}
-
-#: Morphologies that assert the type is unknown. `conflict_rules` in the spec, not this file,
-#: decides when one of them is nevertheless the right answer — and it often is: 8000/8010/8046
-#: together are the registry's own answer for 10.8% of this repository's corpus.
-nos_morphology: ["8000", "8010", "8046"]
-
-# --------------------------------------------------------------------------- not reportable
-# THE FAILURE MODE THIS SECTION EXISTS FOR. On 2026-07-30 a run found a real sigmoid colon
-# hyperplastic polyp in a lung-cancer patient's chart and answered `C187 / 7205 / 0`. Three
-# separate errors, and only a table catches them: 7205 is not an ICD-O-3 morphology; a
-# hyperplastic polyp has no morphology code because it is not a neoplasm; and behaviour 0 is not
-# reportable, so a benign finding is not an answer to "what is the reportable tumour".
-#
-# Entries with a code are real ICD-O-3 morphologies at behaviour 0 — legal codes, not reportable
-# neoplasms. Entries with `code: null` have no ICD-O-3 morphology at all.
-not_reportable:
-  - term: "Hyperplastic polyp"
-    code: null
-    why: "not a neoplasm; no ICD-O-3 morphology exists for it"
-  - term: "Inflammatory polyp / pseudopolyp"
-    code: null
-    why: "not a neoplasm"
-  - term: "Lymphoid aggregate / lymphoid polyp, benign"
-    code: null
-    why: "not a neoplasm"
-  - term: "Adenomatous polyp / tubular adenoma"
-    code: "8210"
-    behavior: "0"
-    why: "benign neoplasm; reportable only if carcinoma arises in it, which is 8210/3"
-  - term: "Tubular adenoma"
-    code: "8211"
-    behavior: "0"
-    why: "benign"
-  - term: "Sessile serrated lesion / sessile serrated adenoma"
-    code: "8213"
-    behavior: "0"
-    why: "benign"
-  - term: "Villous adenoma"
-    code: "8261"
-    behavior: "0"
-    why: "benign"
-  - term: "Tubulovillous adenoma"
-    code: "8263"
-    behavior: "0"
-    why: "benign"
-  - term: "Adenomatous polyposis coli"
-    code: "8220"
-    behavior: "0"
-    why: "benign; the carcinoma arising in it is 8220/3"
-
-# ------------------------------------------------------------------------------- safeguards
-# Statements a reader of an answer should be able to check. Prose, addressed to the model
-# through the prompt — none of these is enforced in code.
-safeguards:
-  - "Behaviour 0 and 1 are not reportable. A benign polyp is not the reportable tumour."
-  - >-
-    A morphology code that is not in the table above is not a code. If the diagnosis has no
-    ICD-O-3 morphology, the honest answer is that the finding is not a reportable neoplasm —
-    not a four-digit number that looks like one.
-  - >-
-    Squamous morphologies belong to the anus and anal canal. A squamous carcinoma coded to a
-    colonic subsite should be explained.
-  - >-
-    C188 is ONE tumour overlapping subsites with an undeterminable origin. Multiple separate
-    tumours in different colonic subsites take C189.
-  - >-
-    A specimen taken from a metastasis does not make the metastatic site the primary. Code the
-    organ of origin with behaviour 3.
+  basis: no external source was consulted. Every topography, morphology, behaviour and reportability entry
+    in this file was RECALLED BY A LANGUAGE MODEL on 2026-07-30 and written directly into YAML. It is
+    not a transcription of ICD-O-3 and no page, section or edition is asserted. Several neuroendocrine
+    morphologies differ between ICD-O-3 and ICD-O-3.2 and this file does not say which edition it is recalling.
+  what_a_human_must_check: the topography and morphology terms against ICD-O-3 in the edition the registry
+    uses, and every ruling under `not_reportable` against the registry's own casefinding manual — reportability
+    is a REGISTRY POLICY question, not an ICD-O-3 question, and this file has no authority to settle it.
+normalization:
+  strip_pattern: '[.\s]'
+  uppercase: true
+  split_on: /
+warnings:
+- Code into this table. A four-digit number that is not in it is not a morphology code,
+- and if a diagnosis has no ICD-O-3 morphology then the finding is not a reportable
+- neoplasm — say that rather than choosing a number that looks like one.
+- ''
+- This table was recalled by a language model, not transcribed from ICD-O-3, and no
+- registrar has checked it. Where it disagrees with a pathology report you have read,
+- say so in your reasoning rather than silently following either one.
+axes:
+  topography:
+    label: TOPOGRAPHY
+    field: primary_site
+    code_shape: C\d{3}
+    shape_description: letter C and three digits
+    scope_note: Either the tumour is not within colorectal and anal primaries — ICD-O-3 topography C18-C21
+      or the wrong table is loaded — this is not evidence that the code is invalid.
+    codes:
+      C180:
+        name: Cecum
+      C181:
+        name: Appendix
+      C182:
+        name: Ascending colon
+        aliases:
+        - right colon
+      C183:
+        name: Hepatic flexure of colon
+      C184:
+        name: Transverse colon
+      C185:
+        name: Splenic flexure of colon
+      C186:
+        name: Descending colon
+        aliases:
+        - left colon
+      C187:
+        name: Sigmoid colon
+        aliases:
+        - sigmoid
+      C188:
+        name: Overlapping lesion of colon
+        note: one tumour crossing two or more colonic subsites whose point of origin cannot be determined.
+          Subcategory 8 is for ONE overlapping tumour; multiple separate tumours in different subsites
+          of the colon take C189.
+      C189:
+        name: Colon, NOS
+        nos: true
+      C199:
+        name: Rectosigmoid junction
+      C209:
+        name: Rectum, NOS
+      C210:
+        name: Anus, NOS
+        nos: true
+      C211:
+        name: Anal canal
+      C212:
+        name: Cloacogenic zone
+      C218:
+        name: Overlapping lesion of rectum, anus and anal canal
+    unspecified:
+    - C189
+    - C210
+  morphology:
+    label: MORPHOLOGY (four digits; behaviour is a separate field)
+    field: histology
+    code_shape: \d{4}
+    shape_description: four digits, behaviour reported separately
+    codes:
+      '8000':
+        name: Neoplasm, malignant
+        typical_behavior: '3'
+        nos: true
+      '8010':
+        name: Carcinoma, NOS
+        typical_behavior: '3'
+        nos: true
+      '8020':
+        name: Carcinoma, undifferentiated, NOS
+        typical_behavior: '3'
+      '8046':
+        name: Non-small cell carcinoma
+        typical_behavior: '3'
+        nos: true
+        note: a lung term; recorded because it appears in this corpus, rarely correct in colorectum
+      '8140':
+        name: Adenocarcinoma, NOS
+        typical_behavior: '3'
+      '8144':
+        name: Adenocarcinoma, intestinal type
+        typical_behavior: '3'
+      '8210':
+        name: Adenocarcinoma in adenomatous polyp
+        typical_behavior: '3'
+        note: carcinoma arising IN a polyp. The polyp alone is 8210/0 and not reportable.
+      '8211':
+        name: Tubular adenocarcinoma
+        typical_behavior: '3'
+      '8213':
+        name: Serrated adenocarcinoma
+        typical_behavior: '3'
+      '8220':
+        name: Adenocarcinoma in adenomatous polyposis coli
+        typical_behavior: '3'
+      '8221':
+        name: Adenocarcinoma in multiple adenomatous polyps
+        typical_behavior: '3'
+      '8255':
+        name: Adenocarcinoma with mixed subtypes
+        typical_behavior: '3'
+      '8261':
+        name: Adenocarcinoma in villous adenoma
+        typical_behavior: '3'
+      '8263':
+        name: Adenocarcinoma in tubulovillous adenoma
+        typical_behavior: '3'
+      '8265':
+        name: Micropapillary carcinoma, NOS
+        typical_behavior: '3'
+      '8480':
+        name: Mucinous adenocarcinoma
+        typical_behavior: '3'
+      '8481':
+        name: Mucin-producing adenocarcinoma
+        typical_behavior: '3'
+      '8490':
+        name: Signet ring cell carcinoma
+        typical_behavior: '3'
+      '8510':
+        name: Medullary carcinoma, NOS
+        typical_behavior: '3'
+      '8560':
+        name: Adenosquamous carcinoma
+        typical_behavior: '3'
+      '8574':
+        name: Adenocarcinoma with neuroendocrine differentiation
+        typical_behavior: '3'
+      '8070':
+        name: Squamous cell carcinoma, NOS
+        typical_behavior: '3'
+      '8071':
+        name: Squamous cell carcinoma, keratinizing, NOS
+        typical_behavior: '3'
+      '8072':
+        name: Squamous cell carcinoma, large cell, nonkeratinizing
+        typical_behavior: '3'
+      '8074':
+        name: Squamous cell carcinoma, spindle cell
+        typical_behavior: '3'
+      '8077':
+        name: Squamous intraepithelial neoplasia, high grade
+        typical_behavior: '2'
+        note: anal HSIL / AIN 2-3. In situ by definition; behaviour 2.
+      '8083':
+        name: Basaloid squamous cell carcinoma
+        typical_behavior: '3'
+      '8240':
+        name: Neuroendocrine tumour, grade 1 / carcinoid tumour, NOS
+        typical_behavior: '3'
+      '8243':
+        name: Goblet cell carcinoid
+        typical_behavior: '3'
+        note: appendix
+      '8244':
+        name: Mixed adenoneuroendocrine carcinoma
+        typical_behavior: '3'
+      '8246':
+        name: Neuroendocrine carcinoma, NOS
+        typical_behavior: '3'
+      '8249':
+        name: Neuroendocrine tumour, grade 2 / atypical carcinoid
+        typical_behavior: '3'
+      '8041':
+        name: Small cell carcinoma, NOS
+        typical_behavior: '3'
+      '8936':
+        name: Gastrointestinal stromal tumour (GIST)
+        typical_behavior: '3'
+      '8800':
+        name: Sarcoma, NOS
+        typical_behavior: '3'
+      '8890':
+        name: Leiomyosarcoma, NOS
+        typical_behavior: '3'
+      '9120':
+        name: Angiosarcoma
+        typical_behavior: '3'
+    unspecified:
+    - '8000'
+    - '8010'
+    - '8046'
+  behavior:
+    label: BEHAVIOUR
+    field: behavior
+    codes:
+      '0':
+        name: benign
+        admissible: false
+      '1':
+        name: uncertain whether benign or malignant; borderline
+        admissible: false
+      '2':
+        name: carcinoma in situ; non-invasive; intraepithelial
+        admissible: true
+      '3':
+        name: malignant, primary site
+        admissible: true
+      '6':
+        note: never the answer for a PRIMARY-site abstraction. If the specimen is from a metastasis, the
+          primary site is still coded to the organ of origin and behaviour stays 3.
+        name: malignant, metastatic site
+        admissible: false
+      '9':
+        note: not used by this repository's specs; recorded so an unexpected 9 is recognisable
+        name: malignant, uncertain whether primary or metastatic
+        admissible: false
+exclusions:
+- term: Hyperplastic polyp
+  why: not a neoplasm; no ICD-O-3 morphology exists for it
+- term: Inflammatory polyp / pseudopolyp
+  why: not a neoplasm
+- term: Lymphoid aggregate / lymphoid polyp, benign
+  why: not a neoplasm
+- term: Adenomatous polyp / tubular adenoma
+  why: benign neoplasm; reportable only if carcinoma arises in it, which is 8210/3
+  axis_values:
+    morphology: '8210'
+    behavior: '0'
+- term: Tubular adenoma
+  why: benign
+  axis_values:
+    morphology: '8211'
+    behavior: '0'
+- term: Sessile serrated lesion / sessile serrated adenoma
+  why: benign
+  axis_values:
+    morphology: '8213'
+    behavior: '0'
+- term: Villous adenoma
+  why: benign
+  axis_values:
+    morphology: '8261'
+    behavior: '0'
+- term: Tubulovillous adenoma
+  why: benign
+  axis_values:
+    morphology: '8263'
+    behavior: '0'
+- term: Adenomatous polyposis coli
+  why: benign; the carcinoma arising in it is 8220/3
+  axis_values:
+    morphology: '8220'
+    behavior: '0'
+guidance:
+- Behaviour 0 and 1 are not reportable. A benign polyp is not the reportable tumour.
+- A morphology code that is not in the table above is not a code. If the diagnosis has no ICD-O-3 morphology,
+  the honest answer is that the finding is not a reportable neoplasm — not a four-digit number that looks
+  like one.
+- Squamous morphologies belong to the anus and anal canal. A squamous carcinoma coded to a colonic subsite
+  should be explained.
+- C188 is ONE tumour overlapping subsites with an undeterminable origin. Multiple separate tumours in
+  different colonic subsites take C189.
+- A specimen taken from a metastasis does not make the metastatic site the primary. Code the organ of
+  origin with behaviour 3.

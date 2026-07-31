@@ -69,7 +69,7 @@ from langchain_core.tools import StructuredTool
 from .coverage_planner import OPEN_REQUEST_OPENED, triggers_from_tool_result
 from .document_concepts import anchor_block, baseline_block
 from .run_manifest import prompt_asset_manifest
-from .icdo3 import code_domain_block
+from .code_tables import code_domain_block
 from .skills import skills_block
 from .tool_surface import LIBRARY_TOOLS, ToolSurfaceError, assert_tool_surface  # noqa: F401
 

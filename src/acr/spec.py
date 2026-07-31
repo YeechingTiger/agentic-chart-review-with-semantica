@@ -913,7 +913,7 @@ def load_spec(path: str | Path) -> ExtractionSpec:
         # been given the codes. Same reason `acr.skills` raises on a missing skill: a supplier of
         # guidance that silently supplies none is worse than one that is absent, because the
         # manifest reports that it was supplied.
-        from .icdo3 import load_table
+        from .code_tables import load_table
         load_table(spec.value_domain)
     return spec
 

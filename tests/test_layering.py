@@ -52,7 +52,11 @@ LAYERS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
         "cli_common", "usage_telemetry")),
     (1, "contract", (
         "spec", "answer_contract", "answer_checks", "concordance", "skills",
-        "registry_catalog", "deps", "spec_repair", "trace")),
+        "registry_catalog", "deps", "spec_repair", "trace",
+        # 值域加载器。在 contract 层而不是 usecase 层，因为泛化之后它只知道"表有若干个有序
+        # 的轴"—— 轴名、章节标题、码形正则和记法折叠规则全部在 `codes/*.yaml` 里。癌症的
+        # 部分现在是纯资产，`tests/test_icdo3.py` 测那些资产。
+        "code_tables")),
     (2, "review", (
         "agent", "answer_gate", "coverage", "coverage_planner", "plan_expansion",
         "conflict_refinement", "runtime_controls", "runtime_profiles", "document_concepts",
@@ -66,23 +70,19 @@ LAYERS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
     (4, "improvement", ("repair_loop", "refine", "assetdev", "labelling", "derive")),
     (4, "authoring", ("intake", "speclint")),
     (5, "usecase", (
-        "icdo3",
         "specview.basis", "specview.decisions", "specview.measurements", "specview.prose",
         "specview.render", "specview.signoff", "specview.statements")),
 )
 
 #: 框架反过来依赖某一个 use case 的边。每条写明哪项工作会删掉它。
 #: 这个清单只能变短 —— 新增一条就是把框架又焊死在肿瘤登记上一次。
-KNOWN_DOMAIN_COUPLING: dict[tuple[str, str], str] = {
-    ("spec", "icdo3"):
-        "load_spec 用 icdo3.load_table 验 value_domain，而 load_table 要求 topography/"
-        "morphology/behavior 三个轴。码表 schema 改成声明式 axes: 之后这条消失。",
-    ("agent", "icdo3"):
-        "code_domain_block 把 ICD-O-3 的章节标题和散文写死在 prompt 里。同上，改成按 "
-        "YAML 声明的轴渲染之后这条消失。",
-    ("run_manifest", "icdo3"):
-        "manifest 记录用了哪张码表。等码表加载器变成通用的，这条会指向那个通用模块。",
-}
+#:
+#: 空了。原先三条 —— `spec` / `agent` / `run_manifest` 各自 import `icdo3` —— 由动作 C
+#: 一次删掉：`icdo3.py` 换成领域中立的 `code_tables.py`，三个写死的轴变成 `codes/*.yaml`
+#: 里声明的 `axes:`。留着这个空 dict 而不是删掉它，是因为规则还在：下一次有人让框架
+#: import 一个 use case 模块，`test_no_layer_imports_a_higher_one` 会红，而这里是他被迫
+#: 写下理由的地方。
+KNOWN_DOMAIN_COUPLING: dict[tuple[str, str], str] = {}
 
 
 #: 允许被跨平面共享的两层。它们承载的正是"输入输出的形式"：`kernel` 是 AssetRef /
@@ -108,9 +108,9 @@ KNOWN_DIRECT_COUPLING: dict[tuple[str, str], str] = {
     # 拆到 contract 之后这两条消失。
     ("assetdev", "coverage"): "B: strata_from_spec/assign_strata 拆到 contract",
     ("derive", "coverage"): "B: 同上",
-    # 动作 C —— 码表加载器通用化。和 KNOWN_DOMAIN_COUPLING 里那三条是同一项工作。
-    ("agent", "icdo3"): "C: 码表加载器通用化（见 KNOWN_DOMAIN_COUPLING）",
-    ("run_manifest", "icdo3"): "C: 同上",
+    # 动作 C 已完成，原先 ("agent","icdo3") 和 ("run_manifest","icdo3") 两条在此，
+    # 随 `icdo3.py` -> `code_tables.py` 一起消失：值域加载器现在在 contract 层，
+    # 而 contract 是允许被共享的 I/O 契约层。
 }
 
 
