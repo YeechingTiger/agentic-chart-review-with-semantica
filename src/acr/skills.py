@@ -41,11 +41,18 @@ import re
 from collections.abc import Sequence
 from pathlib import Path
 
+import yaml
+
 SKILLS_DIR = Path(__file__).resolve().parents[2] / "skills"
 
 #: A skill bigger than this is refused rather than truncated. Roughly 3k tokens: enough for real
 #: guidance, small enough that three of them do not dominate a prompt.
 MAX_SKILL_BYTES = 12_000
+
+#: 一张卡装在哪个槽。槽不是分类标签，是装配位置：`search` 槽恰好装一张，因为它是对照试验里
+#: 唯一被替换的变量；`task` 槽最多一张，跟着 spec 走；`general` 槽不限张数；`eval` 槽属于
+#: 评测那边的 agent，永远不进跑病历的提示词。
+SLOTS: tuple[str, ...] = ("task", "search", "general", "eval")
 
 _FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 
@@ -79,6 +86,41 @@ def load_skill_body(name: str, skills_dir: Path | str | None = None) -> str:
     if not body:
         raise SkillError(f"skill {name!r} has frontmatter and no body")
     return body
+
+
+def _frontmatter(name: str, skills_dir: Path | str | None = None) -> dict:
+    """One skill's frontmatter as a mapping. Raises for anything a loader would drop silently."""
+    root = Path(skills_dir) if skills_dir else SKILLS_DIR
+    path = root / name / "SKILL.md"
+    if not path.is_file():
+        raise SkillError(f"no skill {name!r} at {path}")
+    m = _FRONTMATTER.match(path.read_text(encoding="utf-8"))
+    if not m:
+        raise SkillError(f"skill {name!r} has no frontmatter block at byte 0")
+    data = yaml.safe_load(m.group(1))
+    if not isinstance(data, dict):
+        raise SkillError(f"skill {name!r} frontmatter is not a mapping")
+    return data
+
+
+def skill_slot(name: str, skills_dir: Path | str | None = None) -> str:
+    """Which slot this skill declares it belongs in.
+
+    Refuses a skill that declares nothing rather than defaulting it. A default here would put
+    every unlabelled skill in one slot, and the first time somebody added a second search
+    policy the two would render together — which reads, in the manifest, exactly like one
+    policy that happens to be long.
+    """
+    fm = _frontmatter(name, skills_dir)
+    slot = fm.get("slot")
+    if not slot:
+        raise SkillError(
+            f"skill {name!r} declares no `slot`. Add one of {list(SLOTS)} to its frontmatter; "
+            f"an undeclared slot cannot be assembled without guessing.")
+    if slot not in SLOTS:
+        raise SkillError(
+            f"skill {name!r} declares unknown slot {slot!r}; expected one of {list(SLOTS)}")
+    return str(slot)
 
 
 def skills_block(names: Sequence[str], skills_dir: Path | str | None = None) -> str:

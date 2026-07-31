@@ -1,6 +1,7 @@
 ---
 name: keyword-strategy
 description: Use before issuing the first search and whenever searching is not converging - deciding what terms to search for a spec with more than one output field, a search returning zero hits, a search coming back truncated true, issuing several similar queries without opening a document, or being about to record a not-documented, unknown or NOS value. Covers building the term list from the output fields rather than from the topic, stemming instead of synonym sprays, what the hit cap silently hides, and the rule that a search which leads to no read did nothing.
+slot: search
 license: MIT
 ---
 

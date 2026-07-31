@@ -1,6 +1,7 @@
 ---
 name: store-icdo-coding
 description: How to assign ICD-O-3 primary site, histology and behaviour from a chart under CoC STORE rules. Use when coding a solid tumour's topography or morphology from pathology, cytology, operative or imaging reports - especially when reports disagree, a diagnosis is hedged ("favor X"), the specimen came from a biopsy or metastasis, or no tissue diagnosis exists.
+slot: task
 license: MIT
 ---
 

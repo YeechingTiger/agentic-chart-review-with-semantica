@@ -1,6 +1,7 @@
 ---
 name: store-to-spec
 description: How to turn a registry standard item (CoC STORE, NAACCR, AJCC) into an extraction spec in this repo's specs/*.yaml format. Use when adding a variable the system can extract - deciding which data items become one spec and which must stay apart, writing value domains the runtime can actually enforce, scoping a stratum to the fields it speaks to, choosing what must be proved before an absence claim is accepted, and recording which lines came from the manual and which the model invented. Its sibling guideline-to-rules writes RULES over variables; this one writes the VARIABLES those rules are keyed on.
+slot: task
 license: MIT
 ---
 

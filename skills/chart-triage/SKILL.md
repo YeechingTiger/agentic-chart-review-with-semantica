@@ -1,6 +1,7 @@
 ---
 name: chart-triage
 description: Use at the start of any chart review and whenever you must decide which documents to open - orienting in a chart of hundreds of documents, choosing what to read first, deciding whether a document type is the kind that can answer your question, a type-name filter returning nothing or returning obviously wrong documents, or judging whether a chart genuinely lacks a class of evidence. Covers read order (type before date, date before content), judging a document by what it is rather than by what its name contains, and which document classes are decisive for which kind of question.
+slot: general
 license: MIT
 ---
 

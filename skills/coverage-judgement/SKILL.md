@@ -1,6 +1,7 @@
 ---
 name: coverage-judgement
 description: Use when your answer is about to claim that something is NOT in the chart - the case answer is EVIDENCE_INSUFFICIENT, a field is being left empty, or your reasoning is about to say a value is not documented. Tells you which questions to settle before claiming absence, why a not-otherwise-specified code is a positive claim rather than an absence, how to judge which local document types could establish the answer at all, and what to write down about the looking. Not needed for a positive answer resting on a witness you have read.
+slot: general
 license: MIT
 ---
 
