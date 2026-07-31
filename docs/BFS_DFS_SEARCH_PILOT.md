@@ -106,6 +106,23 @@ Note the `*` in the second loop: `--out runs/pilot/native` lands in
 two runs of one command cannot overwrite each other. A scorer that globs the literal arm name
 finds nothing and reports it as an arm that produced no output.
 
+### Where output may live, which is not the same answer for every command
+
+`acr batch` and `acr eval score` are happy with `runs/` inside the worktree. `acr signal
+--kind judge` and `--kind agent` are NOT: they go through `LocalArtifactStore`, which refuses a
+root that is relative *and* refuses one that resolves inside the Git worktree —
+
+```
+Invalid value: local artifact root resolves inside the Git worktree: …/runs/pilot/native__…
+```
+
+That is the "patient-derived artifacts never enter the repo" rule enforced in code rather than
+left to `.gitignore`, and it is stricter than ignoring the directory. On a server the root is
+the external run tree (`/N/project/computable_phenotype/llm/run/`, per README §3). Locally, the
+manifest and its `.jsonl` have to be copied somewhere outside the checkout before either
+model-calling kind will look at them. Worth knowing before you schedule a cohort and discover it
+at the scoring step.
+
 Verify the four skill names resolve before spending anything. `--skills` is parsed and
 validated before the first model call, so a typo costs nothing at run time — but it costs a
 scheduling round trip, and this check is free:
