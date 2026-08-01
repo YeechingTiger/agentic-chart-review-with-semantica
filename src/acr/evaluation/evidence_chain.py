@@ -160,3 +160,69 @@ def _walk(seq: int | None, by_seq: dict[int, dict]) -> list[int]:
             break
         cur = nxt
     return out
+
+
+def _claim_pointer(because: Any) -> tuple[str, int] | None | str:
+    """从一条主张的 `because` 里取出锚点：`("event", n)` 或 `("evidence", i)`。
+
+    两种锚点都要支持，因为归因主张有两种自然的依据：一步动作（"它从没搜过这个缩写"）和
+    一条已引用的证据（"被引的那一段没提到 behaviour"）。只支持前者会逼调用方把证据主张
+    硬塞进事件编号里。
+    """
+    if not isinstance(because, Mapping):
+        return None
+    ref = because.get("from")
+    if ref is None:
+        return None
+    if not isinstance(ref, Mapping):
+        return UNRESOLVED_REF
+    for kind in ("event", "evidence"):
+        if kind in ref:
+            try:
+                return (kind, int(ref[kind]))
+            except (TypeError, ValueError):
+                return UNRESOLVED_REF
+    return UNRESOLVED_REF
+
+
+def claim_report(claims: list[Mapping], run) -> dict:
+    """散文产物里每条主张的接地状态。
+
+    收一个**通用**的 claim 列表 —— 每项至少有 `text`，可选 `because` —— 而不是归因报告的
+    类型。这个模块在 evaluation 平面；让它 import diagnosis 的 schema 就是把两个平面焊死，
+    而 `tests/test_layering.py` 恰好禁止这件事。调用方负责适配。
+
+    状态与调用层完全相同，理由也相同：`PROSE_ONLY` 既不算已核对也不算没写，而
+    `grounding_ratio` 只把真的解析通的算进分子。
+    """
+    by_seq = {}
+    for ev in (run.trace or []):
+        if ev.get("kind") != _TOOL_KIND:
+            continue
+        try:
+            by_seq[int(ev.get("seq"))] = ev
+        except (TypeError, ValueError):
+            continue
+    n_evidence = len(run.manifest.get("evidence") or [])
+
+    out: list[dict] = []
+    for c in claims:
+        because = c.get("because")
+        target = _claim_pointer(because)
+        if because is None or (isinstance(because, str) and not because.strip()):
+            status, ref = UNSOURCED, None
+        elif target is None:
+            status, ref = PROSE_ONLY, None
+        elif target == UNRESOLVED_REF:
+            status, ref = UNRESOLVED_REF, None
+        else:
+            kind, idx = target
+            ok = (idx in by_seq) if kind == "event" else (0 <= idx < n_evidence)
+            status, ref = (GROUNDED if ok else UNRESOLVED_REF), f"{kind}:{idx}"
+        out.append({"text": str(c.get("text") or "")[:200], "status": status,
+                    "why": _why(because), "ref": ref})
+
+    n = len(out)
+    grounded = sum(1 for c in out if c["status"] == GROUNDED)
+    return {"claims": out, "n_claims": n, "n_grounded": grounded,
+            "grounding_ratio": (grounded / n) if n else None}

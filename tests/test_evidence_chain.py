@@ -158,3 +158,50 @@ def test_an_empty_run_reports_no_ratio_rather_than_zero():
     """0/0 报成 0.0，读起来是"完全没有接地"，而事实是"没有可判断的调用"。"""
     rep = chain_report(_run())
     assert rep["n_links"] == 0 and rep["grounding_ratio"] is None
+
+
+# ============================================================ 主张层：散文里的每一句
+# 工具调用的链回答"为什么做这一步"。归因报告和 L5 explain 是**散文**产物，它们的每一条因果
+# 主张目前没有任何标签 —— 那是这个仓库唯一产出散文却不检查接地的地方。
+#
+# `claim_report` 复用同一套指针格式和同一组状态，但**不认识归因报告的 schema**：它收一个
+# 通用的 claim 列表，由调用方适配。evidence_chain 在 evaluation 平面，让它 import
+# diagnosis 的结构就是把两个平面焊在一起。
+def test_a_claim_pointing_at_a_real_trace_event_is_grounded():
+    from acr.evaluation.evidence_chain import claim_report
+    run = _run({"tool": "search_notes", "args": {"q": "a"}},
+               {"args": {"doc": "d"}})
+    rep = claim_report([
+        {"text": "the run never searched for the abbreviation",
+         "because": {"why": "trace shows one search", "from": {"event": 1}}},
+        {"text": "and it read the wrong document"},
+    ], run)
+    assert [c["status"] for c in rep["claims"]] == [GROUNDED, UNSOURCED]
+    assert rep["grounding_ratio"] == 0.5
+
+
+def test_a_claim_may_cite_an_evidence_entry_instead_of_an_event():
+    """归因常常要指向**答案引用的那条证据**，而不是某一步动作。两种锚点都得能指。"""
+    from acr.evaluation.evidence_chain import claim_report
+    run = _run({"args": {"doc": "d"}})
+    run.manifest["evidence"] = [{"note_id": "path-1", "start": 10, "end": 20}]
+    rep = claim_report([
+        {"text": "the cited span does not mention behaviour",
+         "because": {"why": "read the quote", "from": {"evidence": 0}}},
+        {"text": "and neither does the second one",
+         "because": {"why": "x", "from": {"evidence": 7}}},
+    ], run)
+    assert [c["status"] for c in rep["claims"]] == [GROUNDED, UNRESOLVED_REF]
+
+
+def test_a_claim_with_prose_only_is_not_counted_as_grounded():
+    """和调用层同一条规则：无法核对不等于造假，但也不等于已核对。"""
+    from acr.evaluation.evidence_chain import claim_report
+    rep = claim_report([{"text": "t", "because": "it seemed likely"}], _run())
+    assert [c["status"] for c in rep["claims"]] == [PROSE_ONLY]
+    assert rep["grounding_ratio"] == 0.0
+
+
+def test_no_claims_reports_no_ratio():
+    from acr.evaluation.evidence_chain import claim_report
+    assert claim_report([], _run())["grounding_ratio"] is None
