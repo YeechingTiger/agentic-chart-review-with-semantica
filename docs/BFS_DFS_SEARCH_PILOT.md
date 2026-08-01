@@ -239,5 +239,24 @@ did. Two ways forward, and the first is cheaper:
 2. **More charts.** `MIN_PATIENTS_FOR_SUPPORT` is 20 in `assetdev.py`, and at ~$0.013 per
    patient-arm, 40 patients × 4 arms is about $2. The corpus generator is `tools/generate_corpus.py`.
 
+### A fifth arm, and why it is not a replacement yet
+
+`search-information-gain` was added 2026-07-31. It is not another shape — breadth and depth say
+how much of the chart to traverse, and this says, once per call, *what is still missing and
+which available action would reduce it most*. The three questions it forces (what is missing /
+which action reduces it / has a source class that could settle this gone unexamined) came from a
+design discussion, not from DeepEvidence, which matters because the shapes were borrowed from a
+federation of knowledge bases and this is one patient's record.
+
+It is registered as an ARM, not as a replacement, and the four existing cards stay. Deleting a
+measured baseline because a newer idea reads better is the move this file exists to refuse: the
+behavioural separation above (3.7x on searches, `evidence_span_overlap` 6/12 against 1/12) is
+committed evidence, and nothing about the new card has a number yet. It earns the slot by
+ranking above them on a task with headroom, or it does not.
+
+Run it on the same cohort as the arms above, with the six SYNX adversarial charts added — those
+were built for exactly the case this card claims to handle, where the answer is somewhere an
+ordinary pass does not go.
+
 Until one of those runs, the honest summary is: **the mechanism works and is measurable; the
 accuracy question is open.**
