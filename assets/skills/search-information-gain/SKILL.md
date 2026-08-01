@@ -61,6 +61,16 @@ SPEC, and it is worth more than the step you skipped.
 Do not re-plan from scratch on a departure. Backing out and starting over converts one unusable
 step into an unusable run, and the step you took is still on the record for whoever reads it.
 
+## 记下这一步接在哪一步上
+
+每次调用时，`because` 除了写清楚原因，再加一个指针：`{"why": "...", "from": {"event": N}}`，
+N 是**引起这一步的那个更早的 trace 事件**的 seq —— surfaced 这份文档的那次检索，你正在跟进
+的那处 deferral。它必须已经发生过。
+
+散文是给后来读的人的，指针是给核对用的。没有指针，一条追下去的线索和一串互不相关的动作在
+记录里长得一模一样；有了它，这条线可以被走一遍。不写不会被拒绝 —— 但那一步就无法被算进任何
+"这条链有多深"的判断。
+
 ## What this cannot do
 
 **It optimises one step at a time, so it can walk a path that is locally best and never

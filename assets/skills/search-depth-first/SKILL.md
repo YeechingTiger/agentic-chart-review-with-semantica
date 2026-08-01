@@ -32,6 +32,16 @@ Never revisit a document you have already read in full during this chase — tha
 this traversal is prone to. Keep the thread's hops in mind and, if a hop returns you to a
 document already read, the thread is exhausted, not continuing.
 
+## 记下这一步接在哪一步上
+
+每次调用时，`because` 除了写清楚原因，再加一个指针：`{"why": "...", "from": {"event": N}}`，
+N 是**引起这一步的那个更早的 trace 事件**的 seq —— surfaced 这份文档的那次检索，你正在跟进
+的那处 deferral。它必须已经发生过。
+
+散文是给后来读的人的，指针是给核对用的。没有指针，一条追下去的线索和一串互不相关的动作在
+记录里长得一模一样；有了它，这条线可以被走一遍。不写不会被拒绝 —— 但那一步就无法被算进任何
+"这条链有多深"的判断。
+
 ## What following a lead cannot do
 
 It tells you nothing about the documents no lead pointed at. A chase that ends in a confident,
