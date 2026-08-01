@@ -438,12 +438,21 @@ class Tracer:
     def plan(self, plan, revision, rationale=""): return self.emit("plan", plan=plan, revision=revision, rationale=rationale)
     def llm(self, role, content, tool_calls=None, usage=None):
         return self.emit("llm", role=role, content=content, tool_calls=tool_calls or [], usage=usage or {})
-    def tool(self, name, args, result, ok=True, ms=0.0, because=""):
+    def tool(self, name, args, result, ok=True, ms=0.0, because="", after_event=None):
         # Promoted out of `args` and into the envelope on purpose. It is already inside `args`,
         # but a consumer that has to reach into a free-form argument bag to find the causal
         # link will not do it, and a field nobody reads is a field nobody maintains.
-        return self.emit("tool", tool=name, args=args, result=result, ok=ok, ms=ms,
-                         because=str(because or ""))
+        # `after_event` rides beside `because` for the same reason and one more: it is the half
+        # a reader can CHECK. Omitted from the event entirely when absent, so a run that never
+        # emits one is not littered with nulls that read like failed attempts.
+        ev = {"tool": name, "args": args, "result": result, "ok": ok, "ms": ms,
+              "because": str(because or "")}
+        if after_event is not None:
+            try:
+                ev["after_event"] = int(after_event)
+            except (TypeError, ValueError):
+                pass
+        return self.emit("tool", **ev)
     def reflect(self, verdict, reason, evidence_count):
         return self.emit("reflect", verdict=verdict, reason=reason, evidence_count=evidence_count)
     def rejected(self, why, missing, attempted):

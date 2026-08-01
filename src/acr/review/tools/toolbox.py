@@ -28,35 +28,33 @@ def _tool(name: str, description: str, properties: dict, required: list[str] | N
 #: inference without marking it as one.
 CAUSE_PARAM = "because"
 
-#: Two shapes, both accepted. A bare string is the original form and every recorded run uses
-#: it — prose that a later reader interprets, which is why it stays. The object form adds a
-#: RESOLVABLE pointer beside the prose: `from.event` names the trace `seq` that prompted this
-#: call, so "why did this happen" stops being a sentence and becomes a link an evaluator can
-#: walk. `acr.evaluation.evidence_chain` resolves them and reports; nothing here refuses a
-#: call for lacking one, because judgement turned into a gate is what this repo measured and
-#: removed (60 of 254 rejections destroyed a correct value).
+AFTER_PARAM = "after_event"
+
 _CAUSE_PROPERTY = {
-    "anyOf": [
-        {"type": "string"},
-        {"type": "object",
-         "properties": {
-             "why": {"type": "string",
-                     "description": "what prompted this call, in your own words"},
-             "from": {"type": "object",
-                      "properties": {"event": {
-                          "type": "integer",
-                          "description": ("the `seq` of the EARLIER trace event that prompted "
-                                          "this — the search that surfaced the document, the "
-                                          "deferral you are following. Must already have "
-                                          "happened.")}},
-                      "required": ["event"]},
-         },
-         "required": ["why"]},
-    ],
+    "type": "string",
     "description": ("optional: what prompted this call — the search that surfaced the "
-                    "document, the open thread it settles, the stratum it samples. Prose is "
-                    "read, never checked. Adding `from.event` makes it checkable: it points "
-                    "at the earlier trace event that caused this one."),
+                    "document, the open thread it settles, the stratum it samples. Prose, "
+                    "read by a later reader and never checked."),
+}
+
+#: The pointer, as a FLAT INTEGER beside the prose rather than a field inside it.
+#:
+#: The first version made `because` an `anyOf[string, object]` whose object form carried
+#: `from.event`. Measured on a fresh run of `search-depth-first` with the card explicitly asking
+#: for it: 0 of 18 calls emitted one. Offered two shapes, the model took the simpler. A flat
+#: integer parameter sitting next to the prose is the same information with nothing to choose
+#: between, and `because` goes back to being exactly the string every recorded run already
+#: contains — so backwards compatibility stops being a special case and becomes the default.
+#:
+#: Still optional, still never refused. `acr.evaluation.evidence_chain` resolves it and counts;
+#: judgement turned into a gate is what this repo measured and removed.
+_AFTER_PROPERTY = {
+    "type": "integer",
+    "description": ("optional but strongly preferred: the `seq` of the EARLIER step that led "
+                    "you here — the search that surfaced this document, the deferral you are "
+                    "following, the inventory entry you are sampling. It must already have "
+                    "happened. This is what makes your reasoning a chain a reader can walk "
+                    "instead of a list of unrelated actions."),
 }
 
 
@@ -91,6 +89,7 @@ TOOL_SCHEMAS: list[dict] = [
             "date_to": {"type": "string"},
             "max_hits": {"type": "integer", "description": "default 25"},
             CAUSE_PARAM: _CAUSE_PROPERTY,
+            AFTER_PARAM: _AFTER_PROPERTY,
         },
         ["query"],
     ),
@@ -102,6 +101,7 @@ TOOL_SCHEMAS: list[dict] = [
             "offset": {"type": "integer", "description": "character offset, default 0"},
             "limit": {"type": "integer", "description": "characters to return, default 4000"},
             CAUSE_PARAM: _CAUSE_PROPERTY,
+            AFTER_PARAM: _AFTER_PROPERTY,
         },
         ["note_id"],
     ),
@@ -118,6 +118,7 @@ TOOL_SCHEMAS: list[dict] = [
                          "description": "note_ids to read, typically the ones the runtime drew"},
             "chars_each": {"type": "integer", "description": "excerpt size per document, default 1200"},
             CAUSE_PARAM: _CAUSE_PROPERTY,
+            AFTER_PARAM: _AFTER_PROPERTY,
         },
         ["note_ids"],
     ),
@@ -242,6 +243,7 @@ class Toolbox:
         # has to grow a parameter it does not use. Cleared every call — see `last_cause`.
         args = dict(args)
         self.last_cause = str(args.pop(CAUSE_PARAM, "") or "")
+        self.last_after = args.pop(AFTER_PARAM, None)
         fn = getattr(self, f"_t_{name}", None)
         if fn is None:
             return {"error": f"unknown tool {name!r}", "available": [s["function"]["name"] for s in TOOL_SCHEMAS]}, 0.0

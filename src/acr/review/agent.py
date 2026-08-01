@@ -1581,8 +1581,15 @@ def chart_tools(toolbox, tracer) -> list[StructuredTool]:
             # Read straight after the dispatch that set it. `dispatch` strips `because` out of
             # the arguments, so this is the only place it can still be seen — and it must be
             # read here rather than remembered, because the next dispatch clears it.
-            tracer.tool(_name, kwargs, out, ok="error" not in (out or {}), ms=ms,
-                        because=toolbox.last_cause)
+            ev = tracer.tool(_name, kwargs, out, ok="error" not in (out or {}), ms=ms,
+                             because=toolbox.last_cause,
+                             after_event=toolbox.last_after)
+            # Tell the model which step this WAS. Asking it to cite a `seq` it never sees is
+            # asking it to guess, and it does: the first run with `after_event` emitted 1 and 2
+            # — its own call ordinals — while tool events start at 4, so every pointer was
+            # unresolvable. A pointer can only reference an identifier the caller can observe.
+            if isinstance(out, dict) and isinstance(ev, dict) and ev.get("seq") is not None:
+                out = {**out, "step": ev["seq"]}
             return json.dumps(out, default=str)[:20000]
 
         tools.append(StructuredTool.from_function(

@@ -77,6 +77,14 @@ def _pointer(because: Any) -> int | None | str:
         return UNRESOLVED_REF
 
 
+def _as_seq(raw: Any) -> int | str:
+    """扁平 `after_event` 的取值。坏值走和坏标签同一条路：变成记录，不变成异常。"""
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return UNRESOLVED_REF
+
+
 def _why(because: Any) -> str:
     if isinstance(because, Mapping):
         return str(because.get("why") or "")
@@ -103,7 +111,10 @@ def chain_report(run) -> dict:
         except (TypeError, ValueError):
             seq = None
         because = ev.get("because")
-        target = _pointer(because)
+        # 扁平字段优先。嵌套形态保留只为读懂用第一版 schema 跑出来的记录 —— 那一版实测
+        # 执行率 0/18，所以它不会有多少数据，但读不懂旧记录是另一种损失。
+        flat = ev.get("after_event")
+        target = _pointer(because) if flat is None else _as_seq(flat)
 
         if because is None or (isinstance(because, str) and not because.strip()):
             status, ref = UNSOURCED, None
@@ -155,7 +166,9 @@ def _walk(seq: int | None, by_seq: dict[int, dict]) -> list[int]:
             break
         out.append(cur)
         seen.add(cur)
-        nxt = _pointer(by_seq[cur].get("because"))
+        ev = by_seq[cur]
+        flat = ev.get("after_event")
+        nxt = _pointer(ev.get("because")) if flat is None else _as_seq(flat)
         if not isinstance(nxt, int) or nxt >= cur:
             break
         cur = nxt
