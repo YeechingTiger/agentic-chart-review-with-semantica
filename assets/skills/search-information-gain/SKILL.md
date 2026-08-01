@@ -47,6 +47,20 @@ is spending without a hypothesis.
 
 Running out of ideas for terms is not that sentence. Neither is having read a lot.
 
+## Departing from this, and saying so
+
+You will depart from it — a chart will make the highest-gain action impossible, or the three
+sentences will be unanswerable because the contract itself is unclear. That is allowed and it is
+not a failure. What is a failure is departing silently, because then a run that worked this way
+and a run that ignored it are the same document afterwards.
+
+So when you skip the three sentences, say which one you could not answer and why. "I could not
+name what was missing because the contract does not distinguish X from Y" is a finding about the
+SPEC, and it is worth more than the step you skipped.
+
+Do not re-plan from scratch on a departure. Backing out and starting over converts one unusable
+step into an unusable run, and the step you took is still on the record for whoever reads it.
+
 ## What this cannot do
 
 **It optimises one step at a time, so it can walk a path that is locally best and never
