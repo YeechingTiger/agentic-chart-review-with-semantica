@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import time
-from typing import Sequence
+from collections.abc import Sequence
 
 from ...chartstore.corpus import PatientChart
 from ...core.state import Evidence, EvidenceLedger
@@ -28,11 +28,35 @@ def _tool(name: str, description: str, properties: dict, required: list[str] | N
 #: inference without marking it as one.
 CAUSE_PARAM = "because"
 
+#: Two shapes, both accepted. A bare string is the original form and every recorded run uses
+#: it — prose that a later reader interprets, which is why it stays. The object form adds a
+#: RESOLVABLE pointer beside the prose: `from.event` names the trace `seq` that prompted this
+#: call, so "why did this happen" stops being a sentence and becomes a link an evaluator can
+#: walk. `acr.evaluation.evidence_chain` resolves them and reports; nothing here refuses a
+#: call for lacking one, because judgement turned into a gate is what this repo measured and
+#: removed (60 of 254 rejections destroyed a correct value).
 _CAUSE_PROPERTY = {
-    "type": "string",
+    "anyOf": [
+        {"type": "string"},
+        {"type": "object",
+         "properties": {
+             "why": {"type": "string",
+                     "description": "what prompted this call, in your own words"},
+             "from": {"type": "object",
+                      "properties": {"event": {
+                          "type": "integer",
+                          "description": ("the `seq` of the EARLIER trace event that prompted "
+                                          "this — the search that surfaced the document, the "
+                                          "deferral you are following. Must already have "
+                                          "happened.")}},
+                      "required": ["event"]},
+         },
+         "required": ["why"]},
+    ],
     "description": ("optional: what prompted this call — the search that surfaced the "
-                    "document, the open thread it settles, the stratum it samples. Recorded, "
-                    "never checked; it is how a later reader tells your reasoning from theirs."),
+                    "document, the open thread it settles, the stratum it samples. Prose is "
+                    "read, never checked. Adding `from.event` makes it checkable: it points "
+                    "at the earlier trace event that caused this one."),
 }
 
 
