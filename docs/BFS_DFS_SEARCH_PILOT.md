@@ -239,6 +239,36 @@ did. Two ways forward, and the first is cheaper:
 2. **More charts.** `MIN_PATIENTS_FOR_SUPPORT` is 20 in `assetdev.py`, and at ~$0.013 per
    patient-arm, 40 patients × 4 arms is about $2. The corpus generator is `tools/generate_corpus.py`.
 
+## The search slot, as a series rather than a list
+
+Eight cards now sit in one slot and they are not eight variants of one idea. They answer four
+different questions, and a run picks exactly one card, so a pilot is choosing which QUESTION to
+let the model answer:
+
+| kind | cards | what it decides |
+|---|---|---|
+| traversal shape | `search-breadth-first`, `search-depth-first`, `search-breadth-then-depth` | how wide, how deep, and where they hand over — fixed before the run |
+| term selection | `search-native`, `keyword-strategy` | where terms come from, how to widen after a miss |
+| supplied prior | `search-preplanned` | how far to trust a term list measured on OTHER patients |
+| per-step decision | `search-information-gain` | which action next, recomputed every call |
+| navigation | `search-latest-first` | where to ENTER the record and which direction to move |
+
+The shapes came from DeepEvidence, which reasons over a federation of knowledge bases. The last
+two did not, and the difference shows: a shape is chosen once, a decision rule runs every call,
+and a navigation rule fixes only the entry point and the direction.
+
+MEASURED SO FAR: the three shapes and `search-native`, in the run below. `search-preplanned`,
+`keyword-strategy`, `search-information-gain` and `search-latest-first` have no number at all.
+That ratio — four measured, four not — is the honest state of this slot, and adding a ninth card
+before closing it would make the slot a collection rather than a comparison.
+
+DOMAIN NEUTRALITY, measured by grepping each card for clinical vocabulary:
+`search-breadth-then-depth`, `search-preplanned`, `search-information-gain` and
+`search-latest-first` contain none. `search-native`, `search-breadth-first` and
+`search-depth-first` carry a few words inside EXAMPLES, which costs little. `keyword-strategy`
+carries thirteen and teaches its rule through them, which is a different thing and is why it
+belongs in a pilot before it belongs in a profile.
+
 ### A fifth arm, and why it is not a replacement yet
 
 `search-information-gain` was added 2026-07-31. It is not another shape — breadth and depth say
