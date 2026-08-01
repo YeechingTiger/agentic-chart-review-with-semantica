@@ -93,6 +93,15 @@ class NegativeControlFailed(AssetDevelopmentError):
     """The same search gained as much on permuted labels, so the gain is not about retrieval."""
 
 
+class AnswerLeaked(AssetDevelopmentError):
+    """A derived term renders a development case's own gold value.
+
+    The permutation control cannot catch this one: such a term genuinely points at the answer on
+    every dev case, so shuffling the labels genuinely destroys it and the test passes it. It is
+    worthless on test, where nobody supplies the answer. See `acr.improvement.answer_leak`.
+    """
+
+
 class AdoptionAborted(AssetDevelopmentError):
     """The write did not verify; the spec is untouched."""
 
@@ -818,7 +827,8 @@ def _negative_control(evolution: Evolution, labelling: Labelling, split: Split, 
 
 
 def certify(evolution: Evolution, labelling: Labelling, split: Split, *, model: str,
-            on: str = TEST, spec_id: str = "", today: str | None = None) -> Certification:
+            on: str = TEST, spec_id: str = "", today: str | None = None,
+            gold_values: dict[str, list] | None = None) -> Certification:
     """Turn a dev-set search into a number that may be quoted, or refuse with the reason. None of
     these refusals is a warning: a warning about a leaked split is read once and then becomes
     part of the output format.
@@ -829,6 +839,22 @@ def certify(evolution: Evolution, labelling: Labelling, split: Split, *, model: 
     search on permuted labels and comparing held-out gains. A caller who wants numbers without
     that comparison is not certifying anything, and `measure()` will give them the numbers.
     """
+    # BEFORE the negative control, because it is the one failure that control cannot see: a term
+    # that IS the answer survives permutation honestly. Optional only so that a caller without a
+    # key can still certify; supplying one and having it leak is a refusal, not a note.
+    if gold_values:
+        from .answer_leak import leaking_terms
+        # `keywords` is (stratum, terms) pairs, not a flat list — flattened here, because
+        # passing the pairs would compare tuples against gold values and silently find
+        # nothing, which is the shape of a check that cannot fail.
+        terms = [t for _, group in evolution.final.keywords for t in group]
+        leaks = leaking_terms(terms=terms, gold_values=gold_values)
+        if leaks:
+            raise AnswerLeaked(
+                "derived terms render development answers, so their dev-set gain does not "
+                "transfer: " + "; ".join(str(x) for x in leaks[:5])
+                + (f" (+{len(leaks) - 5} more)" if len(leaks) > 5 else ""))
+
     test_notes = _guards(evolution, labelling, split, on)
     if evolution.candidate is None:
         raise AssetDevelopmentError("the evolution accepted no move, so there is nothing to "
