@@ -22,8 +22,8 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
-from acr.evaluation import evals as E  # noqa: E402
-from acr.evaluation.evidence_chain import chain_report  # noqa: E402
+from acr.evaluation import evals as E
+from acr.evaluation.evidence_chain import chain_report
 
 #: 每种工具在链里怎么读。名字不是给机器的，是给读的人的。
 VERB = {
