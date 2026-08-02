@@ -15,7 +15,7 @@ Nothing here tells you what to look for. These are properties of the instruments
 
 ## `search_notes` matches substrings, not words and not meanings
 
-Case-insensitive substring. `carc` finds `carcinoma`; `heart` finds `heartburn`. There is no
+Case-insensitive substring. `amend` finds `amendment`; `heart` finds `heartburn`. There is no
 word boundary, no stemming engine, no ranking, and **no synonym folding** — two words for one
 thing are two searches, and the tool will never tell you that you missed the other one.
 

@@ -30,8 +30,12 @@ explanations you must tell apart:
 - this site writes it differently from the sites the list was measured on;
 - the term is right but the type filter is wrong.
 
-Try the second before concluding the first: search the term with no type filter. That one call
-separates "not in this chart" from "not where the prior said".
+Try the second before concluding the first: search the term with no type filter.
+
+Be exact about what that buys. It tests the TYPE prior and nothing else — it tells you whether
+this term lands somewhere the prior did not point. It does not test the term. A miss with no
+filter still leaves the other three explanations standing, and it is not grounds for concluding
+the concept is absent.
 
 ## When the plan and the chart disagree
 

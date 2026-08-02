@@ -1,110 +1,76 @@
 ---
 name: keyword-strategy
-description: Use before issuing the first search and whenever searching is not converging - deciding what terms to search for a spec with more than one output field, a search returning zero hits, a search coming back truncated true, issuing several similar queries without opening a document, or being about to record a not-documented, unknown or NOS value. Covers building the term list from the output fields rather than from the topic, stemming instead of synonym sprays, what the hit cap silently hides, and the rule that a search which leads to no read did nothing.
+description: Use when deciding what to search for, before the first query and whenever searching is not converging. Covers building the term list from the fields the answer must fill rather than from the subject matter, choosing how wide a query should be and reacting to what it returns, and the standing rule that a search which leads to no read has established nothing. Says what to look for; `tool-contract` says how the instrument behaves.
 slot: search
 license: MIT
 ---
 
-# Searching a chart so that it finds things
+# Deciding what to search for
 
-Three rules, each of which was broken on a real chart in this project on 2026-07-26 by a
-model that had the search hints in its prompt. Variable-agnostic.
+Terms come from what the ANSWER has to say, not from what the record is about. Everything
+below follows from that.
 
-## 1. Build the term list from the FIELDS, not from the topic
+## One column of terms per field the answer must fill
 
-One column of terms per output field. For each field, write the words a clinician would use
-to state that field's **value** — not words about the subject matter in general.
+For each field the contract asks you to fill, write the words someone would use when STATING
+that field's value. Not words about the subject in general — a record about one thing is full
+of words about that thing, and almost none of them are the words that would settle any
+particular question about it.
 
-Measured. The site/histology/behaviour spec declares three fields, one of them an anatomic
-location. Its eight search hints are `pathology, biopsy, final diagnosis, specimen,
-carcinoma, adenocarcinoma, resection, cytology` and its stratum keyword list is five of the
-same. **Not one names a lobe, a laterality or a bronchus** — yet the spec's own answer check
-refuses the NOS site code unless `lobe` and `bronchus` were searched. The term list was
-built from the topic ("this is a cancer-coding task") instead of from the fields.
+The failure this prevents is specific and easy to walk into: a contract asks for three
+different properties, and the term list contains only words for the topic the three share. Then
+two of the fields have no column at all, and nothing in the run will notice, because searches
+were issued and hits came back the whole time.
 
-The consequence, across the 39 runs in `runs/`: only 17 searched any lobe term and 6 any
-bronchus term, while the two most-issued queries in the whole set were `final diagnosis`
-(28 times) and `adenocarcinoma` (27). Patient `P03` was coded lung-NOS having
-run no site search at all, on a chart where `lobe` matches 126 times.
+**A field with no column is a field you have decided not to look for.** Write the columns down
+before the first search.
 
-Practical form, before the first search:
+Two riders. A field whose value is a date or a code needs terms for the EVENT that fixes it,
+never for the number itself — the number is what you are looking for, so it cannot be what you
+look with. And a field with a short conventional abbreviation needs the long form beside it:
+short strings match inside other words and will bury you in hits that are not about your field.
 
-```
-field: primary_site   -> lobe, bronch, lateral, right, left, upper, lower, hilar, apical
-field: histology      -> patholog, carcinom, adenocarcinom, squamous, small cell, cytolog
-field: behavior       -> invas, in situ, margin, stromal
-```
+## Choosing how wide a query is, and reacting to what comes back
 
-A field with no column is a field you have decided not to look for. Two riders: short
-abbreviations (`RUL`, `LUL`, `FNA`) are dropped by the runtime's keyword machinery at three
-characters or fewer, so always pair them with a longer term; and a field whose value is a
-date or a code needs terms for the **event**, not for the number.
+A query has a width. Too narrow and the local wording defeats it; too wide and it matches
+everything and discriminates nothing. Neither end is safe, so choose deliberately and then let
+the result tell you which way to move.
 
-## 2. Stem, do not spray synonyms
+- **Many hits, spread across kinds of document that cannot answer** — too wide. Add a word,
+  restore an ending, or bound by kind or by date.
+- **No hits** — possibly too narrow. Shorten toward the stem, drop a modifier, try the other
+  spelling or the abbreviation.
+- **Truncated** — you are looking at a slice, not a total, and the shape of what you cannot see
+  is not random. `tool-contract` says which end is missing.
 
-Search is a case-insensitive substring match. A stem therefore subsumes every inflection at
-no cost, and a longer phrase can only ever match less. Measured hit counts on the five real
-charts (full term vs stem, same chart):
+Do not reach straight for the shortest possible stem. A stem short enough to be safe against
+any wording is usually short enough to match half the record, and the hits it buries are as
+lost as the ones a narrow term never found.
 
-| full term | hits | stem | hits |
-|---|---|---|---|
-| `immunohistochemistry` | 0 – 4 | `immuno` | 6 – 60 |
-| `bronchus` | 13 – 46 | `bronch` | 15 – 176 |
-| `metastasis` | 0 – 19 | `metasta` | 17 – 101 |
-| `pathology` | 5 – 58 | `patholog` | 11 – 91 |
-| `special stains` | 0 on four of five charts | `stain` | 8 – 67 |
-| `right upper lobe` | 2 – 54 | `lobe` | 71 – 153 |
+## A zero-hit search is a fact about the string you typed
 
-The spray is worse than useless because it consumes the budget that reading needs. In the
-worst run measured, `tumor`, `tumour`, `malignant`, `malign`, `cancer`, `benign`, `in situ`,
-`dysplasia`, `polyp`, `adenoma`, `squamous`, `sarcoma`, `lymphoma`, `grade`, `stage` and
-`TNM` each returned **zero** hits; `biopsy` returned 1 and `biops` returned 15; and the
-highest-yield query of the run — a two-word site term, 18 hits — was issued 50th out of 50.
+It says that sequence of characters was not found. It does not say the concept is absent: the
+record may use another word, another notation, another abbreviation — or may not contain the
+document that would have said it at all.
 
-`carcinoma` was issued as query 4 and again, character-for-character, as query 30 of the
-same run. Re-issuing a query is the signature of not refining one.
+So a zero-hit result is never, by itself, grounds for answering that something is not there.
+Widening until you run out of ideas does not change this; running out of ideas is a fact about
+you. What an absence claim actually owes is a different question from what a search returns,
+and `coverage-judgement` is where it is answered.
 
-## 3. Search locates; reading answers
+## Search locates; reading answers
 
-Measured over all 39 traces: **337 searches, of which 225 (67%) were never followed by a
-read of any document they hit, and 134 (40%) returned zero hits.** One run issued 50
-searches (48 distinct) and performed 3 reads. A search that leads to no read did nothing
-except spend a step.
+A hit is a position in a document. Whether the text at that position means what you need is
+decided by reading around it — the sentence may be negated, hypothetical, planned rather than
+done, or about a different subject than the one you are asking about.
 
-- After at most two searches on one field, open a document.
-- A hit is a location, not a fact. The snippet is 160 characters of context and is not
-  citable evidence on its own — read the document around it before recording it.
-- Zero hits is a result about **your vocabulary**, not about the chart. Shorten to the stem,
-  drop a modifier, try the abbreviation and the expansion, or check the type filter. Only
-  after the stem also returns nothing is absence evidence of absence.
+- After at most two searches on one field, open something.
+- Record evidence from the document you read, never from the snippet.
+- A search that led to no read spent a step and established nothing. Several in a row is the
+  signature of refining a query instead of answering a question.
 
-## The hit cap hides the newest documents
+## Re-issuing a query
 
-`search_notes` scans documents **oldest first and stops the moment it reaches `max_hits`**
-(default 25). A broad stem on a busy chart therefore returns the oldest chatter and silently
-omits everything after it — including, routinely, the report you were looking for.
-
-Measured: on patient `P02`, `patholog` at the default cap surfaces 3 documents
-of the 18 that match and **loses all four pathology reports** — both
-`Surgical-Pathology-Document`s and two `Cytology-Report`s, all dated the same day — because
-the cap is exhausted inside the first three weeks of a year-long span. On
-`P05`, `stain` at the default cap loses both same-day `Cytology-Report`s.
-
-`truncated: true` on a search result means you are looking at the oldest slice of the
-matches. Thirty search results in the traces came back truncated. React by narrowing with
-`doc_type_contains` or `date_from`, or by raising `max_hits` — never by reasoning over the
-slice as though it were the whole.
-
-## Order of work
-
-1. Write one term column per output field before searching anything.
-2. Reduce each term to its shortest unambiguous stem.
-3. Search the highest-value field first, narrowed by document type where triage identified
-   a deciding class.
-4. Open a document after every one or two searches. Record evidence from the document, not
-   from the snippet.
-5. Before recording any not-documented, unknown or NOS value, check that every term in that
-   field's column was actually searched and that no result was left truncated.
-
-Measured stem-yield tables and the per-field worksheet:
-`assets/skills/keyword-strategy/references/stem-yields.md`.
+Issuing the same string twice tells you what it told you the first time. When you find yourself
+about to, the thing that needs to change is the term, the width, or the field you are working
+on — not the number of attempts.

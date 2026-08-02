@@ -31,7 +31,13 @@ for a later author's recollection of it.
 So treat a summary as the highest-value POINTER in the record and never as a witness unless the
 contract says a statement of that kind establishes the field. A summary can also be wrong about
 its own history, and it is frequently copied forward unchanged from an earlier summary that was
-wrong first. Corroborate the date it names against something written on that date.
+wrong first.
+
+What you owe it is verification of what it REFERS TO — which episode, which subject, which
+event — not necessarily a document written on the date it names. Some contracts explicitly let
+a later authority state that something was true earlier, and require the earlier date. Where a
+contract says that, demanding a contemporaneous document rejects evidence the contract admits.
+Check the contract before you decide what corroboration means here.
 
 ## Let the task's time window exclude before terms do
 
@@ -46,8 +52,12 @@ about the hit itself says so.
 The clearest, most complete, most quotable document is usually late, because clarity accumulates.
 If the contract asks when something was first established, that document is evidence of the
 opposite: everything it states so well was known by then, not first known then. Work back from it
-to the earliest record that would satisfy the contract on its own, and stop there — not at the
-one you would most like to quote.
+to the earliest record the contract would accept — not to the one you would most like to quote.
+
+Whether it accepts it may depend on a LATER document: contracts often admit an early, tentative
+record only when something afterwards confirms what it was tentative about. So the earliest
+candidate and its later confirmation are frequently one piece of evidence in two documents, and
+stopping at the first of them is stopping halfway.
 
 ## What this cannot do
 

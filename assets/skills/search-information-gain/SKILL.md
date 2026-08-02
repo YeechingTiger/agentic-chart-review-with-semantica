@@ -31,12 +31,21 @@ Gain is a change in what you would answer, or in your grounds for it.
 - **High.** A document type the contract lets ESTABLISH the field, when you hold nothing that
   can. A term that separates two readings you are currently unable to decide between. Following
   a deferral to where it was resolved.
-- **Near zero, and it is the trap.** A fourth document saying what three already said. A
-  synonym of a term that already hit. Re-reading a passage you have cited. These feel like
-  work and move the ledger, so they survive a review that counts documents.
+- **Near zero, and it is the trap.** A fourth document saying what three already said.
+  Re-reading a passage you have cited. Repeating a query you have run. These feel like work and
+  move the ledger, so they survive a review that counts documents.
+- **NOT near zero, though it looks it: another word for something a term already found.** The
+  search folds no synonyms, so a term that hit tells you nothing about what its alternatives
+  would reach — including documents that use the other word and never the one you tried. The
+  hits you already have are the reason this feels redundant and no reason at all that it is.
 
-The test for the trap: if you can already predict what the call returns, it has no gain. Make
-the prediction first — being wrong is itself the finding.
+Predict what the call will return before making it — being wrong is itself the finding.
+
+But a confident prediction does not by itself make the call worthless. A result you expected
+still earns its cost when it gives you a citable source for something you currently only
+believe, discharges a proof obligation the contract states, or closes a conflict you have left
+open. Gain is the expected improvement in the ANSWER, in the sufficiency of the evidence under
+it, in the state of any conflict, or in what remains uncertain — not in your surprise.
 
 ## When the highest-gain action is to stop
 

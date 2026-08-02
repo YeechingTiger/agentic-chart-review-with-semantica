@@ -13,24 +13,32 @@ This traversal chases that, one thread at a time, to its end.
 
 ## Which pointers to follow, in order
 
-1. **Deferral in a document that COULD establish the field.** A pathology report saying
-   stains are pending is the highest-value pointer in a chart: the thing it defers is exactly
-   the thing you need, and the resolution is usually in the same file or its addendum.
-2. **An explicit cross-reference.** "See addendum", "per outside records", "correlate with
-   the 3/14 biopsy" — a named destination. Follow the name.
+1. **Deferral in a document that COULD establish the field.** A source that explicitly defers
+   its own conclusion to a later result or a referenced artefact is the highest-value pointer
+   there is: what it defers is exactly what you need, and the resolution is usually in the same
+   document's later part or in an amendment to it.
+2. **An explicit cross-reference.** "See addendum", "per outside records", "compare with the 3/14
+   result" — a named destination. Follow the name.
 3. **A hedge that a later document would have resolved.** "Favor squamous" invites a later
    definite statement. Search forward in time from that date.
 
 ## How far, and when to stop following
 
-Follow one thread until it resolves, or until the next hop would be a guess rather than a
-named destination. A resolved thread is worth more than three half-followed ones: the value
-is in reaching the settled statement, and a chain abandoned in the middle has cost the reads
-and produced nothing citable.
+Follow a thread while its next hop is a named destination and is worth more than the first hop
+of any other thread available to you. Reaching a settled statement is what a chase is for, and
+a chain abandoned in the middle has spent reads and produced nothing citable — but that is an
+argument for choosing threads well, not for staying on one after it stops being the best move.
 
-Never revisit a document you have already read in full during this chase — that is the circle
-this traversal is prone to. Keep the thread's hops in mind and, if a hop returns you to a
-document already read, the thread is exhausted, not continuing.
+A thread whose next hop keeps receding is not becoming more valuable because you have already
+spent reads on it. What you have spent is not a reason.
+
+Do not re-read a document for no reason — going round the same loop is the failure this
+traversal is prone to, and a hop that returns you to a document you have read with nothing new
+to ask of it means the thread is exhausted, not continuing.
+
+But re-read when something has changed what the document would MEAN: a new hypothesis it now
+bears on, a referent you can now resolve, a date you now know matters. The same text read
+against a different question is a different read.
 
 ## 记下这一步接在哪一步上
 

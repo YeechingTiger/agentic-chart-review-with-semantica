@@ -34,7 +34,9 @@ if your answer will also assert that nothing else was documented.
 
 Rank the raised questions by whether the deferral sits in a document type that COULD establish
 the field, and chase them in that order. Follow one thread until it resolves or until the next
-hop would be a guess. Do not start a second thread while a higher-ranked one is unresolved.
+hop would be a guess. Rank does not give a thread the queue. Leave one whose next hop has become a guess, or whose
+next hop is worth less than another thread's first hop, and say why you left. A thread that
+cannot be resolved holding up one that can is the most expensive thing this order can do.
 
 ## Returning to the sweep
 
