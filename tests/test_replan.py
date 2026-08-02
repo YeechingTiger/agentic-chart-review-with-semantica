@@ -1093,7 +1093,7 @@ def _agent(spec, chart, llm=None):
                      gate=lambda submitted: {"accepted": False},
                      toolbox=Toolbox(chart, evidence, coverage))
     ctx.declared = {"read_document", "read_documents_batch", "search_notes", "list_documents",
-                    "document_type_summary", "timeline", "record_evidence", "submit_answer"}
+                    "document_type_summary", "record_evidence", "submit_answer"}
     mw = AuditMiddleware(ctx)
     docs_by_type = documents_by_type(chart)
     mw.plan, mw.coverage, mw.evidence, mw.threads = plan, coverage, evidence, threads

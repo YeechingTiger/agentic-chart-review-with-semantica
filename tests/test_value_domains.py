@@ -75,7 +75,7 @@ def test_domain_is_corpus_wide_not_patient_scoped(vocabulary):
     assert "error" not in w_out and w_out["type_exists_but_empty"] is True
 
 
-@pytest.mark.parametrize("tool", ["search_notes", "timeline"])
+@pytest.mark.parametrize("tool", ["search_notes", "list_documents"])
 def test_every_tool_taking_a_doc_type_enforces_the_domain(tb, tool):
     args = {"doc_type_contains": "Biopsy"}
     if tool == "search_notes":

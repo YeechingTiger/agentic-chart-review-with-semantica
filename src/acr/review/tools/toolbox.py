@@ -421,11 +421,12 @@ class Toolbox:
     # an `available_sections` list with the final diagnosis missing from it. `search` returns
     # offsets and `read` takes them, which reaches the same text without a heading vocabulary.
 
-    def _t_timeline(self, doc_type_contains=None, limit: int = 200) -> dict:
-        bad = self._resolve_doc_type(doc_type_contains)
-        if bad:
-            return bad
-        return {"events": self.chart.timeline(doc_type_contains, limit), "type_filter_valid": True}
+    # `_t_timeline` is gone too, and the handler had to go with the schema rather than after it.
+    # `dispatch` resolves `getattr(self, f"_t_{name}")`, so a handler with no schema entry is
+    # still callable — the surface the model is OFFERED and the surface it can REACH were two
+    # different sets, and the manifest records the first. A run that guessed the name would have
+    # used a tool no reader of its manifest could see. `verify_mechanisms.py` M1 compares the two
+    # sets so this cannot recur silently.
 
     def _t_record_evidence(self, note_id: str, start: int, end: int, supports: str,
                            stance: str = "supports", entity: str = "") -> dict:
