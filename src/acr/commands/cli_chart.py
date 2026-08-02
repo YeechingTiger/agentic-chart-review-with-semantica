@@ -99,9 +99,10 @@ def run(
     skills: str = typer.Option(
         "", "--skills",
         help="override the profile's skill assembly: comma-separated slot=value. "
-             "`search=search-native` replaces the search policy, `general=+chart-triage` "
-             "appends one, `general=chart-triage|thread-chasing` replaces the whole general "
-             "list (`|` because comma already separates clauses), `search=` clears the slot. "
+             "`controller=controller-information-gain` replaces the controller, "
+             "`tactics=+tactic-counterevidence` and `general=+chart-triage` append one, "
+             "`general=chart-triage|thread-chasing` replaces a whole list (`|` because "
+             "comma already separates clauses), `controller=` clears the slot. "
              "Validated before any model call."),
     conflict_refine: bool = typer.Option(
         False, "--conflict-refine",
@@ -182,9 +183,10 @@ def batch(
     skills: str = typer.Option(
         "", "--skills",
         help="override the profile's skill assembly: comma-separated slot=value. "
-             "`search=search-native` replaces the search policy, `general=+chart-triage` "
-             "appends one, `general=chart-triage|thread-chasing` replaces the whole general "
-             "list (`|` because comma already separates clauses), `search=` clears the slot. "
+             "`controller=controller-information-gain` replaces the controller, "
+             "`tactics=+tactic-counterevidence` and `general=+chart-triage` append one, "
+             "`general=chart-triage|thread-chasing` replaces a whole list (`|` because "
+             "comma already separates clauses), `controller=` clears the slot. "
              "Parsed once before the loop, so a typo cannot be charged per patient."),
     out: str = typer.Option("runs", "--out"),
 ):

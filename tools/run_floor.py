@@ -63,7 +63,7 @@ def main() -> int:
         print(f"\n=== {name} ({profile}) ===", flush=True)
         r = subprocess.run(
             [sys.executable, "-m", "acr.commands.cli", "batch",
-             "--spec", SPEC, "--runtime-profile", profile, "--skills", "search=",
+             "--spec", SPEC, "--runtime-profile", profile, "--skills", "controller=",
              "--patients", PATIENTS, "--seed", "1234", "--max-usd", "3.0",
              "--out", str(out_root / name)],
             cwd=ROOT, capture_output=True, text=True,

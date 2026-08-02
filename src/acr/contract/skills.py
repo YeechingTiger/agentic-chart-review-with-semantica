@@ -52,10 +52,14 @@ SKILLS_DIR = asset_dir("assets/skills")
 #: guidance, small enough that three of them do not dominate a prompt.
 MAX_SKILL_BYTES = 12_000
 
-#: 一张卡装在哪个槽。槽不是分类标签，是装配位置：`search` 槽恰好装一张，因为它是对照试验里
-#: 唯一被替换的变量；`task` 槽最多一张，跟着 spec 走；`general` 槽不限张数；`eval` 槽属于
-#: 评测那边的 agent，永远不进跑病历的提示词。
-SLOTS: tuple[str, ...] = ("task", "search", "general", "eval")
+#: 一张卡装在哪个槽。槽不是分类标签，是装配位置。
+#:
+#: `controller` 恰好装一张 —— 它是对照试验里唯一被替换的变量。`tactic` 不限张数，因为一个
+#: 战术是前提成立时才可以调用的动作，不是一次运行的整个方针；2026-08-02 之前八张卡挤在同一
+#: 个槽里八选一，量到的是不同种类干预之间的差别，不是策略之间的差别。`experience` 只在经验
+#: 臂打开。`task` 最多一张，跟着 spec 走。`general` 不限张数，是每个条件都有的东西。`eval`
+#: 属于评测那边的 agent，永远不进跑病历的提示词。
+SLOTS: tuple[str, ...] = ("task", "controller", "tactic", "experience", "general", "eval")
 
 _FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 
@@ -130,28 +134,39 @@ def skill_slot(name: str, skills_dir: Path | str | None = None) -> str:
 class SkillStack:
     """How one run's method guidance is assembled: which skill sits in which slot.
 
-    `search` holds AT MOST ONE because it is the variable a retrieval arm replaces. Two search
-    policies rendered together are not "more guidance" — they are an unlabelled third policy,
-    and the manifest would record two names where the model received one merged instruction.
+    `controller` holds AT MOST ONE because it is the variable an arm replaces. Two controllers
+    rendered together are not "more guidance" — they are an unlabelled third policy, and the
+    manifest would record two names where the model received one merged instruction.
+
+    `tactics` is a TUPLE, and the difference is the whole point of the 2026-08-02 split. A
+    controller decides what to do next; a tactic is a move available when its precondition
+    holds. Following a deferral needs a deferral to exist, entering at a summary needs a summary
+    to exist, working a prior needs a prior — those are moves, and an arm that drew one of them
+    as its entire policy on a record that did not meet its precondition was handed nothing.
+    Eight cards competing for one slot measured the difference between kinds of intervention,
+    not between policies.
     """
 
     task: str | None = None
-    search: str | None = None
+    controller: str | None = None
+    tactics: tuple[str, ...] = ()
     general: tuple[str, ...] = ()
 
     def names(self) -> tuple[str, ...]:
-        """Render order: what the task is, then how to look, then the standing habits."""
+        """Render order: the task, how to decide, the moves available, the standing habits."""
         out: list[str] = []
         if self.task:
             out.append(self.task)
-        if self.search:
-            out.append(self.search)
+        if self.controller:
+            out.append(self.controller)
+        out.extend(self.tactics)
         out.extend(self.general)
         return tuple(out)
 
     def validate(self, skills_dir: Path | str | None = None) -> None:
         """Every named skill exists and declares the slot it was placed in."""
-        placed = [(self.task, "task"), (self.search, "search")]
+        placed = [(self.task, "task"), (self.controller, "controller")]
+        placed += [(n, "tactic") for n in self.tactics]
         placed += [(n, "general") for n in self.general]
         seen: set[str] = set()
         for name, slot in placed:
@@ -164,8 +179,9 @@ class SkillStack:
             if declared != slot:
                 raise SkillError(
                     f"skill {name!r} declares slot {declared!r} but was placed in the {slot!r} "
-                    f"slot. Placement is not a preference: the search slot is the one variable "
-                    f"a retrieval arm replaces.")
+                    f"slot. Placement is not a preference: the controller slot holds the one "
+                    f"variable an arm replaces, and a tactic placed there becomes a whole policy "
+                    f"on records where its precondition never fires.")
 
 
 def parse_skill_stack(spec: str, base: SkillStack,
@@ -177,13 +193,15 @@ def parse_skill_stack(spec: str, base: SkillStack,
     forcing the second to masquerade as the first is how uncertified assets get adopted.
     The result is validated, so a typo fails before a single model call is paid for.
 
-    Clauses are comma-separated, which is why a `general` REPLACEMENT list is joined by `|`
+    Clauses are comma-separated, which is why a multi-card REPLACEMENT list is joined by `|`
     instead: `general=a|b` is one clause naming two cards, where `general=a,general=b` would
-    be two clauses of which only the last survives.
+    be two clauses of which only the last survives. `tactics` takes the same form, and `+name`
+    appends to either instead of replacing.
     """
     if not spec.strip():
         return base
-    task, search, general = base.task, base.search, list(base.general)
+    task, controller = base.task, base.controller
+    lists = {"tactics": list(base.tactics), "general": list(base.general)}
     for clause in spec.split(","):
         clause = clause.strip()
         if not clause:
@@ -192,19 +210,22 @@ def parse_skill_stack(spec: str, base: SkillStack,
             raise SkillError(f"skill override {clause!r}: expected slot=value")
         slot, _, value = clause.partition("=")
         slot, value = slot.strip(), value.strip()
-        if slot not in ("task", "search", "general"):
+        if slot not in ("task", "controller", "tactics", "general"):
             raise SkillError(
-                f"skill override: unknown slot {slot!r}; expected task, search or general "
-                f"(the eval slot belongs to the evaluation agent, not a chart run)")
+                f"skill override: unknown slot {slot!r}; expected task, controller, tactics or "
+                f"general (the eval slot belongs to the evaluation agent, not a chart run). "
+                f"`search` was renamed to `controller` on 2026-08-02 when the traversal tactics "
+                f"moved out of it.")
         if slot == "task":
             task = value or None
-        elif slot == "search":
-            search = value or None
+        elif slot == "controller":
+            controller = value or None
         elif value.startswith("+"):
-            general.append(value[1:])
+            lists[slot].append(value[1:])
         else:
-            general = [v for v in value.split("|") if v]
-    out = SkillStack(task=task, search=search, general=tuple(general))
+            lists[slot] = [v for v in value.split("|") if v]
+    out = SkillStack(task=task, controller=controller,
+                     tactics=tuple(lists["tactics"]), general=tuple(lists["general"]))
     out.validate(skills_dir)
     return out
 
@@ -306,8 +327,10 @@ def skills_manifest(stack: SkillStack, skills_dir: Path | str | None = None) -> 
     slot_of = {}
     if stack.task:
         slot_of[stack.task] = "task"
-    if stack.search:
-        slot_of[stack.search] = "search"
+    if stack.controller:
+        slot_of[stack.controller] = "controller"
+    for n in stack.tactics:
+        slot_of[n] = "tactic"
     for n in stack.general:
         slot_of[n] = "general"
     out = []

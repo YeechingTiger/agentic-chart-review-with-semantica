@@ -1,7 +1,7 @@
 ---
-name: search-breadth-first
+name: tactic-coverage-pool
 description: Use when deciding how to traverse a chart and you want coverage before depth - building the full candidate pool of documents that could carry the field before reading any of them closely. Tells you how to sweep the document inventory by type, what to record about each candidate, when a sweep is complete, and what a sweep cannot tell you. Pairs with but does not replace chasing an individual lead.
-slot: search
+slot: tactic
 license: MIT
 ---
 

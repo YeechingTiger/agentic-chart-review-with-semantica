@@ -68,7 +68,7 @@ The variable changes; these five kinds do not.
 | about status or summary judgements (stage assigned, class of case, vital status) | `Discharge-Summary`, `Tumor-Board-Recommendation-Note`, registry-facing summaries | inference from the clinical course; some of these are genuinely outside the notes |
 
 When a spec's field is a location and its search hints are all diagnostic terms, the second
-row is the one being skipped — see `assets/skills/keyword-strategy/SKILL.md`.
+row is the one being skipped — see `assets/skills/tactic-query-formulation/SKILL.md`.
 
 ## Absence is a finding, but only after you enumerate
 

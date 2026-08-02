@@ -409,7 +409,7 @@ def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None) ->
 
     `skill_stack` IS THE STACK THAT WAS RENDERED, and it must be the same object `agent` passed to
     `skills_block`. Deriving it here from the profile instead was a real defect, caught on the
-    first live run against the synthetic corpus: `--skills search=search-breadth-first` reached
+    first live run against the synthetic corpus: `--skills tactics=tactic-coverage-pool` reached
     the model and the manifest recorded the profile's default, so the artifact said two arms of a
     retrieval ablation used identical guidance while their prompts differed by a whole card. A
     manifest that names the wrong asset is worse than one that names none — the second is a gap a

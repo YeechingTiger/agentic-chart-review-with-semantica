@@ -1476,7 +1476,7 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
 
     # RESOLVED ONCE. The prompt renders this and the manifest records this — the same object,
     # not two evaluations of the same conditional. Two evaluations is how the first live run
-    # against the synthetic corpus ended up with `search-breadth-first` in the model's prompt
+    # against the synthetic corpus ended up with `tactic-coverage-pool` in the model's prompt
     # and the profile's default in its manifest: the render honoured the override and the
     # manifest re-derived from the profile, so the artifact described a run that never happened.
     effective_stack = (skill_stack if skill_stack is not None

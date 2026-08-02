@@ -67,17 +67,17 @@ def test_unknown_slot_raises(tmp_path: Path):
         skill_slot("bad-slot", tmp_path)
 
 
-def test_stack_renders_task_then_search_then_general():
-    stack = SkillStack(task="store-icdo-coding", search="keyword-strategy",
+def test_stack_renders_task_then_controller_then_general():
+    stack = SkillStack(task="store-icdo-coding", controller="controller-reactive",
                        general=("chart-triage", "coverage-judgement"))
-    assert stack.names() == ("store-icdo-coding", "keyword-strategy",
+    assert stack.names() == ("store-icdo-coding", "controller-reactive",
                              "chart-triage", "coverage-judgement")
 
 
 def test_stack_rejects_a_skill_in_the_wrong_slot():
-    """把一张 general 卡塞进 search 槽——这正是会让对照试验失去意义的装配错误。"""
-    with pytest.raises(SkillError, match="chart-triage.*declares slot 'general'.*'search'"):
-        SkillStack(search="chart-triage").validate()
+    """把一张 general 卡塞进 controller 槽——这正是会让对照试验失去意义的装配错误。"""
+    with pytest.raises(SkillError, match="chart-triage.*declares slot 'general'.*'controller'"):
+        SkillStack(controller="chart-triage").validate()
 
 
 def test_stack_rejects_an_eval_skill_in_the_chart_agent(tmp_path: Path):
@@ -97,7 +97,7 @@ def test_stack_rejects_an_eval_skill_in_the_chart_agent(tmp_path: Path):
 
 @pytest.mark.parametrize("name", sorted(p.name for p in SKILLS_DIR.iterdir()
                                         if p.name.startswith("eval-")))
-@pytest.mark.parametrize("slot", ["task", "search", "general"])
+@pytest.mark.parametrize("slot", ["task", "controller", "general"])
 def test_a_real_eval_card_cannot_be_placed_in_a_chart_slot(name: str, slot: str):
     """上一条用 tmp_path 造卡测机制；这一条测真卡，走的是用户真会敲的那条路。
 
@@ -126,7 +126,7 @@ def test_default_profile_renders_the_universal_block_then_the_standing_habits():
     在 `coverage-judgement` 一张卡下跑，重构顺手多塞两张就会让新旧 run 不可比。那个理由仍然
     成立，而 2026-08-02 这次是**故意**破坏它的：`tool-contract` 加进了每一个 profile。
 
-    为什么值得破坏一次可比性——外部审核指出，`keyword-strategy` 知道 substring、hit cap、
+    为什么值得破坏一次可比性——外部审核指出，`tactic-query-formulation` 知道 substring、hit cap、
     扫描顺序这些工具事实，别的卡不知道，于是七个臂的差异里一直混着"谁碰巧了解仪器"。工具
     事实不是策略，属于每一个臂。破坏是一次性的，此后这条测试照旧钉住。
     """
@@ -172,8 +172,8 @@ CORPUS = ROOT / "corpus" / "patients"
 
 def test_parse_replaces_the_search_slot():
     base = SkillStack(general=("coverage-judgement",))
-    got = parse_skill_stack("search=keyword-strategy", base)
-    assert got == SkillStack(search="keyword-strategy", general=("coverage-judgement",))
+    got = parse_skill_stack("controller=controller-reactive", base)
+    assert got == SkillStack(controller="controller-reactive", general=("coverage-judgement",))
 
 
 def test_parse_appends_to_general():
@@ -205,17 +205,17 @@ def test_parse_rejects_an_unknown_slot():
 
 def test_parse_rejects_a_missing_equals():
     with pytest.raises(SkillError, match="expected slot=value"):
-        parse_skill_stack("search-native", SkillStack())
+        parse_skill_stack("controller-reactive", SkillStack())
 
 
 def test_parse_validates_placement():
     with pytest.raises(SkillError, match="declares slot 'general'"):
-        parse_skill_stack("search=chart-triage", SkillStack())
+        parse_skill_stack("controller=chart-triage", SkillStack())
 
 
 def test_parse_empty_value_clears_the_slot():
-    base = SkillStack(search="keyword-strategy", general=("coverage-judgement",))
-    assert parse_skill_stack("search=", base).search is None
+    base = SkillStack(controller="controller-reactive", general=("coverage-judgement",))
+    assert parse_skill_stack("controller=", base).controller is None
 
 
 def test_parse_empty_string_is_the_base():
@@ -267,14 +267,14 @@ def test_run_patient_without_a_stack_renders_the_profiles_own(tmp_path: Path):
     """`skill_stack=None` is the path every recorded run has taken; it must not move."""
     prompt = _scripted_system_prompt(tmp_path)
     assert _was_rendered(prompt, "coverage-judgement")
-    assert not _was_rendered(prompt, "keyword-strategy")
+    assert not _was_rendered(prompt, "tactic-query-formulation")
 
 
 def test_run_patient_renders_the_stack_it_was_given(tmp_path: Path):
     """An explicit stack replaces the profile's, and it is the override that reaches the model."""
     prompt = _scripted_system_prompt(
-        tmp_path, skill_stack=SkillStack(search="keyword-strategy"))
-    assert _was_rendered(prompt, "keyword-strategy")
+        tmp_path, skill_stack=SkillStack(controller="controller-reactive"))
+    assert _was_rendered(prompt, "controller-reactive")
     assert not _was_rendered(prompt, "coverage-judgement")
 
 
@@ -299,7 +299,7 @@ def test_the_manifest_records_the_stack_the_model_was_actually_given(tmp_path: P
     """The prompt and the manifest must name the SAME cards.
 
     This is a regression test for a defect found on the first live run against the synthetic
-    corpus. `--skills search=search-breadth-first` was honoured by the prompt builder and
+    corpus. `--skills controller=tactic-coverage-pool` was honoured by the prompt builder and
     ignored by `prompt_asset_manifest`, which re-derived the stack from the runtime profile. The
     run therefore produced an artifact asserting it had used the profile's default guidance while
     the model had read a different card — and two arms of a retrieval ablation would have
@@ -309,12 +309,12 @@ def test_the_manifest_records_the_stack_the_model_was_actually_given(tmp_path: P
     a reader can see. Asserting agreement between the two, rather than the value of either, is
     what makes the two halves impossible to drift apart again.
     """
-    stack = SkillStack(search="keyword-strategy")
+    stack = SkillStack(controller="controller-reactive")
     recorded = _scripted_manifest_skills(tmp_path / "m", skill_stack=stack)
     prompt = _scripted_system_prompt(tmp_path / "p", skill_stack=stack)
 
-    assert [e["skill"] for e in recorded] == ["keyword-strategy"]
-    assert [e["slot"] for e in recorded] == ["search"]
+    assert [e["skill"] for e in recorded] == ["controller-reactive"]
+    assert [e["slot"] for e in recorded] == ["controller"]
     for entry in recorded:
         assert _was_rendered(prompt, entry["skill"]), (
             f"the manifest claims {entry['skill']!r} but the model was never given it")
@@ -364,7 +364,7 @@ def test_a_bad_skills_string_costs_nothing_on_batch(monkeypatch, tmp_path: Path)
     failures whose cause was one typo.
     """
     r = _invoke(monkeypatch, tmp_path, "batch", "--patients", "SYN0001",
-                "--skills", "search=chart-triage")
+                "--skills", "controller=chart-triage")
     assert r.exit_code != 0
     assert isinstance(r.exception, SkillError), r.output
     assert "declares slot 'general'" in str(r.exception)
@@ -385,5 +385,5 @@ def test_the_skills_help_documents_every_form_of_the_syntax(command: str):
     out = CliRunner().invoke(app, [command, "--help"]).output
     flat = " ".join(out.split())
     assert "--skills" in flat
-    for form in ("search=", "general=+", "|"):
+    for form in ("controller=", "tactics=+", "general=+", "|"):
         assert form in flat, f"{command} --help does not document {form!r}"

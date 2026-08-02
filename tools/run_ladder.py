@@ -26,13 +26,13 @@ SPEC = "assets/specs/STORE.390.date_of_initial_diagnosis.yaml"
 
 #: B0 first — everything else is measured against it. `search=` with no value clears the slot.
 ARMS: list[tuple[str, str]] = [
-    ("B0-base", "search="),
-    ("native", "search=search-native"),
-    ("breadth-first", "search=search-breadth-first"),
-    ("depth-first", "search=search-depth-first"),
-    ("breadth-then-depth", "search=search-breadth-then-depth"),
-    ("information-gain", "search=search-information-gain"),
-    ("latest-first", "search=search-latest-first"),
+    ("B0-base", "controller="),
+    ("native", "controller=controller-native"),
+    ("breadth-first", "controller=controller-breadth-first"),
+    ("depth-first", "controller=controller-depth-first"),
+    ("breadth-then-depth", "controller=controller-breadth-then-depth"),
+    ("information-gain", "controller=controller-information-gain"),
+    ("latest-first", "controller=controller-latest-first"),
 ]
 
 PATIENTS = ",".join(

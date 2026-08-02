@@ -417,7 +417,7 @@ BLUEPRINTS = [
                "malignant, not diagnosis. A run searching the contract's own vocabulary comes "
                "back empty and concludes the chart is silent. 'adeno' hits and "
                "'adenocarcinoma' does not, which is precisely the shorter-stem move the "
-               "search-native card advises — so this chart tests whether that advice is "
+               "controller-reactive card advises — so this chart tests whether that advice is "
                "followed rather than merely rendered."),
         expect={"dx_date": "20210917", "naive_answer": "EVIDENCE_INSUFFICIENT",
                 "requires": "widening to a stem after the contract's own words miss"},
@@ -765,7 +765,7 @@ def shorthand_note(bp, name, sex, dob, dtype, d) -> str:
 
     No full word appears: not "adenocarcinoma", not "carcinoma", not "malignant", not
     "diagnosis". A run that searches the contract's own vocabulary finds nothing and concludes
-    the chart is silent. The `search-native` card's advice to try a shorter stem is exactly what
+    the chart is silent. The `controller-reactive` card's advice to try a shorter stem is exactly what
     reaches this — "adeno" hits, "adenocarcinoma" does not — so the chart tests that advice
     rather than merely repeating it.
     """

@@ -40,7 +40,7 @@ _CAUSE_PROPERTY = {
 #: The pointer, as a FLAT INTEGER beside the prose rather than a field inside it.
 #:
 #: The first version made `because` an `anyOf[string, object]` whose object form carried
-#: `from.event`. Measured on a fresh run of `search-depth-first` with the card explicitly asking
+#: `from.event`. Measured on a fresh run of `tactic-follow-dependency` with the card explicitly asking
 #: for it: 0 of 18 calls emitted one. Offered two shapes, the model took the simpler. A flat
 #: integer parameter sitting next to the prose is the same information with nothing to choose
 #: between, and `because` goes back to being exactly the string every recorded run already
