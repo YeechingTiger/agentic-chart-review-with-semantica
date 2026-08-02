@@ -16,9 +16,41 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 #: `slot: search` cards only, and not the three `-nostop` variants — those are one experiment's
 #: derived arms, not strategies anyone proposed.
-CARDS = ["keyword-strategy", "search-native", "search-preplanned", "search-breadth-first",
-         "search-depth-first", "search-breadth-then-depth", "search-information-gain",
-         "search-latest-first"]
+#:
+#: The second element is what the card is TRYING TO ACHIEVE, in our words, so a reviewer can
+#: judge the text against its own intention. No result from our runs appears anywhere in this
+#: pack: a policy has to be defensible as a policy, and quoting our own measurements at a
+#: reviewer both prejudges the question and rests it on numbers from one synthetic corpus.
+CARDS = [
+    ("keyword-strategy",
+     "Build the term list from what the ANSWER must say rather than from the topic of the "
+     "record; prefer the shortest unambiguous form of a word; treat a search as a locator and "
+     "never as a finding."),
+    ("search-native",
+     "When no term list has been supplied, derive terms from the contract's own words and the "
+     "record's own vocabulary, widen along one axis at a time after a miss, and stop only when "
+     "you can name what a further search would have to find in order to change the answer."),
+    ("search-preplanned",
+     "When a term list and a type prior HAVE been supplied, work them first because they are "
+     "cheap, then test them against this record, and treat a disagreement between plan and "
+     "record as a fact about the plan."),
+    ("search-breadth-first",
+     "Build the full pool of candidate documents before reading any of them, so that whatever "
+     "is later claimed about the record rests on a denominator that can be stated."),
+    ("search-depth-first",
+     "When a document defers its own conclusion, follow the deferral to where the question was "
+     "settled, rather than sampling more of the record."),
+    ("search-breadth-then-depth",
+     "Do both, in a stated order, using the sweep to generate the questions that the chase then "
+     "answers."),
+    ("search-information-gain",
+     "Choose each next action by what it could change about the answer, rather than by how much "
+     "of the record it covers."),
+    ("search-latest-first",
+     "Enter at the most recent summarising document to learn the shape of the case and its "
+     "local vocabulary cheaply, then move upstream to the records that actually establish "
+     "things."),
+]
 
 SPEC = ROOT / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
 
@@ -57,40 +89,40 @@ that found them, per-term cap) · `read_document` (offset/limit) · `read_docume
 
 Deliberately ordinary. There is no semantic search, no section addressing, no timeline tool.
 
-## Measured facts bearing on the cards
+## The problem we already know these cards have, and want judged
 
-The corpus is 21 synthetic patients, ~300 documents each. Six of them (`SYNX01`–`SYNX06`) are
-adversarial: each declares the wrong-but-reachable answer an ordinary pass yields, so "did the
-trap spring" is countable. All numbers below are from runs on this corpus.
+**They are too specific to be policies.** A search policy should be a general habit of reading
+records — something that tells you what to do with any question against any record. Several of
+these instead read as tactics for a situation that may or may not arise, or as reports of what
+happened on one corpus. Three symptoms, all of which a reviewer will see in the text below:
 
-1. **No card beat an empty search slot.** Seven cards, eighteen charts. The empty slot scored
-   15/18; every card scored at or below it.
-2. **The hand-written prior cost accuracy.** With it: 12.8 documents read per patient, 3/6 on the
-   adversarial charts. Without it: 5.8 read, 5/6. It read twice as much and found less — on
-   `SYNX05` it read exactly the 23 documents its `exhaustive` policy mandated, 22 of them a
-   decade of routine clinic notes, and never opened the one carrying the answer.
-3. **On `SYNX05` the winning search term was `cancer`** — a synonym of `carcinoma` and
-   `malignancy`, both of which had already returned hits.
-4. **Stems beat full words.** `patholog` 11–91 hits where `pathology` gets 5–58; `bronch` 15–176
-   where `bronchus` gets 13–46.
-5. **Searches that lead to no read did nothing.** Across 39 early traces, 67% of searches were
-   never followed by a read of anything they hit.
-6. **Hit truncation no longer occurs.** 0 of 953 term-searches in the most recent runs came back
-   truncated, since the cap became per-term.
+- **Anecdote hardened into rule.** Some cards quote counts, named patients and hit tables from
+  our own runs. Whatever those numbers were worth as evidence, inside a policy they are
+  instructions that only apply where the same thing happens to be true.
+- **A domain's example doing a general rule's work.** Where a card needs to illustrate "a
+  document that defers its own conclusion", it reaches for a pathology report awaiting stains.
+  A reader in another domain has to translate before they can comply.
+- **Conditional tactics presented as strategies.** Following a deferral requires a deferral to
+  exist. Entering at the latest summary requires a summarising document to exist. Working a
+  supplied plan requires a plan. These are moves, not policies, and a run that draws one of them
+  on a record that does not meet its precondition has been handed nothing.
 
 ## What we would like reviewed
 
-1. **Each card, on its own terms.** Is the strategy it describes coherent? Are there rules that
-   would obviously damage task execution — not "suboptimal", but actively steering away from the
-   answer?
-2. **Domain leakage.** Which rules are secretly about oncology rather than about reading records?
-3. **The contract.** Is anything in it unanswerable, self-contradictory, or unenforceable? Its
-   value space, in particular: does it let a run express everything a run might truthfully need
-   to say?
-4. **Overlap.** Eight cards for one slot. Which are genuinely distinct strategies and which are
-   the same strategy twice?
-5. **What is missing.** Given the six measured facts above, what strategy is not represented here
-   at all?
+1. **Generality.** For each card: is this a habit that transfers to any record and any question,
+   or a tactic for one situation? Where it is a tactic, what is the general policy it is a
+   special case of?
+2. **Rules that damage.** Not "suboptimal" — rules that would actively steer a competent reader
+   away from the answer. Please quote them.
+3. **Domain leakage.** Which rules are about oncology, or about clinical records specifically,
+   rather than about reading a body of documents to answer a question?
+4. **Overlap.** Eight cards for one slot. Which are genuinely distinct, and which are the same
+   policy stated twice?
+5. **What is missing.** What general search habit is not represented here at all?
+6. **The contract.** Is anything in it unanswerable, self-contradictory, or unenforceable? Its
+   value space in particular: can a run express everything it might truthfully need to say?
+
+Nothing in this pack reports what we measured. The cards should be defensible as policies.
 
 ---
 
@@ -116,9 +148,10 @@ def main() -> None:
                          capture_output=True, text=True).stdout.strip()
     print(HEAD.format(sha=sha, spec_rel=SPEC.relative_to(ROOT),
                       spec_text=SPEC.read_text(encoding="utf-8").rstrip()))
-    for i, name in enumerate(CARDS, 1):
+    for i, (name, intent) in enumerate(CARDS, 1):
         body = (ROOT / "assets" / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
-        print(f"\n---\n\n## 2.{i}  `{name}`\n\n```markdown\n{body.rstrip()}\n```")
+        print(f"\n---\n\n## 2.{i}  `{name}`\n\n**What it is trying to achieve.** {intent}\n\n"
+              f"```markdown\n{body.rstrip()}\n```")
 
 
 if __name__ == "__main__":
