@@ -427,3 +427,112 @@ The experience library (B2): learned on a development set, certified by the perm
 and screened by the answer-leak filter, versioned as an asset. That is what B2 is for. A
 retrieval prior hand-written into the contract and shipped to every run is the thing it exists
 to replace — and E4 measures what that hand-written one is currently worth.
+
+## Amendment, made after launch and before any result was read
+
+`guideline-only` moves two things, not one. Beside dropping the retrieval prior it drops the
+coverage proof:
+
+| arm | `search_terms` | `required_strata` | negative proof |
+|---|---|---|---|
+| `prior` STRATIFIED_COVERAGE | the five | the three | always required |
+| `floor` GUIDELINE_ONLY | none | none | none |
+
+So a `prior`−`floor` difference confounds "no keyword prior" with "weaker gate". It bites on
+SYNX06, whose declared `naive_answer` is EVIDENCE_INSUFFICIENT — a weaker gate makes abstention
+cheaper, and abstention is that chart's trap.
+
+The arm that separates them also already exists and is also unused: `conditional-negative-coverage`
+— `search_terms=()` but `required_strata` retained, coverage activated only when the answer makes
+a negative-shaped claim. `prior`−`conditional` isolates the keyword and type prior;
+`conditional`−`floor` isolates the gate.
+
+It is being run as a third arm after the first two. Recorded here as an amendment rather than
+folded into the prediction above, because the prediction was written without it and a
+pre-registration edited to match what you later thought of is not one.
+
+## E4 results
+
+Three arms, eighteen charts each, one spec hash (`3e3aa2ca6ea6`), no card in any of them.
+
+| arm | 读/人 | 词/人 | 自创词/人 | 全部 | SYNX | 中饵 | 读到关键 |
+|---|---|---|---|---|---|---|---|
+| `conditional` | 5.2 | 16.1 | 13.2 | **17/18** | 5/6 | 1/6 | 5/6 |
+| `floor` | 5.8 | 22.1 | 18.3 | 16/18 | 5/6 | 1/6 | 5/6 |
+| `prior` | 12.8 | 14.8 | 4.8 | 15/18 | 3/6 | 2/6 | 2/6 |
+
+**The prior arm read twice as much and found less.** 12.8 documents per patient against 5.8,
+and on the six adversarial charts it reached the establishing document twice where the other
+two reached it five times.
+
+### The confound is resolved
+
+`conditional` was added to separate "no retrieval prior" from "weaker gate". Its retrieval plan
+turns out to be identical to `floor`'s — `patient_inventory_only`, `read_all=[]`,
+`initial_keywords=[]` — because `required_strata` feeds the proof obligation, not the plan. So
+`conditional`−`floor` is the gate alone, and on the adversarial charts it is nothing: 5/6 and
+5/6, 1/6 sprung and 1/6, 5.2 reads and 5.8.
+
+The gate is not what makes the floor beat the prior. `prior`−`floor` is the retrieval prior.
+
+### Why, mechanically — this part is not statistical
+
+On SYNX05 the `can_establish` stratum contains 23 documents: 22 `Onc-Med-MD-OP-Progress-Note`
+spanning 2009 to 2020, and one pathology report. Its policy is `exhaustive`.
+
+`prior` read 23 documents. **The same 23.** Not a near match — the identical set, all of it,
+and nothing else. `floor` read four, one of which was
+`Endo-Diab-MD-OP-Progress-Note_2018-11-07`, the document carrying the answer.
+
+The shape is structural, not a property of this chart:
+
+| chart | documents | mandated by `exhaustive` | of those, routine oncology follow-up |
+|---|---|---|---|
+| SYNX01 | 303 | 26 | 25 |
+| SYNX02 | 330 | 27 | 26 |
+| SYNX03 | 312 | 24 | 22 |
+| SYNX04 | 299 | 18 | 16 |
+| SYNX05 | 287 | 23 | 22 |
+| SYNX06 | 317 | 21 | 21 |
+
+85–100% of what the stratum compels a run to read is a decade of routine clinic notes. **The
+cost does not depend on the stratum picking the right types.** Pick them right and the run
+still spends its budget reading twenty of them before it may look anywhere else.
+
+### What the gate does buy
+
+`20999999` — year 2099, month 99, day 99 — was produced by `floor` on SYN0002 and by `prior` on
+SYNX06, and never by `conditional`. It is format-valid: `(19|20)\d{2}(0[1-9]|1[0-2]|99)(...|99)`
+accepts it. The run wanted to say the year was not establishable and the value space has no way
+to say it — `decision_rule[5]` orders the year approximated, and the only imputation flag is
+`month_day_imputed`. Nothing records that a year was estimated, so an approximated date and a
+witnessed one are indistinguishable downstream.
+
+`conditional` avoids it because a negative-shaped claim activates the coverage proof, and
+discharging it finds the date. `prior` has that proof always on and still failed — it had spent
+its reads on the stratum first.
+
+**So the two halves want opposite settings**: drop the retrieval prior, keep the negative-claim
+proof. That is `conditional`, and it is the best arm on every column.
+
+### What this does not show
+
+- **SYNX02 is failed by all three.** Its requirement is "sweeping a type that states no
+  diagnosis", and nothing here does that. It is the one chart where a breadth policy might earn
+  its keep, and it remains open.
+- **The six SYNX charts are built to punish priors.** On the twelve ordinary charts `prior` is
+  12/12 and `floor` is 11/12. A prior costs nothing where it is right. What the real mix of
+  right-and-wrong looks like on a clinical corpus, this cannot say.
+- **`读到关键` is a proxy** — "read a document stamped with the gold diagnosis date". On SYNX01
+  `prior` answered correctly while scoring `没读到`, because that chart resolves through a
+  retrospective remark that states the date without the imaging being opened. The proxy
+  overcounts misses; the SYNX accuracy column is the hard one.
+- **Accuracy is underpowered**, as pre-committed. 17/16/15 over 18 charts decides nothing. The
+  read counts and the 23-for-23 mechanism are what carry this.
+
+### Consequence for the ladder above
+
+E1, E2 and E3 compared cards against `B0-base`, which ran this prior. Their finding — "no card
+beats every card" — stands as measured but describes a narrower thing than it appeared to: no
+card improves on the prior, while the prior itself costs 2 of 6 adversarial charts and half the
+read budget. The search-card question should be re-asked against `conditional`, not `B0-base`.
