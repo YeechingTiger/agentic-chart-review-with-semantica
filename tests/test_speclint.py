@@ -166,6 +166,46 @@ def test_a_field_no_stratum_establishes_is_flagged():
     assert any("orphan" in f.where for f in found)
 
 
+def test_a_gate_demanding_can_establish_while_no_stratum_establishes_anything_is_a_failure():
+    """两处检查看的不是同一个东西，而它们之间没有人把话说圆。
+
+    `coverage.py` 那道门是按**名字**过的 —— `ok = "can_establish" in by`。可采纳性判定看的
+    是 `establishes`。所以一个 spec 可以堂堂正正通过 `require_can_establish_nonempty`，
+    同时它的每一条引文都解析成 UNDECLARED：门写着"必须存在一个能确立答案的文档类型"，
+    而没有任何一处说那个类型确立的是什么。
+
+    这正是 F4 已经以 FAIL 拒绝的那个形状 —— "the switch reads as enforcement and enforces
+    nothing" —— 只不过 F5 对它一直只给 NOTE。是 STORE.390 上一次 BLIND 归因跑出来的，
+    在 `seq:17`：agent 想引用一份文档，问"这份可采纳吗"，规格答不上来。
+    """
+    s = mkspec(fields=[{"name": "a", "allowable_values": ["1"]}],
+               evidence_rules={"counts_as_evidence": ["a path report"]},
+               proof_obligation={"for_negative": {
+                   "strata": [{"name": "can_establish", "match": {"rest": True}}],
+                   "gate": {"require_can_establish_nonempty": True}}})
+    found = checks(speclint.lint_spec(s), speclint.F5)
+    assert found, "门要求 can_establish 非空，却没有任何 stratum 说自己确立什么 —— 必须 FAIL"
+
+
+def test_that_failure_does_not_fire_when_the_gate_makes_no_such_demand():
+    """没有那道门的时候，`establishes` 缺席仍然只是 NOTE。
+
+    没有这一条，上面那条测试用"把 F5 的 NOTE 全升成 FAIL"也能通过 —— 那会让每一个
+    不用 `establishes` 的 spec 立刻变成失败，而它们只是把耦合写在散文里，不是坏的。
+    """
+    s = mkspec(fields=[{"name": "a", "allowable_values": ["1"]}],
+               evidence_rules={"counts_as_evidence": ["a path report"]},
+               proof_obligation={"for_negative": {
+                   "strata": [{"name": "can_establish", "match": {"rest": True}}]}})
+    fs = speclint.lint_spec(s)
+    assert not checks(fs, speclint.F5)
+    assert checks(fs, speclint.F5, speclint.NOTE)
+
+
+def test_the_shipped_diagnosis_spec_says_what_its_can_establish_stratum_establishes():
+    assert not checks(speclint.lint_spec(load_spec(DIAG)), speclint.F5)
+
+
 def test_no_counts_as_evidence_at_all_is_flagged():
     s = mkspec(fields=[{"name": "a", "allowable_values": ["1"]}])
     assert checks(speclint.lint_spec(s), speclint.F5)

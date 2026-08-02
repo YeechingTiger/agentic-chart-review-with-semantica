@@ -308,10 +308,24 @@ def _f5_evidence_closure(spec) -> Iterable[Finding]:
                           f"`establishes`, so every citation for it resolves to REFUSED in "
                           f"coverage.admissibility_for_citations.")
         elif not uses_establishes:
-            yield Finding(F5, NOTE, spec.spec_id, f"fields[{f.name}]",
+            # The gate and the admissibility rule do not read the same key. `coverage.py` passes
+            # `require_can_establish_nonempty` on the mere PRESENCE OF THE NAME —
+            # `ok = "can_establish" in by` — while `admissibility_for_citations` rules on
+            # `establishes`. A spec can therefore satisfy a switch that says "some document type
+            # here can settle this" while nothing states what any type settles, and every citation
+            # the run makes resolves to UNDECLARED. Prose coupling is a NOTE; prose coupling
+            # underneath a gate that asserts the coupling exists is the same fault F4 already
+            # refuses over an empty required_keywords list.
+            g = _gate(spec)
+            asserted = (g.get("require_can_establish_nonempty")
+                        or g.get("per_claim_can_establish_nonempty"))
+            yield Finding(F5, sev if asserted else NOTE, spec.spec_id, f"fields[{f.name}]",
                           f"{len(clauses)} counts_as_evidence clause(s) exist but no stratum declares "
                           f"`establishes`, so admissibility is UNDECLARED for every document and the "
-                          f"coupling to {f.name} is prose only.")
+                          f"coupling to {f.name} is prose only."
+                          + (" The gate asserts can_establish is non-empty, which coverage.py checks "
+                             "by stratum NAME alone: it passes on a stratum that establishes nothing."
+                             if asserted else ""))
 
 
 def _f6_abstention_totality(spec) -> Iterable[Finding]:

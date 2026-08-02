@@ -38,6 +38,12 @@ conflict_rules:
     then: "use the cytology date"
   - if: "cytology with an ambiguous term precedes a confirmatory biopsy AND no clinical impression supports it"
     then: "use the biopsy date"
+  # Both strata establish this field, so the pair they form has to be arbitrated by name — a
+  # rule that names neither cannot be applied to it. The direction follows decision_rule 1:
+  # first date, clinically OR histologically established. Later tissue does not supersede an
+  # earlier clinical diagnosis; it confirms one.
+  - if: "a Pathology or Cytology report and a physician's clinical impression recorded in a Progress-Note, Consult, Discharge summary, Endoscopy or Procedure-Note give different dates"
+    then: "use the earlier date, whichever document type it came from, and cite both — tissue confirmation does not reset a diagnosis that a physician had already made"
   - if: "documents disagree on the date"
     then: "take the earliest that satisfies the decision rules and cite every conflicting source"
 
@@ -50,12 +56,24 @@ proof_obligation:
     mode: stratified_exclusion
     confidence: 0.95
     strata:
+      # `establishes` is the machine-readable half of counts_as_evidence, and until 2026-08-02
+      # this file had only the first of its two clauses. The prose says a physician's clinical
+      # impression "can establish a clinical diagnosis without tissue"; impressions live in
+      # progress notes and consults, which sit in `may_mention`. So the strata said tissue was
+      # required while the prose said it was not, and every citation to a clinical impression
+      # was inadmissible — including the one that carries the answer on SYNX05.
+      #
+      # The two strata differ in POLICY, not in what they can establish: pathology must be read
+      # exhaustively because it is few and decisive, progress notes are searched and sampled
+      # because they are many. `may_mention` keeps its name for continuity of the gate.
       - name: can_establish
         match: {doc_type_matches: ["Pathology", "Cytology", "Onc-"]}
         policy: exhaustive
+        establishes: [date_of_initial_diagnosis, month_day_imputed]
       - name: may_mention
         match: {doc_type_matches: ["Progress-Note", "Consult", "Discharge", "Endoscopy", "Procedure-Note"]}
         policy: search_then_read_hits_and_sample_misses
+        establishes: [date_of_initial_diagnosis, month_day_imputed]
         required_keywords: ["diagnosis", "diagnosed", "carcinoma", "biopsy", "malignancy"]
         min_sample_of_misses: 25
         max_tolerated_hits: 0
@@ -218,6 +236,30 @@ provenance:
       committed under a human author's name. Pathology, cytology and oncology documents,
       selected by substring against document type names. Whether an oncology note can fix a
       first diagnosis date on its own is a clinical question decided here by a language model.
+  - element: "proof_obligation.for_negative.strata[can_establish].establishes"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; added 2026-08-02 to make the FIRST counts_as_evidence clause
+      machine-readable. That clause ("a pathology or cytology report whose interpretation
+      establishes the diagnosis") is prose and carries no provenance entry of its own, because
+      nothing in the runtime reads it; `establishes` is what coverage.admissibility_for_citations
+      rules on. Whether month_day_imputed is established by the same document that supplies the
+      date, rather than being a property of how the date was read, is a language model's
+      inference from boundary_cases and has not been reviewed by a registrar.
+  - element: "proof_obligation.for_negative.strata[may_mention].establishes"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; added 2026-08-02 to make the SECOND counts_as_evidence clause
+      machine-readable — "a physician's clinical impression of cancer, which can establish a
+      clinical diagnosis without tissue". Until this commit the enforced half of the spec had
+      only the first clause, so a citation to a clinical impression in a progress note was
+      inadmissible while the prose said it established the field. The defect was surfaced by a
+      BLIND attribution run over SYNX05 (seq:17), not by review, and the correction is a language
+      model reading this file's own prose — no registry manual was consulted for this commit, and
+      whether these five document types are where clinical impressions actually live is the same
+      undecided clinical question that `strata[may_mention].match` already records.
   - element: "proof_obligation.for_negative.strata[may_mention].match"
     origin: model_authored
     status: draft

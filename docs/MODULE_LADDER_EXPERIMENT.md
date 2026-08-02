@@ -262,3 +262,80 @@ describes, and it is visible in the trace rather than asserted.
    could never have answered"? Without the stratum that question cannot be asked, and it is the
    difference between "the policy does not help" and "this case has no answer to find".
 3. **Do not add a ninth card.** Eight cards, seven measured today, none beating an empty slot.
+
+---
+
+# E3 — Is the cost of a card in its search rule or in its stopping rule?
+
+**Pre-registered before the run. 2026-08-02.**
+
+## Where this question came from
+
+E2 left "the cards lose to an empty slot" unexplained. The first explanation offered — that the
+cards fail to invent retrieval terms — was **measured and refused**: counting every search term
+against the spec's five required ones, every card invents terms, and most invent MORE than B0.
+
+| arm | 搜索/人 | 自创词/人 | 占比 |
+|---|---|---|---|
+| B0-base | 7.4 | 2.4 | 32% |
+| native | 9.7 | 4.7 | 48% |
+| depth-first | 8.2 | 3.4 | 41% |
+| information-gain | 9.0 | 4.1 | 45% |
+
+(`breadth-first`'s 18% is not comparable — a pipe-joined multi-term query counts as one term
+under the new tool surface. Measurement artefact of mine, not a property of the arm.)
+
+So the loss is not in term generation. On SYNX05 specifically, `depth-first` issued four
+searches, all required terms, zero invented — on a chart where it invents freely elsewhere. It
+stopped. And its card told it to: *"Follow one thread until it resolves. A resolved thread is
+worth more than three half-followed ones."* The 2019-02-15 pathology report resolves the thread
+and is the declared `naive_answer` bait.
+
+The GOLD-mode diagnosis agrees without being told this: *"the run chose the earliest qualifying
+date **among the later documents it saw**"* — the failure is in what it stopped before reading.
+
+**Hypothesis: a policy is as much a stopping rule as a search rule, and the stopping rule is
+where these cards pay.** An empty slot has no satisfaction criterion, so nothing can satisfy it.
+
+## Manipulation
+
+One variable: the section that states when the traversal is complete, deleted. Nothing else.
+The cut was made by script so the removed bytes could be printed and checked, and the diffs are
+pure deletions (plus the frontmatter no longer promising the removed content).
+
+| card | removed | bytes |
+|---|---|---|
+| `search-depth-first` | "How far, and when to stop following" | 318 |
+| `search-breadth-first` | "When the sweep is done" | 373 |
+| `search-information-gain` | "When the highest-gain action is to stop" | 445 |
+
+`depth-first`'s cut initially also took the anti-circling rule ("never revisit a document you
+have already read"), which is a loop guard and not a completion criterion. It was put back under
+its own heading. Had it stayed out, the arm would have varied in two things at once.
+
+**Six arms, not three.** `depth-first` and `information-gain` were measured on the OLD single-keyword
+tool surface; comparing them to a variant on today's surface would confound the manipulation with
+the tool change. Both members of each pair are re-run today.
+
+## Predicted direction — and the arm that is the control
+
+The three criteria are not of one kind, and that is what makes this testable rather than a
+guess that shorter cards do better:
+
+- **`depth-first`, `information-gain` — criterion satisfiable EARLY** ("the thread resolved",
+  "no action would change the answer"). Removing it predicts **more documents read per patient**.
+- **`breadth-first` — criterion is DEMANDING** ("every type searched or explicitly excluded").
+  Removing it predicts **fewer searches**, and if anything fewer reads. **Opposite direction.**
+
+So if all three nostop variants improve together, the effect is *less text*, not *less stopping*,
+and the hypothesis is refuted even by a favourable-looking accuracy table.
+
+## Endpoint, and what this run cannot decide
+
+**Primary: documents read per patient, and whether the establishing document was read at all.**
+Not accuracy. 18 binary outcomes cannot resolve the 1–2 chart differences at issue — the same
+pre-committed clause that made E2's 15→16 uninterpretable applies here, and stating the endpoint
+afterwards is how that clause gets evaded. Accuracy is reported as description.
+
+**Falsifier:** if reads/patient does not rise for `depth-first` and `information-gain`, the
+early-stop explanation is wrong and SYNX05 needs another cause.
