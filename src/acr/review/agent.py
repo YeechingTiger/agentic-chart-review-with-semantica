@@ -66,6 +66,7 @@ from langchain.agents.middleware.types import AgentMiddleware, ModelRequest, Too
 from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_core.tools import StructuredTool
 
+from ..contract.case_requirements import is_time_anchorable, refuse_before_reading
 from ..contract.code_tables import code_domain_block
 from ..contract.outcomes import (
     KIND_ABSTAIN_EVIDENCE,
@@ -75,6 +76,7 @@ from ..contract.outcomes import (
     status_kind,
 )
 from ..contract.skills import skills_block
+from ..core.case_context import CaseContext
 from ..core.tool_surface import LIBRARY_TOOLS, ToolSurfaceError, assert_tool_surface  # noqa: F401
 from .coverage_planner import OPEN_REQUEST_OPENED, triggers_from_tool_result
 from .document_concepts import anchor_block, baseline_block
@@ -887,6 +889,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
                      out_dir, elapsed_fn, expansion_budget, ctx_out=None,
                      max_usd: float = 5.0, seed_record: dict | None = None,
                      runtime_profile_asset=None, runtime_policy_plan=None,
+                     case: CaseContext | None = None,
                      coverage_plan=None, coverage_state: dict | None = None,
                      # The stack that was actually rendered into `system_prompt`, so the manifest
                      # records what the model received rather than re-deriving it from the profile
@@ -1069,6 +1072,12 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         "spec_version": spec.spec_version,
         "trace": str(tracer.path),
         "runtime": "deepagents-hooks", "patient_id": chart.patient_id,
+        # WHAT THIS RUN WAS TOLD ABOUT THE CASE, as opposed to what it read. A reader asking
+        # later why an answer named the wrong lesion cannot tell "was never told which" from
+        # "was told and ignored it" unless this is written down, and it was not being written
+        # down at all. `null` fields are the honest report that nothing was supplied.
+        "case_context": (case.to_dict() if case is not None
+                         else CaseContext(patient_id=chart.patient_id).to_dict()),
         "runtime_profile_id": (
             runtime_profile_asset.module_id
             if runtime_profile_asset is not None
@@ -1388,11 +1397,47 @@ def make_revise_plan_tool(ctx: RunContext, budget) -> StructuredTool:
                 "thread_id": {"type": "string"}, "reason": {"type": "string"}}}}}})
 
 
+def _case_refused_manifest(spec, chart, case, refusal: dict, out_dir, run_id, model,
+                           runtime_profile: str) -> dict:
+    """The manifest for a run that never began, written like any other run's.
+
+    A refused case that returned nothing, or raised, would be invisible in a batch: the
+    directory would simply hold one fewer manifest and every rate computed over it would have
+    a smaller denominator and no note of why. It gets a trace and a manifest with the same
+    identity keys, `degradation.case_refused` set, and no gate or coverage claim anywhere --
+    there is nothing to claim, because nothing was read.
+    """
+    from ..contract.trace import Tracer
+    tracer = Tracer.create(out_dir, run_id)
+    tracer.emit("case_refused", patient_id=chart.patient_id, spec_id=spec.spec_id,
+                spec_hash=spec.spec_hash, status=refusal["status"],
+                reason=refusal["reasoning"], case_context=case.to_dict())
+    refusal = {**refusal, "status_kind": status_kind(spec, refusal["status"]) or "undeclared"}
+    return {
+        "run_id": tracer.run_id,
+        "model": getattr(model, "model_name", "") or str(model),
+        "trace": str(tracer.path),
+        "runtime": "deepagents-hooks",
+        "patient_id": chart.patient_id,
+        "spec_id": spec.spec_id, "spec_hash": spec.spec_hash,
+        "spec_version": spec.spec_version,
+        "runtime_profile_id": runtime_profile.split("@", 1)[0],
+        "case_context": case.to_dict(),
+        "answer": refusal,
+        "evidence": [],
+        "gate_validated": False,
+        "coverage_gate_validated": False,
+        "termination": "CASE_REFUSED",
+        "degradation": {"case_refused": 1},
+    }
+
+
 def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_calls: int,
                 seed: int = 1234, expansion_budget=None, run_id: str | None = None,
                 ctx_out: list | None = None, max_usd: float = 5.0,
                 additional_task_context: str = "",
                 runtime_profile: str = "current-stratified-coverage",
+                case: CaseContext | None = None,
                 skill_stack=None) -> dict:
     """Assemble the ledgers, tools and gate for one patient and run it.
 
@@ -1431,6 +1476,27 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
 
     chart = corpus.chart(patient_id)
     docs, _ = chart.list_documents(limit=100_000)
+
+    # THE CASE, BEFORE ANYTHING IS BUILT. Two things happen here and both have to happen
+    # before the first tool exists.
+    #
+    # The bound is DERIVED when the caller did not supply one. A check that only runs when
+    # somebody remembered to configure it is a check that does not run, and the last document
+    # in the chart is a bound the chart can always state about itself.
+    #
+    # The refusal is BEFORE THE READ because an unresolved referent is not a retrieval
+    # problem. A run that searches first and then discovers it cannot say which tumour has
+    # spent its budget arriving where it started -- and will usually have found A tumour and
+    # answered about that one, which is what three recorded runs did.
+    case = case or CaseContext(
+        patient_id=patient_id,
+        latest_document_date=max((d.date for d in docs if d.date), default=None))
+    case.honour_window(time_anchorable=is_time_anchorable(spec))
+    refusal = refuse_before_reading(spec, case)
+    if refusal is not None:
+        return _case_refused_manifest(spec, chart, case, refusal, out_dir, run_id, model,
+                                      runtime_profile)
+
     runtime_profile_asset, runtime_policy = resolve_runtime_policy(runtime_profile)
     tracer = Tracer.create(out_dir, run_id)
     tracer.emit("run_start", patient_id=patient_id, runtime="deepagents-hooks",
@@ -1494,6 +1560,7 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
                            tracer=tracer, threads=threads, plan=plan,
                            coverage_plan=coverage_plan,
                            coverage_state=coverage_state,
+                           case=case,
                            runtime_profile=runtime_profile_asset.ref)
 
     # RESOLVED ONCE. The prompt renders this and the manifest records this — the same object,
@@ -1507,7 +1574,7 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
     t0 = time.time()
     return run_chart_review(
         spec=spec, chart=chart, toolbox=toolbox, coverage=coverage, evidence=evidence,
-        plan=plan, threads=threads, catalogue=markers, tracer=tracer, gate=gate,
+        plan=plan, threads=threads, catalogue=markers, tracer=tracer, gate=gate, case=case,
         model=model, tools=tools,
         # THE RULE IDENTIFIERS GO IN THE PROMPT, not only into the finalize question. The
         # self-report channel asks at submit time which decision rule was applied, and

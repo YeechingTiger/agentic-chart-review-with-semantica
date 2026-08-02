@@ -235,6 +235,65 @@ def _partial_date_ccyymmdd(s: str) -> str:
     return ""
 
 
+def _earliest_denoted(s: str):
+    """The earliest real date a partial-date notation could mean, or None if it means nothing.
+
+    `20189999` is a claim about a year, not about 1 January, but 1 January is the earliest day
+    it could denote — so it is the right thing to compare against an upper bound. Comparing the
+    literal digits would read `99` as a month and refuse a run for a date it never claimed.
+    """
+    import datetime
+    if not re.fullmatch(r"\d{8}", s):
+        return None
+    y, m, d = int(s[:4]), s[4:6], s[6:8]
+    mm = 1 if m == UNKNOWN else int(m)
+    dd = 1 if d == UNKNOWN else int(d)
+    if not (1 <= mm <= 12):
+        return None
+    try:
+        return datetime.date(y, mm, dd)
+    except ValueError:
+        return None
+
+
+def check_dates_not_after(fields, value: dict, not_after) -> list[Violation]:
+    """Dates no case could witness: later than the last document that could report them.
+
+    THE ONE CONTENT CHECK IN THIS MODULE THAT REFUSES, and the test it passes is the one the
+    five removed clinical checks failed. `field_format` was demoted to advisory because it
+    refused `C34.9` — the punctuated form ICD-O-3 itself writes — and so destroyed correct
+    values over notation; 60 of 254 recorded rejections refused a tuple that was exactly the
+    registry's. No correct answer can fail THIS one. A document cannot report a diagnosis that
+    has not happened, so a date after every document in the chart has no possible witness,
+    whatever notation it is written in.
+
+    Applies only to fields declaring the partial-date calendar: it is arithmetic on a declared
+    value space, not a judgement about a tumour.
+    """
+    out: list[Violation] = []
+    if not_after is None:
+        return out
+    for f in fields or []:
+        if getattr(f, "calendar", None) != "partial_date_ccyymmdd":
+            continue
+        raw = value.get(getattr(f, "name", ""))
+        if raw is None or str(raw).strip() == "":
+            continue
+        s = str(raw).strip()
+        earliest = _earliest_denoted(s)
+        if earliest is None or earliest <= not_after:
+            continue
+        out.append(Violation(
+            rule_id=field_rule_id("date_not_after_record", f.name),
+            rule_kind="date_not_after_record", field=f.name, coded_value=s,
+            trigger=not_after.isoformat(),
+            message=(f"{f.name}={s!r} is after {not_after.isoformat()}, the last document in "
+                     f"this record. Nothing in the chart could have reported it, so no "
+                     f"citation for it can exist. If the year is an estimate, give a real "
+                     f"year and set year_imputed.")))
+    return out
+
+
 #: The calendar kinds `check_field_formats_detail` dispatches on. A field declaring one that
 #: is absent here does not load -- same rule as `ANSWER_CHECK_KINDS`, and for the same reason:
 #: a declared validator that never runs looks exactly like one that ran and found nothing.

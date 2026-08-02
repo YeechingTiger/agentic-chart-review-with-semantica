@@ -25,10 +25,15 @@ raises.
 from __future__ import annotations
 
 from ..chartstore.corpus import PatientChart
-from ..contract.answer_checks import check_answer_detail, check_field_formats_detail
 from ..contract import outcomes as OUTCOMES
+from ..contract.answer_checks import (
+    check_answer_detail,
+    check_dates_not_after,
+    check_field_formats_detail,
+)
 from ..contract.answer_contract import SPEC_SECTIONS
 from ..contract.spec import ExtractionSpec
+from ..core.case_context import CaseContext
 from ..core.state import EvidenceLedger
 from .coverage import (
     CoverageLedger,
@@ -365,12 +370,31 @@ def _coverage_verdict(
     }
 
 
+def _unwitnessable_after(case: CaseContext | None, chart: PatientChart):
+    """The upper bound on any date this case could carry.
+
+    From the case context when the caller supplied one — it may know an extract date the chart
+    cannot show — and otherwise derived from the chart itself, because the bound exists whether
+    or not anybody thought to pass it and a check that only runs when configured is a check
+    that does not run.
+    """
+    if case is not None:
+        return case.unwitnessable_after()
+    try:
+        docs, _ = chart.list_documents(limit=100_000)
+    except Exception:  # noqa: BLE001 - a bound we cannot compute is simply absent
+        return None
+    dates = [d.date for d in docs if getattr(d, "date", None) is not None]
+    return max(dates) if dates else None
+
+
 def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedger,
                 coverage: CoverageLedger, chart: PatientChart, tracer=None,
                 threads: OpenThreadLedger | None = None,
                 plan: CoveragePlan | None = None,
                 coverage_plan: CoveragePlan | None = None,
                 coverage_state: dict | None = None,
+                case: CaseContext | None = None,
                 runtime_profile: str = DEFAULT_RUNTIME_PROFILE) -> dict:
     """The single decision on whether an answer may stand. Returns an acceptance dict.
 
@@ -483,6 +507,26 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
                       "measured here rather than refused"),
             )
     if kind == OUTCOMES.KIND_VALUE:
+        # VALUES NO CASE COULD WITNESS. Two arithmetic checks, both refused rather than
+        # recorded, and the reason they may refuse when the format check may not is that no
+        # correct answer can fail them. 29 February 2018 is not a notation dispute; a date
+        # after the last document in the record has no possible citation. `C34.9` — the
+        # refusal that cost this repo twelve correct answers — is a notation dispute, and it
+        # stays advisory two blocks above.
+        impossible = [v for v in check_field_formats_detail(getattr(spec, "fields", []) or [],
+                                                            value)
+                      if v.rule_kind == "field_calendar"]
+        impossible += check_dates_not_after(getattr(spec, "fields", []) or [], value,
+                                            _unwitnessable_after(case, chart))
+        if impossible:
+            if tracer:
+                tracer.emit("impossible_value_refused", severity="warning",
+                            provenance="DETERMINISTIC",
+                            violations=[v.to_dict() for v in impossible],
+                            rules=sorted({v.rule_id for v in impossible}))
+            return {"accepted": False,
+                    "why": "the answer carries a value no record could witness",
+                    "missing": [v.message for v in impossible]}
         # Positives were previously accepted unchecked, so `gate_validated: True`
         # on a FOUND answer asserted nothing. These are the spec's own decision
         # rules, applied deterministically rather than hoped for in a prompt.

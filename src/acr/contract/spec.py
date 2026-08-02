@@ -306,6 +306,8 @@ def enforced_elements(spec: "ExtractionSpec") -> list[EnforcedElement]:
       fields[].calendar                       answer_checks.check_field_formats
       result.status                           outcomes.submittable_statuses (+ the tool enum
                                               the model is offered, and every gate branch)
+      case_context.requires_target_entity     case_requirements.refuse_before_reading
+      case_context.time_anchorable            case_context.CaseContext.honour_window
       answer_checks[]                         answer_checks.check_answer
       for_negative.required_keywords          graph.check_gate  (+ rendered in every prompt)
       for_negative.required_coverage          graph.check_gate  (+ rendered in every prompt)
@@ -351,6 +353,15 @@ def enforced_elements(spec: "ExtractionSpec") -> list[EnforcedElement]:
     if (spec.result or {}).get("status"):
         add("result.status", "outcome_space", spec.result["status"],
             "outcomes.submittable_statuses")
+
+    # WHAT THE CONTRACT DEMANDS OF A CASE. Both switches change behaviour: the first ENDS a
+    # run before it reads anything, the second turns a supplied window into an exception. Only
+    # written keys enter — an absent one is the code's default and carries the code's
+    # provenance, the same rule the gate keys follow above.
+    for key, read_by in (("requires_target_entity", "case_requirements.refuse_before_reading"),
+                         ("time_anchorable", "case_context.CaseContext.honour_window")):
+        if key in (spec.case_context or {}):
+            add(f"case_context.{key}", "case_requirement", spec.case_context[key], read_by)
 
     for chk in (spec.answer_checks or []):
         if isinstance(chk, dict):
@@ -668,6 +679,10 @@ class ExtractionSpec(BaseModel):
     #: contract that declares nothing means the three statuses this repo shipped with, and
     #: that default belongs in one place.
     result: dict[str, Any] = Field(default_factory=dict)
+    #: What this contract needs to know about a CASE before a run of it means anything —
+    #: `requires_target_entity`, `time_anchorable`. Read through
+    #: `acr.contract.case_requirements`, which holds the defaults for a contract that is silent.
+    case_context: dict[str, Any] = Field(default_factory=dict)
     abstention: dict[str, str] = Field(default_factory=dict)
     special_codes_not_mar: list[Any] = Field(default_factory=list)
     boundary_cases: list[Any] = Field(default_factory=list)
