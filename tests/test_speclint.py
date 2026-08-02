@@ -155,6 +155,34 @@ def test_an_empty_required_keyword_list_under_an_enforcing_gate_is_flagged():
     assert checks(speclint.lint_spec(s), speclint.F4)
 
 
+
+def test_a_contract_declaring_no_retrieval_at_all_owes_no_reachability_map():
+    """契约不声明任何检索时，`keyword_field_coverage` 缺席只是 NOTE。
+
+    2026-08-02 检索资产移出 spec 之后，"哪些词够得到哪个字段"变成开发集上的测量，由经验层
+    做。对一个不声明检索的契约还要求这张映射表，等于把检索要回契约里。
+    """
+    s = mkspec(fields=[{"name": "a", "allowable_values": ["1"]}],
+               proof_obligation={"for_negative": {}})
+    fs = speclint.lint_spec(s)
+    assert not checks(fs, speclint.F4)
+    assert checks(fs, speclint.F4, speclint.NOTE)
+
+
+def test_a_contract_that_DOES_declare_searches_still_owes_the_map():
+    """区分分支的那一条。没有它，上面那条用"把 F4 全降成 NOTE"也能通过，而那会让
+    声明了必需检索却说不出它们为什么存在的 spec 一起蒙混过去。"""
+    s = mkspec(fields=[{"name": "a", "allowable_values": ["1"]}],
+               proof_obligation={"for_negative": {"required_keywords": ["biopsy"]}})
+    assert checks(speclint.lint_spec(s), speclint.F4)
+
+
+def test_the_shipped_diagnosis_spec_has_no_failures_left():
+    """检索资产、覆盖门和本地类型名全部移出之后，这个契约应当干净。"""
+    fs = speclint.lint_spec(load_spec(DIAG))
+    assert [f.where for f in fs if f.severity == speclint.FAIL] == []
+
+
 # ------------------------------------------------------------- F5 formal: evidence closure
 def test_a_field_no_stratum_establishes_is_flagged():
     s = mkspec(fields=[{"name": "a", "allowable_values": ["1"]},

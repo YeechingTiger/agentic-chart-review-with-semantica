@@ -40,16 +40,6 @@ But re-read when something has changed what the document would MEAN: a new hypot
 bears on, a referent you can now resolve, a date you now know matters. The same text read
 against a different question is a different read.
 
-## 记下这一步接在哪一步上
-
-每次检索或阅读，除了 `because` 写清楚原因，**再填 `after_event`**：一个整数，是**引起这一步
-的那个更早的步骤**的编号 —— 每个工具返回里的 `step` 字段就是它自己的编号，照抄那个数 —— surfaced 这份文档的那次检索，你正在跟进的那处 deferral。它必须
-已经发生过。
-
-散文是给后来读的人的，`after_event` 是给核对用的。没有它，一条追下去的线索和一串互不相关
-的动作在记录里长得一模一样；有了它，这条线可以被走一遍。不填不会被拒绝 —— 但那一步就无法
-被算进任何"这条链有多深"的判断。
-
 ## What following a lead cannot do
 
 It tells you nothing about the documents no lead pointed at. A chase that ends in a confident,

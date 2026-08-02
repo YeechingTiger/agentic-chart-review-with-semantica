@@ -260,10 +260,23 @@ def _f4_keyword_coverage(spec) -> Iterable[Finding]:
                       "enforcement and enforces nothing.")
     cov = (spec.model_extra or {}).get("keyword_field_coverage")
     if not isinstance(cov, dict):
+        if not required:
+            # A contract that declares NO retrieval has no reachability claim to verify, and
+            # demanding the map anyway is demanding retrieval back. That is the direction this
+            # tree moved on 2026-08-02: which terms reach which field is a measurement over a
+            # development set, made by the experience layer, not a sentence the contract asserts.
+            # Reported so the absence is visible, because silence here would read as a spec that
+            # had been checked.
+            yield Finding(F4, NOTE, spec.spec_id, "keyword_field_coverage",
+                          f"undeclared, and no required searches are declared either, so this "
+                          f"contract makes no reachability claim about its {len(names)} field(s) "
+                          f"{names}. Whatever reaches them has to come from a certified "
+                          f"experience asset and be measured there.")
+            return
         yield Finding(F4, sev, spec.spec_id, "keyword_field_coverage",
                       f"undeclared, so nothing states which required search reaches which field. "
                       f"Reachability is unverifiable for all {len(names)} fields {names}; required "
-                      f"terms declared: {required or 'none'}.")
+                      f"terms declared: {required}.")
         return
     used: set[str] = set()
     for n in names:

@@ -1,0 +1,46 @@
+# The coverage gate that used to sit in the task contract, with the provenance records that
+# travelled with it. Removed 2026-08-02: how hard a run must look before it may report
+# nothing is not part of what the answer MEANS, and mixing the two made the contract and
+# the search policy impossible to vary separately.
+#
+# Not loaded by anything. When the coverage/audit module needs a gate it should get one
+# that is measured, not one inherited from here — the records below say themselves that
+# this one passed while the declared keyword list missed 31.7% of patients.
+
+provenance_of_removed_elements:
+  - element: "proof_obligation.for_negative.gate.required_keywords_all_searched"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that every term in the criterion-level
+      required list has been searched. A switch on this repository's coverage gate, read by
+      acr/coverage.py. The gate is this repository's construct end to end; no registry manual
+      defines one, and nobody clinical has agreed that passing it means the chart was adequately
+      searched.
+  - element: "proof_obligation.for_negative.gate.keyword_list_validated"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. Requires that searching the group that may mention
+      the answer turned up no unread document -- which is how a bad list of search terms is
+      supposed to be caught. It did not catch this list: measured on the whole corpus the terms
+      miss the diagnosis for 31.7% of patients while the gate stays clean, because the check
+      only sees documents the search already found. A switch on this repository's coverage gate,
+      read by acr/coverage.py. The gate is this repository's construct end to end; no registry
+      manual defines one, and nobody clinical has agreed that passing it means the chart was
+      adequately searched.
+  - element: "proof_obligation.for_negative.gate.max_elusion_upper"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; written by a language model in commit e5229b0 (2026-07-25) and
+      committed under a human author's name. The largest residual chance of a missed document
+      the run may finish with. 25 documents drawn with no relevant hit supports 11.3% at 95%
+      confidence, so this is the nearest round number above the floor the sample size makes
+      reachable -- arithmetic about the sample size, not a measurement of this corpus. No
+      clinician has said that a 12% chance of a missed document is acceptable for this variable.
+      A switch on this repository's coverage gate, read by acr/coverage.py. The gate is this
+      repository's construct end to end; no registry manual defines one, and nobody clinical has
+      agreed that passing it means the chart was adequately searched.
