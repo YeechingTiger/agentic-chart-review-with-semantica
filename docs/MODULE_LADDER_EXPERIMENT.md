@@ -339,3 +339,91 @@ afterwards is how that clause gets evaded. Accuracy is reported as description.
 
 **Falsifier:** if reads/patient does not rise for `depth-first` and `information-gain`, the
 early-stop explanation is wrong and SYNX05 needs another cause.
+
+---
+
+# E4 — The floor under E1, E2 and E3
+
+**Pre-registered before the run. 2026-08-02.** E3 is suspended until this returns.
+
+## What was wrong with every experiment above
+
+`B0-base` is described throughout this document as "the empty search slot" and treated as the
+unassisted floor. It is not empty. Every arm — B0 included — receives a retrieval plan before
+its first search, built from the spec's hand-written strata:
+
+```
+B0-base on SYNX05   source=spec_strata
+  read_all = [Onc-Med-MD-OP-Progress-Note, Surgical-Pathology-Report]
+  search   = [... Endo-Diab-MD-OP-Progress-Note ...]
+  initial_keywords = [diagnosis, diagnosed, carcinoma, biopsy, malignancy]
+```
+
+`read_all` is the two documents carrying SYNX05's bait answer 20190215. The type carrying the
+real one is demoted to `search`. Neither `pancreatic` nor `cancer` — the two terms that
+distinguish the runs that answer this chart correctly — is in the list.
+
+There is a second layer in the prompt itself: `as_prompt_block(view="full")` prints
+`required searches:`, `document types that must be reviewed:` and `SEARCH HINTS`.
+
+So E1/E2/E3 measured **card on top of a prior** against **prior alone**. "No card beats every
+card" is true and says less than it appeared to: the prior was never on the other side of a
+comparison. It is precisely the kind of asset `assetdev.certify` exists to certify — a claim
+about where to look — and being hand-written YAML it bypasses the permutation control and the
+answer-leak filter both. No development set was ever involved.
+
+`coverage_planner.plan_from_spec` states this in its own docstring: *"That is the arm the
+develop plane wants to falsify."* It was designed to be the thing under test. It became the
+ground under every test instead.
+
+This is the same error as E1's, one level down. E1 found that every card had been compared
+against an unmeasured floor. That floor was standing on an unmeasured prior.
+
+## The ablation already existed
+
+`guideline-only` — `search_terms=()`, `required_strata=()`, and `uses_clinical_contract_view`
+true so the prompt hides retrieval detail. Described in the registry as *"Clinical task contract
+only: no task keywords, note-type priors, or negative coverage proof."* Built, shipped, never
+run against the stratified profile on STORE.390.
+
+| arm | profile | plan source |
+|---|---|---|
+| `prior` | `current-stratified-coverage` | `spec_strata` |
+| `floor` | `guideline-only` | `patient_inventory_only` |
+
+Both with `--skills search=`. No card in either. One variable.
+
+## Prediction
+
+If the prior earns its place, `floor` reads more, searches more and answers worse. If it is a
+liability, `floor` matches or beats it on the six SYNX charts — the only ones with a
+wrong-but-reachable answer to be steered into.
+
+A one-patient probe on SYNX05 returned the gold 20181107 from four self-chosen searches
+(`cancer, carcinoma, malignan, diagnos` — note the stems, which no spec term supplies). It
+discriminates nothing: B0 with the prior also answers that chart correctly. It is recorded as
+the reason this run exists, not as evidence for its outcome.
+
+## What E3 cost, and the guard that came out of it
+
+The E3 run was killed at arm 2. Arm 1 had run against the spec as it stood; the `establishes`
+fix was committed while it was in flight, so arms 2–6 would have run against a different spec
+— and the change was on the measured axis, since it decides whether a progress-note citation
+is admissible at all.
+
+Nothing in the tree would have caught it. `analyze_arms.py` now collects `spec_hash` per arm and
+refuses to print a comparison across more than one. Verified against the contaminated data
+rather than a fixture:
+
+```
+拒绝比较：这些臂跑在 2 个不同的 spec 版本上
+  depth-first-stop    ['1b8834600b7b']
+  depth-first-nostop  ['3e3aa2ca6ea6']
+```
+
+## Where the prior should come from instead
+
+The experience library (B2): learned on a development set, certified by the permutation control
+and screened by the answer-leak filter, versioned as an asset. That is what B2 is for. A
+retrieval prior hand-written into the contract and shipped to every run is the thing it exists
+to replace — and E4 measures what that hand-written one is currently worth.
