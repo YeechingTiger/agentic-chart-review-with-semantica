@@ -16,9 +16,16 @@ fields:
     description: "STORE [1880] code"
   - name: recurrence_date
     type: string
-    format: "(19|20)\\d{2}(0[1-9]|1[0-2]|99)([0-2]\\d|3[01]|99)"
+    # Two steps, the same split as STORE.390: the pattern decides whether each component is a
+    # legal token, `calendar` decides whether the three together name a day that exists. The
+    # pattern alone accepted 29 February 2018, 31 April and day 00, and said in its own
+    # provenance record that it "rejects non-date text" -- true, and a different claim.
+    format: "(19|20)\\d{2}(0[1-9]|1[0-2]|99)(0[1-9]|[12]\\d|3[01]|99)"
+    calendar: partial_date_ccyymmdd
     nullable: true
-    description: "CCYYMMDD date of first recurrence; null when there is none or it is unknown"
+    description: >-
+      CCYYMMDD date of first recurrence; null when there is none or it is unknown. 99 in the
+      MONTH or DAY slot means that component is not recorded; the YEAR slot is never 99.
 
 decision_rule:
   - "A recurrence is the first progression, metastasis or recurrence AFTER a documented disease-free interval."
@@ -186,10 +193,19 @@ provenance:
     status: draft
     basis: >-
       no external source; mechanically replaced the literal registry notation written by a
-      language model in commit e5229b0 (2026-07-25) with a Python full-match pattern. The
-      pattern accepts eight-digit dates with explicit unknown month/day components and rejects
-      non-date text, but its year range and unknown-component rules have not been checked
-      against STORE item [1860]; it remains draft until that comparison is done.
+      language model in commit e5229b0 (2026-07-25) with a Python full-match pattern, and
+      narrowed on 2026-08-02 from ([0-2]\\d|3[01]|99) to (0[1-9]|[12]\\d|3[01]|99) because the
+      first admitted day 00. This is the COMPONENT half only; see the `calendar` element below.
+      Its year range and unknown-component rules have still not been checked against STORE
+      item [1860]; it remains draft until that comparison is done.
+  - element: "fields[recurrence_date].calendar"
+    origin: model_authored
+    status: draft
+    basis: >-
+      no external source; added 2026-08-02 for the same reason as the equivalent element in
+      STORE.390 -- a regular expression cannot decide whether a day exists, because leap years
+      are arithmetic. The rules of `answer_checks.CALENDAR_KINDS['partial_date_ccyymmdd']`
+      were chosen in this repository and have not been checked against STORE item [1860].
   - element: "proof_obligation.for_negative.gate.all_claims_satisfied"
     origin: model_authored
     status: draft

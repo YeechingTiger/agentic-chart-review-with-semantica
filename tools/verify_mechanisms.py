@@ -2,7 +2,7 @@
 
     python tools/verify_mechanisms.py [runs/floor]
 
-Three mechanisms, checked against recorded runs rather than against fixtures. A fixture proves
+Four mechanisms, checked against recorded runs rather than against fixtures. A fixture proves
 the code can behave; a recorded run proves it did.
 
 Every check is written so it CAN fail. A check that cannot fail is decoration, and this file
@@ -14,6 +14,8 @@ would be the worst place in the tree to put one: it is the thing that says the o
                     spec's keyword list is the frozen one the develop plane scores against
   M3  eval agent    truth mode is a CEILING: what a diagnosis may authorise is bounded by what it
                     was allowed to see
+  M4  outcome space the set of conclusions the model is OFFERED is the set the contract
+                    declares, and one it does not declare is refused rather than waved through
 
 Exit code is the number of failures.
 """
@@ -29,11 +31,13 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from acr.chartstore.corpus import Corpus  # noqa: E402
+from acr.contract import outcomes as OUTCOMES  # noqa: E402
 from acr.contract.spec import load_spec  # noqa: E402
 from acr.core.modules import TRUTH_MODES  # noqa: E402
 from acr.evaluation import evals as E  # noqa: E402
+from acr.review.answer_gate import gate_answer  # noqa: E402
 from acr.review.coverage_planner import spec_declared_keywords  # noqa: E402
-from acr.review.tools.toolbox import TOOL_SCHEMAS, Toolbox  # noqa: E402
+from acr.review.tools.toolbox import TOOL_SCHEMAS, Toolbox, build_tool_schemas  # noqa: E402
 
 SPEC = ROOT / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
 ATTRIBUTIONS = pathlib.Path("/tmp/acr-artifacts/error-cases/default/attributions.jsonl")
@@ -240,6 +244,63 @@ def m3_eval() -> None:
           "\n".join(f"{m}: {v}" for m, v in sorted(by_mode.items())))
 
 
+# ------------------------------------------------------------ M4  outcome-space mechanism
+def m4_outcomes(root: pathlib.Path) -> None:
+    """Is the set of things a run may conclude the set the CONTRACT declares?
+
+    Same shape of question as M1 and for the same reason. M1 asks whether the tool surface the
+    model is offered is the surface it can reach; this asks whether the OUTCOME surface it is
+    offered is the outcome surface the gate honours. Both were places where two lists that had
+    to agree were maintained separately and nothing compared them.
+    """
+    print("\nM4  outcome-space mechanism")
+    spec = load_spec(SPEC)
+    declared = OUTCOMES.submittable_statuses(spec)
+
+    offered = _offered_statuses(spec)
+    check("the statuses offered to the model are the contract's submittable ones",
+          offered == list(declared),
+          f"offered:  {offered}\ndeclared: {list(declared)}")
+
+    # Not just declared -- REACHABLE. A status the contract names and the gate treats as
+    # undeclared would be an outcome the model is invited to send and then refused for sending.
+    unreachable = [s for s in declared if OUTCOMES.status_kind(spec, s) is None]
+    check("every offered status resolves to a kind the gate branches on",
+          not unreachable, f"unresolvable: {unreachable}")
+
+    # And the refusal has to bite: an outcome nobody declared must not fall through to the
+    # gate's acceptance, which is exactly what it did until 2026-08-02.
+    ev, cov, chart = _gate_fixture(spec)
+    v = gate_answer(spec, {"status": "NOT_A_STATUS", "value": {}, "reasoning": "x"},
+                    evidence=ev, coverage=cov, chart=chart)
+    check("an undeclared status is refused rather than accepted unchecked",
+          v.get("accepted") is False, f"verdict: {v.get('why')!r}")
+
+    # Against the record. A status no contract declares, sitting in a manifest, means either a
+    # run that outran its contract or a contract edited after the run -- both worth naming.
+    seen: dict[str, int] = {}
+    for _, rec in runs_of(root):
+        if rec.status:
+            seen[rec.status] = seen.get(rec.status, 0) + 1
+    stray = sorted(s for s in seen if OUTCOMES.status_kind(spec, s) is None)
+    check(f"every status in the recorded runs is one this contract declares ({sum(seen.values())})",
+          not stray, f"seen: {seen}" + (f"\nundeclared: {stray}" if stray else ""))
+
+
+def _offered_statuses(spec) -> list:
+    tb = build_tool_schemas(spec)
+    submit = next(t for t in tb if t["function"]["name"] == "submit_answer")
+    return list(submit["function"]["parameters"]["properties"]["status"]["enum"])
+
+
+def _gate_fixture(spec):
+    from acr.core.state import EvidenceLedger
+    from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
+    chart = Corpus(ROOT / "corpus" / "patients").chart("SYN0002")
+    docs, _ = chart.list_documents(limit=100_000)
+    return EvidenceLedger(), CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(7)), chart
+
+
 # ------------------------------------------------------------------ can the checks fail?
 def selftest() -> int:
     """Feed each check input it must reject, and fail if it accepts.
@@ -287,6 +348,19 @@ def selftest() -> int:
     must_reject("M3 load-bearing: modes reaching the same verdict is caught",
                 len(set(by_mode.values())) == 1)
 
+    spec390 = load_spec(SPEC)
+    offered = _offered_statuses(spec390)
+    must_reject("M4 offered set: a status the tool adds on its own is caught",
+                [*offered, "GAVE_UP"] != list(OUTCOMES.submittable_statuses(spec390)))
+    must_reject("M4 reachability: a declared status with no kind is caught",
+                OUTCOMES.status_kind(spec390, "NOT_A_STATUS") is None)
+    ev, cov, chart = _gate_fixture(spec390)
+    accepted = gate_answer(spec390, {"status": "NOT_A_STATUS", "value": {}, "reasoning": "x"},
+                           evidence=ev, coverage=cov, chart=chart).get("accepted")
+    must_reject("M4 gate: an undeclared status reaching acceptance is caught", accepted is False)
+    must_reject("M4 record: a manifest status no contract declares is caught",
+                OUTCOMES.status_kind(spec390, "MADE_UP_BY_A_RUN") is None)
+
     print(f"  {bad} inert check(s)")
     return bad
 
@@ -299,6 +373,7 @@ def main() -> int:
     m1_search(root)
     m2_prior(root)
     m3_eval()
+    m4_outcomes(root)
     print(f"\n{len(FAILURES)} failure(s)" + (": " + "; ".join(FAILURES) if FAILURES else ""))
     return len(FAILURES)
 

@@ -67,6 +67,13 @@ from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_core.tools import StructuredTool
 
 from ..contract.code_tables import code_domain_block
+from ..contract.outcomes import (
+    KIND_ABSTAIN_EVIDENCE,
+    KIND_ABSTAIN_SPEC,
+    KIND_VALUE,
+    default_evidence_abstention,
+    status_kind,
+)
 from ..contract.skills import skills_block
 from ..core.tool_surface import LIBRARY_TOOLS, ToolSurfaceError, assert_tool_surface  # noqa: F401
 from .coverage_planner import OPEN_REQUEST_OPENED, triggers_from_tool_result
@@ -851,7 +858,10 @@ def downgrade_a_positive_that_owes_something(ans: dict, *, spec, coverage, plan,
         obligations = ["the proposed positive never passed the deterministic answer gate"]
     if not obligations:
         return
-    ans["status"] = "EVIDENCE_INSUFFICIENT"
+    # The contract's own evidence-abstention, not a literal. Declaration order decides which
+    # one when a contract declares several; for a contract that declares none this is exactly
+    # the `EVIDENCE_INSUFFICIENT` that stood here before.
+    ans["status"] = default_evidence_abstention(spec)
     ans["downgraded_from"] = "FOUND"
     ans["downgraded_because"] = (
         f"the run stopped ({termination}) with {len(obligations)} obligation(s) still "
@@ -976,7 +986,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         coverage_plan=coverage_plan,
         coverage_state=ctx.coverage_state,
     )
-    if answer.get("status") == "FOUND":
+    if status_kind(spec, str(answer.get("status") or "")) == KIND_VALUE:
         # Witness proof: one qualifying document settles it, which is what the FOUND branch of
         # the gate checks. It never claims the universe was searched, so no coverage ledger is
         # attached here.
@@ -990,7 +1000,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
             tracer.emit("ungated_positive", severity="warning", termination=termination)
     answer["evidence"] = evidence.to_list()
     spec_gap = None
-    if answer.get("status") == "SPEC_INSUFFICIENT":
+    if status_kind(spec, str(answer.get("status") or "")) == KIND_ABSTAIN_SPEC:
         spec_gap, remedy = build_spec_gap(
             spec, answer, reported_by=("runtime" if forced_from is not None else "agent"),
             gate_validated=ctx.gate_validated)
@@ -1003,7 +1013,11 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         strip_value_from_spec_insufficient(answer, tracer)
     for k in ("spec_section", "spec_quote", "uncovered_fields"):
         answer.pop(k, None)
-    if answer.get("status") == "EVIDENCE_INSUFFICIENT":
+    # THE LEDGER GOES TO THE KIND THAT EARNS IT, not to a spelling. STORE.390 declares a
+    # second abstention about this chart -- CORPUS_INSUFFICIENT -- and a literal test would
+    # have dropped its coverage ledger silently, leaving an answer that had passed the gate
+    # unable to show it.
+    if status_kind(spec, str(answer.get("status") or "")) == KIND_ABSTAIN_EVIDENCE:
         # `ctx.accepted and not ctx.coverage_unreachable`: the gate ends the run in both cases and
         # only one of them earned a coverage claim. Passing `ctx.accepted` alone would attach the
         # ledger and stamp GATE_VALIDATED over a run whose exclusion sampling was invalidated,
@@ -1037,7 +1051,12 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
     claim = ({"coverage_attested": answer["coverage_attested"]} if "coverage_attested" in answer
              else {"coverage_note": answer.get("coverage_note") or NO_COVERAGE_CLAIM})
     # Refuses an unearned ledger AND a gate-validated negative that arrives without one.
-    assert_answer_is_reportable(answer)
+    # WHAT THE STATUS MEANT, recorded beside the status. The eval plane reads manifests
+    # months later, across contracts, without the contract in hand -- and `CORPUS_INSUFFICIENT`
+    # means nothing to a reader who has to guess whether it carries a value. Resolved once,
+    # here, where the contract is present, rather than re-derived by every consumer.
+    answer["status_kind"] = status_kind(spec, str(answer.get("status") or "")) or "undeclared"
+    assert_answer_is_reportable(answer, spec)
 
     manifest = {
         # IDENTITY. A manifest a reader cannot tie back to a patient, a spec version, a model
@@ -1172,7 +1191,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
             answer.get("value") or {}, str(answer.get("status") or ""),
             gate_validated=(
                 ctx.coverage_claim_earned
-                if answer.get("status") == "EVIDENCE_INSUFFICIENT"
+                if status_kind(spec, str(answer.get("status") or "")) == KIND_ABSTAIN_EVIDENCE
                 else ctx.gate_validated
             )),
         "negative_basis": answer.get("negative_basis"),
@@ -1422,8 +1441,11 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
 
     evidence = EvidenceLedger()
     coverage = CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(seed))
+    # `spec=` is what binds `submit_answer`'s status enum to THIS contract's outcome space.
+    # Omitting it does not fail loudly -- the toolbox falls back to the default three -- so it
+    # is the kind of omission that shows up as "the model never used the new status".
     toolbox = Toolbox(chart, evidence, coverage,
-                      known_doc_types=corpus.doc_type_vocabulary())
+                      known_doc_types=corpus.doc_type_vocabulary(), spec=spec)
     coverage_plan = plan_from_spec(spec, chart)
     plan = (
         coverage_plan

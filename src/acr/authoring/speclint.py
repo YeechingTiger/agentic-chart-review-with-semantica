@@ -50,9 +50,27 @@ F7 = "F7 CONFLICT_MATRIX"
 F8 = "F8 GATE_SATISFIABILITY"
 F9 = "F9 ANSWER_CHECK_INTEGRITY"
 F10 = "F10 LOCAL_TYPE_NAMES_IN_CONTRACT"
-TIER1_CHECKS = (F1, F2, F3, F4, F5, F6, F7, F8, F9, F10)
+F11 = "F11 OUTCOME_SPACE"
+TIER1_CHECKS = (F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11)
 
-ABSTENTIONS = ("EVIDENCE_INSUFFICIENT", "SPEC_INSUFFICIENT")
+#: Dates that do not exist. Used to ask a `format` pattern whether it is being made to do a
+#: job a pattern cannot do — see `_f1_formats`. Not a guess about the author's intent: a regex
+#: that accepts a real date, rejects prose, and also accepts 29 February 2018 is a regex whose
+#: value space is dates and which is not deciding them.
+_IMPOSSIBLE_DATES = ("20180229", "20180431", "20180100", "20181301")
+_A_REAL_DATE = "20180115"
+
+
+def abstentions(spec) -> tuple[str, ...]:
+    """The statuses this contract abstains with, from its own declaration.
+
+    Was a module constant naming two literals. A contract that declares a third — STORE.390
+    now separates "the chart does not say" from "the record does not go back far enough" —
+    would have had it read as a coded value by F6 and flagged as an outcome the spec cannot
+    represent, which is the linter contradicting the file it is linting.
+    """
+    from ..contract.outcomes import abstention_statuses
+    return abstention_statuses(spec)
 
 
 @dataclass(frozen=True)
@@ -202,6 +220,7 @@ def _f1_formats(spec) -> Iterable[Finding]:
             continue
         state, why = _format_state(f.format)
         if state == "ok":
+            yield from _f1_regex_is_not_a_calendar(spec, f)
             continue
         rejected = [v for v in _declared_examples(spec, f.name)
                     if state == "literal" and not re.fullmatch(f.format, v)]
@@ -212,6 +231,43 @@ def _f1_formats(spec) -> Iterable[Finding]:
                       f"re.fullmatch, so this field rejects every value it can legally hold."
                       + (f" The spec's own declared values are rejected by it: {rejected}."
                          if rejected else ""))
+
+
+def _f1_regex_is_not_a_calendar(spec, f) -> Iterable[Finding]:
+    """A `format` that admits a date which does not exist, and no second validator behind it.
+
+    THE DEFECT, MEASURED RATHER THAN IMAGINED. STORE.390 declared
+
+        (19|20)\\d{2}(0[1-9]|1[0-2]|99)([0-2]\\d|3[01]|99)
+
+    and its own provenance record said the pattern "rejects non-date text". It does. It also
+    accepts 29 February 2018, 31 April, and day `00` — because whether a day exists is
+    arithmetic over the year and the month, and a regular expression cannot carry it. A run
+    submitted `20999999` under that pattern and passed validation.
+
+    The probe is a fact about the pattern: feed it a real date, feed it prose, feed it four
+    days that do not exist. A pattern that takes the first, refuses the second and takes any
+    of the last four has a value space of dates and is not deciding them. Anything else in
+    the tree — `C\\d{3}`, `cN(X|0|1|2|3)` — fails the first probe and is never reached.
+    """
+    if getattr(f, "calendar", None):
+        return                      # a second validator is declared; that is the remedy
+    try:
+        if not re.fullmatch(f.format, _A_REAL_DATE) or re.fullmatch(f.format, "hello"):
+            return                  # this field's value space is not dates
+        admitted = [d for d in _IMPOSSIBLE_DATES if re.fullmatch(f.format, d)]
+    except re.error:
+        return
+    if admitted:
+        yield Finding(F1, FAIL, spec.spec_id, f"fields[{f.name}].format",
+                      f"format {f.format!r} admits {admitted[0]}, which is not a date, and the "
+                      f"field declares no `calendar` validator behind it. It also admits "
+                      f"{admitted[1:] or 'nothing else in the probe set'}. A pattern decides "
+                      f"whether each COMPONENT is a legal token; whether the components name a "
+                      f"day that exists is arithmetic. Declare "
+                      f"`calendar: partial_date_ccyymmdd` — a shape check described as a date "
+                      f"check is worse than none, because the manifest reports that validation "
+                      f"ran.")
 
 
 def _f2_totality(spec) -> Iterable[Finding]:
@@ -349,13 +405,14 @@ def _f6_abstention_totality(spec) -> Iterable[Finding]:
     possible proof that the outcome space is not closed.
     """
     by_name = {f.name: f for f in spec.fields}
+    abst = abstentions(spec)
     for bc in (spec.boundary_cases or []):
         if not isinstance(bc, dict) or not by_name:
             continue
         where = f"boundary_cases[{str(bc.get('case', '?'))[:40]}]"
         for key, val in bc.items():
             text = str(val)
-            if key in ("case", "why") or val is None or any(a in text for a in ABSTENTIONS):
+            if key in ("case", "why") or val is None or any(a in text for a in abst):
                 continue
             if key in by_name:
                 if not _accepts(by_name[key], val):
@@ -531,12 +588,51 @@ def _f10_local_type_names(spec) -> Iterable[Finding]:
                       f"this corpus. Replace it with `means:` prose and a Site Mapping.")
 
 
+def _f11_outcome_space(spec) -> Iterable[Finding]:
+    """`abstention` and `result.status` describe one thing, so they have to agree.
+
+    Two blocks, two audiences, one subject. `abstention` is the wording rendered into the
+    prompt — what each way of not answering MEANS. `result.status` is what `submit_answer`
+    offers and what the gate resolves obligations from. A key in one and not the other is
+    either an instruction the model cannot comply with, or an outcome it can send that nobody
+    explained; both were live in this tree before the check existed, and neither was visible
+    from either block alone.
+    """
+    from ..contract.outcomes import (KIND_VALUE, OutcomeSpaceError, declared_statuses,
+                                     submittable_statuses)
+    try:
+        space = declared_statuses(spec)
+    except OutcomeSpaceError as e:
+        yield Finding(F11, FAIL, spec.spec_id, "result.status", str(e))
+        return
+    abst = set(abstentions(spec))
+    declared_wording = set(spec.abstention or {})
+    for name in sorted(declared_wording - abst):
+        yield Finding(F11, FAIL, spec.spec_id, f"abstention[{name}]",
+                      f"{name} is given wording for the model but is not an abstaining outcome "
+                      f"in result.status ({', '.join(space) or 'the default three'}). The model "
+                      f"is told what it means and then cannot send it.")
+    for name in sorted(abst - declared_wording):
+        yield Finding(F11, FAIL, spec.spec_id, f"result.status[{name}]",
+                      f"{name} is an abstention the model may submit and the ABSTENTION block "
+                      f"says nothing about when to use it. Two abstentions a reader cannot tell "
+                      f"apart are one abstention with two spellings.")
+    if not [n for n, d in space.items() if d.get("kind") == KIND_VALUE]:
+        yield Finding(F11, FAIL, spec.spec_id, "result.status",
+                      "no outcome carries a value, so this contract's question can never be "
+                      "answered — only abstained from.")
+    if not submittable_statuses(spec):
+        yield Finding(F11, FAIL, spec.spec_id, "result.status",
+                      "every declared outcome is `submittable: false`; submit_answer would "
+                      "offer an empty enum.")
+
+
 def lint_spec(spec) -> list[Finding]:
     """Tier 1 only. Deterministic, offline, and ordered by check so a diff of two runs reads."""
     out: list[Finding] = []
     for fn in (_f1_formats, _f2_totality, _f3_establishes, _f4_keyword_coverage,
                _f5_evidence_closure, _f6_abstention_totality, _f7_conflicts, _f8_gate,
-               _f9_answer_checks, _f10_local_type_names):
+               _f9_answer_checks, _f10_local_type_names, _f11_outcome_space):
         out.extend(fn(spec))
     return out
 

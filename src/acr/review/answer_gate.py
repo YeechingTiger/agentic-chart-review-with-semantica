@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from ..chartstore.corpus import PatientChart
 from ..contract.answer_checks import check_answer_detail, check_field_formats_detail
+from ..contract import outcomes as OUTCOMES
 from ..contract.answer_contract import SPEC_SECTIONS
 from ..contract.spec import ExtractionSpec
 from ..core.state import EvidenceLedger
@@ -238,9 +239,15 @@ def negative_claim_reasons(
     those claims instead of branching only on the case-level status.
     """
     reasons: list[str] = []
-    if status == "EVIDENCE_INSUFFICIENT":
-        reasons.append("case_status:EVIDENCE_INSUFFICIENT")
-    if status == "FOUND":
+    # BY KIND, not by the literal. `CORPUS_INSUFFICIENT` is the same claim about the same
+    # chart as `EVIDENCE_INSUFFICIENT` -- an absence -- and an absence is only true if the
+    # chart was searched. A literal test would hand every status a contract adds a free pass
+    # through the coverage machinery, which is a wider outcome space and a hole in the gate
+    # arriving as one change.
+    kind = OUTCOMES.status_kind(spec, status)
+    if kind == OUTCOMES.KIND_ABSTAIN_EVIDENCE:
+        reasons.append(f"case_status:{status}")
+    if kind == OUTCOMES.KIND_VALUE:
         for field in spec.fields:
             raw = value.get(field.name)
             if raw is None or (isinstance(raw, str) and not raw.strip()):
@@ -377,6 +384,15 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
     profile_asset, _ = resolve_runtime_policy(runtime_profile)
     status = submitted.get("status", "")
     value = submitted.get("value") or {}
+    # THE FALL-THROUGH, CLOSED. Every branch below tests a KIND, and a status the contract
+    # does not declare resolves to no kind -- so before this line it matched nothing, reached
+    # the unconditional `accepted: True` at the end of this function, and stood having proved
+    # nothing at all. The most permissive outcome in the system was the one nobody wrote down.
+    kind = OUTCOMES.status_kind(spec, status)
+    if kind is None:
+        return {"accepted": False,
+                "why": "that is not an outcome this specification declares",
+                "missing": OUTCOMES.undeclared_status_message(spec, status)}
     if tracer:
         # ONE EVALUATION, counted once, before any branch can return early. It used to be
         # counted inside `answer_check_outcome`, which was called unconditionally so a rejection
@@ -396,7 +412,7 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
             tracer.evidence_admissibility(admissibility_for_citations(
                 spec, coverage, evidence.to_list(),
                 [k for k, v in value.items() if str(v if v is not None else "").strip()]))
-    if not evidence.items and status == "FOUND":
+    if not evidence.items and kind == OUTCOMES.KIND_VALUE:
         return {"accepted": False, "why": "no evidence recorded",
                 "missing": ["record at least one verbatim quote with record_evidence before answering FOUND"]}
 
@@ -406,7 +422,7 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
     # never opened is the document that would have changed it) alike. SPEC_INSUFFICIENT is
     # exempt for the same reason it is exempt from coverage: it is a claim about the
     # specification, and no amount of chasing a pending stain can make a silent spec speak.
-    if status in ("FOUND", "EVIDENCE_INSUFFICIENT"):
+    if kind in (OUTCOMES.KIND_VALUE, OUTCOMES.KIND_ABSTAIN_EVIDENCE):
         open_threads = check_threads(threads)
         if open_threads:
             if tracer:
@@ -442,7 +458,7 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
     # What is left in this function is provenance, not content: is there evidence, was every
     # quote re-read from disk at its offsets, is the patient in scope, is the budget spent, is a
     # read still unfinished. None of those is a clinical judgement.
-    if status in {"FOUND", "EVIDENCE_INSUFFICIENT"} and tracer:
+    if kind in (OUTCOMES.KIND_VALUE, OUTCOMES.KIND_ABSTAIN_EVIDENCE) and tracer:
         # Recorded, never refused: the trace still carries which declared shapes the answer
         # missed, so the eval plane can count them without re-deriving the spec.
         #
@@ -466,7 +482,7 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
                       "populated field that misses them is an instruction-following failure, "
                       "measured here rather than refused"),
             )
-    if status == "FOUND":
+    if kind == OUTCOMES.KIND_VALUE:
         # Positives were previously accepted unchecked, so `gate_validated: True`
         # on a FOUND answer asserted nothing. These are the spec's own decision
         # rules, applied deterministically rather than hoped for in a prompt.
@@ -496,7 +512,7 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
             return {"accepted": False,
                     "why": "the answer contradicts the specification's decision rules",
                     "missing": [v.message for v in detail]}
-    if status == "SPEC_INSUFFICIENT":
+    if kind == OUTCOMES.KIND_ABSTAIN_SPEC:
         # NOT sent to the coverage gate. SPEC_INSUFFICIENT is a statement about the
         # SPECIFICATION, not about this chart, and no amount of reading the chart can
         # discharge it — see the status table in `answer_contract`. What it owes
@@ -508,7 +524,8 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
         return verdict
     requirement = coverage_requirement(profile_asset.ref)
     reasons: list[str] = []
-    if requirement == COVERAGE_ALWAYS and status in {"FOUND", "EVIDENCE_INSUFFICIENT"}:
+    if requirement == COVERAGE_ALWAYS and kind in (OUTCOMES.KIND_VALUE,
+                                                   OUTCOMES.KIND_ABSTAIN_EVIDENCE):
         reasons = [f"profile:{ALWAYS_COVERAGE_PROFILE}"]
     elif requirement == COVERAGE_ON_NEGATIVE_OR_MISSING:
         # Preserve the historical profile's old branch exactly; the new conditional profile
@@ -517,9 +534,9 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
             negative_claim_reasons(spec, status, value)
             if profile_asset.module_id == CONDITIONAL_COVERAGE_PROFILE
             else (
-                ["case_status:EVIDENCE_INSUFFICIENT"]
+                [f"case_status:{status}"]
                 if profile_asset.module_id == STRATIFIED_COVERAGE_PROFILE
-                and status == "EVIDENCE_INSUFFICIENT"
+                and kind == OUTCOMES.KIND_ABSTAIN_EVIDENCE
                 else []
             )
         )
@@ -549,7 +566,7 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
             tracer=tracer,
             activation_reasons=reasons,
         )
-    if status == "EVIDENCE_INSUFFICIENT":
+    if kind == OUTCOMES.KIND_ABSTAIN_EVIDENCE:
         # Targeted search is deliberately not a coverage claim.  It still has to establish
         # the patient-level document universe so "nothing found" is not a run that never
         # looked at the chart at all.

@@ -108,6 +108,16 @@ instruction.
 
 What we do not know is whether the remaining text is now GENERAL, or merely shorter.
 
+The contract has also had its OUTCOME SPACE moved into it. The list of things a run may
+conclude used to be a literal `enum` in the tool that submits answers and a chain of
+`status == "..."` branches in the gate; a contract could not widen it, and a status nobody
+declared fell through the gate to unconditional acceptance. `result.status` now names each
+outcome and its KIND — value / abstain_evidence / abstain_spec / failure — and code branches
+on the kind, so a new outcome arrives with obligations rather than without them. Its value
+space gained the same treatment: a date is validated in two steps, a component pattern and
+then a calendar, and one imputation boolean became three because one could not say which
+component was estimated.
+
 ## What we would like reviewed
 
 1. **Generality.** For each card: is this a habit that transfers to any record and any question,

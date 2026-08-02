@@ -69,7 +69,9 @@ That machinery was never the problem and it is what made the measurement above p
 """
 from __future__ import annotations
 
+import calendar as _calendar
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from .spec import _answer_check_key
@@ -170,6 +172,81 @@ def check_answer_detail(checks, value: dict, evidence, searched=()) -> list[Viol
     return []
 
 
+# --------------------------------------------------------------------------- calendars
+# THE SECOND STEP, and the reason there is a second step at all.
+#
+# A regex decides whether each component of a date is a legal TOKEN. It cannot decide whether
+# the components together name a day that exists, because that is arithmetic: February has 28
+# days except when it has 29, and which one depends on a rule about 4, 100 and 400. The
+# pattern this contract shipped with,
+#
+#     (19|20)\d{2}(0[1-9]|1[0-2]|99)([0-2]\d|3[01]|99)
+#
+# accepted 29 February 2018, 31 April, and day `00`, and was described in the provenance
+# record as the thing that "rejects non-date text" -- true, and not the same claim.
+#
+# WHERE `99` IS LEGAL is declared here rather than implied by a character class, because the
+# four notations mean four different things and one of them has never been decided:
+#
+#     YYYYMMDD   fully known
+#     YYYYMM99   the day is not recorded
+#     YYYY9999   neither month nor day is recorded
+#     YYYY99DD   UNDECLARED. A known day under an unknown month may be meaningful or may be a
+#                transcription slip, nobody in this project has ruled, and a regex that
+#                silently admitted or silently refused it would be making the ruling by
+#                accident. It is refused, and the message says it is undecided rather than
+#                impossible -- the two are different things to tell an author.
+#
+# The year slot is NEVER 99. `decision_rule[5]` requires an unidentifiable year to be
+# APPROXIMATED, so an unknown year has no notation, and it must not acquire one by convention:
+# `20999999` -- submitted twice in the E4 floor run and format-valid at the time -- is what a
+# model does when it extends the convention one slot too far and nothing stops it. What it
+# needed instead was `year_imputed`.
+UNKNOWN = "99"
+
+
+def _partial_date_ccyymmdd(s: str) -> str:
+    """Return why this is not a representable partial date, or "" if it is one."""
+    if not re.fullmatch(r"\d{8}", s):
+        return "must be exactly eight digits, CCYYMMDD"
+    yyyy, mm, dd = s[:4], s[4:6], s[6:8]
+    if yyyy == "9999":
+        return ("the year may not be unknown. A year that cannot be identified is APPROXIMATED "
+                "to a real four-digit year and recorded as approximated; there is no notation "
+                "for an absent year")
+    if int(yyyy) == 0:
+        return "year 0000 is not a year"
+    if mm == UNKNOWN and dd != UNKNOWN:
+        return (f"month is {UNKNOWN} (unknown) but day is {dd}. That notation is NOT DECLARED by "
+                f"this contract: whether a known day under an unknown month is meaningful has "
+                f"not been decided. Write {yyyy}{UNKNOWN}{UNKNOWN} if neither is known, or "
+                f"supply the month")
+    if mm != UNKNOWN and not (1 <= int(mm) <= 12):
+        return f"month {mm} is not a month"
+    if dd == UNKNOWN:
+        return ""
+    if int(dd) < 1:
+        return f"day {dd} is not a day; there is no day zero"
+    if mm == UNKNOWN:
+        return ""          # unreachable: mm==99 with dd!=99 was refused above
+    last = _calendar.monthrange(int(yyyy), int(mm))[1]
+    if int(dd) > last:
+        return f"{yyyy}-{mm} has {last} days, so day {dd} does not exist"
+    return ""
+
+
+#: The calendar kinds `check_field_formats_detail` dispatches on. A field declaring one that
+#: is absent here does not load -- same rule as `ANSWER_CHECK_KINDS`, and for the same reason:
+#: a declared validator that never runs looks exactly like one that ran and found nothing.
+CALENDAR_KINDS: dict[str, Callable[[str], str]] = {
+    "partial_date_ccyymmdd": _partial_date_ccyymmdd,
+}
+
+
+class UnknownCalendarKindError(ValueError):
+    """A field declares a calendar validator nothing implements."""
+
+
 def check_field_formats(fields, value: dict) -> list[str]:
     """The messages only; `check_field_formats_detail` is the attributable form."""
     return [v.message for v in check_field_formats_detail(fields, value)]
@@ -200,16 +277,34 @@ def check_field_formats_detail(fields, value: dict) -> list[Violation]:
         if raw is None or str(raw).strip() == "":
             continue          # absent is abstention's business, not the format checker's
         s = str(raw).strip()
+        shape_failed = False
         fmt = getattr(f, "format", None)
         if fmt:
             try:
                 if not re.fullmatch(fmt, s):
+                    shape_failed = True
                     out.append(Violation(
                         rule_id=field_rule_id("field_format", name), rule_kind="field_format",
                         field=name, coded_value=s, trigger=str(fmt),
                         message=f"{name}={s!r} does not match the required format {fmt!r}."))
             except re.error:
                 pass          # a broken pattern in the spec must not block the run
+        cal = getattr(f, "calendar", None)
+        # STEP TWO PRESUPPOSES STEP ONE. `2018-11-07` is one defect — the wrong notation — and
+        # reporting it as both a shape miss and a non-existent date would make a single mistake
+        # look like two, which is how a rejection message stops being readable.
+        if cal and not shape_failed:
+            fn = CALENDAR_KINDS.get(str(cal))
+            if fn is None:
+                raise UnknownCalendarKindError(
+                    f"{name}.calendar={cal!r} is not implemented. One of: "
+                    f"{', '.join(sorted(CALENDAR_KINDS))}")
+            why = fn(s)
+            if why:
+                out.append(Violation(
+                    rule_id=field_rule_id("field_calendar", name), rule_kind="field_calendar",
+                    field=name, coded_value=s, trigger=str(cal),
+                    message=f"{name}={s!r} is not a date that exists: {why}."))
         allowed = getattr(f, "allowable_values", None)
         if allowed and s not in [str(v) for v in allowed]:
             out.append(Violation(

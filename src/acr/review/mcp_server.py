@@ -96,6 +96,7 @@ from ..contract.answer_contract import (
     build_spec_gap,
     strip_value_from_spec_insufficient,
 )
+from ..contract.outcomes import KIND_ABSTAIN_EVIDENCE, status_kind
 from ..contract.spec import ExtractionSpec, load_specs
 from ..core.state import EvidenceLedger
 from .answer_gate import check_gate, gate_answer, keyword_hits_among_drawn
@@ -610,7 +611,7 @@ class ChartReviewService:
         seed = self._seed_for(patient, spec_id)
         coverage = CoverageLedger(docs, strata, ForcedSampler(seed))
         evidence = EvidenceLedger()
-        toolbox = Toolbox(chart, evidence, coverage, self._vocab())
+        toolbox = Toolbox(chart, evidence, coverage, self._vocab(), spec=spec)
 
         assigned = assign_strata(docs, strata) if strata else {}
         plan: dict[str, Any] = {"read_all": [], "search": [], "sample": []}
@@ -777,7 +778,7 @@ class ChartReviewService:
             ans["coverage_note"] = ("no coverage claim is made — SPEC_INSUFFICIENT is a "
                                     "statement about the specification, not about this chart")
             strip_value_from_spec_insufficient(ans)
-        elif ans["status"] == "EVIDENCE_INSUFFICIENT":
+        elif status_kind(run.spec, ans["status"]) == KIND_ABSTAIN_EVIDENCE:
             ans["negative_basis"] = "GATE_VALIDATED"
             ans["proof_obligation"] = check_gate(run.spec, run.coverage).to_dict()
             ans["coverage_attested"] = run.coverage.to_dict()
@@ -787,7 +788,8 @@ class ChartReviewService:
             # that was never validated.
             ans.pop(k, None)
         ans["evidence"] = run.evidence.to_list()
-        assert_answer_is_reportable(ans)   # enforced at emission, not merely intended
+        ans["status_kind"] = status_kind(run.spec, str(ans.get("status") or "")) or "undeclared"
+        assert_answer_is_reportable(ans, run.spec)   # enforced at emission, not merely intended
         return ans
 
     # -- registry.truth -----------------------------------------------------------

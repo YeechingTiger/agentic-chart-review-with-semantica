@@ -327,12 +327,18 @@ def test_finalize_does_not_route_spec_insufficient_into_the_coverage_branch():
     The crash was one branch ordering: SPEC_INSUFFICIENT fell into the gate-validated negative
     branch and was handed a coverage ledger it may not carry. Asserted on `run_chart_review`,
     which owns the ordering now.
+
+    The branches test the outcome KIND rather than the status literal as of 2026-08-02, so
+    this test looks for the kind. The property is unchanged; only where it is expressed
+    moved. A contract may declare a second abstention about the chart — STORE.390's
+    CORPUS_INSUFFICIENT — and a branch keyed to one spelling would route the other into the
+    wrong arm, which is the same category error one name further along.
     """
     import acr.review.agent as A
 
     fin = inspect.getsource(A.run_chart_review)
-    i_spec = fin.index('answer.get("status") == "SPEC_INSUFFICIENT"')
-    i_cov = fin.index('answer.get("status") == "EVIDENCE_INSUFFICIENT"')
+    i_spec = fin.index("== KIND_ABSTAIN_SPEC")
+    i_cov = fin.index("== KIND_ABSTAIN_EVIDENCE")
     assert i_spec < i_cov, (
         "SPEC_INSUFFICIENT must be handled before the coverage branch, or it is handed a "
         "ledger it may not carry and the run dies at emission")
@@ -602,7 +608,13 @@ def test_the_manifest_no_longer_attests_coverage_unconditionally():
         for child in ast.iter_child_nodes(node):
             if isinstance(child, ast.If):
                 test = ast.unparse(child.test)
-                on_status = "EVIDENCE_INSUFFICIENT" in test and "status" in test
+                # THE KIND, not the spelling. The guard used to read
+                # `status == "EVIDENCE_INSUFFICIENT"`; it now resolves the status through the
+                # contract's declared outcome space, because a contract may name more than one
+                # abstention about the chart and every one of them earns the ledger. Looking
+                # for the old literal here would report a guard that had been deleted as
+                # present, which is the failure this whole test exists to prevent.
+                on_status = "KIND_ABSTAIN_EVIDENCE" in test and "status" in test
                 if not all(guarded(n, inside_status_test or on_status) for n in child.body):
                     return False
                 if not all(guarded(n, inside_status_test) for n in child.orelse):
@@ -619,8 +631,8 @@ def test_the_manifest_no_longer_attests_coverage_unconditionally():
              and isinstance(n.func, ast.Name) and n.func.id == "attach_coverage_claim"]
     assert calls, "attach_coverage_claim is no longer called at all"
     assert guarded(tree, False), (
-        "attach_coverage_claim is reachable without testing status == EVIDENCE_INSUFFICIENT; "
-        "the ledger must be conditional on the one status that earns it")
+        "attach_coverage_claim is reachable without testing the outcome KIND; the ledger must "
+        "be conditional on the statuses that earn it (kind: abstain_evidence)")
 
 
 def test_every_front_end_offers_the_reporting_fields_to_the_model():

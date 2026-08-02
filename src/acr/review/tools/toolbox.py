@@ -5,6 +5,7 @@ import time
 from collections.abc import Sequence
 
 from ...chartstore.corpus import PatientChart
+from ...contract import outcomes as OUTCOMES
 from ...core.state import Evidence, EvidenceLedger
 from ...review.coverage import CoverageLedger  # the only coverage ledger — see note in state.py
 
@@ -58,7 +59,9 @@ _AFTER_PROPERTY = {
 }
 
 
-TOOL_SCHEMAS: list[dict] = [
+#: The six retrieval tools. `submit_answer` is not among them: its status enum comes from
+#: the contract, so it is built per run by `_submit_answer_tool` below.
+_RETRIEVAL_TOOLS: list[dict] = [
     _tool(
         "list_documents",
         "List this patient's documents as METADATA ONLY (type, date, size). Returns no text. "
@@ -150,16 +153,39 @@ TOOL_SCHEMAS: list[dict] = [
         },
         ["note_id", "start", "end", "supports"],
     ),
-    _tool(
+]
+
+
+def _submit_answer_tool(spec=None) -> dict:
+    """`submit_answer`, with its status enum taken from the CONTRACT.
+
+    The enum used to be a literal here. That made the outcome space a property of the tool:
+    a contract could not widen it, and one that instructed the model toward a status this
+    list did not carry -- STORE.390 does exactly that in its proof obligation -- was asking
+    for something the model had no way to send. See `acr.contract.outcomes`.
+
+    The prose is generated from the same declaration for the same reason. A hand-written
+    description beside a generated enum is a second statement of the outcome space, free to
+    drift from the first, and the one the model actually reads.
+    """
+    space = OUTCOMES.declared_statuses(spec) if spec is not None else dict(OUTCOMES.DEFAULT_SPACE)
+    offered = {n: d for n, d in space.items() if d.get("submittable", True) is not False}
+    lines = ["Submit the final answer. `status` must be exactly one of:"]
+    lines += [f"  {n} — {d['meaning']}" for n, d in offered.items()]
+    if any(d["kind"] == OUTCOMES.KIND_ABSTAIN_EVIDENCE for d in offered.values()):
+        lines.append(
+            "A negative or absent answer is REJECTED unless the specification's proof "
+            "obligation has been met.")
+    spec_gap = [n for n, d in offered.items() if d["kind"] == OUTCOMES.KIND_ABSTAIN_SPEC]
+    if spec_gap:
+        lines.append(
+            f"{' / '.join(spec_gap)} reports on the SPECIFICATION, not on this chart: it is "
+            "rejected unless it names the part at fault, and it may not carry a value.")
+    return _tool(
         "submit_answer",
-        "Submit the final answer. status must be FOUND, EVIDENCE_INSUFFICIENT (spec is clear "
-        "but the chart lacks the evidence) or SPEC_INSUFFICIENT (the specification does not "
-        "cover this case, or the variable is not derivable from notes). A negative or absent "
-        "answer is REJECTED unless the specification's proof obligation has been met. "
-        "SPEC_INSUFFICIENT is a report about the SPECIFICATION, not about this chart: it is "
-        "rejected unless it names the part at fault, and it may not carry a value.",
+        "\n".join(lines),
         {
-            "status": {"type": "string", "enum": ["FOUND", "EVIDENCE_INSUFFICIENT", "SPEC_INSUFFICIENT"]},
+            "status": {"type": "string", "enum": list(offered)},
             "value": {"type": "object", "description": "object keyed by the spec's output field names"},
             "reasoning": {"type": "string", "description": "how the decision rules were applied"},
             # SPEC_INSUFFICIENT only. These three exist because the status alone told the
@@ -212,15 +238,25 @@ TOOL_SCHEMAS: list[dict] = [
             },
         },
         ["status", "reasoning"],
-    ),
-]
+    )
+
+
+def build_tool_schemas(spec=None) -> list[dict]:
+    """The seven tools, with `submit_answer` bound to this contract's outcome space."""
+    return [*_RETRIEVAL_TOOLS, _submit_answer_tool(spec)]
+
+
+#: The surface with no contract in hand: `mcp_server` builds a scratch toolbox before a spec
+#: is chosen, and several tests read the shape rather than a run's. Same seven tools, the
+#: three statuses `outcomes.DEFAULT_SPACE` declares.
+TOOL_SCHEMAS: list[dict] = build_tool_schemas()
 
 
 class Toolbox:
     """Executes tool calls against one patient chart, maintaining both ledgers."""
 
     def __init__(self, chart: PatientChart, evidence: EvidenceLedger, coverage: CoverageLedger,
-                 known_doc_types: Sequence[str] | None = None):
+                 known_doc_types: Sequence[str] | None = None, spec=None):
         self.chart = chart
         self.evidence = evidence
         self.coverage = coverage
@@ -236,9 +272,13 @@ class Toolbox:
         #: immediately after the call; cleared each dispatch so a stale cause cannot attach
         #: itself to a later action as a causal link nobody wrote.
         self.last_cause: str = ""
+        #: Built once, at construction, from the contract this run is under. Not recomputed
+        #: per call: the manifest records the surface the model was offered, and a surface
+        #: that could change mid-run would make that record a claim about one moment.
+        self._schemas: list[dict] = build_tool_schemas(spec)
 
     def schemas(self) -> list[dict]:
-        return TOOL_SCHEMAS
+        return self._schemas
 
     def dispatch(self, name: str, args: dict) -> tuple[dict, float]:
         t0 = time.time()
@@ -249,7 +289,8 @@ class Toolbox:
         self.last_after = args.pop(AFTER_PARAM, None)
         fn = getattr(self, f"_t_{name}", None)
         if fn is None:
-            return {"error": f"unknown tool {name!r}", "available": [s["function"]["name"] for s in TOOL_SCHEMAS]}, 0.0
+            return {"error": f"unknown tool {name!r}",
+                    "available": [s["function"]["name"] for s in self._schemas]}, 0.0
         try:
             out = fn(**args)
         except TypeError as e:

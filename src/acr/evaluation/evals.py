@@ -480,6 +480,16 @@ class RunRecord:
     spec_hash = property(lambda s: str(s.manifest.get("spec_hash") or ""))
     answer = property(lambda s: s.manifest.get("answer") or {})
     status = property(lambda s: str(s.answer.get("status") or ""))
+    #: The outcome KIND the contract gave this status, recorded at emission by the runtime.
+    #: Empty for a manifest written before 2026-08-02, which is why `abstained` falls back to
+    #: the literal set rather than treating an unrecorded kind as a value-carrying answer.
+    status_kind = property(lambda s: str(s.answer.get("status_kind") or ""))
+    #: Whether this run's fields may be scored as CODED. Anything that is not the
+    #: value-carrying kind coded nothing, whatever it is spelled: a contract may declare more
+    #: than one abstention, and a hardcoded set of names would score the ones it had not heard
+    #: of as if they had answered.
+    abstained = property(lambda s: (s.status_kind != "value") if s.status_kind
+                         else s.status in ABSTAIN_STATUSES)
     value = property(lambda s: s.answer.get("value") or {})
     gate_validated = property(lambda s: bool(s.manifest.get("gate_validated")))
     rejections = property(lambda s: list(s.manifest.get("rejections") or []))
@@ -992,7 +1002,7 @@ def score(runs: Sequence[RunRecord], answer_key: Mapping[str, Mapping[str, Any]]
         row = answer_key.get(iid) or answer_key.get(run.patient_id)
         n_unkeyed += int(row is None)
         kf = (row or {}).get("fields") or {}
-        abstained = run.status in ABSTAIN_STATUSES
+        abstained = run.abstained
         outcomes = []
         for f in fields:
             coded = None if abstained else _norm_value(run.value.get(f))

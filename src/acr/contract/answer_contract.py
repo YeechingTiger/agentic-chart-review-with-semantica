@@ -15,6 +15,7 @@ category error this module was written to end (see the status table below).
 """
 from __future__ import annotations
 
+from .outcomes import KIND_ABSTAIN_EVIDENCE, status_kind
 from .spec import ExtractionSpec
 from .trace import parse_rule_citations, rule_catalog
 
@@ -89,7 +90,7 @@ class SpecGapError(AssertionError):
     """A SPEC_INSUFFICIENT answer was emitted without the report that makes it usable."""
 
 
-def assert_coverage_claim_is_earned(ans: dict) -> None:
+def assert_coverage_claim_is_earned(ans: dict, spec: ExtractionSpec | None = None) -> None:
     """`coverage_attested` may appear on exactly one kind of answer.
 
     A coverage ledger asserts "I searched the defined universe". Only a negative that passed
@@ -101,14 +102,21 @@ def assert_coverage_claim_is_earned(ans: dict) -> None:
     Checked at the point of emission rather than left as an intention, since the whole family
     of bugs this guards against consists of intentions that the code did not keep.
     """
+    # BY KIND. `spec` is optional because two callers reach this with an answer and no
+    # contract in hand, and `outcomes` resolves None to the three statuses this repo shipped
+    # with -- so the literal that used to be here is still the answer, in exactly those cases.
+    # Where a contract IS available and declares a second abstention about the chart
+    # (STORE.390's CORPUS_INSUFFICIENT), a literal test would have RAISED on a legitimately
+    # gate-validated answer: the ledger it earned would look like a ledger it stole.
     has_ledger = "coverage_attested" in ans
-    earned = (ans.get("status") == "EVIDENCE_INSUFFICIENT"
+    status = str(ans.get("status") or "")
+    earned = (status_kind(spec, status) == KIND_ABSTAIN_EVIDENCE
               and ans.get("negative_basis") == "GATE_VALIDATED")
     if has_ledger and not earned:
         raise CoverageClaimError(
             f"coverage_attested attached to status={ans.get('status')!r} "
             f"negative_basis={ans.get('negative_basis')!r} proof_basis={ans.get('proof_basis')!r}; "
-            "only a gate-validated EVIDENCE_INSUFFICIENT may carry a coverage claim"
+            "only a gate-validated abstention ABOUT THIS CHART may carry a coverage claim"
         )
     if earned and not has_ledger:
         raise CoverageClaimError(
@@ -165,13 +173,16 @@ def assert_spec_gap_is_reported(ans: dict) -> None:
         )
 
 
-def assert_answer_is_reportable(ans: dict) -> None:
+def assert_answer_is_reportable(ans: dict, spec: ExtractionSpec | None = None) -> None:
     """Every obligation an answer owes at emission, in one call so no front end owes fewer.
 
     Three runtimes emit answers (graph, deep_runner, mcp_server). A rule enforced in two of
     them makes the signal silently conditional on which runtime the operator happened to use.
+
+    `spec` is optional and only widens what can be resolved: without it the outcome space is
+    the default three, which is the right answer for a caller that has no contract.
     """
-    assert_coverage_claim_is_earned(ans)
+    assert_coverage_claim_is_earned(ans, spec)
     assert_spec_gap_is_reported(ans)
 
 

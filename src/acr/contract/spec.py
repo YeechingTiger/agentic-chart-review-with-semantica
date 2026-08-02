@@ -133,6 +133,15 @@ class OutputField(BaseModel):
     name: str
     type: str = "string"
     format: str | None = None
+    #: A SECOND validator, applied after `format`, for value spaces a regex cannot decide.
+    #: One kind is implemented — `partial_date_ccyymmdd`; see `answer_checks.CALENDAR_KINDS`.
+    #:
+    #: The split is not stylistic. `format` asks whether each component is a legal token;
+    #: this asks whether the components together name something that exists. Leap years are
+    #: arithmetic, and the pattern that stood here alone until 2026-08-02 admitted 29 February
+    #: 2018, 31 April, and day `00`. A shape check described as a date check is worse than no
+    #: check, because the manifest reports that validation ran.
+    calendar: str | None = None
     allowable_values: list[Any] | None = None
     nullable: bool = True
     description: str = ""
@@ -294,6 +303,9 @@ def enforced_elements(spec: "ExtractionSpec") -> list[EnforcedElement]:
     element enters this list when some code path CHANGES BEHAVIOUR on its value:
 
       fields[].format / .allowable_values     answer_checks.check_field_formats
+      fields[].calendar                       answer_checks.check_field_formats
+      result.status                           outcomes.submittable_statuses (+ the tool enum
+                                              the model is offered, and every gate branch)
       answer_checks[]                         answer_checks.check_answer
       for_negative.required_keywords          graph.check_gate  (+ rendered in every prompt)
       for_negative.required_coverage          graph.check_gate  (+ rendered in every prompt)
@@ -325,9 +337,20 @@ def enforced_elements(spec: "ExtractionSpec") -> list[EnforcedElement]:
         if f.format:
             add(f"fields[{f.name}].format", "field_format", f.format,
                 "answer_checks.check_field_formats", f.name)
+        if f.calendar:
+            add(f"fields[{f.name}].calendar", "field_calendar", f.calendar,
+                "answer_checks.check_field_formats", f.name)
         if f.allowable_values:
             add(f"fields[{f.name}].allowable_values", "field_allowable_values",
                 list(f.allowable_values), "answer_checks.check_field_formats", f.name)
+
+    # THE OUTCOME SPACE. Enforced twice over: it builds `submit_answer`'s status enum, so it
+    # decides what the model may say, and the gate resolves each status through it, so it
+    # decides what may stand. A contract able to widen either without a record attached would
+    # be the one invented rule in the file with no marking on it.
+    if (spec.result or {}).get("status"):
+        add("result.status", "outcome_space", spec.result["status"],
+            "outcomes.submittable_statuses")
 
     for chk in (spec.answer_checks or []):
         if isinstance(chk, dict):
@@ -460,6 +483,23 @@ def bind_provenance(spec: "ExtractionSpec") -> None:
                 f"nothing implements. Known kinds: {sorted(ANSWER_CHECK_KINDS)}. A kind no code "
                 "dispatches on is a rule that can never fire, and it reads in the manifest "
                 "exactly like a rule that fired and found nothing.")
+
+    # SAME RULE FOR THE SECOND VALIDATOR. A `calendar:` nobody implements would leave the
+    # field validated by its regex alone while the provenance block and the manifest both say
+    # a calendar check is in force -- the exact overstatement this package removed.
+    from .answer_checks import CALENDAR_KINDS
+    for f in spec.fields:
+        if f.calendar and str(f.calendar) not in CALENDAR_KINDS:
+            raise ProvenanceError(
+                f"{spec.spec_id}: fields[{f.name}].calendar is {f.calendar!r}, which nothing "
+                f"implements. Known kinds: {sorted(CALENDAR_KINDS)}.")
+
+    # And the outcome space, which raises `OutcomeSpaceError` on an unimplemented kind. Called
+    # for its side effect: `enforced_elements` below would reach it anyway, but only if the
+    # block is non-empty, and a `result:` with a malformed `status` under it must not load as
+    # a contract that simply declared nothing.
+    from .outcomes import declared_statuses
+    declared_statuses(spec)
 
     by_path = {e.path: e for e in enforced_elements(spec)}
     seen: set[str] = set()
@@ -621,6 +661,13 @@ class ExtractionSpec(BaseModel):
     conflict_rules: list[Any] = Field(default_factory=list)
     answer_checks: list[Any] = Field(default_factory=list)
     proof_obligation: ProofObligation = Field(default_factory=ProofObligation)
+    #: THE OUTCOME SPACE, when this contract declares one. `result.status` maps each outcome
+    #: to its `kind` (which obligations apply), its `meaning` (rendered to the model) and
+    #: optionally `submittable: false` (an outcome of a run that is not an answer a model may
+    #: claim). Read through `acr.contract.outcomes`, never off this attribute directly — a
+    #: contract that declares nothing means the three statuses this repo shipped with, and
+    #: that default belongs in one place.
+    result: dict[str, Any] = Field(default_factory=dict)
     abstention: dict[str, str] = Field(default_factory=dict)
     special_codes_not_mar: list[Any] = Field(default_factory=list)
     boundary_cases: list[Any] = Field(default_factory=list)
@@ -738,10 +785,15 @@ class ExtractionSpec(BaseModel):
             binding obligation, so they shape the search that produced the answer.
         """
         answered = {k for k, v in (value or {}).items() if str(v if v is not None else "").strip()}
-        found = status == "FOUND"
+        # By KIND, not by the literal `FOUND`. A contract that names its value-carrying status
+        # something else would otherwise report every field rule as unused, and the run would
+        # come back looking cleaner than it was.
+        from .outcomes import is_value
+        found = is_value(self, status)
         used: list[str] = []
         for e in enforced_elements(self):
-            if e.kind in ("field_format", "field_allowable_values", "answer_check"):
+            if e.kind in ("field_format", "field_calendar", "field_allowable_values",
+                          "answer_check"):
                 if found and e.field in answered:
                     used.append(e.path)
             elif e.kind in ("gate_threshold", "sample_threshold"):
