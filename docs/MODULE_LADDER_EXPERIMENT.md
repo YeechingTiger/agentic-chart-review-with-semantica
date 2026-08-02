@@ -192,3 +192,73 @@ And two things block the *design* rather than any single arm:
 4. **Evidence-pack builder** — turn the `REGISTRY_REFERENCE` attribution into a two-sided packet
    for a human. This is what makes adjudication affordable, and adjudication gates B1/B5/B6.
 5. Then the ladder, on data where its numbers mean something.
+
+
+---
+
+# E1 + E2 results, 2026-08-01
+
+Seven arms x eighteen charts (twelve base + six SYNX adversarial), `STORE.390`, seed 1234,
+`gpt-5.6-luna`, 126 runs, about 70 minutes, roughly $1.6. B0 is the empty search slot.
+
+| arm | exact | trap sprung | abstained | recovery | **harm** | net | grounding | max depth | calls |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **B0-base** | 15/18 | 1 | 2 | — | — | — | 0.49 | 4 | 10.1 |
+| native | 15/18 | 2 | 1 | 1 | 1 | 0 | 0.54 | 4 | 11.5 |
+| breadth-first | 15/18 | 1 | 2 | 0 | 0 | 0 | **0.74** | 4 | 11.3 |
+| depth-first | 14/18 | 2 | 1 | 0 | 1 | −1 | 0.53 | 3 | 9.9 |
+| breadth-then-depth | 15/18 | 2 | 1 | 1 | 1 | 0 | **0.70** | 4 | 11.3 |
+| information-gain | **16/18** | 1 | 1 | 1 | 0 | **+1** | 0.55 | 3 | 10.4 |
+| latest-first | 14/18 | 1 | 3 | 0 | 1 | −1 | 0.54 | **5** | 11.3 |
+
+B0's three failures: SYN0002, SYNX02, SYNX06.
+
+## What this establishes
+
+**Nothing about accuracy, and that is the finding.** The whole spread is 14 to 16 out of 18. The
+powering section above committed, before any number existed, to reporting a one- or two-case
+difference as underpowered, and that is exactly what this is. `information-gain` at +1 net is one
+chart.
+
+**But the baseline itself is the result.** B0 — no search card at all — scores 15/18, matching or
+beating five of the six cards. Every card measured before today was compared against a floor
+nobody had measured. It turns out the floor is high, and on this task **no card has yet bought a
+point**.
+
+**The task is saturated.** Fifteen of eighteen correct leaves three cases of headroom, of which
+one is an abstention and two are traps. That is the same ceiling problem `BFS_DFS_SEARCH_PILOT`
+diagnosed on twelve charts, and adding the six adversarial charts did not fix it: the traps
+sprang once or twice per arm, not systematically. **The SYNX charts are not hard enough for the
+current agent**, so they do not supply the discrimination they were built for.
+
+**Harm is real and would have been invisible.** Four arms have harm ≥ 1 — they turned a case B0
+got right into one it got wrong — and three of those have net ≤ 0. Reported as accuracy alone,
+`native` and `breadth-then-depth` look identical to B0 at 15/18; the paired view shows each
+recovered one case and broke a different one. A ladder that reports only the headline would have
+called them "no change".
+
+## The one clean signal: grounding is driven by SHAPE, not by instruction
+
+`breadth-first` 0.74 and `breadth-then-depth` 0.70 against 0.49–0.55 for everything else — and
+**neither of those two cards was ever given the pointer instruction.** It went to `depth-first`
+and `information-gain`, which came back at 0.53 and 0.55.
+
+So the causal story is not the one the instruction predicted. A wide sweep produces steps that
+each hang naturally off the inventory or a prior search; a lead-chase produces jumps whose origin
+is harder to name, and telling the model to name it did not close the gap. This contradicts the
+prediction made when the pointer landed — that `depth-first` would go deepest — and it is
+falsifiable, which is more than the accuracy column offers.
+
+`latest-first` reaches depth 5, the deepest of any arm, on a grounding ratio of only 0.54: it
+builds one long chain rather than many short ones. That is exactly the navigation shape its card
+describes, and it is visible in the trace rather than asserted.
+
+## What to do next, from these numbers
+
+1. **A harder task, not more charts.** STORE.390 is saturated at B0. `STORE.1860_1880.first_recurrence`
+   has a FOUND key for 7 of 12 and requires separating a recurrence from the initial disease
+   across a timeline. Adding charts to a saturated task adds cost, not power.
+2. **Corpus answerability profiling.** Of the three residual failures, how many are "the corpus
+   could never have answered"? Without the stratum that question cannot be asked, and it is the
+   difference between "the policy does not help" and "this case has no answer to find".
+3. **Do not add a ninth card.** Eight cards, seven measured today, none beating an empty slot.
