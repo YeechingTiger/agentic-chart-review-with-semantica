@@ -125,8 +125,18 @@ def m2_prior(root: pathlib.Path) -> None:
     frozen = [k.lower() for k in spec_declared_keywords(spec)]
     corpus = Corpus(ROOT / "corpus" / "patients")
 
+    # The frozen-list check compares a RECORDED run against a spec on disk, so it is only
+    # meaningful where the two are the same spec. Retrieval assets were taken out of this file
+    # on 2026-08-02; against the runs made before that, `spec_declared_keywords` returns the
+    # empty list and every one of them reads as corrupted. Same error as the E3 contamination,
+    # arriving this time inside the verifier. Skipped runs are COUNTED and printed — a silent
+    # skip turns a check into a check that passes.
+    stale = 0
     bad_frozen, bad_empty, bad_exhaustive = [], [], []
     for arm, rec in runs_of(root):
+        if rec.spec_hash != spec.spec_hash:
+            stale += 1
+            continue
         pl = next((t["plan"] for t in rec.trace if t.get("kind") == "retrieval_plan"), None)
         if pl is None:
             bad_frozen.append(f"{arm}/{rec.patient_id}: no retrieval_plan event at all")
@@ -170,6 +180,15 @@ def m2_prior(root: pathlib.Path) -> None:
                 bad_empty.append(f"{arm}/{rec.patient_id}: source={pl['source']} but "
                                  f"read_all={pl['read_all']} kw={pl.get('initial_keywords')}")
 
+    fresh = sum(1 for _, rec in runs_of(root) if rec.spec_hash == spec.spec_hash)
+    if not fresh:
+        # PASS over zero runs is the shape this file exists to refuse. Say SKIP and say why.
+        print(f"  SKIP  all {stale} run(s) predate the spec on disk ({spec.spec_hash[:12]}); "
+              f"M2 checks nothing until a run is made against it")
+        return
+    if stale:
+        print(f"          ({stale} of {stale + fresh} run(s) skipped: recorded against an "
+              f"earlier spec hash)")
     check("every run records a retrieval plan", not any("no retrieval_plan" in b for b in bad_frozen))
     check("spec_strata plans carry the spec's frozen keyword list", not bad_frozen,
           "\n".join(bad_frozen[:4]))
