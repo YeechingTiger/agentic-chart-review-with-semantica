@@ -119,15 +119,20 @@ def test_manifest_carries_the_slot():
     assert entries[0]["content_hash"]
 
 
-def test_default_profile_renders_exactly_what_it_rendered_before():
-    """这次改动不许改变默认 profile 送给模型的字节。
+def test_default_profile_renders_the_universal_block_then_the_standing_habits():
+    """默认 profile 送给模型的字节，钉死在这里。
 
-    历史上每一次 run 都是在 `coverage-judgement` 这一张卡下跑的。如果重构顺手多塞了两张，
-    过去的 run 和以后的 run 就不可比，而存档单不会说这件事——它只记得当时渲染了什么。
+    这条测试原来的名字是 `..._exactly_what_it_rendered_before`，理由是：历史上每一次 run 都
+    在 `coverage-judgement` 一张卡下跑，重构顺手多塞两张就会让新旧 run 不可比。那个理由仍然
+    成立，而 2026-08-02 这次是**故意**破坏它的：`tool-contract` 加进了每一个 profile。
+
+    为什么值得破坏一次可比性——外部审核指出，`keyword-strategy` 知道 substring、hit cap、
+    扫描顺序这些工具事实，别的卡不知道，于是七个臂的差异里一直混着"谁碰巧了解仪器"。工具
+    事实不是策略，属于每一个臂。破坏是一次性的，此后这条测试照旧钉住。
     """
     from acr.review.runtime_profiles import DEFAULT_RUNTIME_PROFILE, runtime_policy_skills
     stack = runtime_policy_skills(DEFAULT_RUNTIME_PROFILE)
-    assert stack.names() == ("coverage-judgement",)
+    assert stack.names() == ("tool-contract", "coverage-judgement")
     assert skills_block(stack).endswith(load_skill_body("coverage-judgement"))
     # `endswith` only pins the tail. The header and the separators are prompt bytes too, and a
     # reworded header would move every run onto a different prompt while the manifest — which
@@ -141,15 +146,21 @@ def test_default_profile_renders_exactly_what_it_rendered_before():
         "questions, and where it does not fit this chart you should depart from it and say so in "
         "your reasoning. Your departure is recorded, not refused.",
         "",
+        "--- skill: tool-contract ---",
+        "",
+        load_skill_body("tool-contract"),
+        "",
         "--- skill: coverage-judgement ---",
         "",
         load_skill_body("coverage-judgement"),
     ])
 
 
-def test_unknown_profile_still_falls_back_to_coverage_judgement():
+def test_unknown_profile_still_falls_back_to_the_universal_block():
+    """未知 profile 的兜底也必须带工具契约 —— 否则"每一个臂都有"就有一个例外，而例外
+    正好落在没人特意配置过的那条路径上。"""
     from acr.review.runtime_profiles import runtime_policy_skills
-    assert runtime_policy_skills("not-a-profile").names() == ("coverage-judgement",)
+    assert runtime_policy_skills("not-a-profile").names() == ("tool-contract", "coverage-judgement")
 
 
 # --- Task 3: `--skills` swaps one card without minting a profile -----------------------------
@@ -314,7 +325,8 @@ def test_the_manifest_records_the_stack_the_model_was_actually_given(tmp_path: P
 def test_the_manifest_records_the_profiles_stack_when_nothing_overrode_it(tmp_path: Path):
     """`skill_stack=None` — the path every recorded run took — must not have moved."""
     recorded = _scripted_manifest_skills(tmp_path)
-    assert [(e["skill"], e["slot"]) for e in recorded] == [("coverage-judgement", "general")]
+    assert [(e["skill"], e["slot"]) for e in recorded] == [
+        ("tool-contract", "general"), ("coverage-judgement", "general")]
 
 
 def _invoke(monkeypatch, tmp_path: Path, *args):

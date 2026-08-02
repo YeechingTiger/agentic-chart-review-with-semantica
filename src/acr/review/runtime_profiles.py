@@ -473,14 +473,14 @@ def targeted_negative_basis(ref: str) -> str:
 #: `evaluate_gate` used to issue — the arms differ in whether coverage is PROVEN, not in whether
 #: the model is told how to think about an absence claim.
 _PROFILE_SKILLS: dict[str, SkillStack] = {
-    GUIDELINE_ONLY_PROFILE: SkillStack(general=("coverage-judgement",)),
-    CONDITIONAL_COVERAGE_PROFILE: SkillStack(general=("coverage-judgement",)),
-    ALWAYS_COVERAGE_PROFILE: SkillStack(general=("coverage-judgement",)),
-    WITNESS_FIRST_PROFILE: SkillStack(general=("coverage-judgement",)),
-    STRATIFIED_COVERAGE_PROFILE: SkillStack(general=("coverage-judgement",)),
+    GUIDELINE_ONLY_PROFILE: SkillStack(general=("tool-contract", "coverage-judgement")),
+    CONDITIONAL_COVERAGE_PROFILE: SkillStack(general=("tool-contract", "coverage-judgement")),
+    ALWAYS_COVERAGE_PROFILE: SkillStack(general=("tool-contract", "coverage-judgement")),
+    WITNESS_FIRST_PROFILE: SkillStack(general=("tool-contract", "coverage-judgement")),
+    STRATIFIED_COVERAGE_PROFILE: SkillStack(general=("tool-contract", "coverage-judgement")),
 }
 
-_FALLBACK_SKILLS = SkillStack(general=("coverage-judgement",))
+_FALLBACK_SKILLS = SkillStack(general=("tool-contract", "coverage-judgement"))
 
 
 def runtime_policy_skills(module_id: str) -> SkillStack:
