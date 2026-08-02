@@ -2,6 +2,7 @@
 name: tactic-query-formulation
 description: Use when deciding what to search for, before the first query and whenever searching is not converging. Covers building the term list from the fields the answer must fill rather than from the subject matter, choosing how wide a query should be and reacting to what it returns, and the standing rule that a search which leads to no read has established nothing. Says what to look for; `tool-contract` says how the instrument behaves.
 slot: tactic
+precondition: "Always applicable: a query has to be formed before anything can be searched."
 license: MIT
 ---
 

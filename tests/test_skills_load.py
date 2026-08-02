@@ -116,3 +116,27 @@ def test_reference_pointers_resolve(skill_dir: Path):
             assert (repo / ref).is_file(), f"{md} points at missing {ref}"
         for bare in re.findall(r"`(references/[A-Za-z0-9_/.-]+\.md)`", md.read_text()):
             pytest.fail(f"{md}: pointer {bare!r} is cwd-relative; write it repo-relative")
+
+
+def test_every_skills_frontmatter_parses_and_a_tactic_declares_its_precondition():
+    """一个未加引号、含冒号的 `precondition:` 让 YAML 解析失败，而失败是以 collection error
+    的形式出现的 —— 整个测试套件收集不起来，报的是别的文件的名字。这条把它变成一句能读的话。
+
+    同时钉住：`tactic` 槽的卡必须声明 precondition。战术之所以从 controller 槽拆出来，就是
+    因为它只在前提成立时才有内容；不说前提的战术，和一张普通的卡没有区别。
+    """
+    import re
+
+    import yaml
+
+    from acr.contract.skills import SKILLS_DIR, skill_slot
+    for d in sorted(SKILLS_DIR.iterdir()):
+        f = d / "SKILL.md"
+        if not f.is_file():
+            continue
+        m = re.match(r"\A---\n(.*?)\n---\n", f.read_text(encoding="utf-8"), re.S)
+        assert m, f"{d.name}: no frontmatter block at byte 0"
+        fm = yaml.safe_load(m.group(1))
+        assert isinstance(fm, dict), f"{d.name}: frontmatter is not a mapping"
+        if skill_slot(d.name) == "tactic":
+            assert fm.get("precondition"), f"{d.name} sits in the tactic slot and declares no precondition"

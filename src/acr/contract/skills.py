@@ -310,7 +310,15 @@ def skills_block(stack: SkillStack, skills_dir: Path | str | None = None) -> str
         "your reasoning. Your departure is recorded, not refused.",
     ]
     for n in names:
-        parts += ["", f"--- skill: {n} ---", "", load_skill_body(n, skills_dir)]
+        head = f"--- skill: {n} ---"
+        # A tactic's PRECONDITION has to reach the model or it is frontmatter nobody reads —
+        # and the whole reason tactics were split out of the controller slot is that a move
+        # drawn on a record that does not meet its precondition is a move that gives no
+        # guidance. The controller needs to know when each one applies in order not to call it.
+        pre = _frontmatter(n, skills_dir).get("precondition")
+        if pre:
+            head += f"\n    CALL THIS WHEN: {pre}"
+        parts += ["", head, "", load_skill_body(n, skills_dir)]
     return "\n".join(parts)
 
 
