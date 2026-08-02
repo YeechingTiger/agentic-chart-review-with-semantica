@@ -82,8 +82,12 @@ TOOL_SCHEMAS: list[dict] = [
         "Case-insensitive search across the patient's documents. Returns matches with the "
         "note_id and exact character offsets so you can cite them.",
         {
-            "query": {"type": "string", "description": "term or phrase; set regex=true for a pattern"},
-            "regex": {"type": "boolean"},
+            "query": {"anyOf": [{"type": "string"},
+                                {"type": "array", "items": {"type": "string"}}],
+                      "description": ("one keyword, or a LIST of keywords searched in this one "
+                                      "call. Prefer the list: five terms in one call cost one "
+                                      "call, and hits stay attributed to the term that found "
+                                      "them.")},
             "doc_type_contains": {"type": "string"},
             "date_from": {"type": "string"},
             "date_to": {"type": "string"},
@@ -105,6 +109,11 @@ TOOL_SCHEMAS: list[dict] = [
         },
         ["note_id"],
     ),
+    # `timeline` removed: it returned documents in date order, which `list_documents` already
+    # gives with `date_from`/`date_to` and a type filter. A second way to ask one question is a
+    # second thing to keep honest, and the tool surface should be ordinary — keyword search, and
+    # the ability to see every note type and every note date. Nothing invented.
+    #
     # `read_section` removed: it addressed headings through an ALL-CAPS regex that reached
     # `FINAL DIAGNOSIS` in 2.3% of the documents containing it and `ADDENDUM` in 0 of 2,401.
     # Use `search_notes` for the offset, then `read_document` with that offset.
@@ -121,12 +130,6 @@ TOOL_SCHEMAS: list[dict] = [
             AFTER_PARAM: _AFTER_PROPERTY,
         },
         ["note_ids"],
-    ),
-    _tool(
-        "timeline",
-        "Chronological list of documents, optionally filtered by type. Use to establish "
-        "sequence — e.g. whether a disease-free interval preceded a later finding.",
-        {"doc_type_contains": {"type": "string"}, "limit": {"type": "integer"}},
     ),
     _tool(
         "record_evidence",
@@ -340,20 +343,59 @@ class Toolbox:
         return {"patient_id": self.chart.patient_id, "n_documents": len(self.chart),
                 "n_types": len(rows), "types": rows}
 
-    def _t_search_notes(self, query: str, regex: bool = False, doc_type_contains=None,
+    @staticmethod
+    def search_many(chart, query, doc_type_contains=None, date_from=None, date_to=None,
+                    max_hits: int = 25) -> dict:
+        """One call, one or many keywords, hits kept ATTRIBUTED TO THE TERM THAT FOUND THEM.
+
+        The tool used to take a single string, so covering a chart with five terms cost five
+        calls no matter what any policy said — measured at 506 searches over eighteen charts in
+        E2, `biopsy` alone eighty-six times, while the same arm opened FEWER documents than a run
+        with no card at all. Half of that was a bad card; this is the other half.
+
+        `by_term` rather than a merged pool because which term surfaced a document is the one
+        distinction the causal chain can use, and flattening throws it away.
+
+        The cap is PER TERM. Sharing it would let the first term eat the budget and make every
+        later term read as "not in this chart", which is the same failure as an unfiltered miss.
+        """
+        terms = [query] if isinstance(query, str) else list(query or [])
+        terms = [str(t) for t in terms if str(t).strip()]
+        if not terms:
+            return {"error": "NO_TERMS",
+                    "detail": ("search_notes needs at least one keyword. An empty list would "
+                               "return zero hits, which reads as 'this chart contains nothing'.")}
+        by_term = {}
+        for t in terms:
+            hits = chart.search(t, False, doc_type_contains, date_from, date_to,
+                                max_hits=max_hits)
+            by_term[t] = {"n_hits": len(hits), "truncated": len(hits) >= max_hits,
+                          "hits": [h.__dict__ for h in hits]}
+        out = {"terms": terms, "by_term": by_term,
+               "n_hits_total": sum(b["n_hits"] for b in by_term.values())}
+        if len(terms) == 1:
+            # The one-term call keeps its original shape. Every recorded run, every downstream
+            # consumer and thirty-three tests read `hits` and `n_hits` off the top level; a new
+            # capability that silently changes the old call's return is a breaking change wearing
+            # an addition's clothes.
+            t = terms[0]
+            out.update({"query": t, "n_hits": by_term[t]["n_hits"],
+                        "truncated": by_term[t]["truncated"], "hits": by_term[t]["hits"]})
+        return out
+
+    def _t_search_notes(self, query, doc_type_contains=None,
                         date_from=None, date_to=None, max_hits: int = 25) -> dict:
         bad = self._resolve_doc_type(doc_type_contains)
         if bad:
             return bad
-        hits = self.chart.search(query, regex, doc_type_contains, date_from, date_to, max_hits=max_hits)
-        self.coverage.note_search(query, [h.note_id for h in hits])
-        return {
-            "query": query,
-            "n_hits": len(hits),
-            "truncated": len(hits) >= max_hits,
-            "type_filter_valid": True,
-            "hits": [h.__dict__ for h in hits],
-        }
+        out = self.search_many(self.chart, query, doc_type_contains, date_from, date_to,
+                               max_hits=max_hits)
+        if out.get("error"):
+            return out
+        for term, block in out["by_term"].items():
+            self.coverage.note_search(term, [h["note_id"] for h in block["hits"]])
+        out["type_filter_valid"] = True
+        return out
 
     def _t_read_document(self, note_id: str, offset: int = 0, limit: int = 4000) -> dict:
         if note_id not in self.chart._docs:

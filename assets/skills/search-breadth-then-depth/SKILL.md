@@ -13,9 +13,12 @@ cannot support a claim of absence.
 
 ## Phase 1 — sweep
 
-Inventory the chart by document type. One search per candidate type, same terms, type filter
-varied. Record the pool — which documents matched, which type, which date — BEFORE reading
-closely. The pool is the denominator any later absence claim rests on.
+Inventory the chart by document type, then widen along a NEW AXIS each time — a different
+term, a different date window, a type not yet looked at. NOT the same term under a document-type
+filter: `search_notes` already covers the whole chart, so that returns a subset of what you hold.
+Record the pool — which documents matched, which type, which date — BEFORE reading closely; the
+pool is the denominator any later absence claim rests on. And keep budget for the reading: a hit
+locates, only a read answers.
 
 ## The handover
 

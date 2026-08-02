@@ -15,10 +15,17 @@ could carry the field. Only then start reading.
 
 1. **Inventory by type.** Which types exist in THIS chart, and how many of each. Types the
    contract can never accept still get listed — you need them to say what you excluded.
-2. **One search per candidate type.** Same terms, type filter varied. This is what makes the
-   result a comparison rather than a walk: a term that hits in pathology and misses in
-   imaging tells you something about the term; a term tried only in pathology does not.
-3. **Record the pool before reading.** Which documents matched, which type, which date. The
+2. **Widen along a NEW AXIS each time, never by repeating a term under a filter.**
+   `search_notes` already searches the whole chart, so running the same term again with a
+   document-type filter returns a subset of what you already have. Measured: this card's first
+   version said "same terms, type filter varied" and produced 506 searches over eighteen charts,
+   460 of them type-filtered, `biopsy` alone eighty-six times — for the same accuracy as issuing
+   no searches beyond the obvious ones. The axes that actually add something are a DIFFERENT
+   TERM, a DIFFERENT DATE WINDOW, or a type you have not looked at at all.
+3. **Search locates; reading answers.** A hit is a pointer, not a finding. The same first
+   version spent its budget sweeping and opened FEWER documents per patient than a run with no
+   card at all (2.6 against 3.3) — wider by every count except the one that decides the answer.
+4. **Record the pool before reading.** Which documents matched, which type, which date. The
    pool is your denominator, and once you begin reading you will stop being able to say what
    you started with.
 

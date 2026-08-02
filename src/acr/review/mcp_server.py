@@ -569,7 +569,10 @@ class ChartReviewService:
         return self._chart_call(patient, "list_documents", args)
 
     def _h_search(self, patient: str, query: str, type: str | None = None, **kw) -> dict:
-        args = {"query": query, "doc_type_contains": type, "regex": bool(kw.get("regex", False)),
+        # No `regex`: the tool surface is ordinary keyword search and nothing else. It was
+        # removed rather than deprecated, and forwarding a key the dispatch no longer accepts
+        # fails the whole call — which is how twenty-three tests went red at once.
+        args = {"query": query, "doc_type_contains": type,
                 "date_from": kw.get("from"), "date_to": kw.get("to"),
                 "max_hits": int(kw.get("max_hits", 25))}
         out = self._chart_call(patient, "search_notes", args)
