@@ -9,9 +9,9 @@ because "somebody approved a different version of this" is what the next reviewe
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Sequence
 
 from .statements import Element, elements
 
@@ -49,7 +49,7 @@ def record_signoff(directory: str | Path, spec, element_id: str, *, reviewer: st
             + (f"did you mean {', '.join(near)}? " if near else "")
             + f"ids in this spec: {', '.join(sorted(els))}")
     rec = {
-        "signed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "signed_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "reviewer": reviewer,
         "spec_id": spec.spec_id,
         "spec_version": spec.spec_version,

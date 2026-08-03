@@ -54,9 +54,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Literal
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -190,7 +191,7 @@ class UnprovenancedElementError(ProvenanceError):
     from a transcribed one, so nothing about the run ever looks wrong.
     """
 
-    def __init__(self, spec_id: str, elements: "list[EnforcedElement]"):
+    def __init__(self, spec_id: str, elements: list[EnforcedElement]):
         self.spec_id = spec_id
         self.elements = list(elements)
         lines = [f"{spec_id}: {len(self.elements)} enforced element(s) carry no provenance "
@@ -294,7 +295,7 @@ def _answer_check_key(chk: dict) -> str:
             + (f".{nos[0]}" if nos else ""))
 
 
-def enforced_elements(spec: "ExtractionSpec") -> list[EnforcedElement]:
+def enforced_elements(spec: ExtractionSpec) -> list[EnforcedElement]:
     """Everything in this spec that the runtime reads and acts on, in declaration order.
 
     The list is deliberately narrower than "everything in the file". `decision_rule` and
@@ -474,7 +475,7 @@ def _validate_record(spec_id: str, rec: ProvenanceRecord) -> None:
                 "element_hash_at_review is what a later edit is compared against.")
 
 
-def bind_provenance(spec: "ExtractionSpec") -> None:
+def bind_provenance(spec: ExtractionSpec) -> None:
     """Attach each record to its element, void signatures on edited elements, then refuse
     the spec if anything enforced is left unmarked. Mutates `spec.provenance` in place."""
     # A DECLARED CHECK MUST BE A CHECK THAT EXISTS. `check_answer_detail` dispatches on
@@ -573,7 +574,7 @@ class ProvenanceFinding(BaseModel):
 ORIGIN_NOT_RECORDED = "origin_not_recorded"
 
 
-def editorial_records(spec: "ExtractionSpec") -> tuple[dict[str, ProvenanceRecord],
+def editorial_records(spec: ExtractionSpec) -> tuple[dict[str, ProvenanceRecord],
                                                        list[ProvenanceFinding]]:
     """Parse the editorial channel leniently. Returns (valid records by element, findings).
 
@@ -610,7 +611,7 @@ def editorial_records(spec: "ExtractionSpec") -> tuple[dict[str, ProvenanceRecor
     return index, findings
 
 
-def editorial_findings(spec: "ExtractionSpec",
+def editorial_findings(spec: ExtractionSpec,
                        known_elements: Iterable[str] | None = None,
                        attributed_elsewhere: Iterable[str] | None = None,
                        ) -> list[ProvenanceFinding]:
@@ -811,10 +812,7 @@ class ExtractionSpec(BaseModel):
                           "answer_check"):
                 if found and e.field in answered:
                     used.append(e.path)
-            elif e.kind in ("gate_threshold", "sample_threshold"):
-                if not found:
-                    used.append(e.path)
-            elif e.kind == "required_keywords" and e.path.startswith(
+            elif e.kind in ("gate_threshold", "sample_threshold") or e.kind == "required_keywords" and e.path.startswith(
                     "proof_obligation.for_negative.strata"):
                 if not found:
                     used.append(e.path)

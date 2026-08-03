@@ -14,8 +14,8 @@ Every threshold is an argument with no default, exactly as the library demands: 
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Mapping
 
 import typer
 from rich.table import Table

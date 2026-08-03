@@ -27,7 +27,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
-from acr.chartstore.corpus import _notation_tolerant  # noqa: E402
+from acr.chartstore.corpus import _notation_tolerant
 
 CORPUS = REPO / "corpus" / "patients"
 

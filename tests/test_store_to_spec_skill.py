@@ -204,7 +204,7 @@ def test_no_yaml_example_hands_the_author_a_policy_that_is_never_complete():
     assert "exhaustive" in implemented, "policy dispatch in coverage.py has moved"
     for path, text in _docs().items():
         for block in _yaml_blocks(text):
-            for policy in re.findall(r"^\s*policy:\s*([a-z_]+)", block, re.M):
+            for policy in re.findall(r"^\s*policy:\s*([a-z_]+)", block, re.MULTILINE):
                 if policy in implemented:
                     continue
                 context = [ln for ln in text.splitlines() if policy in ln]
@@ -246,7 +246,7 @@ def test_every_yaml_key_the_skill_tells_an_author_to_write_is_read_by_something(
 
     for path, text in _docs().items():
         for block in _yaml_blocks(text):
-            for key in re.findall(r"^([a-z][a-z0-9_]*):", block, re.M):
+            for key in re.findall(r"^([a-z][a-z0-9_]*):", block, re.MULTILINE):
                 assert key in known, (
                     f"{path.name} teaches top-level key {key!r}, which no spec declares and "
                     f"no loader field names -- it would load, hash, and do nothing"
@@ -265,10 +265,10 @@ def test_the_order_of_work_is_documented_in_the_order_it_must_be_done():
     produces the one-stratification-for-three-fields shape that mis-coded P03.
     """
     body = SKILL.read_text(encoding="utf-8")
-    m = re.search(r"^##+ .*[Oo]rder of work.*$", body, re.M)
+    m = re.search(r"^##+ .*[Oo]rder of work.*$", body, re.MULTILINE)
     assert m, "SKILL.md has no order-of-work section"
     section = body[m.end():]
-    nxt = re.search(r"^## ", section, re.M)
+    nxt = re.search(r"^## ", section, re.MULTILINE)
     section = section[:nxt.start()] if nxt else section
 
     at = []
@@ -338,4 +338,4 @@ def test_no_worked_example_uses_anything_but_the_pseudonyms(path: Path):
         assert token in {f"P0{i}" for i in range(1, 6)}, (
             f"{path.name}: {token} is outside the P01..P05 pseudonym range"
         )
-    assert not re.search(r"\bMRN\s*[:#]?\s*\d", text, re.I), f"{path.name}: an MRN-shaped number"
+    assert not re.search(r"\bMRN\s*[:#]?\s*\d", text, re.IGNORECASE), f"{path.name}: an MRN-shaped number"

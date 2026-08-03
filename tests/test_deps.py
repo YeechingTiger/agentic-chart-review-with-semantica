@@ -58,7 +58,7 @@ def cat() -> VariableCatalog:
 
 
 @pytest.fixture(scope="module")
-def shipped(cat) -> "D.GuidelineDeps":
+def shipped(cat) -> D.GuidelineDeps:
     return D.build_dependencies(load_guideline(GUIDELINE), cat)
 
 
@@ -88,7 +88,7 @@ def _toy_guideline(**rec_overrides) -> dict:
             "value_sets": {"toy_set": ["8140"]}, "recommendations": [rec]}
 
 
-def _toy_deps(cat, **rec_overrides) -> "D.GuidelineDeps":
+def _toy_deps(cat, **rec_overrides) -> D.GuidelineDeps:
     return D.build_dependencies(parse_guideline(_toy_guideline(**rec_overrides)), cat)
 
 

@@ -33,10 +33,11 @@ import json
 import os
 import random
 import re
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, fields, replace
 from datetime import date
 from pathlib import Path
-from typing import Any, Literal, Sequence
+from typing import Any, Literal
 
 import typer
 import yaml

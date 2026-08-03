@@ -128,11 +128,12 @@ import json
 import os
 import re
 import threading
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any
 
 from ..chartstore.corpus import Corpus, DocMeta
 from ..core.repo_paths import repo_root
@@ -158,7 +159,7 @@ def cost_usd(prompt_tokens: int, completion_tokens: int) -> float:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 class LabellingError(Exception):
@@ -272,7 +273,7 @@ class Requirement:
                 "this module will not supply a default clinical rule of its own.")
 
     @classmethod
-    def from_spec(cls, spec: Any) -> "Requirement":
+    def from_spec(cls, spec: Any) -> Requirement:
         """Build from anything with `spec_id`, `question`, `fields` and `evidence_rules`.
 
         Duck-typed on purpose, exactly as `coverage_planner.plan_coverage` is: this module must
@@ -642,7 +643,7 @@ class NoteLabel:
         return d
 
     @classmethod
-    def from_dict(cls, d: Mapping[str, Any]) -> "NoteLabel":
+    def from_dict(cls, d: Mapping[str, Any]) -> NoteLabel:
         """A row -> a label, refusing loudly anything that is not this generation's shape."""
         kw = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}
         kw["admissibility"] = _admissibility_from_dict(d.get("admissibility") or {})

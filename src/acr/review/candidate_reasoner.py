@@ -99,6 +99,11 @@ UPDATE_TOOL: dict = {
                                                "description":
                                                "what would settle THIS one against the others. "
                                                "'more information' is not a discriminator"},
+                            "not_a_target_value": {"type": "boolean", "description":
+                                                   "reject only: this value is in the evidence "
+                                                   "but is not a candidate for THIS question — "
+                                                   "the note's own date, a treatment date, a "
+                                                   "date about another entity"},
                             "reason": {"type": "string", "description":
                                        "required for reject: why this reading is out, citing a "
                                        "rule id or an evidence id"},
@@ -108,10 +113,40 @@ UPDATE_TOOL: dict = {
                     },
                 },
                 "unresolved_discriminators": {
-                    "type": "array", "items": {"type": "string"},
-                    "description": ("what the record would have to contain for the choice BETWEEN "
-                                    "candidates to be made. Empty when one candidate stands "
+                    "type": "array",
+                    "description": ("REQUIRED when two or more candidates remain active. What "
+                                    "would settle the choice between them — one entry per "
+                                    "competing pair. Empty only when one candidate stands "
                                     "unopposed."),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "candidate_a": {"type": "string", "description": "candidate id"},
+                            "candidate_b": {"type": "string", "description": "candidate id"},
+                            "unresolved_fact": {"type": "string", "description":
+                                                "the specific thing that is not settled. NOT "
+                                                "'more information is needed' — a fact someone "
+                                                "could go and check"},
+                            "evidence_needed": {"type": "string", "description":
+                                                "what document or statement would settle it"},
+                            "likely_source": {"type": "array", "items": {"type": "string"},
+                                              "description":
+                                              "where such a document would be, in general terms "
+                                              "— a contemporaneous physician note, an outside "
+                                              "record, a rule in the contract"},
+                            "can_be_resolved_from_current_corpus": {"type": "boolean"},
+                        },
+                        "required": ["unresolved_fact"],
+                    },
+                },
+                "answerability": {
+                    "type": "string",
+                    "enum": ["VALUE_AVAILABLE", "EVIDENCE_INSUFFICIENT", "CORPUS_INSUFFICIENT"],
+                    "description": ("whether the question is answerable AT ALL, which is a "
+                                    "separate axis from which value wins. Say "
+                                    "EVIDENCE_INSUFFICIENT when the chart holds documents but "
+                                    "none establishes the answer, and CORPUS_INSUFFICIENT when "
+                                    "the documents that would are not in this record."),
                 },
             },
             "required": ["candidate_updates"],
@@ -119,53 +154,58 @@ UPDATE_TOOL: dict = {
     },
 }
 
-SYSTEM = """You maintain the CANDIDATE SET for a chart-review task. That is your only job.
+SYSTEM = """You COMPARE candidates for a chart-review task. That is your only job.
 
-You are given the task contract, the evidence recorded so far, and the candidate set as it
-stands. Return the candidate set as it should now stand.
+The candidate set has already been seeded MECHANICALLY: every value in the recorded evidence
+that is type-compatible with the target is already in the set, whether or not it is a plausible
+answer. Your job is not to find values. Your job is to decide which of them are candidates for
+THIS question, which are not, how they stand against each other, and what would settle it.
 
 YOU ARE NOT ANSWERING THE QUESTION. Another component submits the answer. You are not deciding
 whether enough has been read; another component decides that. You have no chart tools and you
 may not ask for a search. Do not propose keywords. Do not say the review is complete.
 
-WHAT A CANDIDATE IS: a value the recorded evidence could defensibly support, under this
-contract's own rules. Three shapes, and only three:
+WHAT TO DO WITH THE SEEDED SET, in order:
 
-  1. ONE candidate. The evidence points one way and nothing substantive cuts against it.
-     Declare it, link its evidence, and stop. This is the common case.
-  2. TWO OR MORE candidates. The contract's rules could be read to give different answers on
-     the evidence in hand — a different date, a different source ordering, a different reading
-     of what qualifies. Declare each, link what supports and what contradicts each, and say what
-     would DISCRIMINATE them.
-  3. NO candidate with support. Declare one candidate carrying the abstention that fits.
+  1. REJECT what is not a target value. The set is deliberately over-inclusive. A note's own
+     service date, a treatment date, a follow-up date, a date about a different entity — reject
+     each with `not_a_target_value: true` and say which it is. REJECTING IS THE MAIN WORK.
+     A rejection with a reason is a far better record than a value that was never listed.
+  2. MERGE nothing silently. Two notations of one date are two entries; if they are the same
+     reading, reject one and say it duplicates the other.
+  3. For what remains, LINK the evidence: what supports each, and what cuts against it.
+  4. If ONE candidate remains, select it as leading and stop.
+  5. If TWO OR MORE remain, they are in genuine competition. You must give a DISCRIMINATOR for
+     each competing pair.
 
-DO NOT MANUFACTURE ALTERNATIVES. A second candidate invented so the set looks considered is
-worse than one candidate, because it makes a clear case read like a contested one. If the
-evidence points one way, say so with one candidate.
+A DISCRIMINATOR IS A FACT SOMEBODY COULD GO AND CHECK. "Whether a physician recorded a clinical
+impression of cancer on or before 2010-05-17" is one. "More information is needed" is not — it
+names nothing, and a component downstream has to act on this. Say which two candidates, what
+exact fact is unsettled, what document would settle it, where such a document would be, and
+whether this record could contain it.
 
-A DISCRIMINATOR IS A SPECIFIC MISSING FACT. "Whether the 2010-06-12 cytology still qualifies
-once the biopsy confirms" is a discriminator. "More information is needed" is not; leave it out
-rather than write it.
-
-EVERY CANDIDATE SHOULD CITE EVIDENCE by its id. If you are declaring a reading that nothing
-recorded supports yet, say so in its label rather than attaching evidence that does not bear
-on it."""
+ANSWERABILITY IS A SEPARATE AXIS from which value wins. If the evidence supports no value at
+all, do not invent a candidate for the abstention — set `answerability` and leave the candidate
+set as it is."""
 
 
 class ReasonerResult:
     """What one call produced, including the ways it can produce nothing."""
 
-    __slots__ = ("discriminators", "error", "ok", "raw", "updates")
+    __slots__ = ("answerability", "discriminators", "error", "ok", "raw", "updates")
 
-    def __init__(self, updates=None, discriminators=None, ok=True, error="", raw=None):
+    def __init__(self, updates=None, discriminators=None, ok=True, error="", raw=None,
+                 answerability=""):
         self.updates = list(updates or [])
         self.discriminators = list(discriminators or [])
+        self.answerability = str(answerability or "")
         self.ok = ok
         self.error = error
         self.raw = raw
 
     def to_dict(self) -> dict:
         return {"ok": self.ok, "error": self.error, "n_updates": len(self.updates),
+                "answerability": self.answerability,
                 "discriminators": self.discriminators}
 
 
@@ -179,13 +219,18 @@ def build_messages(spec_block: str, evidence: EvidenceLedger,
     unattributable to this one.
     """
     current = ledger.render() or "(no candidates yet)"
+    n_live = len([c for c in ledger.candidates if c.status in ("ACTIVE", "LEADING", "SELECTED")])
+    ask = ("Reject what is not a target value for this question, link the evidence for what "
+           "remains, and select the leading candidate."
+           if n_live > 1 else
+           "Confirm or reject what is there, and link its evidence.")
     return [
         {"role": "system", "content": SYSTEM},
         {"role": "user", "content": (
             f"# TASK CONTRACT\n\n{spec_block}\n\n"
             f"# EVIDENCE RECORDED SO FAR\n\n{evidence.render()}\n\n"
-            f"# CANDIDATE SET AS IT STANDS\n\n{current}\n\n"
-            "Return the candidate set as it should now stand.")},
+            f"# CANDIDATE SET, SEEDED FROM THE EVIDENCE\n\n{current}\n\n"
+            f"{ask}")},
     ]
 
 
@@ -236,6 +281,7 @@ def reason(*, spec_block: str, evidence: EvidenceLedger, ledger: CandidateLedger
         return ReasonerResult(ok=False, error="no update_candidates call in the reply", raw=reply)
     return ReasonerResult(updates=args.get("candidate_updates"),
                           discriminators=args.get("unresolved_discriminators"),
+                          answerability=args.get("answerability"),
                           raw=args)
 
 
@@ -274,6 +320,8 @@ def apply_updates(ledger: CandidateLedger, result: ReasonerResult, *, step: int,
                 if action == "reject":
                     ledger.set_state(cid, "REJECTED", step=step,
                                      reason=str(u.get("reason") or ""))
+                    if u.get("not_a_target_value"):
+                        ledger.by_id(cid).not_a_target_value = True
                 elif action == "select_leading":
                     ledger.set_state(cid, "LEADING", step=step,
                                      reason=str(u.get("reason") or ""))
@@ -303,8 +351,22 @@ def apply_updates(ledger: CandidateLedger, result: ReasonerResult, *, step: int,
                 ledger.set_discriminators(u["discriminators"], step=step, cid=cid)
         except (KeyError, ValueError) as e:
             rejected.append(f"{action} {cid}: {e}")
-    if result.discriminators:
-        ledger.set_discriminators(result.discriminators, step=step)
+    for d in result.discriminators:
+        if isinstance(d, dict):
+            try:
+                ledger.add_discriminator(d, step=step)
+            except ValueError as e:
+                rejected.append(f"discriminator: {e}")
+        elif str(d).strip():
+            # The prose form, still accepted so a provider that ignores the object schema does
+            # not lose the content — but it lands in `open_discriminators`, not in the
+            # structured list, so the two cannot be counted as one thing.
+            ledger.set_discriminators([*ledger.open_discriminators, str(d)], step=step)
+    if result.answerability:
+        try:
+            ledger.set_answerability(result.answerability, step=step, reason="reasoner")
+        except ValueError as e:
+            rejected.append(f"answerability: {e}")
     return rejected
 
 

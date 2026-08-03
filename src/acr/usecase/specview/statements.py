@@ -17,9 +17,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 #: The enforced channel's identity function for an answer_check, imported rather than
 #: re-derived: two spellings of "which check is this" would drift, and the drift would show
@@ -79,7 +80,7 @@ def _element_hash(spec_id: str, kind: str, raw: Any) -> str:
     included so that moving a sentence out of the conflict rules and into the decision rules
     — which changes when it fires — does invalidate it.
     """
-    blob = f"{spec_id}\x00{kind}\x00{_canonical(raw)}".encode("utf-8")
+    blob = f"{spec_id}\x00{kind}\x00{_canonical(raw)}".encode()
     return hashlib.sha256(blob).hexdigest()[:16]
 
 
@@ -199,7 +200,7 @@ def elements(spec, source_path: str | Path | None = None) -> list[Element]:
         # matched, what it may establish, what must be searched, how much is sampled). The
         # reviewer sees one sentence and two sub-bullets, so the group sentence answers to
         # whichever of match/establishes carries a record.
-        ebase = (f"proof_obligation.for_negative"
+        ebase = ("proof_obligation.for_negative"
                  + (f".claims[{g.claim}]" if g.claim else "") + f".strata[{g.raw.get('name')}]")
         add(base, "source-group", group_sentence(g), g.raw, 2,
             basis_needle=(g.raw.get("name") or g.label),

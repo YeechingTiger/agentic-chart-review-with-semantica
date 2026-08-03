@@ -43,6 +43,33 @@ class Evidence:
     #: and last so those still load.
     evidence_id: str = ""
 
+    # ---- THE MINIMUM SEMANTICS CANDIDATE INDUCTION NEEDS -----------------------------
+    # Not the full set the architecture asks for (no episode match, no copied-forward risk):
+    # only what is required to seed a candidate and to keep an inadmissible span out of the
+    # candidate space. The rest arrives when something reads it — a field nobody reads is a
+    # field nobody maintains, and this dataclass is serialised into every manifest and trace.
+    #
+    # All defaulted and appended last, so every Evidence in every recorded trace still loads.
+    #
+    #: WHEN THE TEXT IS ABOUT, as opposed to when the note was written. `date` is the
+    #: document's. A retrospective statement — "in retrospect the patient had cancer in 2019" —
+    #: has a document date years after the event date, and STORE.390's decision_rule[2] turns
+    #: on exactly that distinction. Empty when the two are the same or nobody has said.
+    event_date: str = ""
+    #: Whether the span asserts the thing or denies it. `stance` above is about the CLAIM the
+    #: evidence was recorded against; this is about the span's own语气.
+    polarity: str = "UNJUDGED"
+    #: How firmly. "suspicious for" and "consistent with" and "diagnostic of" are three
+    #: different strengths and STORE.390's evidence rules turn on which one a source carries.
+    certainty: str = "UNJUDGED"
+    #: Whether this span is about the entity the question is about.
+    target_entity_match: str = "UNJUDGED"
+    #: Whether the contract admits it as evidence at all. `UNJUDGED` is the default and is NOT
+    #: `INADMISSIBLE`: nobody having ruled is a different fact from somebody having ruled it
+    #: out, and treating the first as the second shrinks the candidate space before anyone
+    #: has looked at it.
+    admissibility: str = "UNJUDGED"
+
     def to_dict(self) -> dict:
         return asdict(self)
 
@@ -122,6 +149,11 @@ class EvidenceLedger:
 #: until they are not, and the gap between them is the interesting case.
 CANDIDATE_STATES: tuple[str, ...] = ("ACTIVE", "LEADING", "REJECTED", "SELECTED")
 
+#: The answerability axis. Imported from `acr.review.candidate_induction` too, defined here
+#: because it is a property of the ledger rather than of the layer that first sets it.
+ANSWERABILITY: tuple[str, ...] = ("UNDETERMINED", "VALUE_AVAILABLE", "EVIDENCE_INSUFFICIENT",
+                                  "CORPUS_INSUFFICIENT")
+
 
 @dataclass
 class Candidate:
@@ -158,6 +190,21 @@ class Candidate:
     created_at_step: int = 0
     updated_at_step: int = 0
     rejection_reason: str = ""
+    #: WHICH SPANS PUT THIS VALUE ON THE TABLE, and by what method. A candidate the extractor
+    #: seeded and a candidate the reasoner proposed are different objects for the metrics —
+    #: candidate RECALL is about the first, candidate PRECISION about what survives the second.
+    seeded_from: tuple[str, ...] = ()
+    #: WHICH KIND of place put this value on the table — `quote`, `document_date`, `event_date`.
+    #: A note's own date is the thing the reasoner most often has to reject, and separating
+    #: those rejections from wrong-reading ones is what keeps precision meaningful.
+    seed_sources: tuple[str, ...] = ()
+    seed_method: str = ""
+    #: Rejected because it is not a value for THIS question at all — the note's own service
+    #: date, a treatment date, a date about another entity — as opposed to rejected because a
+    #: rival reading beat it. The seeder is deliberately over-inclusive, so most rejections are
+    #: this kind, and separating them is what keeps candidate PRECISION from being a count of
+    #: the extractor's noise.
+    not_a_target_value: bool = False
     #: Every transition, with the step and the reason. On the candidate rather than only in the
     #: trace because manifests outlive traces, and "which candidate was dropped and why" has to
     #: be answerable from the manifest alone.
@@ -166,7 +213,8 @@ class Candidate:
     def to_dict(self) -> dict:
         d = asdict(self)
         for k in ("supporting_evidence_ids", "contradicting_evidence_ids",
-                  "unresolved_discriminators", "state_history"):
+                  "unresolved_discriminators", "state_history", "seeded_from",
+                  "seed_sources"):
             d[k] = list(d[k])
         return d
 
@@ -203,10 +251,20 @@ def _value_key(value: dict, label: str = "") -> str:
     into one candidate, which is the same collapse this function exists to refuse one level up.
     """
     import json
-    if not value:
+    # A CANDIDATE IS IDENTIFIED BY WHAT IT ASSERTS. Keys carrying nothing — a null, an empty
+    # string, a `False` flag — are dropped before the key is taken. A live run produced the
+    # duplicate this closes: the seeder builds `{date: ...}` and the submitted answer carries
+    # `{date: ..., year_imputed: False, month_imputed: False, day_imputed: False}`, so one date
+    # became two candidates, the second was stamped "never declared", and the conflict set
+    # counted two live readings where there was one.
+    #
+    # A flag that IS set stays in: "1995, year approximated" and "1995, year read off the
+    # record" are different claims and the contract has three fields to say so.
+    asserted = {str(k): str(v).strip() for k, v in (value or {}).items()
+                if v is not None and v is not False and str(v).strip() != ""}
+    if not asserted:
         return f"abstain:{normalise_abstention(label).lower()}"
-    return json.dumps({str(k): str(v).strip() for k, v in sorted((value or {}).items())},
-                      sort_keys=True, ensure_ascii=False)
+    return json.dumps(dict(sorted(asserted.items())), sort_keys=True, ensure_ascii=False)
 
 
 @dataclass
@@ -215,8 +273,25 @@ class CandidateLedger:
 
     candidates: list[Candidate] = field(default_factory=list)
     #: Discriminators that belong to the SET rather than to one candidate: what the run would
-    #: have to find to choose at all.
+    #: have to find to choose at all. Free-text, kept for the callers that still write prose.
     open_discriminators: tuple[str, ...] = ()
+    #: STRUCTURED discriminators, one per competing pair. Phase A's were strings and came back
+    #: vacuous — two across thirteen candidates, neither naming a fact anybody could check.
+    #: A shape with named parts is the difference between something a Strategic Controller can
+    #: act on and a sentence it can only print.
+    discriminators: list = field(default_factory=list)
+    #: WHETHER THE QUESTION IS ANSWERABLE AT ALL, kept apart from the value candidates.
+    #:
+    #: "date A versus EVIDENCE_INSUFFICIENT" and "date A versus date B" are different
+    #: disagreements. Phase A put both in the candidate set and every one of its three
+    #: multi-candidate charts turned out to be the first kind — so `conflict` meant two things
+    #: and neither could be counted. `UNDETERMINED` is the honest start and is not an
+    #: abstention: it means nobody has ruled.
+    answerability: str = "UNDETERMINED"
+    #: Explicit competing-value sets. Derived from the candidates, rebuilt rather than
+    #: accumulated, so a resolved disagreement stops being one — a Controller pointed at a
+    #: conflict somebody already closed would keep searching for an answer it has.
+    conflict_sets: list = field(default_factory=list)
     #: Every mutation, in order. The Strategic Controller and the evidence graph both need the
     #: sequence, not only the end state.
     events: list[dict] = field(default_factory=list)
@@ -251,14 +326,41 @@ class CandidateLedger:
         return out
 
     # -- writes --------------------------------------------------------------------
-    def declare(self, value: dict, *, step: int, state: str = "ACTIVE", label: str = "",
-                abstention: str = "", confidence: float | None = None) -> Candidate:
+    def set_answerability(self, status: str, *, step: int, reason: str = "") -> None:
+        if status not in ANSWERABILITY:
+            raise ValueError(f"answerability {status!r} is not one of {ANSWERABILITY}")
+        if status == self.answerability:
+            return
+        self._emit("answerability_changed", to=status, reason=reason, step=step)
+        self.answerability = status
+
+    def rebuild_conflict_sets(self, *, step: int) -> None:
+        """REBUILT, never accumulated. A rejected candidate leaves the disagreement."""
+        live = [c for c in self.candidates if c.status in ("ACTIVE", "LEADING", "SELECTED")
+                and c.value]
+        before = list(self.conflict_sets)
+        self.conflict_sets = ([{"type": "competing_values",
+                                "candidate_ids": [c.candidate_id for c in live],
+                                "values": [c.value for c in live]}]
+                              if len(live) > 1 else [])
+        if before != self.conflict_sets:
+            self._emit("conflict_sets_changed", n=len(self.conflict_sets), step=step)
+
+    def declare(self, value: dict, *, step: int, state: str | None = None, label: str = "",
+                abstention: str = "", confidence: float | None = None,
+                seeded_from=None, seed_sources=None, seed_method: str = "") -> Candidate:
         """Create, or update the existing candidate with this literal value.
+
+        `state=None` MEANS LEAVE IT ALONE, and the default is None rather than "ACTIVE" for one
+        reason: the seeder re-declares every value it finds on every pass, and a default of
+        ACTIVE made the second pass silently revive every candidate the reasoner had already
+        rejected. Re-seeing a span is not a reason to reopen a settled reading, and the ledger
+        being worth reading twice depends on that.
 
         An abstention candidate carries no value, so its identity is `abstention` normalised to
         its status token — see `normalise_abstention`. Its prose goes to `label` and is kept.
         """
-        if state not in CANDIDATE_STATES:
+        if state is not None and state not in CANDIDATE_STATES:
             raise ValueError(f"candidate state {state!r} is not one of {CANDIDATE_STATES}")
         abst = normalise_abstention(abstention) if abstention else ""
         label = label or (abstention if abstention else "")
@@ -269,9 +371,17 @@ class CandidateLedger:
                     c.label = label                # keep the fuller statement of the reason
                 if abst:
                     c.abstention = abst
+                for e in (seeded_from or ()):
+                    if e not in c.seeded_from:
+                        c.seeded_from = (*c.seeded_from, e)
+                for k in (seed_sources or ()):
+                    if k not in c.seed_sources:
+                        c.seed_sources = (*c.seed_sources, k)
+                if seed_method and not c.seed_method:
+                    c.seed_method = seed_method
                 if confidence is not None:
                     c.confidence = confidence
-                if state != c.status:
+                if state is not None and state != c.status:
                     self.set_state(c.candidate_id, state, step=step)
                 else:
                     c.updated_at_step = step
@@ -279,11 +389,14 @@ class CandidateLedger:
         # Minted by the runtime, never supplied. A model-invented id is re-invented differently
         # next turn and every pointer to it stops resolving.
         c = Candidate(candidate_id=f"C{len(self.candidates) + 1}", value=dict(value or {}),
-                      status=state, label=label, abstention=abst, confidence=confidence,
+                      status=(state or "ACTIVE"), label=label, abstention=abst,
+                      confidence=confidence,
+                      seeded_from=tuple(seeded_from or ()),
+                      seed_sources=tuple(seed_sources or ()), seed_method=seed_method,
                       created_at_step=step, updated_at_step=step)
         self.candidates.append(c)
         self._emit("candidate_declared", candidate_id=c.candidate_id, value=c.value,
-                   state=state, step=step)
+                   state=c.status, step=step)
         if state == "LEADING":
             self._demote_other_leaders(c.candidate_id, step)
         return c
@@ -304,6 +417,7 @@ class CandidateLedger:
         self._emit("candidate_state_changed", candidate_id=cid, to=state, reason=reason, step=step)
         if state == "LEADING":
             self._demote_other_leaders(cid, step)
+        self.rebuild_conflict_sets(step=step)
         return c
 
     def link(self, cid: str, evidence_id: str, role: str, *, step: int) -> None:
@@ -336,6 +450,25 @@ class CandidateLedger:
         self._emit("candidate_evidence_linked", candidate_id=cid, evidence_id=evidence_id,
                    role=role, step=step)
 
+    def add_discriminator(self, d: dict, *, step: int) -> None:
+        """One competing pair, and what would settle it. Refuses one that names no fact."""
+        fact = str((d or {}).get("unresolved_fact") or "").strip()
+        if not fact:
+            raise ValueError("a discriminator with no `unresolved_fact` names nothing; a "
+                             "component downstream has to act on it")
+        row = {"candidate_a": str(d.get("candidate_a") or ""),
+               "candidate_b": str(d.get("candidate_b") or ""),
+               "unresolved_fact": fact,
+               "evidence_needed": str(d.get("evidence_needed") or ""),
+               "likely_source": [str(x) for x in (d.get("likely_source") or [])],
+               "can_be_resolved_from_current_corpus":
+                   d.get("can_be_resolved_from_current_corpus"),
+               "step": step}
+        if row not in self.discriminators:
+            self.discriminators.append(row)
+            self._emit("discriminator_added", **{k: v for k, v in row.items() if k != "step"},
+                       step=step)
+
     def set_discriminators(self, items, *, step: int, cid: str | None = None) -> None:
         vals = tuple(str(x).strip() for x in (items or []) if str(x).strip())
         if cid is None:
@@ -363,6 +496,9 @@ class CandidateLedger:
             "schema": "acr.core.state/candidates/1",
             "candidates": [c.to_dict() for c in self.candidates],
             "open_discriminators": list(self.open_discriminators),
+            "discriminators": list(self.discriminators),
+            "answerability": self.answerability,
+            "conflict_sets": list(self.conflict_sets),
             "evidence_view": self.evidence_view(),
             "n_declared": len(self.candidates),
             "n_active": len(self.active()),

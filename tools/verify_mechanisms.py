@@ -22,7 +22,6 @@ Exit code is the number of failures.
 
 from __future__ import annotations
 
-import glob
 import json
 import pathlib
 import sys
@@ -30,14 +29,14 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from acr.chartstore.corpus import Corpus  # noqa: E402
-from acr.contract import outcomes as OUTCOMES  # noqa: E402
-from acr.contract.spec import load_spec  # noqa: E402
-from acr.core.modules import TRUTH_MODES  # noqa: E402
-from acr.evaluation import evals as E  # noqa: E402
-from acr.review.answer_gate import gate_answer  # noqa: E402
-from acr.review.coverage_planner import spec_declared_keywords  # noqa: E402
-from acr.review.tools.toolbox import TOOL_SCHEMAS, Toolbox, build_tool_schemas  # noqa: E402
+from acr.chartstore.corpus import Corpus
+from acr.contract import outcomes as OUTCOMES
+from acr.contract.spec import load_spec
+from acr.core.modules import TRUTH_MODES
+from acr.evaluation import evals as E
+from acr.review.answer_gate import gate_answer
+from acr.review.coverage_planner import spec_declared_keywords
+from acr.review.tools.toolbox import TOOL_SCHEMAS, Toolbox, build_tool_schemas
 
 SPEC = ROOT / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
 ATTRIBUTIONS = pathlib.Path("/tmp/acr-artifacts/error-cases/default/attributions.jsonl")
@@ -332,7 +331,7 @@ def selftest() -> int:
                 bool(["Surgical-Pathology-Report"] or []))
     must_reject("M2 ledger: reviewed > actually read is caught", 9 > 3)
     must_reject("M2 ledger: complete=true with reviewed<N is caught",
-                bool(True) != (3 == 23))
+                True != (3 == 23))
 
     fake = [{"case_id": "X", "mode": "BLIND", "semantic_patch_allowed": True,
              "primary_cause": {"cause": "RETRIEVAL", "causal_strength": "PLAUSIBLE"}},

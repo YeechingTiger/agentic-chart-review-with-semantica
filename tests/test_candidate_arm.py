@@ -154,7 +154,8 @@ def test_the_reasoner_path_actually_executes_against_a_real_run_context():
             return self
         def invoke(self, messages):
             return {"tool_calls": [{"name": "update_candidates", "args": {
-                "candidate_updates": [{"action": "create", "value": {"d": "20200101"},
+                "candidate_updates": [{"action": "create",
+                                       "value": {"date_of_initial_diagnosis": "20200101"},
                                        "supports": ["E1"]}],
                 "unresolved_discriminators": []}}]}
 
@@ -172,9 +173,16 @@ def test_the_reasoner_path_actually_executes_against_a_real_run_context():
     assert ev.items and ev.items[0].evidence_id == "E1"
 
     mw._reason_about_candidates(why="new_evidence")
-    assert len(ctx.candidates.candidates) == 1
-    assert ctx.candidates.candidates[0].supporting_evidence_ids == ("E1",)
+    # TWO candidates, and that is the seeder working: one is the value the (fake) reasoner
+    # returned, the other is the document's own date, which A1.5 seeds deliberately because in
+    # a clinical record the date that dates a diagnosis is usually in the note's header rather
+    # than in the sentence quoted from it. Rejecting it is the reasoner's job and is recorded.
+    values = {c.value["date_of_initial_diagnosis"] for c in ctx.candidates.candidates}
+    assert "20200101" in values, "the reasoner's own value is missing"
+    seeded = [c for c in ctx.candidates.candidates if c.seed_method]
+    assert seeded and seeded[0].seed_sources == ("document_date",)
     assert ctx.candidate_calls[0]["ok"] is True and ctx.candidate_calls[0]["refused"] == []
+    assert ctx.candidate_calls[0]["induction"]["n_seeded"] >= 1
 
     # Called again with nothing new: no second call.
     mw._reason_about_candidates(why="new_evidence")

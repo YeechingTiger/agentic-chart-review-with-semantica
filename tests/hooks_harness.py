@@ -28,12 +28,12 @@ import pytest
 
 pytest.importorskip("langchain_core.language_models.chat_models")
 
-from langchain_core.callbacks import CallbackManagerForLLMRun  # noqa: E402
-from langchain_core.language_models.chat_models import BaseChatModel  # noqa: E402
-from langchain_core.messages import AIMessage, BaseMessage  # noqa: E402
-from langchain_core.outputs import ChatGeneration, ChatResult  # noqa: E402
+from langchain_core.callbacks import CallbackManagerForLLMRun
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
 
-from acr.review.agent import run_patient  # noqa: E402
+from acr.review.agent import run_patient
 
 
 class ToolScript(BaseChatModel):

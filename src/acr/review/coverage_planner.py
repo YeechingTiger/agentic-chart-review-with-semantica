@@ -65,9 +65,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 from ..core.repo_paths import asset_dir
 
@@ -355,7 +356,7 @@ class OpenRequest(dict):
         return self["status"] == OPEN_REQUEST_OPENED
 
     @property
-    def thread(self) -> "OpenThread | None":
+    def thread(self) -> OpenThread | None:
         """The thread this request concerns — the NEW one for `opened`, the EXISTING one for
         `already_open` / `already_settled`, and None when nothing was or is owed."""
         return self["thread"]
@@ -872,8 +873,8 @@ class ExpansionBudget:
     max_revisions: int
 
     @classmethod
-    def priced_against(cls, plan: "CoveragePlan", n_docs_by_type: dict[str, int],
-                       *, max_revisions: int) -> "ExpansionBudget":
+    def priced_against(cls, plan: CoveragePlan, n_docs_by_type: dict[str, int],
+                       *, max_revisions: int) -> ExpansionBudget:
         """Caps derived from the commitment the plan was already priced at.
 
         No literal appears here on purpose. Each cap is "no more than what has already been
@@ -936,7 +937,7 @@ class PlanRevision:
                                     for t, r in self.dismiss_threads]}
 
     @classmethod
-    def from_json(cls, j: Any) -> "PlanRevision":
+    def from_json(cls, j: Any) -> PlanRevision:
         """Parse the model's reply. Anything unrecognised is dropped, never guessed at."""
         j = j if isinstance(j, dict) else {}
         terms = tuple(str(t).strip().lower() for t in (j.get("add_terms") or [])

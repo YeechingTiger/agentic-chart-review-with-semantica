@@ -21,12 +21,12 @@ from typer.testing import CliRunner
 
 pytest.importorskip("langchain_core.language_models.chat_models")
 
-from langchain_core.callbacks import CallbackManagerForLLMRun  # noqa: E402
-from langchain_core.language_models.chat_models import BaseChatModel  # noqa: E402
-from langchain_core.messages import AIMessage, BaseMessage  # noqa: E402
-from langchain_core.outputs import ChatGeneration, ChatResult  # noqa: E402
+from langchain_core.callbacks import CallbackManagerForLLMRun
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
 
-from acr.commands.cli import app  # noqa: E402
+from acr.commands.cli import app
 
 runner = CliRunner()
 ROOT = Path(__file__).resolve().parents[1]

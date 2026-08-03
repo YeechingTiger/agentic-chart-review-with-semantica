@@ -280,3 +280,26 @@ def test_an_abstention_with_no_recognisable_status_keeps_the_whole_string():
     led.declare({}, step=1, abstention="i am not sure")
     led.declare({}, step=1, abstention="i am also not sure")
     assert len(led.candidates) == 2
+
+
+def test_a_value_is_identified_by_what_it_asserts_not_by_its_empty_fields():
+    """真实运行里的重复:seeder 建的候选只有 `date_of_initial_diagnosis`,提交的答案还带着
+    `year_imputed: False` 等三个默认假值,于是同一个日期变成两个候选 —— 而且第二个被
+    盖上"从没声明过"的章,还把冲突集撑成 2。
+
+    候选的身份是它**主张**了什么。`year_imputed: False` 什么都没主张。
+    """
+    led = CandidateLedger()
+    a = led.declare({"date_of_initial_diagnosis": "20200302"}, step=1)
+    b = led.declare({"date_of_initial_diagnosis": "20200302",
+                     "year_imputed": False, "month_imputed": False, "day_imputed": False}, step=5)
+    assert a.candidate_id == b.candidate_id
+    assert len(led.candidates) == 1
+
+
+def test_a_flag_that_is_set_is_part_of_what_a_candidate_asserts():
+    """"1995,年份是估的"和"1995,年份读出来的"是两个不同的主张。"""
+    led = CandidateLedger()
+    led.declare({"date_of_initial_diagnosis": "20159999"}, step=1)
+    led.declare({"date_of_initial_diagnosis": "20159999", "year_imputed": True}, step=1)
+    assert len(led.candidates) == 2

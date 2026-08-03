@@ -46,7 +46,7 @@ class LLMConfig:
     extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_env(cls, **overrides) -> "LLMConfig":
+    def from_env(cls, **overrides) -> LLMConfig:
         cfg = cls(
             model=os.getenv("ACR_MODEL", cls.model),
             api_base=os.getenv("ACR_API_BASE") or None,

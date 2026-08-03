@@ -61,7 +61,7 @@ MAX_SKILL_BYTES = 12_000
 #: 属于评测那边的 agent，永远不进跑病历的提示词。
 SLOTS: tuple[str, ...] = ("task", "controller", "tactic", "experience", "general", "eval")
 
-_FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.S)
+_FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 
 
 class SkillError(ValueError):

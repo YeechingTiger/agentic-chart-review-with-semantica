@@ -9,7 +9,7 @@ to disagree with it.
 from __future__ import annotations
 
 import re
-from typing import Sequence
+from collections.abc import Sequence
 
 from .prose import plain
 

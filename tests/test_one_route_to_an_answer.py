@@ -20,15 +20,15 @@ import pytest
 
 pytest.importorskip("langchain.agents")
 
-import acr.review.agent as A  # noqa: E402
-from acr.contract.answer_contract import NO_COVERAGE_CLAIM, attach_coverage_claim  # noqa: E402
+import acr.review.agent as A
+from acr.contract.answer_contract import NO_COVERAGE_CLAIM, attach_coverage_claim
 
 SRC = inspect.getsource(A)
 
 
 def test_accepted_has_exactly_one_origin():
     """`ctx.accepted` is what the manifest reports as `gate_validated`."""
-    assignments = re.findall(r"^\s*(?:self\.)?ctx\.accepted\s*=\s*(\S+)", SRC, re.M)
+    assignments = re.findall(r"^\s*(?:self\.)?ctx\.accepted\s*=\s*(\S+)", SRC, re.MULTILINE)
     assert assignments == ["True"], (
         f"expected exactly one assignment, setting True; found {assignments}. Two places that "
         f"can validate an answer are two places that can validate a wrong one.")

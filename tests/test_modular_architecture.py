@@ -408,7 +408,7 @@ def test_conditional_profile_activates_only_for_negative_shaped_claims(
     )
     evidence = SimpleNamespace(
         items=[] if submission["status"] != "FOUND" else [object()],
-        to_list=lambda: [],
+        to_list=list,
     )
     seen = {}
 

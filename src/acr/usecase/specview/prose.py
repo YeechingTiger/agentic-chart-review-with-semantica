@@ -9,7 +9,8 @@ comments. A term that leaks is a term missing from the table below, not a bug el
 from __future__ import annotations
 
 import re
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 #: Vocabulary that must never reach a reviewer, mapped to what it actually means.
 #:

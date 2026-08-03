@@ -54,9 +54,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Protocol, Sequence
+from typing import Any, Protocol
 
 import yaml
 
@@ -1040,11 +1041,11 @@ def route_guideline(guideline: Guideline, catalog: VariableCatalog, *,
                     f"{note}. No chart review can produce it; "
                     + (f"{hit[0]} exists precisely to refuse it" if hit
                        else "no spec exists to refuse it either"),
-                    f"join it from the registry extract and merge with "
-                    f"`acr concord --extra-variables`"
+                    "join it from the registry extract and merge with "
+                    "`acr concord --extra-variables`"
                     + ("" if hit else
-                       f"; and consider a refusing spec like STORE.610 so the refusal is a "
-                       f"shipped artifact rather than a runtime opinion"),
+                       "; and consider a refusing spec like STORE.610 so the refusal is a "
+                       "shipped artifact rather than a runtime opinion"),
                     context=tuple(x for x in [hit[0] if hit else ""] if x)))
                 if not hit:
                     gaps.append(Gap(

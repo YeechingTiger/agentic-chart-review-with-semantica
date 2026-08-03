@@ -9,7 +9,7 @@ worst outcome of running either is a wrong plan on the screen.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
@@ -86,7 +86,7 @@ def ask(
 
 def _ask_doc(d, question: str, specs_dir: str, guidelines_dir: str) -> dict:
     return {"schema": ASK_SCHEMA,
-            "created_utc": datetime.now(timezone.utc).isoformat(),
+            "created_utc": datetime.now(UTC).isoformat(),
             "code_sha": code_sha(), "question": question,
             "specs_dir": specs_dir, "guidelines_dir": guidelines_dir,
             "routing": d.to_dict()}

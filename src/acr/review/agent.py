@@ -364,13 +364,29 @@ class AuditMiddleware(AgentMiddleware):
             return
         ctx.candidates_seen_evidence = n
         step = ctx.n_model_calls
+
+        # SEED FIRST, DETERMINISTICALLY. Phase A measured that a reasoner asked to both DISCOVER
+        # the values in the evidence and REASON between them does the second and skips the
+        # first: thirteen candidates, not one pair value-against-value, and on a chart built so
+        # three sources give three dates it declared one candidate with nothing contradicting.
+        # For a date target the discovery half is close to mechanical, so it is done here and
+        # the reasoner is handed a set to compare rather than a blank page.
+        from .candidate_induction import seed_candidates
+        induction = seed_candidates(ctx.candidates, ctx.spec, evidence, step=step)
+
         res = reason(spec_block=self._spec_block_for_reasoner(),
                      evidence=evidence, ledger=ctx.candidates,
                      invoke=self._reasoner_invoke)
         known = {e.evidence_id for e in evidence.items if e.evidence_id}
         refused = apply_updates(ctx.candidates, res, step=step, known_evidence_ids=known)
         ctx.candidate_calls.append({"step": step, "why": why, "n_evidence": n,
+                                    "induction": induction.to_dict(),
                                     **res.to_dict(), "refused": refused})
+        # TWO PROVENANCES IN ONE EVENT, marked apart. The seeded values are DETERMINISTIC — a
+        # regex over recorded spans — and the updates are SELF_REPORTED. Collapsing them would
+        # let a candidate the extractor found be read as one the model thought of.
+        ctx.tracer.emit("candidate_induction", severity="info", provenance="DETERMINISTIC",
+                        step=step, **induction.to_dict())
         ctx.tracer.emit("candidate_reasoner", severity="info", provenance="SELF_REPORTED",
                         step=step, why=why, n_evidence=n, ok=res.ok, error=res.error,
                         n_updates=len(res.updates), refused=refused,

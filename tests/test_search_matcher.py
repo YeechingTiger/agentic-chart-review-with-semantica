@@ -123,8 +123,8 @@ def test_the_snippet_window_default_is_the_widened_one():
                              ).parameters["context"].default == 250
 
     chart = Corpus(CORPUS).chart("SYN0002")
-    note_id = max(((chart.read(d.note_id, 0, 10 ** 6)["total_chars"], d.note_id)
-                   for d in chart.list_documents(limit=999)[0]))[1]
+    note_id = max((chart.read(d.note_id, 0, 10 ** 6)["total_chars"], d.note_id)
+                   for d in chart.list_documents(limit=999)[0])[1]
     text = chart.read(note_id, 0, 10 ** 6)["text"]
     word = next(w for w in text[300:].split() if len(w) > 5 and w.isalpha())
     hit = next(h for h in chart.search(word, max_hits=1) if h.note_id == note_id)
@@ -159,9 +159,7 @@ def test_dates_and_types_come_back_so_the_model_can_choose_reading_order():
 # `test_a_two_character_token_does_not_match_the_inside_of_other_words`.
 # ======================================================================================
 
-import re
 
-from acr.chartstore.corpus import _notation_tolerant
 
 
 def found(query: str, text: str) -> bool:

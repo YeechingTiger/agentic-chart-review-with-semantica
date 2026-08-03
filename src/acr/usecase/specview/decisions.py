@@ -7,9 +7,9 @@ competent clinician choose otherwise, and would the outputs differ?
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
 
 from .measurements import SAMPLING_ARITHMETIC, measurement_for
 from .prose import (
@@ -115,8 +115,8 @@ def decisions(spec, source_path: str | Path | None = None,
         eid = f"source-group.{g.index}"
         if g.raw.get("establishes") == []:
             push(eid,
-                 f"Is it right that nothing in this group of documents can ever contribute to "
-                 f"any part of the answer?",
+                 "Is it right that nothing in this group of documents can ever contribute to "
+                 "any part of the answer?",
                  f"{g.label}. We treat every one of these as incapable of contributing, and "
                  f"we only sample them to check that assumption.",
                  "If any of these can carry a finding that matters — a spine film showing a "

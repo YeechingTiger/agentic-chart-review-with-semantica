@@ -25,9 +25,10 @@ from __future__ import annotations
 
 import difflib
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 from .spec import ExtractionSpec, load_specs
 
@@ -166,7 +167,7 @@ class VariableCatalog:
     directory: str = ""
 
     @classmethod
-    def from_directory(cls, directory: str | Path = "assets/specs") -> "VariableCatalog":
+    def from_directory(cls, directory: str | Path = "assets/specs") -> VariableCatalog:
         """Load `<directory>/*.yaml`, NON-recursively, exactly as `load_specs` does.
 
         The non-recursion is load-bearing, not an oversight inherited from `load_specs`:

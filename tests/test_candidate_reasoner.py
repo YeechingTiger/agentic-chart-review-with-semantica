@@ -257,3 +257,68 @@ def test_a_create_can_declare_itself_leading_without_inventing_an_id():
                                                "state": "LEADING", "supports": ["E1"]}]))
     assert CR.apply_updates(led, r, step=1, known_evidence_ids={"E1", "E2"}) == []
     assert led.leading().candidate_id == "C1"
+
+
+# --------------------------------------------------------------- A1.5:比较器,不是发现者
+
+def test_the_prompt_says_the_set_is_already_seeded_and_rejecting_is_the_work():
+    """A1 的结果:模型被要求既发现值又比较值时,只做后者。现在发现由抽取器做完了。"""
+    for phrase in ("seeded MECHANICALLY", "REJECTING IS THE MAIN WORK",
+                   "not to find values", "ANSWERABILITY IS A SEPARATE AXIS"):
+        assert phrase in CR.SYSTEM
+
+
+def test_a_structured_discriminator_survives_into_the_ledger():
+    """A1 拿到的 discriminator 太泛,是因为它只是一个字符串。现在它有形状,而形状里
+    每一个字段都是 Controller 之后要读的东西。"""
+    led = CandidateLedger()
+    disc = {"candidate_a": "C1", "candidate_b": "C2",
+            "unresolved_fact": "whether a physician recorded an impression on or before "
+                               "2010-05-17",
+            "evidence_needed": "a contemporaneous physician note of that date",
+            "likely_source": ["contemporaneous physician note"],
+            "can_be_resolved_from_current_corpus": True}
+    r = CR.reason(spec_block="c", evidence=_evidence(), ledger=led, invoke=lambda m, t: _reply(
+        [{"action": "create", "value": {"d": "20100517"}},
+         {"action": "create", "value": {"d": "20100522"}}], [disc]))
+    CR.apply_updates(led, r, step=1, known_evidence_ids={"E1", "E2"})
+    got = led.discriminators[0]
+    assert got["unresolved_fact"].startswith("whether a physician")
+    assert got["can_be_resolved_from_current_corpus"] is True
+    assert got["likely_source"] == ["contemporaneous physician note"]
+
+
+def test_a_discriminator_that_names_no_fact_is_refused():
+    """"需要更多信息"不是分歧点,它什么都没指出,而下游要拿它去决定动作。"""
+    led = CandidateLedger()
+    r = CR.reason(spec_block="c", evidence=_evidence(), ledger=led,
+                  invoke=lambda m, t: _reply([], [{"candidate_a": "C1", "unresolved_fact": ""}]))
+    assert any("unresolved_fact" in x for x in CR.apply_updates(led, r, step=1))
+    assert led.discriminators == []
+
+
+def test_the_reasoner_sets_answerability_without_creating_a_candidate_for_it():
+    """A1 的三次"多候选"全部是"值 vs 弃权"。弃权现在走自己的轴。"""
+    led = CandidateLedger()
+    r = CR.reason(spec_block="c", evidence=_evidence(), ledger=led,
+                  invoke=lambda m, t: {"tool_calls": [{"name": "update_candidates", "args": {
+                      "candidate_updates": [],
+                      "answerability": "CORPUS_INSUFFICIENT"}}]})
+    CR.apply_updates(led, r, step=2)
+    assert led.answerability == "CORPUS_INSUFFICIENT"
+    assert led.candidates == []
+
+
+def test_rejecting_a_seeded_value_records_that_it_was_not_a_target_value():
+    """"看到了这个日期、因为它是文档自己的日期而排除"和"从没考虑过"必须长得不一样。"""
+    led = CandidateLedger()
+    led.declare({"d": "20200101"}, step=1, seeded_from=["E1"],
+                seed_method="evidence_value_extraction")
+    r = CR.reason(spec_block="c", evidence=_evidence(), ledger=led,
+                  invoke=lambda m, t: _reply([{"action": "reject", "candidate_id": "C1",
+                                               "not_a_target_value": True,
+                                               "reason": "this is the note's own service date"}]))
+    assert CR.apply_updates(led, r, step=2) == []
+    c = led.by_id("C1")
+    assert c.status == "REJECTED" and c.not_a_target_value is True
+    assert "service date" in c.rejection_reason

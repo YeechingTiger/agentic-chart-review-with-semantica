@@ -36,7 +36,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from acr.evaluation import evals as E  # noqa: E402
+from acr.evaluation import evals as E
 
 #: The spec's five gate-required terms. Anything else the run chose for itself.
 REQUIRED = {"biopsy", "carcinoma", "diagnosed", "diagnosis", "malignancy"}

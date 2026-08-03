@@ -134,7 +134,7 @@ def test_every_skills_frontmatter_parses_and_a_tactic_declares_its_precondition(
         f = d / "SKILL.md"
         if not f.is_file():
             continue
-        m = re.match(r"\A---\n(.*?)\n---\n", f.read_text(encoding="utf-8"), re.S)
+        m = re.match(r"\A---\n(.*?)\n---\n", f.read_text(encoding="utf-8"), re.DOTALL)
         assert m, f"{d.name}: no frontmatter block at byte 0"
         fm = yaml.safe_load(m.group(1))
         assert isinstance(fm, dict), f"{d.name}: frontmatter is not a mapping"

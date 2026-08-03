@@ -598,8 +598,12 @@ def _f11_outcome_space(spec) -> Iterable[Finding]:
     explained; both were live in this tree before the check existed, and neither was visible
     from either block alone.
     """
-    from ..contract.outcomes import (KIND_VALUE, OutcomeSpaceError, declared_statuses,
-                                     submittable_statuses)
+    from ..contract.outcomes import (
+        KIND_VALUE,
+        OutcomeSpaceError,
+        declared_statuses,
+        submittable_statuses,
+    )
     try:
         space = declared_statuses(spec)
     except OutcomeSpaceError as e:

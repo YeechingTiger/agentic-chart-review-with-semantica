@@ -160,7 +160,7 @@ def test_the_prose_plan_is_gone_and_the_coverage_plan_is_wired_in():
     import acr.review.agent as A
 
     src = inspect.getsource(A)
-    assert not re.search(r"^\w*PLAN_PROMPT\s*=", src, re.M), (
+    assert not re.search(r"^\w*PLAN_PROMPT\s*=", src, re.MULTILINE), (
         "a second planning prompt has appeared. The REPLAN bug existed because there were two "
         "plans and only one mattered; a second one is the bug returning")
     for token in ("plan.render", "apply_revision"):
@@ -786,7 +786,7 @@ def test_a_spent_budget_with_nothing_outstanding_is_not_a_dead_end(spec, chart, 
     agent.threads = OpenThreadLedger()
     agent._expansion_budget = ExpansionBudget(0, 0, 0, max_revisions=6)
     _apply(plan, PlanRevision(add_terms=("x",)), budget=agent._expansion_budget, chart=chart)
-    monkeypatch.setattr(agent, "_outstanding_obligations", lambda: [])
+    monkeypatch.setattr(agent, "_outstanding_obligations", list)
     assert agent._expansion_exhausted_with_obligations() is False
 
 
