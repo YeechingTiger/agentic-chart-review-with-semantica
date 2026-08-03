@@ -952,9 +952,37 @@ def test_the_credentials_file_is_parsed_as_data_never_sourced(tmp_path):
     assert not (tmp_path / "pwned").exists()
 
 
-def test_a_missing_or_incomplete_credentials_file_is_an_error_not_a_default(tmp_path):
+def test_an_incomplete_configuration_is_an_error_not_a_default(tmp_path, monkeypatch):
+    """Half a configuration must refuse, from EITHER source.
+
+    Until 2026-08-03 this plane read credentials only from a file whose default path was an
+    institutional absolute. De-institutionalising that left the default empty, so `Path("")` became
+    `Path(".")` and the whole experience plane died on "no environment file at ." — found by running
+    it end to end, because no test reaches this function: reaching it costs money.
+
+    The fallback is to the environment, but to `ACR_*` ONLY. A plain `os.environ` fallback would let
+    an `OPENAI_API_KEY` in somebody's shell profile become the credential this dials out with, which
+    is a provider nobody chose and a bill nobody named. The vendor spellings are still honoured
+    inside a FILE, because a file was written on purpose.
+    """
+    for k in ("ACR_API_BASE", "ACR_API_KEY", "ACR_MODEL", "OPENAI_API_KEY", "OPENAI_BASE_URL",
+              "AZURE_API_KEY"):
+        monkeypatch.delenv(k, raising=False)
+
     with pytest.raises(L.NotConfiguredError):
         L.azure_client(tmp_path / "absent")
+
     (tmp_path / "half").write_text("export ACR_API_BASE=https://example.invalid\n")
     with pytest.raises(L.NotConfiguredError):
         L.azure_client(tmp_path / "half")
+
+    # An ambient vendor key must NOT be picked up when there is no file.
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-ambient-should-not-be-used")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://example.invalid")
+    with pytest.raises(L.NotConfiguredError):
+        L.azure_client("")
+
+    # `ACR_*` in the environment IS the deliberate path, and it works with no file at all.
+    monkeypatch.setenv("ACR_API_BASE", "https://example.invalid")
+    monkeypatch.setenv("ACR_API_KEY", "k")
+    assert L.azure_client("") is not None

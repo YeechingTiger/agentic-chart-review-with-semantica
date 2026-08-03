@@ -234,7 +234,16 @@ def progress(
     doc = {"spec_id": req.spec_id, "requirement_hash": req.hash, "run_key": store.key,
            "store_dir": str(store.dir), "n_labels": len(labels), "n_ok": len(ok),
            "n_errors": len(labels) - len(ok), "spend_usd": round(store.spend(), 6),
-           "n_quote_unverified": sum(1 for ll in ok if not ll.admissibility.quote_verified),
+           # SPLIT, because collapsing them libels a working scan. A label with no quote is a note
+           # the model read and correctly found nothing quotable in — on a 321-note scan of three
+           # charts, 306 of them. A label whose quote is NOT IN THE TEXT is the model composing, and
+           # there was exactly one. Reported as one number, the first run of this printed "305
+           # label(s) carry a quote that is not in the note text", which reads as a 95% fabrication
+           # rate and would make an operator throw away a scan that worked.
+           "n_no_quote": sum(1 for ll in ok if not (ll.admissibility.quote or "").strip()),
+           "n_quote_unverified": sum(
+               1 for ll in ok
+               if (ll.admissibility.quote or "").strip() and not ll.admissibility.quote_verified),
            "n_terms_kept": sum(len(ll.retrieval_terms) for ll in ok),
            "n_terms_proposed": sum(ll.n_terms_proposed for ll in ok),
            "n_terms_hallucinated": sum(ll.n_terms_hallucinated for ll in ok),
@@ -249,7 +258,67 @@ def progress(
     if ok and doc["n_quote_unverified"]:
         # A paraphrased span means the model composed rather than reported, and the verdicts
         # it composed for are what every later number counts.
-        con.print(f"[yellow]{doc['n_quote_unverified']} label(s) carry a quote that is not in "
-                  f"the note text[/]")
+        con.print(f"[yellow]{doc['n_quote_unverified']} label(s) quote text that is NOT in the "
+                  f"note — the model composed rather than reported[/]")
+    if ok and doc["n_no_quote"]:
+        # Not a warning. Most notes establish nothing, and a model that quotes nothing from them is
+        # behaving. It is printed because a silent zero here and a silent 306 look the same.
+        con.print(f"[dim]{doc['n_no_quote']} label(s) carry no quote at all, which is what a note "
+                  f"that establishes nothing should produce[/]")
     typer.echo(json.dumps({k: doc[k] for k in ("n_labels", "n_ok", "n_errors", "spend_usd")}))
     dump(doc, out)
+
+
+@label_app.command("export")
+def cmd_export(
+    spec: str = _SPEC, max_terms_per_note: int = _MAXTERMS, min_term_chars: int = _MINCHARS,
+    labels_root: str = _ROOT,
+    out: str = typer.Option(..., "--out", help="write the assetdev-shaped labelling here"),
+):
+    """Re-shape a completed scan into the labelling `acr assets` reads.
+
+    THE TWO ENDS OF THIS PLANE DISAGREED ABOUT A FILE FORMAT, and nothing said so until somebody
+    ran the chain end to end. `label scan` writes `labels.jsonl` — one object per line, admissibility
+    nested, terms as `{term, reason}` pairs. `improvement/assetdev.Labelling.load` reads a SINGLE
+    JSON object with `{model, prompt_hash, spec_hash, notes: [...], indexed_vocabulary}` and notes
+    shaped `{patient_id, note_id, doc_type, establishes, mentions, terms}`. Feeding one to the other
+    fails on `JSONDecodeError: Extra data: line 2`.
+
+    `assetdev.py:129` says of its own copy of the schema: "Redeclared here rather than imported from
+    `acr.improvement.labelling` so the two modules are coupled by a FILE FORMAT, not a class." The
+    intent is right — a format is a better seam than a shared class. But a format nobody converts to
+    and no test round-trips is two formats, and the comment reads as though the coupling had been
+    arranged.
+
+    So this is the conversion, in one place, with `tests/test_labelling.py` round-tripping it. The
+    two modules stay coupled by a format; this is the thing that makes the sentence true.
+    """
+    terms = lab.TermConfig(max_terms_per_note=max_terms_per_note, min_term_chars=min_term_chars)
+    req, store = _store(labels_root, spec, terms, f"openai/{lab.DEPLOYMENT}")
+    labels = [ll for ll in store.load().values() if ll.ok]
+    if not labels:
+        con.print("[red]no completed labels in this store — run `acr label scan` first[/]")
+        raise typer.Exit(code=2)
+
+    notes = []
+    for ll in labels:
+        verdicts = ll.admissibility.verdicts or {}
+        notes.append({
+            "patient_id": ll.patient_id, "note_id": ll.note_id, "doc_type": ll.doc_type,
+            "establishes": sorted(f for f, v in verdicts.items() if v == "can_establish"),
+            "mentions": sorted(f for f, v in verdicts.items() if v == "merely_mentions"),
+            "terms": sorted({t.term for t in ll.retrieval_terms}),
+        })
+    doc = {
+        "schema": "acr.labelling/1",
+        "model": labels[0].model,
+        "prompt_hash": req.hash,
+        "spec_hash": _requirement(spec).spec_hash if hasattr(_requirement(spec), "spec_hash") else req.hash,
+        "notes": notes,
+        # WHAT THE SCAN ACTUALLY INDEXED, not every term that happens to appear. `assetdev` scores a
+        # needle outside this set as an error rather than as a zero, because a term the scan never
+        # looked for scoring zero is a lie about the term rather than a fact about it.
+        "indexed_vocabulary": sorted({t for n in notes for t in n["terms"]}),
+    }
+    dump(doc, out)
+    con.print(f"{len(notes)} note(s), {len(doc['indexed_vocabulary'])} indexed term(s) -> {out}")

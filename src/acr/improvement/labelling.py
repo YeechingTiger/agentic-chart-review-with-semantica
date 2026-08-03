@@ -954,12 +954,34 @@ def azure_client(env_path: str | Path = AZURE_ENV_PATH, *, max_tokens: int = 120
     """
     from ..core.llm import LLMClient, LLMConfig
 
-    env = parse_env_file(env_path)
-    api_base = env.get("ACR_API_BASE") or env.get("OPENAI_BASE_URL")
-    api_key = env.get("ACR_API_KEY") or env.get("OPENAI_API_KEY") or env.get("AZURE_API_KEY")
+    # A FILE IF ONE IS CONFIGURED, OTHERWISE THE ENVIRONMENT. This plane used to read only a
+    # credentials file, whose path was an institutional absolute. De-institutionalising that on
+    # 2026-08-03 left `site.MODEL_ENV_FILE` unset by default, so `env_path` became `""` -> `Path(".")`
+    # -> "no environment file at ." and the entire experience plane could not start. Nothing caught
+    # it: no test reaches this function, because reaching it costs money.
+    #
+    # Every other plane in this system reads `ACR_API_BASE` / `ACR_API_KEY` / `ACR_MODEL` from the
+    # environment. This one had a second mechanism, and a second mechanism is a second thing that can
+    # be unconfigured. The file remains an OVERRIDE, because reading credentials as data rather than
+    # sourcing them as shell is worth keeping — but it is no longer the only way in.
+    from_file = bool(env_path) and Path(str(env_path)).is_file()
+    if from_file:
+        env, source = parse_env_file(env_path), str(env_path)
+    else:
+        # ONLY THE `ACR_` NAMES from the environment, and that narrowing is not tidiness. A plain
+        # `dict(os.environ)` fallback would let an `OPENAI_API_KEY` sitting in somebody's shell
+        # profile silently become the credential this plane dials out with — a provider nobody in
+        # this run chose, billed to an account nobody in this run named. A file may carry the vendor
+        # spellings because someone wrote that file on purpose; an ambient variable did not.
+        env = {k: v for k, v in os.environ.items() if k.startswith("ACR_")}
+        source = "the environment (ACR_* only)"
+    api_base = env.get("ACR_API_BASE") or (env.get("OPENAI_BASE_URL") if from_file else None)
+    api_key = env.get("ACR_API_KEY") or (
+        (env.get("OPENAI_API_KEY") or env.get("AZURE_API_KEY")) if from_file else None)
     if not api_base or not api_key:
         raise NotConfiguredError(
-            f"{env_path} has no ACR_API_BASE/ACR_API_KEY; cannot address the deployment")
+            f"{source} has no ACR_API_BASE/ACR_API_KEY; cannot address the deployment. Set them in "
+            f"the environment, or point ACR_MODEL_ENV_FILE at a file of `KEY=value` lines.")
     return LLMClient(LLMConfig(
         model=env.get("ACR_MODEL") or f"openai/{DEPLOYMENT}", api_base=api_base, api_key=api_key,
         temperature=float(env.get("ACR_TEMPERATURE") or 1.0), max_tokens=max_tokens,

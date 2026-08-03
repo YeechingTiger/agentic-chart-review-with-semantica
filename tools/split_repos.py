@@ -113,7 +113,7 @@ REPOS: dict[str, dict] = {
 SPLIT_TOOLS = ("split_repos.py", "scaffold_repos.py", "verify_structure.py")
 
 #: Tools that belong to a specific repo rather than to the harness.
-TOOL_HOMES = {"render_chain.py": "acr-eval"}
+TOOL_HOMES = {"render_chain.py": "acr-eval", "build_termcache.py": "acr-improvement"}
 
 #: WHO OWNS WHICH METHOD CARD. `assets/skills/` held cards for four different consumers in one
 #: directory, and the split is what made that visible: the five `slot: eval` cards plus the PHI
