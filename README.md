@@ -289,13 +289,16 @@ are highest. The fence is **per sub-question**, not per dimension.
 One environment. `langchain`, `deepagents`, `langfuse` and `pytest` are all in `.venv`.
 
 ```bash
-cd /N/project/computable_phenotype/xh_project/agentic-chart-review
-set -a && . /N/project/computable_phenotype/llm/.azure_env && set +a
-export ACR_AUDIT_LOG=/N/project/computable_phenotype/llm/run/<name>/audit.jsonl
+cd /path/to/agentic-chart-review
+set -a && . "$ACR_MODEL_ENV_FILE" && set +a       # see acr/core/site.py
+export ACR_AUDIT_LOG="$ACR_AUDIT_DIR/run/<name>/audit.jsonl"
 ```
 
-`.azure_env` exports `ACR_API_BASE`, `ACR_API_KEY`, `ACR_MODEL`. **It is chmod 600 and outside
-the git tree. Keep it that way.**
+The credentials file exports `ACR_API_BASE`, `ACR_API_KEY`, `ACR_MODEL`. **It is chmod 600 and
+outside the git tree. Keep it that way.** Every other address this project needs — where labellings
+live, where the price table is, what an identifier looks like here — is an environment variable
+declared in one place, `src/acr/core/site.py`. Nothing site-specific is compiled into the code, and
+a deployment holding real data is REFUSED until it declares its identifier shape.
 
 ### Look before you spend
 
@@ -314,7 +317,7 @@ the git tree. Keep it that way.**
 .venv/bin/acr extract \
   --cohort cohort.txt \                 # csv/tsv/txt/json of patient ids
   --variables primary_site,histology,behavior \
-  --corpus /N/project/computable_phenotype/acr_real/patients \
+  --corpus "$ACR_REAL_CORPUS/patients" \
   --max-steps 50 --max-usd 5 --temperature 1 --seed 1234 \
   --out runs/
 ```
@@ -615,7 +618,7 @@ production RUN jobs carry neither registry values nor chart-observable gold.
   --runs runs/extract__… --spec assets/specs/STORE.400_522_523.site_histology_behavior.yaml \
   --case-map case-map.json --mode REGISTRY_REFERENCE \
   --registry-reference registry-reference.json \
-  --corpus /N/project/computable_phenotype/acr_real/patients \
+  --corpus "$ACR_REAL_CORPUS/patients" \
   --max-model-calls 12 --max-usd 1 --max-chart-reads 12 \
   --min-term-chars 2 --max-rejection-repeats 2 \
   --token-band 0,10000000 --turn-band 0,1000 --library-id shb-pilot
@@ -668,11 +671,11 @@ The sixteen fixes and the reframed limits are verified **by tests only**. Re-run
 cohort on current code before quoting any figure:
 
 ```bash
-B=/N/project/computable_phenotype/llm/run/hooks_current && mkdir -p $B
-cp /N/project/computable_phenotype/llm/run/real_ten/{cohort.txt,answer_key.json} $B/
+B="$ACR_LOCAL_ROOT/run/hooks_current" && mkdir -p "$B"
+cp "$ACR_LOCAL_ROOT/run/real_ten"/{cohort.txt,answer_key.json} "$B"/
 export ACR_AUDIT_LOG=$B/audit.jsonl
 .venv/bin/acr extract --cohort $B/cohort.txt --variables primary_site,histology,behavior \
-  --corpus /N/project/computable_phenotype/acr_real/patients \
+  --corpus "$ACR_REAL_CORPUS/patients" \
   --max-steps 50 --temperature 1 --out $B/runs
 ```
 
@@ -779,14 +782,14 @@ added.
    `tests/test_no_phi_in_tree.py` enforces it — and it has caught me.
 2. The only endpoint approved for PHI is the Azure deployment in `.azure_env`. That approval does
    **not** generalise. It is why Langfuse Cloud and AgentLoop are unusable here.
-3. `/N/project/computable_phenotype/acr_real/` is the real corpus. `corpus/patients/` is
+3. `$ACR_REAL_CORPUS` is the real corpus, if this deployment has one. `corpus/patients/` is
    synthetic and PHI-free — develop against it.
 4. Never `rm -rf` under `runs/`; use `tools/archive_runs.sh`.
 5. **Another team works in this tree.** Do not touch `assets/usecase/`,
    `assets/skills/crc-guideline-registry-authoring/`, `tests/test_crc_*.py`. **Do not run
    `git stash -u`** — it stashes their untracked work. I did, and it looked like I had broken
    four of their tests.
-6. Write run outputs outside the repo (`/N/project/computable_phenotype/llm/run/`). `/N/slate/`
+6. Write run outputs outside the repo (`$ACR_LOCAL_ROOT/run/`). Scratch storage
    is near quota.
 
 **Three lessons that cost real time:**

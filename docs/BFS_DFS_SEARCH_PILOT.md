@@ -118,7 +118,7 @@ Invalid value: local artifact root resolves inside the Git worktree: …/runs/pi
 
 That is the "patient-derived artifacts never enter the repo" rule enforced in code rather than
 left to `.gitignore`, and it is stricter than ignoring the directory. On a server the root is
-the external run tree (`/N/project/computable_phenotype/llm/run/`, per README §3). Locally, the
+the external run tree (`$ACR_LOCAL_ROOT/run/`, per README §3). Locally, the
 manifest and its `.jsonl` have to be copied somewhere outside the checkout before either
 model-calling kind will look at them. Worth knowing before you schedule a cohort and discover it
 at the scoring step.

@@ -19,7 +19,7 @@ htmlcov/
 # real manifest carries the person_id inside it.
 #
 # Run output is still an experimental record and must not be deleted — it lives outside the
-# repo, under /N/project/computable_phenotype/llm/run/. Deleting it destroys data; committing
+# repo, under $ACR_LOCAL_ROOT/run/. Deleting it destroys data; committing
 # it is a disclosure. Those are different problems and this file only solves the second.
 runs/
 *.jsonl
