@@ -54,6 +54,19 @@ LAST = ["Whitaker", "Alvarez", "Okafor", "Lindqvist", "Baptiste", "Moreau", "Nak
 
 BACKGROUND_YEARS = 10          # decade of routine care before the index diagnosis
 
+#: WHY A CANDIDATE LOSES, as a closed vocabulary. Prose reasons cannot be compared across
+#: charts, and a reasoner may be reliable at one kind and unreliable at another — a note's own
+#: service date is easy, a conflict rule is not — which one number over both would hide.
+REJECTION_CODES = (
+    "DOCUMENT_SERVICE_DATE",
+    "NONQUALIFYING_RADIOLOGY",
+    "SUPERSEDED_BY_EARLIER",
+    "TREATMENT_OR_FOLLOWUP_DATE",
+    "NOT_THE_TARGET_ENTITY",
+    "AMBIGUOUS_CYTOLOGY_UNSUPPORTED",
+    "OUT_OF_SCOPE_DATE",
+)
+
 
 # --------------------------------------------------------------------------------------
 # Patient blueprints — each encodes what the ground truth should be and why
@@ -149,6 +162,23 @@ class Blueprint:
     #: is a contaminated chart silently counted as clean, so a chart that does not claim to be
     #: held out is treated as informed. Claiming it requires naming where the design came from.
     informed_module_design: bool = True
+    # ---- GOLD FOR THE CANDIDATE MECHANISM, not only for the answer ------------------
+    #: EVERY VALUE A CAREFUL READER WOULD PUT ON THE TABLE, including the ones that lose. A
+    #: gold ANSWER cannot tell three failures apart — never saw the candidate, saw it and
+    #: wrongly ruled it out, saw it and resolved it correctly — and those have three different
+    #: owners. Empty means nobody has stated it, and the analyser EXCLUDES such a chart from
+    #: the candidate metrics rather than scoring it as a miss.
+    gold_candidates: tuple[str, ...] = ()
+    #: value -> why it loses, as a CODE from `REJECTION_CODES`. Prose cannot be compared across
+    #: charts, and which KIND of rejection a reasoner gets wrong is the question worth asking.
+    gold_rejections: dict = field(default_factory=dict)
+    #: What the answerability axis should say, kept apart from the values by construction.
+    gold_answerability: str = "VALUE_AVAILABLE"
+    #: `clear` / `competing` / `no_answer`. The `clear` stratum is where false competition is
+    #: measured; without it, candidate recall has no counterweight and rewards declaring
+    #: alternatives everywhere.
+    candidate_stratum: str = ""
+
     #: Where the trap came from, in words a reader can check against the artefact named.
     #: `contract_clause: <clause>` for a held-out chart — the clause must be one the contract
     #: states and no other chart exercises. Required whenever `informed_module_design` is False.
@@ -216,6 +246,12 @@ BLUEPRINTS = [
         site_text="sigmoid colon", site_code="C187",
         histology_text="", histology_code="", behavior="",
         dx_date="20220906",
+        # `clear` FOR THIS TARGET. SYN0002's evidence gap is about HISTOLOGY — the biopsy was
+        # done elsewhere — and STORE.390's date is plainly in the chart. A stratum is per
+        # target, not per patient, and filing it under no_answer would have put a chart with a
+        # findable date into the population that measures abstention.
+        candidate_stratum="clear",
+        gold_candidates=('20220906',),
         dx_date_why="CT 2022-09-06 shows obstructing mass; GI note same day states 'known colon cancer'.",
         tissue=False, recurrence_type="99", recurrence_date="",
         imaging=["Abd-Pelvis-CT-W-Contr"],
@@ -228,6 +264,8 @@ BLUEPRINTS = [
         site_text="pancreatic head", site_code="C250",
         histology_text="adenocarcinoma", histology_code="8140", behavior="3",
         dx_date="20210118",
+        candidate_stratum="clear",
+        gold_candidates=('20210118',),
         dx_date_why="EUS-FNA pathology 2021-01-18 is the first diagnosis of record.",
         tissue=True, recurrence_type="70", recurrence_date="",
         imaging=["Abd-Pelvis-CT-W-Contr", "Chest-CT-W-Contr"],
@@ -250,6 +288,8 @@ BLUEPRINTS = [
         site_text="urinary bladder", site_code="C679",
         histology_text="urothelial carcinoma in situ", histology_code="8120", behavior="2",
         dx_date="20240220",
+        candidate_stratum="clear",
+        gold_candidates=('20240220',),
         dx_date_why="TURBT pathology 2024-02-20.",
         tissue=True, recurrence_type="00", recurrence_date="",
         imaging=["Abd-Pelvis-CT-W-Contr"],
@@ -271,6 +311,8 @@ BLUEPRINTS = [
         site_text="right breast", site_code="C509",
         histology_text="intraductal carcinoma with focal invasion", histology_code="8500", behavior="3",
         dx_date="20200917",
+        candidate_stratum="clear",
+        gold_candidates=('20200917',),
         dx_date_why="Excisional biopsy pathology 2020-09-17.",
         tissue=True, recurrence_type="00", recurrence_date="",
         imaging=["Chest-CT-W-Contr"],
@@ -330,7 +372,9 @@ BLUEPRINTS = [
         pid="SYN0011", pattern="follow-up truncated; no recurrence before truncation",
         site_text="sigmoid colon", site_code="C187",
         histology_text="adenocarcinoma", histology_code="8140", behavior="3",
-        dx_date="20190222", dx_date_why="Colonoscopic biopsy pathology 2019-02-22.",
+        dx_date="20190222",
+        candidate_stratum="clear",
+        gold_candidates=('20190222',), dx_date_why="Colonoscopic biopsy pathology 2019-02-22.",
         tissue=True, recurrence_type="00", recurrence_date="",
         imaging=["Abd-Pelvis-CT-W-Contr"], followup="truncated", truncate_after_years=2.0,
         notes=("ACCEPTANCE TEST for the clipping fix. Surveillance is clean, then the patient "
@@ -377,7 +421,10 @@ BLUEPRINTS = [
         trap="retrospective",
         site_text="right upper lobe of lung", site_code="C341",
         histology_text="adenocarcinoma", histology_code="8140", behavior="3",
-        dx_date="20190312", index_date="20210608",
+        dx_date="20190312",
+        candidate_stratum="competing",
+        gold_candidates=('20190312', '20210608'),
+        gold_rejections={'20210608': 'SUPERSEDED_BY_EARLIER'}, index_date="20210608",
         dx_date_why=("An oncology note of 2021-06-15 states that the 8 mm nodule on the "
                      "2019-03-12 CT is this same tumour in retrospect. STORE.390 decision_rule: "
                      "'If a physician states that in retrospect the patient had cancer at an "
@@ -426,7 +473,10 @@ BLUEPRINTS = [
         trap="cytology_no_impression",
         site_text="right lower lobe of lung", site_code="C342",
         histology_text="squamous cell carcinoma", histology_code="8070", behavior="3",
-        dx_date="20220309", index_date="20220309",
+        dx_date="20220309",
+        candidate_stratum="competing",
+        gold_candidates=('20220309', '20220214'),
+        gold_rejections={'20220214': 'AMBIGUOUS_CYTOLOGY_UNSUPPORTED'}, index_date="20220309",
         dx_date_why=("Cytology of 2022-02-14 is ambiguous ('suspicious for') and NO physician's "
                      "clinical impression of cancer accompanies it, so STORE.390's second "
                      "conflict_rule applies and the biopsy date governs."),
@@ -474,7 +524,10 @@ BLUEPRINTS = [
         trap="buried_late",
         site_text="pancreatic head", site_code="C250",
         histology_text="adenocarcinoma", histology_code="8140", behavior="3",
-        dx_date="20181107", index_date="20190215",
+        dx_date="20181107",
+        candidate_stratum="competing",
+        gold_candidates=('20181107', '20190215'),
+        gold_rejections={'20190215': 'SUPERSEDED_BY_EARLIER'}, index_date="20190215",
         dx_date_why=("An endocrinology follow-up of 2018-11-07 records the physician's "
                      "assessment that the pancreatic head lesion is malignant. STORE.390 takes "
                      "the FIRST date, clinically or histologically established, and a "
@@ -675,7 +728,9 @@ BLUEPRINTS = [
         trap="death_certificate_only",
         site_text="head of pancreas", site_code="C250",
         histology_text="adenocarcinoma", histology_code="8140", behavior="3",
-        dx_date="20220419", index_date="20220419",
+        dx_date="20220419",
+        candidate_stratum="competing",
+        gold_candidates=('20220419',), index_date="20220419",
         dx_date_why=("Nothing before the death names a malignancy: the three preceding visits "
                      "record decline, weight loss and jaundice and no more. The Death-Summary "
                      "of 2022-04-19 states metastatic adenocarcinoma of the pancreas as the "
@@ -701,7 +756,9 @@ BLUEPRINTS = [
         trap="year_only_approximate",
         site_text="sigmoid colon", site_code="C187",
         histology_text="adenocarcinoma", histology_code="8140", behavior="3",
-        dx_date="20159999", index_date="20190604",
+        dx_date="20159999",
+        candidate_stratum="competing",
+        gold_candidates=('20159999',), index_date="20190604",
         dx_date_why=("No document states a diagnosis date. The establishing-care note of "
                      "2019-06-04 says the cancer was treated 'roughly four years ago' at an "
                      "outside hospital, and the pharmacy feed carries an adjuvant capecitabine "
@@ -732,7 +789,10 @@ BLUEPRINTS = [
         trap="three_sources_disagree",
         site_text="left breast", site_code="C504",
         histology_text="invasive ductal carcinoma", histology_code="8500", behavior="3",
-        dx_date="20200302", index_date="20200401",
+        dx_date="20200302",
+        candidate_stratum="competing",
+        gold_candidates=('20200302', '20200326', '20200401', '20200410'),
+        gold_rejections={'20200326': 'NONQUALIFYING_RADIOLOGY', '20200401': 'SUPERSEDED_BY_EARLIER', '20200410': 'SUPERSEDED_BY_EARLIER'}, index_date="20200401",
         dx_date_why=("Three sources, three dates. Cytology 2020-03-02 reads 'suspicious for "
                      "invasive ductal carcinoma' AND an oncology note of the same day records "
                      "a clinical impression of malignancy, so conflict_rules[1] makes the "
@@ -757,7 +817,9 @@ BLUEPRINTS = [
         trap="seasonal_phrase",
         site_text="ascending colon", site_code="C182",
         histology_text="adenocarcinoma", histology_code="8140", behavior="3",
-        dx_date="20191099", index_date="20200127",
+        dx_date="20191099",
+        candidate_stratum="competing",
+        gold_candidates=('20191099',), index_date="20200127",
         dx_date_why=("The transfer-of-care note of 2020-01-27 says the cancer was diagnosed "
                      "'in the fall of 2019' at another institution, the outside pathology "
                      "never arrived, and nothing else in the chart names a date. "
@@ -787,7 +849,9 @@ BLUEPRINTS = [
         trap="record_starts_after",
         site_text="rectum", site_code="C209",
         histology_text="adenocarcinoma", histology_code="8140", behavior="3",
-        dx_date="", index_date="20210308",
+        dx_date="",
+        candidate_stratum="no_answer",
+        gold_answerability="CORPUS_INSUFFICIENT", index_date="20210308",
         dx_date_why=("CORPUS_INSUFFICIENT. Every note is surveillance and every one refers to "
                      "the diagnosis only as history; the chart states no date, no season, no "
                      "interval and no treatment start, and the outside records are named as "
@@ -816,7 +880,10 @@ BLUEPRINTS = [
         trap="imaging_only_early",
         site_text="body of pancreas", site_code="C251",
         histology_text="adenocarcinoma", histology_code="8140", behavior="3",
-        dx_date="20221115", index_date="20221115",
+        dx_date="20221115",
+        candidate_stratum="competing",
+        gold_candidates=('20221115', '20221008'),
+        gold_rejections={'20221008': 'NONQUALIFYING_RADIOLOGY'}, index_date="20221115",
         dx_date_why=("The CT of 2022-10-08 reads 'HIGHLY SUSPICIOUS FOR MALIGNANCY' and "
                      "recommends tissue sampling. evidence_rules.does_not_count[2] excludes a "
                      "radiology report that merely describes a suspicious mass absent a "
@@ -1786,9 +1853,21 @@ def build_patient(bp: Blueprint, out_root: Path) -> dict:
             f"held out has to say what clause of the contract its trap came from, because that "
             f"is the sentence a reader checks against the contract. Without it the claim is "
             f"unfalsifiable and the chart is treated as informed.")
+    bad = [c for c in bp.gold_rejections.values() if c not in REJECTION_CODES]
+    if bad:
+        raise ValueError(f"{bp.pid}: rejection code(s) {bad} not in REJECTION_CODES.")
+    if bp.gold_candidates and bp.dx_date and bp.dx_date not in bp.gold_candidates:
+        raise ValueError(f"{bp.pid}: the gold ANSWER {bp.dx_date} is not in gold_candidates; a "
+                         f"candidate set without the winner in it cannot score anything.")
     gt = {
         "patient_id": bp.pid,
         "evidence_pattern": bp.pattern,
+        # THE CANDIDATE-LEVEL GOLD. Empty on a chart nobody has stated it for, which the
+        # analyser reads as "exclude from the candidate metrics" rather than as zero.
+        "candidate_stratum": bp.candidate_stratum,
+        "gold_candidates": list(bp.gold_candidates),
+        "gold_rejections": dict(bp.gold_rejections),
+        "gold_answerability": bp.gold_answerability,
         "designer_notes": bp.notes,
         # WHETHER THIS CHART MAY BE SCORED AS A HEADLINE NUMBER. See the Blueprint field: the
         # SYNX charts were designed by watching runs fail and the cards were written from the

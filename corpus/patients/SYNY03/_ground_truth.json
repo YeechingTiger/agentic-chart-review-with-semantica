@@ -1,6 +1,19 @@
 {
   "patient_id": "SYNY03",
   "evidence_pattern": "three admissible sources give three different dates",
+  "candidate_stratum": "competing",
+  "gold_candidates": [
+    "20200302",
+    "20200326",
+    "20200401",
+    "20200410"
+  ],
+  "gold_rejections": {
+    "20200326": "NONQUALIFYING_RADIOLOGY",
+    "20200401": "SUPERSEDED_BY_EARLIER",
+    "20200410": "SUPERSEDED_BY_EARLIER"
+  },
+  "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "The arithmetic is not the test \u2014 SYN0001 already has a two-source version and runs get it right. conflict_rules[4] additionally demands that EVERY conflicting source be cited and the conflict resolved, which is the half of the proof obligation nothing has ever exercised. A run that answers 20200302 citing only the cytology has the right value and has not met the obligation, and those are two different results.",
   "informed_module_design": false,
   "designed_from": "contract_clause: conflict_rules[4] (cite every conflicting source)",

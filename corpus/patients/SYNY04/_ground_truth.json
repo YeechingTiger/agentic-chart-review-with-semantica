@@ -1,6 +1,12 @@
 {
   "patient_id": "SYNY04",
   "evidence_pattern": "a season and a year are all the record offers",
+  "candidate_stratum": "competing",
+  "gold_candidates": [
+    "20191099"
+  ],
+  "gold_rejections": {},
+  "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "The contract's third boundary case is this exact shape ('diagnosed in the spring of 2010' -> 20100499) and no chart has ever produced one, so the season table has been rendered into every prompt for weeks and applied to nothing. The flags are the second half: a run that answers 20191099 and leaves all three false has given a date it invented two components of and said it read them.",
   "informed_module_design": false,
   "designed_from": "contract_clause: date_imputation (seasonal phrase -> month, flagged)",

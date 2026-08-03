@@ -1,6 +1,10 @@
 {
   "patient_id": "SYN0008",
   "evidence_pattern": "conflicting notes \u2014 consult contradicts the imaging impression",
+  "candidate_stratum": "",
+  "gold_candidates": [],
+  "gold_rejections": {},
+  "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "Oncology consult claims 'CT shows liver metastases' while the CT IMPRESSION explicitly says no hepatic lesions. Tests conflict handling and whether the agent cites the primary report over the downstream restatement.",
   "informed_module_design": true,
   "designed_from": "",

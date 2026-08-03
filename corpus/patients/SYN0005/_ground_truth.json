@@ -1,6 +1,12 @@
 {
   "patient_id": "SYN0005",
   "evidence_pattern": "in situ disease \u2014 behavior 2",
+  "candidate_stratum": "clear",
+  "gold_candidates": [
+    "20240220"
+  ],
+  "gold_rejections": {},
+  "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "Behavior must be 2, not 3. Tests that the agent reads the behavior off the pathology wording rather than defaulting to invasive.",
   "informed_module_design": true,
   "designed_from": "",

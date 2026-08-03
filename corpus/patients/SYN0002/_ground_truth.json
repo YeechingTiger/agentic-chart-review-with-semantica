@@ -1,6 +1,12 @@
 {
   "patient_id": "SYN0002",
   "evidence_pattern": "evidence gap \u2014 biopsy performed at outside hospital",
+  "candidate_stratum": "clear",
+  "gold_candidates": [
+    "20220906"
+  ],
+  "gold_rejections": {},
+  "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "Histology must come back EVIDENCE_INSUFFICIENT: the diagnosis is asserted in prose but the confirming pathology was done elsewhere and is not in the record. Recurrence status is genuinely unknown (99), not 00.",
   "informed_module_design": true,
   "designed_from": "",

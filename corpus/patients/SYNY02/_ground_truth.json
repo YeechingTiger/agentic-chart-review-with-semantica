@@ -1,6 +1,12 @@
 {
   "patient_id": "SYNY02",
   "evidence_pattern": "the year cannot be read anywhere and must be approximated",
+  "candidate_stratum": "competing",
+  "gold_candidates": [
+    "20159999"
+  ],
+  "gold_rejections": {},
+  "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "THE CHART THE `20999999` DEFECT NEEDED. Two E4 runs put 99 in the YEAR slot because decision_rule[5] orders an approximation and no field could record that one had been made; the value space now can, and nothing tested it. Note which flags are true: the year was approximated, the month and day are simply not recorded \u2014 a distinction one boolean could not make, and the reason there are three. The hard anchor is in a claims feed, which is a source class a run reading only clinical note types never opens.",
   "informed_module_design": false,
   "designed_from": "contract_clause: decision_rule[5] (the year must be approximated)",

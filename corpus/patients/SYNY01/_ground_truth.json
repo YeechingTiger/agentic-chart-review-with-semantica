@@ -1,6 +1,12 @@
 {
   "patient_id": "SYNY01",
   "evidence_pattern": "death certificate only \u2014 nothing ante-mortem names a cancer",
+  "candidate_stratum": "competing",
+  "gold_candidates": [
+    "20220419"
+  ],
+  "gold_rejections": {},
+  "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "No tissue was ever obtained and no oncology referral was completed, so there is nothing earlier to find. A run that reads the decline notes and stops returns EVIDENCE_INSUFFICIENT and is wrong by one document \u2014 one whose type appears nowhere else in the corpus, so no type prior can point at it.",
   "informed_module_design": false,
   "designed_from": "contract_clause: decision_rule[4] (autopsy / death certificate only)",

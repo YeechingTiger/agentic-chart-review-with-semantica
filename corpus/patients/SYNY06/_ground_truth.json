@@ -1,6 +1,15 @@
 {
   "patient_id": "SYNY06",
   "evidence_pattern": "suspicious imaging weeks before the biopsy \u2014 the later date wins",
+  "candidate_stratum": "competing",
+  "gold_candidates": [
+    "20221115",
+    "20221008"
+  ],
+  "gold_rejections": {
+    "20221008": "NONQUALIFYING_RADIOLOGY"
+  },
+  "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "THE INVERSE TRAP, and the only one in the corpus. SYNX01, SYNX02, SYNX05 and SYNY01 all reward reaching for the earliest date, so a card written from them learns 'earlier wins' and cannot be told apart from a card that learned the rule. Here the earliest candidate is inadmissible. A policy that only generalises in one direction fails exactly here and nowhere else.",
   "informed_module_design": false,
   "designed_from": "contract_clause: evidence_rules.does_not_count[2] (imaging is not a diagnosis)",

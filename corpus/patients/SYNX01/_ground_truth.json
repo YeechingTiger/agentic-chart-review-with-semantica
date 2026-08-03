@@ -1,6 +1,15 @@
 {
   "patient_id": "SYNX01",
   "evidence_pattern": "retrospective diagnosis \u2014 the answer predates the workup by two years",
+  "candidate_stratum": "competing",
+  "gold_candidates": [
+    "20190312",
+    "20210608"
+  ],
+  "gold_rejections": {
+    "20210608": "SUPERSEDED_BY_EARLIER"
+  },
+  "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "The biopsy date 2021-06-08 is where every ordinary path leads and it is WRONG. Reaching 2019-03-12 needs two hops: find the retrospective sentence in a post-diagnosis oncology note, then go back for the CT it names. A sweep that stops at the pathology never sees the sentence; a chase that never opens the follow-up notes never starts.",
   "informed_module_design": true,
   "designed_from": "observed_failure: naive passes took the workup date; the retrospective clause was the fix",

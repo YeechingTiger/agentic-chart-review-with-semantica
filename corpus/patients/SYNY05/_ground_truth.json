@@ -1,6 +1,10 @@
 {
   "patient_id": "SYNY05",
   "evidence_pattern": "the record begins after the diagnosis and never says when",
+  "candidate_stratum": "no_answer",
+  "gold_candidates": [],
+  "gold_rejections": {},
+  "gold_answerability": "CORPUS_INSUFFICIENT",
   "designer_notes": "THE FIRST CHART WHOSE CORRECT ANSWER IS AN ABSTENTION. CORPUS_INSUFFICIENT was declared in the contract and offered by the tool with no chart that could ever score it right, so the status could only ever be measured as a mistake. It is also the control for the opposite error: a smoke run on 2026-08-02 returned CORPUS_INSUFFICIENT on SYNX06, where the answer was present in dictation shorthand \u2014 a retrieval failure presenting as a fact about the corpus. Neither direction is measurable without a chart on each side. THAT OBSERVATION IS WHY THE GAP WAS NOTICED; the trap itself is derived from the contract's own abstention block, and no card's behaviour shaped it.",
   "informed_module_design": false,
   "designed_from": "contract_clause: abstention.CORPUS_INSUFFICIENT",

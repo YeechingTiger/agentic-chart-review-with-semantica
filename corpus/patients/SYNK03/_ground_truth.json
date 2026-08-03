@@ -1,6 +1,10 @@
 {
   "patient_id": "SYNK03",
   "evidence_pattern": "two defensible readings \u2014 the chart itself does not settle it",
+  "candidate_stratum": "",
+  "gold_candidates": [],
+  "gold_rejections": {},
+  "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "NEITHER SIDE IS WRONG, and that is what makes it a control. STORE.390 counts 'a pathology or cytology report whose interpretation establishes the diagnosis' and separately discounts 'cytology carrying only an ambiguous term'. POSITIVE FOR MALIGNANT CELLS is not ambiguous, so the first clause reaches it; but the conflict_rules are written around the ambiguous case and say nothing here. Without this chart an evaluation can score full marks by calling every disagreement a defect, which is the same failure as calling none of them one.",
   "informed_module_design": true,
   "designed_from": "observed_failure: evaluation named a winner where the contract supports both readings",

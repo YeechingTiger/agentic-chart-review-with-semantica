@@ -1,6 +1,12 @@
 {
   "patient_id": "SYN0007",
   "evidence_pattern": "focal invasion inside an in-situ lesion \u2014 behavior 3",
+  "candidate_stratum": "clear",
+  "gold_candidates": [
+    "20200917"
+  ],
+  "gold_rejections": {},
+  "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "STORE [523] boundary case: 'Code 3 if any malignant invasion is present, no matter how limited.' The prose says intraductal (which reads in situ) but reports focal invasion.",
   "informed_module_design": true,
   "designed_from": "",
