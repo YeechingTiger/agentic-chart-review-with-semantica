@@ -1,6 +1,6 @@
 """The method-card ladder: what does each card change, measured one slot at a time.
 
-    python tools/run_ladder.py                 # the controller ladder, 3 arms
+    python tools/run_ladder.py                 # the policy ladder, 3 arms
     python tools/run_ladder.py --group tactic  # one arm per tactic, plus all of them
     python tools/run_ladder.py --group all     # everything
     python tools/run_ladder.py --dry-run       # validate every arm, spend nothing
@@ -58,8 +58,8 @@ BATCH_CMD = ["batch"]
 RUNTIME_PROFILE = "guideline-only"
 
 #: What every arm starts from, so the only difference between two arms is the clause below.
-#: This is what the runtime profiles all resolve to today — a base with no controller and no
-#: tactic — which is why the baseline arm's clause is the empty string rather than `controller=`.
+#: This is what the runtime profiles all resolve to today — a base with no policy and no
+#: tactic — which is why the baseline arm's clause is the empty string rather than `policy=`.
 BASE = SkillStack(general=("tool-contract", "coverage-judgement"))
 
 _TACTICS = (
@@ -71,19 +71,21 @@ _TACTICS = (
     "tactic-sample-unknown-types",
 )
 
-#: THE CONTROLLER LADDER. A controller decides what to do next, and exactly one is drawn per
-#: run — it is the single variable a controlled arm replaces. Two cards exist.
-CONTROLLER_ARMS: list[tuple[str, str]] = [
+#: THE POLICY LADDER. A policy is how a run decides what to look at next and when it is done.
+#: Exactly one is drawn per run — the single variable a controlled arm replaces. Three exist.
+#: (The slot was called `controller` until 2026-08-03; see the note at the top of this file for
+#: what that name promised and did not deliver.)
+POLICY_ARMS: list[tuple[str, str]] = [
     ("B0-base", ""),
-    ("ctrl-reactive", "controller=controller-reactive"),
-    ("ctrl-infogain", "controller=controller-information-gain"),
+    ("pol-reactive", "policy=policy-reactive"),
+    ("pol-infogain", "policy=policy-information-gain"),
     # Added 2026-08-03 in place of the candidate ledger. It asks for the behaviour that machinery
     # was built to enforce — enumerate the ways the contract says an answer can be established,
     # then confirm or exclude each — as judgement rather than as a structure. Two enforced
     # versions were measured and both failed on their own terms; see
     # `docs/CANDIDATE_LEDGER_REMOVED.md`, and note that a card was ONE of the two, so this arm's
     # first job is to find out whether the difference is the framing or the whole idea.
-    ("ctrl-hypothesis-set", "controller=controller-hypothesis-set"),
+    ("pol-hypothesis-set", "policy=policy-hypothesis-set"),
 ]
 
 #: THE TACTIC LADDER. A tactic is a move available when its precondition holds, so an arm
@@ -106,7 +108,7 @@ EXPERIENCE_ARMS: list[tuple[str, str]] = [
     ("experience-method", "experience=experience-adapter"),
 ]
 
-GROUPS = {"controller": CONTROLLER_ARMS, "tactic": TACTIC_ARMS, "experience": EXPERIENCE_ARMS}
+GROUPS = {"policy": POLICY_ARMS, "tactic": TACTIC_ARMS, "experience": EXPERIENCE_ARMS}
 
 PATIENTS = ",".join(
     [f"SYN{i:04d}" for i in range(1, 13)] + [f"SYNX{i:02d}" for i in range(1, 7)])
@@ -142,7 +144,7 @@ def preflight(arms: list[tuple[str, str]]) -> list[tuple[str, SkillStack]]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--group", default="controller", choices=[*GROUPS, "all"])
+    ap.add_argument("--group", default="policy", choices=[*GROUPS, "all"])
     ap.add_argument("--dry-run", action="store_true",
                     help="validate every arm and print what would run; spend nothing")
     ap.add_argument("--max-usd", type=float, default=3.0, help="per arm")

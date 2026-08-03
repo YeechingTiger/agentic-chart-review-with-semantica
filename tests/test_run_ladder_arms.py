@@ -4,7 +4,8 @@
 `search` 槽拆成 `controller` + `tactic` 并给每张卡改了名;`tools/run_ladder.py` 收到的是
 `s/search-/controller-/`,别的什么都没改。结果七条臂里有五条点名的卡根本不存在
 —— `controller-native`、`controller-breadth-first`、`controller-depth-first`、
-`controller-breadth-then-depth`、`controller-latest-first`。跑起来会怎样:前两条臂正常花钱,
+`controller-breadth-then-depth`、`controller-latest-first`。(槽在 2026-08-03 又从
+`controller` 改叫 `policy`;上面这些名字是事故当时的原样,不随之改写。)跑起来会怎样:前两条臂正常花钱,
 第三条 `SkillStack.validate` 抛异常。
 
 一个只在运行时才发现自己名字写错的驱动脚本,是一个必须先付钱才能报错的驱动脚本。所以校验
@@ -37,7 +38,7 @@ def ladder():
     return _load("run_ladder")
 
 
-@pytest.mark.parametrize("group", ["controller", "tactic", "experience", "all"])
+@pytest.mark.parametrize("group", ["policy", "tactic", "experience", "all"])
 def test_every_arm_assembles_and_validates(ladder, group):
     """点名一张不存在的卡、或者把卡装错槽,都在这里炸,而不是在第三条臂上炸。"""
     resolved = ladder.preflight(ladder.arms_for(group))
@@ -61,20 +62,20 @@ def test_all_does_not_run_the_baseline_three_times(ladder):
 def test_a_card_that_does_not_exist_still_fails_loudly(ladder):
     """把守卫本身证伪一次:preflight 不是一个恒真的函数。"""
     with pytest.raises(SkillError):
-        ladder.preflight([("bogus", "controller=controller-native")])
+        ladder.preflight([("bogus", "policy=policy-native")])
 
 
-def test_the_controller_arms_are_every_controller_card_in_the_tree(ladder):
-    """一张树上有、梯子上没有的 controller 卡,是一个不会被测到的干预。
+def test_the_policy_arms_are_every_policy_card_in_the_tree(ladder):
+    """一张树上有、梯子上没有的 policy 卡,是一个不会被测到的干预。
 
     原来这条测试把名单钉成两张卡,理由是"第三张出现时要有人说明它是什么"。第三张出现了
-    (`controller-hypothesis-set`,2026-08-03,替代被删掉的候选账本机制),而钉死名单意味着
+    (`policy-hypothesis-set`,2026-08-03,替代被删掉的候选账本机制),而钉死名单意味着
     加一张卡就要改一次测试 —— 于是这条测试量的是我记不记得改它。改成对着树:少一张就是漏测。
     """
     on_disk = {p.name for p in (ROOT / "assets" / "skills").iterdir()
-               if p.name.startswith("controller-")}
-    named = {s.controller for _, s in ladder.preflight(ladder.CONTROLLER_ARMS)} - {None}
-    assert named == on_disk, "controller 卡和梯子不一致"
+               if p.name.startswith("policy-")}
+    named = {s.policy for _, s in ladder.preflight(ladder.POLICY_ARMS)} - {None}
+    assert named == on_disk, "policy 卡和梯子不一致"
 
 
 def test_the_tactic_arms_cover_every_tactic_card_in_the_tree():

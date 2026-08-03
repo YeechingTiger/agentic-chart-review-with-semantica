@@ -1,7 +1,7 @@
 # The candidate ledger: two attempts, both falsified, and the numbers
 
 Removed 2026-08-03. The behaviour it existed to produce is now asked for in prose —
-`assets/skills/controller-hypothesis-set/SKILL.md` — and enforced nowhere.
+`assets/skills/policy-hypothesis-set/SKILL.md` — and enforced nowhere.
 
 This file exists so nobody rebuilds it without knowing what has already been measured. Both
 approaches are falsified on their own terms; a third would need a different premise, not a better
@@ -121,4 +121,4 @@ that puts one next is answering a question this variable does not ask.
 `Evidence.evidence_id`; the corpus's `gold_candidates` / `gold_rejections` / `candidate_stratum`
 annotations on 14 charts, which are hand-authored knowledge about which readings are defensible
 and are the input any future approach needs; and `tools/measure_agency.py` and
-`tools/measure_controller_value.py`, which read manifests and never depended on the ledger.
+`tools/measure_policy_value.py`, which read manifests and never depended on the ledger.

@@ -1,7 +1,7 @@
 ---
-name: controller-hypothesis-set
-description: Before searching, enumerate the ways this contract says an answer can be established, then work to confirm or exclude each one. Covers where the list of ways comes from, what confirming and excluding each takes, what an excluded route is worth, and when the set is finished. A controller — it decides what to do next, for the whole run.
-slot: controller
+name: policy-hypothesis-set
+description: Before searching, enumerate the ways this contract says an answer can be established, then work to confirm or exclude each one. Covers where the list of ways comes from, what confirming and excluding each takes, what an excluded route is worth, and when the set is finished. A policy — it decides what to do next, for the whole run.
+slot: policy
 license: MIT
 ---
 

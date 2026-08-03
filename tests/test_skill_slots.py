@@ -67,17 +67,17 @@ def test_unknown_slot_raises(tmp_path: Path):
         skill_slot("bad-slot", tmp_path)
 
 
-def test_stack_renders_task_then_controller_then_general():
-    stack = SkillStack(task="store-icdo-coding", controller="controller-reactive",
+def test_stack_renders_task_then_policy_then_general():
+    stack = SkillStack(task="store-icdo-coding", policy="policy-reactive",
                        general=("chart-triage", "coverage-judgement"))
-    assert stack.names() == ("store-icdo-coding", "controller-reactive",
+    assert stack.names() == ("store-icdo-coding", "policy-reactive",
                              "chart-triage", "coverage-judgement")
 
 
 def test_stack_rejects_a_skill_in_the_wrong_slot():
-    """把一张 general 卡塞进 controller 槽——这正是会让对照试验失去意义的装配错误。"""
-    with pytest.raises(SkillError, match="chart-triage.*declares slot 'general'.*'controller'"):
-        SkillStack(controller="chart-triage").validate()
+    """把一张 general 卡塞进 policy 槽——这正是会让对照试验失去意义的装配错误。"""
+    with pytest.raises(SkillError, match="chart-triage.*declares slot 'general'.*'policy'"):
+        SkillStack(policy="chart-triage").validate()
 
 
 def test_stack_rejects_an_eval_skill_in_the_chart_agent(tmp_path: Path):
@@ -97,7 +97,7 @@ def test_stack_rejects_an_eval_skill_in_the_chart_agent(tmp_path: Path):
 
 @pytest.mark.parametrize("name", sorted(p.name for p in SKILLS_DIR.iterdir()
                                         if p.name.startswith("eval-")))
-@pytest.mark.parametrize("slot", ["task", "controller", "general"])
+@pytest.mark.parametrize("slot", ["task", "policy", "general"])
 def test_a_real_eval_card_cannot_be_placed_in_a_chart_slot(name: str, slot: str):
     """上一条用 tmp_path 造卡测机制；这一条测真卡，走的是用户真会敲的那条路。
 
@@ -172,8 +172,8 @@ CORPUS = ROOT / "corpus" / "patients"
 
 def test_parse_replaces_the_search_slot():
     base = SkillStack(general=("coverage-judgement",))
-    got = parse_skill_stack("controller=controller-reactive", base)
-    assert got == SkillStack(controller="controller-reactive", general=("coverage-judgement",))
+    got = parse_skill_stack("policy=policy-reactive", base)
+    assert got == SkillStack(policy="policy-reactive", general=("coverage-judgement",))
 
 
 def test_parse_appends_to_general():
@@ -205,17 +205,17 @@ def test_parse_rejects_an_unknown_slot():
 
 def test_parse_rejects_a_missing_equals():
     with pytest.raises(SkillError, match="expected slot=value"):
-        parse_skill_stack("controller-reactive", SkillStack())
+        parse_skill_stack("policy-reactive", SkillStack())
 
 
 def test_parse_validates_placement():
     with pytest.raises(SkillError, match="declares slot 'general'"):
-        parse_skill_stack("controller=chart-triage", SkillStack())
+        parse_skill_stack("policy=chart-triage", SkillStack())
 
 
 def test_parse_empty_value_clears_the_slot():
-    base = SkillStack(controller="controller-reactive", general=("coverage-judgement",))
-    assert parse_skill_stack("controller=", base).controller is None
+    base = SkillStack(policy="policy-reactive", general=("coverage-judgement",))
+    assert parse_skill_stack("policy=", base).policy is None
 
 
 def test_parse_empty_string_is_the_base():
@@ -273,8 +273,8 @@ def test_run_patient_without_a_stack_renders_the_profiles_own(tmp_path: Path):
 def test_run_patient_renders_the_stack_it_was_given(tmp_path: Path):
     """An explicit stack replaces the profile's, and it is the override that reaches the model."""
     prompt = _scripted_system_prompt(
-        tmp_path, skill_stack=SkillStack(controller="controller-reactive"))
-    assert _was_rendered(prompt, "controller-reactive")
+        tmp_path, skill_stack=SkillStack(policy="policy-reactive"))
+    assert _was_rendered(prompt, "policy-reactive")
     assert not _was_rendered(prompt, "coverage-judgement")
 
 
@@ -299,7 +299,7 @@ def test_the_manifest_records_the_stack_the_model_was_actually_given(tmp_path: P
     """The prompt and the manifest must name the SAME cards.
 
     This is a regression test for a defect found on the first live run against the synthetic
-    corpus. `--skills controller=tactic-coverage-pool` was honoured by the prompt builder and
+    corpus. `--skills policy=tactic-coverage-pool` was honoured by the prompt builder and
     ignored by `prompt_asset_manifest`, which re-derived the stack from the runtime profile. The
     run therefore produced an artifact asserting it had used the profile's default guidance while
     the model had read a different card — and two arms of a retrieval ablation would have
@@ -309,12 +309,12 @@ def test_the_manifest_records_the_stack_the_model_was_actually_given(tmp_path: P
     a reader can see. Asserting agreement between the two, rather than the value of either, is
     what makes the two halves impossible to drift apart again.
     """
-    stack = SkillStack(controller="controller-reactive")
+    stack = SkillStack(policy="policy-reactive")
     recorded = _scripted_manifest_skills(tmp_path / "m", skill_stack=stack)
     prompt = _scripted_system_prompt(tmp_path / "p", skill_stack=stack)
 
-    assert [e["skill"] for e in recorded] == ["controller-reactive"]
-    assert [e["slot"] for e in recorded] == ["controller"]
+    assert [e["skill"] for e in recorded] == ["policy-reactive"]
+    assert [e["slot"] for e in recorded] == ["policy"]
     for entry in recorded:
         assert _was_rendered(prompt, entry["skill"]), (
             f"the manifest claims {entry['skill']!r} but the model was never given it")
@@ -364,7 +364,7 @@ def test_a_bad_skills_string_costs_nothing_on_batch(monkeypatch, tmp_path: Path)
     failures whose cause was one typo.
     """
     r = _invoke(monkeypatch, tmp_path, "batch", "--patients", "SYN0001",
-                "--skills", "controller=chart-triage")
+                "--skills", "policy=chart-triage")
     assert r.exit_code != 0
     assert isinstance(r.exception, SkillError), r.output
     assert "declares slot 'general'" in str(r.exception)
@@ -385,7 +385,7 @@ def test_the_skills_help_documents_every_form_of_the_syntax(command: str):
     out = CliRunner().invoke(app, [command, "--help"]).output
     flat = " ".join(out.split())
     assert "--skills" in flat
-    for form in ("controller=", "tactics=+", "general=+", "|"):
+    for form in ("policy=", "tactics=+", "general=+", "|"):
         assert form in flat, f"{command} --help does not document {form!r}"
 
 
@@ -403,11 +403,11 @@ def test_the_experience_slot_can_actually_be_stacked():
 
 def test_experience_renders_after_the_tactics_and_before_the_standing_habits():
     """先验是"有人替你查过的东西",它排在自选战术之后、每个臂都有的东西之前。"""
-    stack = SkillStack(controller="controller-reactive",
+    stack = SkillStack(policy="policy-reactive",
                        tactics=("tactic-coverage-pool",),
                        experience=("experience-adapter",),
                        general=("tool-contract",))
-    assert stack.names() == ("controller-reactive", "tactic-coverage-pool",
+    assert stack.names() == ("policy-reactive", "tactic-coverage-pool",
                              "experience-adapter", "tool-contract")
 
 

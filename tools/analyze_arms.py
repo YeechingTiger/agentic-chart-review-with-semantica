@@ -13,7 +13,7 @@ a hunch. Now the arithmetic stops instead.
 
 AND IT REFUSES TO FOLD AN INFORMED CHART INTO A HEADLINE NUMBER. SYNX01-06 were designed by
 watching runs fail and the search cards were written from the same failures — SYNX06's own
-designer note says it tests "precisely the shorter-stem move the controller-reactive card
+designer note says it tests "precisely the shorter-stem move the policy-reactive card
 advises". A card's score on those charts is a score on its own development set, and it was
 being printed in the same column as everything else. The two populations are now separated by
 `informed_module_design`, counted apart, and the held-out column is the one a claim may rest

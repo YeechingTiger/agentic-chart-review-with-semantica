@@ -99,11 +99,11 @@ def run(
     skills: str = typer.Option(
         "", "--skills",
         help="override the profile's skill assembly: comma-separated slot=value. "
-             "`controller=controller-information-gain` replaces the controller, "
+             "`policy=policy-information-gain` replaces the policy, "
              "`tactics=+tactic-counterevidence` and `general=+chart-triage` append one, "
              "`experience=experience-adapter` turns the develop-set prior on, "
              "`general=chart-triage|thread-chasing` replaces a whole list (`|` because "
-             "comma already separates clauses), `controller=` clears the slot. "
+             "comma already separates clauses), `policy=` clears the slot. "
              "Validated before any model call."),
     conflict_refine: bool = typer.Option(
         False, "--conflict-refine",
@@ -184,11 +184,11 @@ def batch(
     skills: str = typer.Option(
         "", "--skills",
         help="override the profile's skill assembly: comma-separated slot=value. "
-             "`controller=controller-information-gain` replaces the controller, "
+             "`policy=policy-information-gain` replaces the policy, "
              "`tactics=+tactic-counterevidence` and `general=+chart-triage` append one, "
              "`experience=experience-adapter` turns the develop-set prior on, "
              "`general=chart-triage|thread-chasing` replaces a whole list (`|` because "
-             "comma already separates clauses), `controller=` clears the slot. "
+             "comma already separates clauses), `policy=` clears the slot. "
              "Parsed once before the loop, so a typo cannot be charged per patient."),
     out: str = typer.Option("runs", "--out"),
 ):

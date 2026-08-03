@@ -154,7 +154,7 @@ class Blueprint:
     #:
     #: SYNX01-06 were built by watching runs fail, and the search cards were then written from
     #: the same failures — SYNX06's own designer note says it tests "precisely the shorter-stem
-    #: move the controller-reactive card advises". Scoring those cards on those charts is
+    #: move the policy-reactive card advises". Scoring those cards on those charts is
     #: scoring them on their own development set, and until 2026-08-03 nothing in the tree
     #: recorded that. `docs/MODULE_LADDER_EXPERIMENT.md:138` named the flag and no code had it.
     #:
@@ -566,7 +566,7 @@ BLUEPRINTS = [
                "malignant, not diagnosis. A run searching the contract's own vocabulary comes "
                "back empty and concludes the chart is silent. 'adeno' hits and "
                "'adenocarcinoma' does not, which is precisely the shorter-stem move the "
-               "controller-reactive card advises — so this chart tests whether that advice is "
+               "policy-reactive card advises — so this chart tests whether that advice is "
                "followed rather than merely rendered."),
         expect={"dx_date": "20210917", "naive_answer": "EVIDENCE_INSUFFICIENT",
                 "requires": "widening to a stem after the contract's own words miss"},
@@ -574,7 +574,7 @@ BLUEPRINTS = [
         # state either way. `designed_from` is set because the provenance is known
         # and specific, and a reader deciding whether to trust a number over this
         # chart needs the sentence, not the boolean.
-        designed_from="observed_failure: the contract's own vocabulary missed; informed the stem-widening advice in controller-reactive",
+        designed_from="observed_failure: the contract's own vocabulary missed; informed the stem-widening advice in policy-reactive",
     ),
 
     # ==================================================================================
@@ -700,7 +700,7 @@ BLUEPRINTS = [
     #
     # WHY A SECOND ADVERSARIAL SET EXISTS. SYNX01-06 were designed by watching runs fail, and
     # the search cards were then written from the same failures — SYNX06's own designer note
-    # says it tests "precisely the shorter-stem move the controller-reactive card advises".
+    # says it tests "precisely the shorter-stem move the policy-reactive card advises".
     # Scoring those cards on those charts is scoring them on their own development set. That
     # was true from the day the cards were written and nothing in the tree recorded it;
     # `docs/MODULE_LADDER_EXPERIMENT.md:138` named the flag and no code had it.
@@ -1145,7 +1145,7 @@ def shorthand_note(bp, name, sex, dob, dtype, d) -> str:
 
     No full word appears: not "adenocarcinoma", not "carcinoma", not "malignant", not
     "diagnosis". A run that searches the contract's own vocabulary finds nothing and concludes
-    the chart is silent. The `controller-reactive` card's advice to try a shorter stem is exactly what
+    the chart is silent. The `policy-reactive` card's advice to try a shorter stem is exactly what
     reaches this — "adeno" hits, "adenocarcinoma" does not — so the chart tests that advice
     rather than merely repeating it.
     """

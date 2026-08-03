@@ -108,7 +108,7 @@ class EvidenceLedger:
 #                    make it do so functioned on dates only, cost SYN0002 its gold answer three
 #                    times out of three, and left 40% of clear charts in false competition.
 #
-# The behaviour is now asked for in prose, in `assets/skills/controller-hypothesis-set/SKILL.md`:
+# The behaviour is now asked for in prose, in `assets/skills/policy-hypothesis-set/SKILL.md`:
 # enumerate the ways the contract says an answer can be established, then confirm or exclude each.
 # Judgement the model applies, recorded when it departs, enforced nowhere. What that gives up is
 # the ability to COUNT whether it happened; what it stops paying for is a structure that shaped

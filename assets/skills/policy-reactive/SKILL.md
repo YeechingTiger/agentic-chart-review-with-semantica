@@ -1,7 +1,7 @@
 ---
-name: controller-reactive
+name: policy-reactive
 description: Use when deciding how to search a chart and when to stop searching, and no keyword list or note-type prior has been supplied. Tells you how to choose terms from the task contract and the patient's own document inventory, how to widen after an empty result, and how to judge that further searching would not change your answer. Not a rule about how much searching is enough - that judgement stays yours and is recorded, not enforced.
-slot: controller
+slot: policy
 license: MIT
 ---
 

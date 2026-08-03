@@ -54,12 +54,19 @@ MAX_SKILL_BYTES = 12_000
 
 #: 一张卡装在哪个槽。槽不是分类标签，是装配位置。
 #:
-#: `controller` 恰好装一张 —— 它是对照试验里唯一被替换的变量。`tactic` 不限张数，因为一个
-#: 战术是前提成立时才可以调用的动作，不是一次运行的整个方针；2026-08-02 之前八张卡挤在同一
-#: 个槽里八选一，量到的是不同种类干预之间的差别，不是策略之间的差别。`experience` 只在经验
+#: `policy` 恰好装一张，并且总是生效 —— 它是一次运行的检索方针，是对照试验里唯一被替换的
+#: 变量。`tactic` 不限张数且各带前提，因为一个战术是前提成立时才可以调用的动作，不是整个方
+#: 针；2026-08-02 之前八张卡挤在同一个槽里八选一，量到的是不同种类干预之间的差别，不是策略
+#: 之间的差别。
+#:
+#: 这个槽 2026-08-03 之前叫 `controller`，那个名字是从架构文档里搬来的，而文档里的
+#: Strategic Controller 是一次独立的模型调用，输出 CONTINUE / STOP / ABSTAIN / ESCALATE 的
+#: 封闭枚举且不碰检索。这里从来没有那个东西：没有任何代码读这个槽做决定，它唯一的去处是
+#: `names()` 的渲染顺序。一个承诺了不存在机制的名字，在这棵树上已经付过一次代价（见
+#: `tools/run_ladder.py` 的开头）。`experience` 只在经验
 #: 臂打开。`task` 最多一张，跟着 spec 走。`general` 不限张数，是每个条件都有的东西。`eval`
 #: 属于评测那边的 agent，永远不进跑病历的提示词。
-SLOTS: tuple[str, ...] = ("task", "controller", "tactic", "experience", "general", "eval")
+SLOTS: tuple[str, ...] = ("task", "policy", "tactic", "experience", "general", "eval")
 
 _FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 
@@ -134,13 +141,14 @@ def skill_slot(name: str, skills_dir: Path | str | None = None) -> str:
 class SkillStack:
     """How one run's method guidance is assembled: which skill sits in which slot.
 
-    `controller` holds AT MOST ONE because it is the variable an arm replaces. Two controllers
-    rendered together are not "more guidance" — they are an unlabelled third policy, and the
-    manifest would record two names where the model received one merged instruction.
+    A POLICY IS A SEARCH POLICY: how this run chooses what to look at next and how it judges
+    that it is done. It holds AT MOST ONE because it is the variable an arm replaces, and
+    because two policies rendered together are not "more guidance" — they are an unlabelled
+    third policy, and the manifest would record two names where the model received one merged
+    instruction.
 
     `tactics` is a TUPLE, and the difference is the whole point of the 2026-08-02 split. A
-    controller decides what to do next; a tactic is a move available when its precondition
-    holds. Following a deferral needs a deferral to exist, entering at a summary needs a summary
+    policy always applies; a tactic is a move available when its precondition holds. Following a deferral needs a deferral to exist, entering at a summary needs a summary
     to exist, working a prior needs a prior — those are moves, and an arm that drew one of them
     as its entire policy on a record that did not meet its precondition was handed nothing.
     Eight cards competing for one slot measured the difference between kinds of intervention,
@@ -148,7 +156,7 @@ class SkillStack:
     """
 
     task: str | None = None
-    controller: str | None = None
+    policy: str | None = None
     tactics: tuple[str, ...] = ()
     #: The develop-set prior, when a run is given one. A TUPLE and a separate slot from
     #: `tactics` because it is the third factor of the three-factor experiment and has to be
@@ -165,8 +173,8 @@ class SkillStack:
         out: list[str] = []
         if self.task:
             out.append(self.task)
-        if self.controller:
-            out.append(self.controller)
+        if self.policy:
+            out.append(self.policy)
         out.extend(self.tactics)
         out.extend(self.experience)
         out.extend(self.general)
@@ -174,7 +182,7 @@ class SkillStack:
 
     def validate(self, skills_dir: Path | str | None = None) -> None:
         """Every named skill exists and declares the slot it was placed in."""
-        placed = [(self.task, "task"), (self.controller, "controller")]
+        placed = [(self.task, "task"), (self.policy, "policy")]
         placed += [(n, "tactic") for n in self.tactics]
         placed += [(n, "experience") for n in self.experience]
         placed += [(n, "general") for n in self.general]
@@ -189,7 +197,7 @@ class SkillStack:
             if declared != slot:
                 raise SkillError(
                     f"skill {name!r} declares slot {declared!r} but was placed in the {slot!r} "
-                    f"slot. Placement is not a preference: the controller slot holds the one "
+                    f"slot. Placement is not a preference: the policy slot holds the one "
                     f"variable an arm replaces, and a tactic placed there becomes a whole policy "
                     f"on records where its precondition never fires.")
 
@@ -210,7 +218,7 @@ def parse_skill_stack(spec: str, base: SkillStack,
     """
     if not spec.strip():
         return base
-    task, controller = base.task, base.controller
+    task, policy = base.task, base.policy
     lists = {"tactics": list(base.tactics), "experience": list(base.experience),
              "general": list(base.general)}
     for clause in spec.split(","):
@@ -221,22 +229,24 @@ def parse_skill_stack(spec: str, base: SkillStack,
             raise SkillError(f"skill override {clause!r}: expected slot=value")
         slot, _, value = clause.partition("=")
         slot, value = slot.strip(), value.strip()
-        if slot not in ("task", "controller", "tactics", "experience", "general"):
+        if slot not in ("task", "policy", "tactics", "experience", "general"):
             raise SkillError(
-                f"skill override: unknown slot {slot!r}; expected task, controller, tactics, "
+                f"skill override: unknown slot {slot!r}; expected task, policy, tactics, "
                 f"experience or general (the eval slot belongs to the evaluation agent, not a "
                 f"chart run). "
-                f"`search` was renamed to `controller` on 2026-08-02 when the traversal tactics "
-                f"moved out of it.")
+                f"This slot was `search` until 2026-08-02, when the traversal tactics moved "
+                f"out of it and it became `controller`; it became `policy` on 2026-08-03, "
+                f"because nothing reads it to make a decision and `controller` named a "
+                f"component this system does not have.")
         if slot == "task":
             task = value or None
-        elif slot == "controller":
-            controller = value or None
+        elif slot == "policy":
+            policy = value or None
         elif value.startswith("+"):
             lists[slot].append(value[1:])
         else:
             lists[slot] = [v for v in value.split("|") if v]
-    out = SkillStack(task=task, controller=controller,
+    out = SkillStack(task=task, policy=policy,
                      tactics=tuple(lists["tactics"]),
                      experience=tuple(lists["experience"]),
                      general=tuple(lists["general"]))
@@ -326,9 +336,9 @@ def skills_block(stack: SkillStack, skills_dir: Path | str | None = None) -> str
     for n in names:
         head = f"--- skill: {n} ---"
         # A tactic's PRECONDITION has to reach the model or it is frontmatter nobody reads —
-        # and the whole reason tactics were split out of the controller slot is that a move
+        # and the whole reason tactics were split out of the policy slot is that a move
         # drawn on a record that does not meet its precondition is a move that gives no
-        # guidance. The controller needs to know when each one applies in order not to call it.
+        # guidance. The policy needs to know when each one applies in order not to call it.
         pre = _frontmatter(n, skills_dir).get("precondition")
         if pre:
             head += f"\n    CALL THIS WHEN: {pre}"
@@ -349,8 +359,8 @@ def skills_manifest(stack: SkillStack, skills_dir: Path | str | None = None) -> 
     slot_of = {}
     if stack.task:
         slot_of[stack.task] = "task"
-    if stack.controller:
-        slot_of[stack.controller] = "controller"
+    if stack.policy:
+        slot_of[stack.policy] = "policy"
     for n in stack.tactics:
         slot_of[n] = "tactic"
     for n in stack.experience:

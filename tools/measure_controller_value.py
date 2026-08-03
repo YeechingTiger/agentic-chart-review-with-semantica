@@ -1,5 +1,10 @@
 """When a run converged on the WRONG value, would more searching have helped?
 
+`Controller` here means the ARCHITECTURE DOCUMENT's Strategic Controller — a separate model
+call whose whole output is CONTINUE / STOP / ABSTAIN / ESCALATE. It is not the `policy` slot
+(`assets/skills/policy-*`), which is prose in the one loop's prompt and was itself called
+`controller` until 2026-08-03. This file asks whether that component would have a job.
+
     python tools/measure_controller_value.py runs/a15eval
 
 THE QUESTION THIS DECIDES. A1.5 was built on the assumption that a Strategic Controller
