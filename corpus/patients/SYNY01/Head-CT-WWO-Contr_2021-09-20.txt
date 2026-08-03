@@ -1,0 +1,9 @@
+MRN: SYNY01
+Patient: Avery Ferris
+DOB: 1947-03-26   Sex: M
+Document Type: Head CT WWO Contr
+Service Date: 2021-09-20
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

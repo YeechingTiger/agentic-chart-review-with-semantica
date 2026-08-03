@@ -1,0 +1,9 @@
+MRN: SYNY02
+Patient: Casey Baptiste
+DOB: 1949-04-20   Sex: M
+Document Type: Chest CT WWO Contr
+Service Date: 2018-09-19
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

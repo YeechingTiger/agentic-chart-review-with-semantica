@@ -1,0 +1,12 @@
+MRN: SYNY01
+Patient: Avery Ferris
+DOB: 1947-03-26   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2016-04-24
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2016-04-24   LISINOPRIL 10MG TAB              qty 90
+  2016-04-24   PANTOPRAZOLE 40MG TAB            qty 90
+  2016-04-24   ATORVASTATIN 20MG TAB            qty 90
+

@@ -1,0 +1,12 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2017-10-02
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2017-10-02   OXYCODONE 5MG TAB                qty 30
+  2017-10-02   ATORVASTATIN 20MG TAB            qty 30
+  2017-10-02   ONDANSETRON 8MG TAB              qty 60
+

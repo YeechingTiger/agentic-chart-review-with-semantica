@@ -1,0 +1,9 @@
+MRN: SYNK02
+Patient: Reese Baptiste
+DOB: 1968-01-13   Sex: M
+Document Type: Chest CT W Contr
+Service Date: 2012-10-23
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

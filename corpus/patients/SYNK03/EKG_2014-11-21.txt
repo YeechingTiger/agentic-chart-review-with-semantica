@@ -1,0 +1,9 @@
+MRN: SYNK03
+Patient: Riley Alvarez
+DOB: 1945-04-28   Sex: F
+Document Type: EKG
+Service Date: 2014-11-21
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 93. No acute ST-T changes.
+

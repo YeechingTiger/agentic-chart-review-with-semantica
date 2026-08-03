@@ -1,0 +1,9 @@
+MRN: SYNY01
+Patient: Avery Ferris
+DOB: 1947-03-26   Sex: M
+Document Type: Procedure Note
+Service Date: 2019-09-08
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

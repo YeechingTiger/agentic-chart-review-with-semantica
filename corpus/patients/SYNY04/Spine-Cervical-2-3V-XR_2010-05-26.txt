@@ -1,0 +1,9 @@
+MRN: SYNY04
+Patient: Jordan Ferris
+DOB: 1970-08-17   Sex: F
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2010-05-26
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

@@ -1,0 +1,12 @@
+MRN: SYNK01
+Patient: Reese Moreau
+DOB: 1954-01-11   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2021-10-31
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2021-10-31   ATORVASTATIN 20MG TAB            qty 90
+  2021-10-31   ONDANSETRON 8MG TAB              qty 60
+  2021-10-31   OXYCODONE 5MG TAB                qty 30
+

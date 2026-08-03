@@ -1,0 +1,9 @@
+MRN: SYNK02
+Patient: Reese Baptiste
+DOB: 1968-01-13   Sex: M
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2015-11-24
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

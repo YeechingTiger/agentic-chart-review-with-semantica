@@ -1,0 +1,9 @@
+MRN: SYNY02
+Patient: Casey Baptiste
+DOB: 1949-04-20   Sex: M
+Document Type: Fluoroscopy Up to 1 Hr
+Service Date: 2019-05-29
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

@@ -1,0 +1,12 @@
+MRN: SYNY06
+Patient: Riley Okafor
+DOB: 1974-01-18   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2024-02-20
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2024-02-20   OXYCODONE 5MG TAB                qty 60
+  2024-02-20   LISINOPRIL 10MG TAB              qty 90
+  2024-02-20   ATORVASTATIN 20MG TAB            qty 60
+

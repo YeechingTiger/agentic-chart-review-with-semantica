@@ -1,0 +1,20 @@
+MRN: SYNY05
+Patient: Riley Lindqvist
+DOB: 1946-08-09   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2023-06-19
+----------------------------------------------------------------
+INTERVAL HISTORY:
+  Surveillance visit. History of adenocarcinoma of the rectum,
+  managed in full at another health system before transfer. No outside records are
+  present in this chart.
+
+EXAM:
+  Well appearing. Weight stable. No palpable adenopathy.
+
+ASSESSMENT:
+  No evidence of disease at today's visit.
+
+PLAN:
+  Continue interval surveillance.
+

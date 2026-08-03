@@ -1,0 +1,12 @@
+MRN: SYNY02
+Patient: Casey Baptiste
+DOB: 1949-04-20   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2011-09-20
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2011-09-20   ATORVASTATIN 20MG TAB            qty 30
+  2011-09-20   PANTOPRAZOLE 40MG TAB            qty 90
+  2011-09-20   OXYCODONE 5MG TAB                qty 30
+

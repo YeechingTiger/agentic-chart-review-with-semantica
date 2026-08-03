@@ -1,0 +1,9 @@
+MRN: SYNY04
+Patient: Jordan Ferris
+DOB: 1970-08-17   Sex: F
+Document Type: Chest CT W Contr
+Service Date: 2011-02-27
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

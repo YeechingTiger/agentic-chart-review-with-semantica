@@ -1,0 +1,16 @@
+MRN: SYNK02
+Patient: Reese Baptiste
+DOB: 1968-01-13   Sex: M
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2020-06-16
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt seen today to discuss recent imaging of the sigmoid colon.
+  Reports fatigue, appetite down. No fevers.
+
+ASSESSMENT AND PLAN:
+  1. Mass, sigmoid colon. Clinically this represents malignancy;
+     proceeding to tissue sampling for confirmation.
+
+MEDS: atorvastatin, pantoprazole, ondansetron
+

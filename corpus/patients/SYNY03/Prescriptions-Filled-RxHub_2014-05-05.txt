@@ -1,0 +1,12 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2014-05-05
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2014-05-05   ONDANSETRON 8MG TAB              qty 90
+  2014-05-05   OXYCODONE 5MG TAB                qty 90
+  2014-05-05   LISINOPRIL 10MG TAB              qty 90
+

@@ -1,0 +1,9 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: EKG
+Service Date: 2015-05-05
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 75. No acute ST-T changes.
+

@@ -1,0 +1,9 @@
+MRN: SYNY04
+Patient: Jordan Ferris
+DOB: 1970-08-17   Sex: F
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2013-07-01
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

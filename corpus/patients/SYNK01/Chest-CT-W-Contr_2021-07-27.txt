@@ -1,0 +1,20 @@
+MRN: SYNK01
+Patient: Reese Moreau
+DOB: 1954-01-11   Sex: M
+Document Type: Chest CT W Contr
+Service Date: 2021-07-27
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Eval of left upper lobe of lung lesion.
+
+TECHNIQUE:
+  Chest CT W Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the left upper lobe of lung, measuring 29 x 31 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the left upper lobe of lung, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

@@ -1,0 +1,9 @@
+MRN: SYNY06
+Patient: Riley Okafor
+DOB: 1974-01-18   Sex: F
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2013-07-07
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

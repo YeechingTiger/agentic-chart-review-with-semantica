@@ -1,0 +1,9 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2015-02-17
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

@@ -1,0 +1,9 @@
+MRN: SYNK02
+Patient: Reese Baptiste
+DOB: 1968-01-13   Sex: M
+Document Type: Fluoroscopy Up to 1 Hr
+Service Date: 2020-06-24
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

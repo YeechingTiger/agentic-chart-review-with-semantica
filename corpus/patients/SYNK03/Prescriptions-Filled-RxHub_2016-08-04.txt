@@ -1,0 +1,12 @@
+MRN: SYNK03
+Patient: Riley Alvarez
+DOB: 1945-04-28   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2016-08-04
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2016-08-04   OXYCODONE 5MG TAB                qty 60
+  2016-08-04   METFORMIN HCL 500MG TAB          qty 90
+  2016-08-04   ATORVASTATIN 20MG TAB            qty 90
+

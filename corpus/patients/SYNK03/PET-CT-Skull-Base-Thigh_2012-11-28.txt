@@ -1,0 +1,9 @@
+MRN: SYNK03
+Patient: Riley Alvarez
+DOB: 1945-04-28   Sex: F
+Document Type: PET CT Skull Base Thigh
+Service Date: 2012-11-28
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

@@ -1,0 +1,12 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2017-01-17
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2017-01-17   PANTOPRAZOLE 40MG TAB            qty 60
+  2017-01-17   ONDANSETRON 8MG TAB              qty 90
+  2017-01-17   METFORMIN HCL 500MG TAB          qty 30
+

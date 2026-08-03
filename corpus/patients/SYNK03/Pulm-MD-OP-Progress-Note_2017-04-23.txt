@@ -1,0 +1,14 @@
+MRN: SYNK03
+Patient: Riley Alvarez
+DOB: 1945-04-28   Sex: F
+Document Type: Pulm MD OP Progress Note
+Service Date: 2017-04-23
+----------------------------------------------------------------
+SUBJECTIVE:
+  Interval visit. Tolerating therapy. Labs reviewed.
+
+ASSESSMENT AND PLAN:
+  1. Continue current regimen. RTC 4 wks.
+
+MEDS: pantoprazole, dexamethasone, ondansetron
+

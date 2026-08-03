@@ -1,0 +1,12 @@
+MRN: SYNK01
+Patient: Reese Moreau
+DOB: 1954-01-11   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2013-03-08
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2013-03-08   METFORMIN HCL 500MG TAB          qty 90
+  2013-03-08   OXYCODONE 5MG TAB                qty 60
+  2013-03-08   ATORVASTATIN 20MG TAB            qty 90
+

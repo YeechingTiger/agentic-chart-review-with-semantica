@@ -1,0 +1,12 @@
+MRN: SYNY02
+Patient: Casey Baptiste
+DOB: 1949-04-20   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2015-08-17
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2015-08-17   CAPECITABINE 500MG TAB           qty 84   ADJUVANT CYCLE 1
+  2015-09-07   CAPECITABINE 500MG TAB           qty 84   ADJUVANT CYCLE 2
+  2015-09-28   CAPECITABINE 500MG TAB           qty 84   ADJUVANT CYCLE 3
+

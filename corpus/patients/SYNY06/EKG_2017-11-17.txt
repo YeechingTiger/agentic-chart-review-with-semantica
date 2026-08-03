@@ -1,0 +1,9 @@
+MRN: SYNY06
+Patient: Riley Okafor
+DOB: 1974-01-18   Sex: F
+Document Type: EKG
+Service Date: 2017-11-17
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 65. No acute ST-T changes.
+

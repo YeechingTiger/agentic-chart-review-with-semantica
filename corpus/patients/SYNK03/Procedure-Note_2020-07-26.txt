@@ -1,0 +1,9 @@
+MRN: SYNK03
+Patient: Riley Alvarez
+DOB: 1945-04-28   Sex: F
+Document Type: Procedure Note
+Service Date: 2020-07-26
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

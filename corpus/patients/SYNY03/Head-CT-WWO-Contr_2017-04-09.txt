@@ -1,0 +1,9 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Head CT WWO Contr
+Service Date: 2017-04-09
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

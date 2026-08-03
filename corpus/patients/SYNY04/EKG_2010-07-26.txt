@@ -1,0 +1,9 @@
+MRN: SYNY04
+Patient: Jordan Ferris
+DOB: 1970-08-17   Sex: F
+Document Type: EKG
+Service Date: 2010-07-26
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 82. No acute ST-T changes.
+

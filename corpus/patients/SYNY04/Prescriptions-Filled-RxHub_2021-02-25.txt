@@ -1,0 +1,12 @@
+MRN: SYNY04
+Patient: Jordan Ferris
+DOB: 1970-08-17   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2021-02-25
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2021-02-25   LISINOPRIL 10MG TAB              qty 60
+  2021-02-25   ONDANSETRON 8MG TAB              qty 90
+  2021-02-25   METFORMIN HCL 500MG TAB          qty 90
+

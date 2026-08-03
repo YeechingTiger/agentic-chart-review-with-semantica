@@ -1,0 +1,16 @@
+MRN: SYNY06
+Patient: Riley Okafor
+DOB: 1974-01-18   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2022-11-18
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt seen today to discuss recent imaging of the body of pancreas.
+  Reports fatigue, appetite down. No fevers.
+
+ASSESSMENT AND PLAN:
+  1. Mass, body of pancreas. Clinically this represents malignancy;
+     proceeding to tissue sampling for confirmation.
+
+MEDS: lisinopril, metformin, ondansetron
+

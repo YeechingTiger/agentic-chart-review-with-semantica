@@ -1,0 +1,9 @@
+MRN: SYNY06
+Patient: Riley Okafor
+DOB: 1974-01-18   Sex: F
+Document Type: Head CT W Contr
+Service Date: 2018-07-09
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

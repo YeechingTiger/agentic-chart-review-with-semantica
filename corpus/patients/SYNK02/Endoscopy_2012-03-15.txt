@@ -1,0 +1,9 @@
+MRN: SYNK02
+Patient: Reese Baptiste
+DOB: 1968-01-13   Sex: M
+Document Type: Endoscopy
+Service Date: 2012-03-15
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the sigmoid colon. Biopsies obtained.
+

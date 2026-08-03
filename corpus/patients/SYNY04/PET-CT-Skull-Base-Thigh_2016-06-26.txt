@@ -1,0 +1,9 @@
+MRN: SYNY04
+Patient: Jordan Ferris
+DOB: 1970-08-17   Sex: F
+Document Type: PET CT Skull Base Thigh
+Service Date: 2016-06-26
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

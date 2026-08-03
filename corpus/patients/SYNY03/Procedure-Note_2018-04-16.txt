@@ -1,0 +1,9 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Procedure Note
+Service Date: 2018-04-16
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

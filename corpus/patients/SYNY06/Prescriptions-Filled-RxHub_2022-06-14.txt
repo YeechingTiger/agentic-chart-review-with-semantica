@@ -1,0 +1,12 @@
+MRN: SYNY06
+Patient: Riley Okafor
+DOB: 1974-01-18   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2022-06-14
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2022-06-14   LISINOPRIL 10MG TAB              qty 60
+  2022-06-14   PANTOPRAZOLE 40MG TAB            qty 60
+  2022-06-14   ONDANSETRON 8MG TAB              qty 30
+

@@ -1,0 +1,12 @@
+MRN: SYNY02
+Patient: Casey Baptiste
+DOB: 1949-04-20   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2016-07-23
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2016-07-23   OXYCODONE 5MG TAB                qty 30
+  2016-07-23   ONDANSETRON 8MG TAB              qty 60
+  2016-07-23   LISINOPRIL 10MG TAB              qty 30
+

@@ -1,0 +1,12 @@
+MRN: SYNK02
+Patient: Reese Baptiste
+DOB: 1968-01-13   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2012-11-16
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2012-11-16   METFORMIN HCL 500MG TAB          qty 60
+  2012-11-16   ATORVASTATIN 20MG TAB            qty 90
+  2012-11-16   PANTOPRAZOLE 40MG TAB            qty 30
+

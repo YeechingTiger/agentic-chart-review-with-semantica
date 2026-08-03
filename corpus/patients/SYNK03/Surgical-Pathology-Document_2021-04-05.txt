@@ -1,0 +1,16 @@
+MRN: SYNK03
+Patient: Riley Alvarez
+DOB: 1945-04-28   Sex: F
+Document Type: Surgical Pathology Document
+Service Date: 2021-04-05
+----------------------------------------------------------------
+SPECIMEN:
+  Fine needle aspirate, right lower lobe of lung
+
+INTERPRETATION:
+  Cellular aspirate. Malignant epithelial cells are present, forming glandular
+  groups. No benign explanation is identified.
+
+IMPRESSION:
+  POSITIVE FOR MALIGNANT CELLS.
+

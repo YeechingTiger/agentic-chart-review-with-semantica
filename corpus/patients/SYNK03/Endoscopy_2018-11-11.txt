@@ -1,0 +1,9 @@
+MRN: SYNK03
+Patient: Riley Alvarez
+DOB: 1945-04-28   Sex: F
+Document Type: Endoscopy
+Service Date: 2018-11-11
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the right lower lobe of lung. Biopsies obtained.
+

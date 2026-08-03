@@ -1,0 +1,12 @@
+MRN: SYNY05
+Patient: Riley Lindqvist
+DOB: 1946-08-09   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2022-03-04
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2022-03-04   ATORVASTATIN 20MG TAB            qty 60
+  2022-03-04   PANTOPRAZOLE 40MG TAB            qty 90
+  2022-03-04   ONDANSETRON 8MG TAB              qty 90
+

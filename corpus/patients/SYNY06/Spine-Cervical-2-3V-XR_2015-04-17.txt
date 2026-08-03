@@ -1,0 +1,9 @@
+MRN: SYNY06
+Patient: Riley Okafor
+DOB: 1974-01-18   Sex: F
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2015-04-17
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

@@ -1,0 +1,9 @@
+MRN: SYNK03
+Patient: Riley Alvarez
+DOB: 1945-04-28   Sex: F
+Document Type: EKG
+Service Date: 2016-08-14
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 83. No acute ST-T changes.
+

@@ -1,0 +1,12 @@
+MRN: SYNK01
+Patient: Reese Moreau
+DOB: 1954-01-11   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2020-12-24
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2020-12-24   METFORMIN HCL 500MG TAB          qty 90
+  2020-12-24   LISINOPRIL 10MG TAB              qty 60
+  2020-12-24   ONDANSETRON 8MG TAB              qty 30
+

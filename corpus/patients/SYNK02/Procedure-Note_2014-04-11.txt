@@ -1,0 +1,9 @@
+MRN: SYNK02
+Patient: Reese Baptiste
+DOB: 1968-01-13   Sex: M
+Document Type: Procedure Note
+Service Date: 2014-04-11
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

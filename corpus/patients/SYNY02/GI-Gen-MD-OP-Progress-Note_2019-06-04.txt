@@ -1,0 +1,17 @@
+MRN: SYNY02
+Patient: Casey Baptiste
+DOB: 1949-04-20   Sex: M
+Document Type: GI Gen MD OP Progress Note
+Service Date: 2019-06-04
+----------------------------------------------------------------
+REASON FOR VISIT:
+  Establishing care. Transferred from out of state.
+
+HISTORY:
+  Adenocarcinoma of the sigmoid colon, treated roughly 4 years ago at an outside hospital.
+  The patient cannot recall the month and no outside records have been received.
+  Treatment was completed and there has been no further therapy since.
+
+ASSESSMENT:
+  Long-term survivor. Continue surveillance.
+

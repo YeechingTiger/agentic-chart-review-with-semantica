@@ -1,0 +1,9 @@
+MRN: SYNK01
+Patient: Reese Moreau
+DOB: 1954-01-11   Sex: M
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2021-01-13
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

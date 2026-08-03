@@ -1,0 +1,9 @@
+MRN: SYNK03
+Patient: Riley Alvarez
+DOB: 1945-04-28   Sex: F
+Document Type: Chest CT WWO Contr
+Service Date: 2015-07-21
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

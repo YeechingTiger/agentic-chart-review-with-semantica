@@ -1,0 +1,9 @@
+MRN: SYNY02
+Patient: Casey Baptiste
+DOB: 1949-04-20   Sex: M
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2015-04-15
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

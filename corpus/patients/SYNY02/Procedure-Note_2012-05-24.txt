@@ -1,0 +1,9 @@
+MRN: SYNY02
+Patient: Casey Baptiste
+DOB: 1949-04-20   Sex: M
+Document Type: Procedure Note
+Service Date: 2012-05-24
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

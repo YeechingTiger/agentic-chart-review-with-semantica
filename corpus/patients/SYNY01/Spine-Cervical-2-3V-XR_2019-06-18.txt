@@ -1,0 +1,9 @@
+MRN: SYNY01
+Patient: Avery Ferris
+DOB: 1947-03-26   Sex: M
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2019-06-18
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

@@ -1,0 +1,9 @@
+MRN: SYNY04
+Patient: Jordan Ferris
+DOB: 1970-08-17   Sex: F
+Document Type: Head CT WWO Contr
+Service Date: 2013-05-15
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

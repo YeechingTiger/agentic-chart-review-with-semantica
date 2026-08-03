@@ -1,0 +1,12 @@
+MRN: SYNY01
+Patient: Avery Ferris
+DOB: 1947-03-26   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2014-04-15
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2014-04-15   ATORVASTATIN 20MG TAB            qty 60
+  2014-04-15   ONDANSETRON 8MG TAB              qty 90
+  2014-04-15   METFORMIN HCL 500MG TAB          qty 90
+

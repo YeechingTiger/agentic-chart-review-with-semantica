@@ -1,0 +1,20 @@
+MRN: SYNK03
+Patient: Riley Alvarez
+DOB: 1945-04-28   Sex: F
+Document Type: Surgical Pathology Report
+Service Date: 2021-05-10
+----------------------------------------------------------------
+SPECIMEN:
+  A. right lower lobe of lung — biopsy
+
+GROSS DESCRIPTION:
+  Received in formalin, multiple tan-pink soft tissue fragments aggregating 1.2 cm.
+
+MICROSCOPIC DESCRIPTION:
+  Sections demonstrate adenocarcinoma.
+
+FINAL DIAGNOSIS:
+  A. RIGHT LOWER LOBE OF LUNG, BIOPSY — ADENOCARCINOMA.
+
+Electronically signed by Pathology.
+

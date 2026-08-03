@@ -1,0 +1,12 @@
+MRN: SYNY06
+Patient: Riley Okafor
+DOB: 1974-01-18   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2023-11-18
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2023-11-18   ATORVASTATIN 20MG TAB            qty 90
+  2023-11-18   METFORMIN HCL 500MG TAB          qty 90
+  2023-11-18   ONDANSETRON 8MG TAB              qty 30
+

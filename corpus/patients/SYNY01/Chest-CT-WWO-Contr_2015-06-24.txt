@@ -1,0 +1,9 @@
+MRN: SYNY01
+Patient: Avery Ferris
+DOB: 1947-03-26   Sex: M
+Document Type: Chest CT WWO Contr
+Service Date: 2015-06-24
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

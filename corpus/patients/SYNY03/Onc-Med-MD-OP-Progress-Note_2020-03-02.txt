@@ -1,0 +1,16 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2020-03-02
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt seen today to discuss recent imaging of the left breast.
+  Reports fatigue, appetite down. No fevers.
+
+ASSESSMENT AND PLAN:
+  1. Mass, left breast. Clinically this represents malignancy;
+     proceeding to tissue sampling for confirmation.
+
+MEDS: lisinopril, ondansetron, dexamethasone
+

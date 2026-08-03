@@ -1,0 +1,9 @@
+MRN: SYNY01
+Patient: Avery Ferris
+DOB: 1947-03-26   Sex: M
+Document Type: EKG
+Service Date: 2017-10-11
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 63. No acute ST-T changes.
+

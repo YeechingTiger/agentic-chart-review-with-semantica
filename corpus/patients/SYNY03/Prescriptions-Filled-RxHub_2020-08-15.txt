@@ -1,0 +1,12 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2020-08-15
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2020-08-15   LISINOPRIL 10MG TAB              qty 60
+  2020-08-15   OXYCODONE 5MG TAB                qty 60
+  2020-08-15   METFORMIN HCL 500MG TAB          qty 90
+

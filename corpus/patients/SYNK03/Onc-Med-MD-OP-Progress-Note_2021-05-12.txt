@@ -1,0 +1,16 @@
+MRN: SYNK03
+Patient: Riley Alvarez
+DOB: 1945-04-28   Sex: F
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2021-05-12
+----------------------------------------------------------------
+SUBJECTIVE:
+  Pt seen today to discuss recent imaging of the right lower lobe of lung.
+  Reports fatigue, appetite down. No fevers.
+
+ASSESSMENT AND PLAN:
+  1. Mass, right lower lobe of lung. Clinically this represents malignancy;
+     proceeding to tissue sampling for confirmation.
+
+MEDS: pantoprazole, dexamethasone, atorvastatin
+

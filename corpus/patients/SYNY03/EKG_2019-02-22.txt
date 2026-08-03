@@ -1,0 +1,9 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: EKG
+Service Date: 2019-02-22
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 68. No acute ST-T changes.
+

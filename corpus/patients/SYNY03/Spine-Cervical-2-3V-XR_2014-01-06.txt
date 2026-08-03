@@ -1,0 +1,9 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2014-01-06
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

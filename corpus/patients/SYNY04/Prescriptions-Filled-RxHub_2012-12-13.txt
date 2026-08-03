@@ -1,0 +1,12 @@
+MRN: SYNY04
+Patient: Jordan Ferris
+DOB: 1970-08-17   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2012-12-13
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2012-12-13   ATORVASTATIN 20MG TAB            qty 60
+  2012-12-13   LISINOPRIL 10MG TAB              qty 90
+  2012-12-13   ONDANSETRON 8MG TAB              qty 30
+

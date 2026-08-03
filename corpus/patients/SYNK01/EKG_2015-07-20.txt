@@ -1,0 +1,9 @@
+MRN: SYNK01
+Patient: Reese Moreau
+DOB: 1954-01-11   Sex: M
+Document Type: EKG
+Service Date: 2015-07-20
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 90. No acute ST-T changes.
+

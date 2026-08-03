@@ -1,0 +1,21 @@
+MRN: SYNY01
+Patient: Avery Ferris
+DOB: 1947-03-26   Sex: M
+Document Type: Death Summary
+Service Date: 2022-04-19
+----------------------------------------------------------------
+CIRCUMSTANCES:
+  Patient expired 2022-04-19 at home under hospice care. Pronounced by attending.
+
+SUMMARY:
+  Progressive decline over the preceding eight weeks with anorexia, weight loss and
+  jaundice. No tissue was obtained and no oncology referral was completed.
+
+CAUSE OF DEATH:
+  I. a. Hepatic failure
+     b. Metastatic adenocarcinoma of the head of pancreas
+  No autopsy requested.
+
+COMPLETED BY:
+  Attending physician of record.
+

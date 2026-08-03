@@ -1,0 +1,16 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2020-04-15
+----------------------------------------------------------------
+INTERVAL HISTORY:
+  Referred following the left breast work-up.
+
+ASSESSMENT:
+  Invasive ductal carcinoma of the left breast.
+  Per the referring service the diagnosis was made on 2020-04-10.
+
+PLAN:
+  Staging complete. Proceed to multidisciplinary review.
+

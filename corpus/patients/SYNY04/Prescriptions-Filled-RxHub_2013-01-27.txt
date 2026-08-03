@@ -1,0 +1,12 @@
+MRN: SYNY04
+Patient: Jordan Ferris
+DOB: 1970-08-17   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2013-01-27
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2013-01-27   OXYCODONE 5MG TAB                qty 60
+  2013-01-27   METFORMIN HCL 500MG TAB          qty 60
+  2013-01-27   ONDANSETRON 8MG TAB              qty 90
+

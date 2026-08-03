@@ -1,0 +1,9 @@
+MRN: SYNK02
+Patient: Reese Baptiste
+DOB: 1968-01-13   Sex: M
+Document Type: EKG
+Service Date: 2016-01-19
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 86. No acute ST-T changes.
+

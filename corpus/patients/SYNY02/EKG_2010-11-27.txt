@@ -1,0 +1,9 @@
+MRN: SYNY02
+Patient: Casey Baptiste
+DOB: 1949-04-20   Sex: M
+Document Type: EKG
+Service Date: 2010-11-27
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 62. No acute ST-T changes.
+

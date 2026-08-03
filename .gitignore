@@ -64,5 +64,22 @@ corpus/patients/.doc_type_vocab.json
 # space-digit suffix so they never enter a chart and no run was affected — but they are 1,929
 # staged additions away from being committed as corpus, and the next reader would have no way
 # to tell them from real documents.
-*[0-9].txt
-!*__[0-9].txt
+#
+# THE PATTERN WAS MISSING THE SPACE until 2026-08-03, and what that cost is worth writing down.
+# `*[0-9].txt` matches a conflict copy, and it also matches EVERY real document, because a chart
+# filename is `Doc-Type_YYYY-MM-DD.txt` and ends in a digit. Already-tracked files were unaffected
+# (gitignore only governs untracked ones), so the 5,611 documents committed before the pattern
+# landed stayed committed and nothing looked wrong. Everything generated AFTER it was silently
+# excluded: the six held-out SYNY charts went in with one file each — their `_ground_truth.json` —
+# and 1,589 documents were never committed at all.
+#
+# That inverts the one guarantee the held-out set exists to provide. `run_manifest.chart_hash`
+# says of itself that a chart moving under a stable `patient_id` moved because somebody edited it,
+# and that this "is exactly what must not happen quietly on a held-out one after a result has been
+# scored against it". The charts not in Git were precisely the held-out six, so an edit to one was
+# invisible to version control and the freeze rested on the generator's determinism alone.
+#
+# The narrow pattern below matches the space-digit shape only. Verified: it catches 0 of the 8,154
+# real corpus files, and `!*__[0-9].txt` is gone with it — a `__2` sequence suffix never matched
+# the space form, so the exception was itself residue of the wrong pattern.
+* [0-9].txt

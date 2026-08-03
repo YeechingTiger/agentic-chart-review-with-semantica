@@ -1,0 +1,16 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Surgical Pathology Document
+Service Date: 2020-03-02
+----------------------------------------------------------------
+SPECIMEN:
+  Fine needle aspirate, left breast
+
+INTERPRETATION:
+  Atypical cells present, suspicious for invasive ductal carcinoma.
+  Correlation with tissue biopsy recommended.
+
+IMPRESSION:
+  SUSPICIOUS FOR INVASIVE DUCTAL CARCINOMA.
+

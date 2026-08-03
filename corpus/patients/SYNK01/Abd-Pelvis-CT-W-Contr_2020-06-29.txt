@@ -1,0 +1,9 @@
+MRN: SYNK01
+Patient: Reese Moreau
+DOB: 1954-01-11   Sex: M
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2020-06-29
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

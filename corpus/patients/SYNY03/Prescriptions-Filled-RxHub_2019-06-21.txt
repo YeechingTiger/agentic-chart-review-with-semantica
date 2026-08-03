@@ -1,0 +1,12 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2019-06-21
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2019-06-21   ONDANSETRON 8MG TAB              qty 60
+  2019-06-21   ATORVASTATIN 20MG TAB            qty 90
+  2019-06-21   LISINOPRIL 10MG TAB              qty 30
+

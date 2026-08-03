@@ -1,0 +1,12 @@
+MRN: SYNY01
+Patient: Avery Ferris
+DOB: 1947-03-26   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2012-07-31
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2012-07-31   OXYCODONE 5MG TAB                qty 90
+  2012-07-31   ONDANSETRON 8MG TAB              qty 30
+  2012-07-31   PANTOPRAZOLE 40MG TAB            qty 60
+

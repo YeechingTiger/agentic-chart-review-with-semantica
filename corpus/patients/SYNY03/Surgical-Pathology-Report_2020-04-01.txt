@@ -1,0 +1,20 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Surgical Pathology Report
+Service Date: 2020-04-01
+----------------------------------------------------------------
+SPECIMEN:
+  A. left breast — biopsy
+
+GROSS DESCRIPTION:
+  Received in formalin, multiple tan-pink soft tissue fragments aggregating 1.2 cm.
+
+MICROSCOPIC DESCRIPTION:
+  Sections demonstrate invasive ductal carcinoma.
+
+FINAL DIAGNOSIS:
+  A. LEFT BREAST, BIOPSY — INVASIVE DUCTAL CARCINOMA.
+
+Electronically signed by Pathology.
+

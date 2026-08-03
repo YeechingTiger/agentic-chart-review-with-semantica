@@ -1,0 +1,17 @@
+MRN: SYNY04
+Patient: Jordan Ferris
+DOB: 1970-08-17   Sex: F
+Document Type: GI Gen MD OP Progress Note
+Service Date: 2020-01-27
+----------------------------------------------------------------
+REASON FOR REFERRAL:
+  Transfer of care. Requesting surveillance.
+
+HISTORY OF PRESENT ILLNESS:
+  The patient reports that adenocarcinoma of the ascending colon was diagnosed in the fall of 2019
+  at another institution. Resection followed; no adjuvant therapy was given.
+  Outside pathology has been requested and is not yet available.
+
+ASSESSMENT:
+  Establish surveillance. Obtain outside records.
+

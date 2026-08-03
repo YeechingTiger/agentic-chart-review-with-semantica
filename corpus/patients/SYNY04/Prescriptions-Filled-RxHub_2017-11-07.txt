@@ -1,0 +1,12 @@
+MRN: SYNY04
+Patient: Jordan Ferris
+DOB: 1970-08-17   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2017-11-07
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2017-11-07   ATORVASTATIN 20MG TAB            qty 90
+  2017-11-07   ONDANSETRON 8MG TAB              qty 90
+  2017-11-07   METFORMIN HCL 500MG TAB          qty 90
+

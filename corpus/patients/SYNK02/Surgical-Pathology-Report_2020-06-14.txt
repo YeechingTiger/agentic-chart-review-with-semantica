@@ -1,0 +1,20 @@
+MRN: SYNK02
+Patient: Reese Baptiste
+DOB: 1968-01-13   Sex: M
+Document Type: Surgical Pathology Report
+Service Date: 2020-06-14
+----------------------------------------------------------------
+SPECIMEN:
+  A. sigmoid colon — biopsy
+
+GROSS DESCRIPTION:
+  Received in formalin, multiple tan-pink soft tissue fragments aggregating 1.2 cm.
+
+MICROSCOPIC DESCRIPTION:
+  Sections demonstrate adenocarcinoma.
+
+FINAL DIAGNOSIS:
+  A. SIGMOID COLON, BIOPSY — ADENOCARCINOMA.
+
+Electronically signed by Pathology.
+

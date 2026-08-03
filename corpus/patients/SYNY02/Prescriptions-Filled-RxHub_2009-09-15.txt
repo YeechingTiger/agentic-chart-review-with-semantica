@@ -1,0 +1,12 @@
+MRN: SYNY02
+Patient: Casey Baptiste
+DOB: 1949-04-20   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2009-09-15
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2009-09-15   ONDANSETRON 8MG TAB              qty 60
+  2009-09-15   METFORMIN HCL 500MG TAB          qty 60
+  2009-09-15   LISINOPRIL 10MG TAB              qty 90
+

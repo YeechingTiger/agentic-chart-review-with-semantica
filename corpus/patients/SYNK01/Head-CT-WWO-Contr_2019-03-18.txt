@@ -1,0 +1,9 @@
+MRN: SYNK01
+Patient: Reese Moreau
+DOB: 1954-01-11   Sex: M
+Document Type: Head CT WWO Contr
+Service Date: 2019-03-18
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

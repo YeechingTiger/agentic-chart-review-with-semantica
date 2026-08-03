@@ -1,0 +1,9 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Fluoroscopy Up to 1 Hr
+Service Date: 2018-09-24
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

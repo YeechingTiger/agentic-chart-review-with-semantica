@@ -1,0 +1,17 @@
+MRN: SYNK01
+Patient: Reese Moreau
+DOB: 1954-01-11   Sex: M
+Document Type: Onc Med MD OP Progress Note
+Service Date: 2021-08-02
+----------------------------------------------------------------
+SUBJECTIVE:
+  New patient, transferred care. Reports a lung biopsy performed at an outside
+  facility in March. Records requested; not yet received.
+  Brought a medication list only.
+
+ASSESSMENT AND PLAN:
+  1. History per patient of a lung lesion biopsied elsewhere. Outside pathology is
+     NOT available for review and no report is in this record. Cannot verify the
+     result independently today.
+  2. Records request re-sent. Restage here if they do not arrive.
+

@@ -1,0 +1,9 @@
+MRN: SYNY04
+Patient: Jordan Ferris
+DOB: 1970-08-17   Sex: F
+Document Type: EKG
+Service Date: 2018-11-07
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 69. No acute ST-T changes.
+

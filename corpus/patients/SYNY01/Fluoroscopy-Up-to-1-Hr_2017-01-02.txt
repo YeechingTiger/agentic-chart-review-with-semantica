@@ -1,0 +1,9 @@
+MRN: SYNY01
+Patient: Avery Ferris
+DOB: 1947-03-26   Sex: M
+Document Type: Fluoroscopy Up to 1 Hr
+Service Date: 2017-01-02
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

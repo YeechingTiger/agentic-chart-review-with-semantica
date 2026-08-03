@@ -1,0 +1,9 @@
+MRN: SYNY02
+Patient: Casey Baptiste
+DOB: 1949-04-20   Sex: M
+Document Type: EKG
+Service Date: 2012-10-30
+----------------------------------------------------------------
+INTERPRETATION:
+  Sinus tachycardia, rate 81. No acute ST-T changes.
+

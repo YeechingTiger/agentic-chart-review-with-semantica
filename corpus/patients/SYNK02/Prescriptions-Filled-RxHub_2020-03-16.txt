@@ -1,0 +1,12 @@
+MRN: SYNK02
+Patient: Reese Baptiste
+DOB: 1968-01-13   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2020-03-16
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2020-03-16   LISINOPRIL 10MG TAB              qty 60
+  2020-03-16   ATORVASTATIN 20MG TAB            qty 60
+  2020-03-16   PANTOPRAZOLE 40MG TAB            qty 30
+

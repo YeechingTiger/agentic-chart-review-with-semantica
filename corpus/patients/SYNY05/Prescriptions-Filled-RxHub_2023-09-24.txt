@@ -1,0 +1,12 @@
+MRN: SYNY05
+Patient: Riley Lindqvist
+DOB: 1946-08-09   Sex: F
+Document Type: Prescriptions Filled RxHub
+Service Date: 2023-09-24
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2023-09-24   LISINOPRIL 10MG TAB              qty 60
+  2023-09-24   OXYCODONE 5MG TAB                qty 60
+  2023-09-24   PANTOPRAZOLE 40MG TAB            qty 30
+

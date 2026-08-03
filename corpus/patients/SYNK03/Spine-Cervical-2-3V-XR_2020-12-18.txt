@@ -1,0 +1,9 @@
+MRN: SYNK03
+Patient: Riley Alvarez
+DOB: 1945-04-28   Sex: F
+Document Type: Spine Cervical 2 3V XR
+Service Date: 2020-12-18
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

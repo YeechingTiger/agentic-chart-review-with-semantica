@@ -1,0 +1,20 @@
+MRN: SYNY03
+Patient: Quinn Moreau
+DOB: 1945-05-15   Sex: M
+Document Type: Mammography Diagnostic Bilat
+Service Date: 2020-03-26
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Follow-up left breast lesion.
+
+TECHNIQUE:
+  Mammography Diagnostic Bilat performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the left breast, measuring 48 x 22 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the left breast, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

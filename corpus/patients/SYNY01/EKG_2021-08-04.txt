@@ -1,0 +1,9 @@
+MRN: SYNY01
+Patient: Avery Ferris
+DOB: 1947-03-26   Sex: M
+Document Type: EKG
+Service Date: 2021-08-04
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 88. No acute ST-T changes.
+

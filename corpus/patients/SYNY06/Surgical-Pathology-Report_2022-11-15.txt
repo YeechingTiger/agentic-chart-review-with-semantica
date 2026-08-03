@@ -1,0 +1,20 @@
+MRN: SYNY06
+Patient: Riley Okafor
+DOB: 1974-01-18   Sex: F
+Document Type: Surgical Pathology Report
+Service Date: 2022-11-15
+----------------------------------------------------------------
+SPECIMEN:
+  A. body of pancreas — biopsy
+
+GROSS DESCRIPTION:
+  Received in formalin, multiple tan-pink soft tissue fragments aggregating 1.2 cm.
+
+MICROSCOPIC DESCRIPTION:
+  Sections demonstrate adenocarcinoma.
+
+FINAL DIAGNOSIS:
+  A. BODY OF PANCREAS, BIOPSY — ADENOCARCINOMA.
+
+Electronically signed by Pathology.
+

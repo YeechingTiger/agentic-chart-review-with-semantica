@@ -1,0 +1,12 @@
+MRN: SYNY02
+Patient: Casey Baptiste
+DOB: 1949-04-20   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2012-12-24
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2012-12-24   PANTOPRAZOLE 40MG TAB            qty 30
+  2012-12-24   ONDANSETRON 8MG TAB              qty 90
+  2012-12-24   OXYCODONE 5MG TAB                qty 60
+

@@ -1,0 +1,9 @@
+MRN: SYNK02
+Patient: Reese Baptiste
+DOB: 1968-01-13   Sex: M
+Document Type: EKG
+Service Date: 2019-11-05
+----------------------------------------------------------------
+INTERPRETATION:
+  Normal sinus rhythm, rate 68. No acute ST-T changes.
+

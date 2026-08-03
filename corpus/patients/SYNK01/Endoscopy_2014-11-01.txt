@@ -1,0 +1,9 @@
+MRN: SYNK01
+Patient: Reese Moreau
+DOB: 1954-01-11   Sex: M
+Document Type: Endoscopy
+Service Date: 2014-11-01
+----------------------------------------------------------------
+FINDINGS:
+  Mucosal lesion noted in the left upper lobe of lung. Biopsies obtained.
+

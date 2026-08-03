@@ -1,0 +1,20 @@
+MRN: SYNK03
+Patient: Riley Alvarez
+DOB: 1945-04-28   Sex: F
+Document Type: Chest CT W Contr
+Service Date: 2021-05-04
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Follow-up right lower lobe of lung lesion.
+
+TECHNIQUE:
+  Chest CT W Contr performed per department protocol.
+
+FINDINGS:
+  There is a mass involving the right lower lobe of lung, measuring 31 x 39 mm.
+  No acute osseous abnormality. Visualized bowel gas pattern unremarkable.
+  No hepatic lesions identified. No definite hepatic metastatic disease.
+
+IMPRESSION:
+  1. Mass in the right lower lobe of lung, as above. Neoplasm is favored.
+  2. No evidence of hepatic metastasis.

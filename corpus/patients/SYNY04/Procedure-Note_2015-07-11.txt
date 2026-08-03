@@ -1,0 +1,9 @@
+MRN: SYNY04
+Patient: Jordan Ferris
+DOB: 1970-08-17   Sex: F
+Document Type: Procedure Note
+Service Date: 2015-07-11
+----------------------------------------------------------------
+FINDINGS:
+  Procedure completed without immediate complication.
+

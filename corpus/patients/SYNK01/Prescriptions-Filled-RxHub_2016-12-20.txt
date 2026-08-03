@@ -1,0 +1,12 @@
+MRN: SYNK01
+Patient: Reese Moreau
+DOB: 1954-01-11   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2016-12-20
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2016-12-20   ONDANSETRON 8MG TAB              qty 60
+  2016-12-20   METFORMIN HCL 500MG TAB          qty 90
+  2016-12-20   ATORVASTATIN 20MG TAB            qty 90
+

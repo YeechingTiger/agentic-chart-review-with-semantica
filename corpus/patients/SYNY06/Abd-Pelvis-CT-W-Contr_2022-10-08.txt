@@ -1,0 +1,17 @@
+MRN: SYNY06
+Patient: Riley Okafor
+DOB: 1974-01-18   Sex: F
+Document Type: Abd Pelvis CT W Contr
+Service Date: 2022-10-08
+----------------------------------------------------------------
+CLINICAL HISTORY:
+  Abdominal pain, weight loss.
+
+FINDINGS:
+  A 3.1 cm mass is identified in the body of pancreas, with irregular
+  margins and heterogeneous enhancement. Regional nodes measure up to 11 mm.
+
+IMPRESSION:
+  Mass in the body of pancreas, HIGHLY SUSPICIOUS FOR MALIGNANCY.
+  Tissue sampling is recommended for definitive diagnosis.
+

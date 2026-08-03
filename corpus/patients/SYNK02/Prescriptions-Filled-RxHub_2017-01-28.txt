@@ -1,0 +1,12 @@
+MRN: SYNK02
+Patient: Reese Baptiste
+DOB: 1968-01-13   Sex: M
+Document Type: Prescriptions Filled RxHub
+Service Date: 2017-01-28
+----------------------------------------------------------------
+FILLED PRESCRIPTIONS (external claims feed):
+
+  2017-01-28   OXYCODONE 5MG TAB                qty 60
+  2017-01-28   METFORMIN HCL 500MG TAB          qty 90
+  2017-01-28   LISINOPRIL 10MG TAB              qty 30
+
