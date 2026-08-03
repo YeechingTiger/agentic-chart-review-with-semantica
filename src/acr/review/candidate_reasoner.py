@@ -107,6 +107,10 @@ UPDATE_TOOL: dict = {
                             "reason": {"type": "string", "description":
                                        "required for reject: why this reading is out, citing a "
                                        "rule id or an evidence id"},
+                            "rejecting_rule": {"type": "string", "description":
+                                               "reject only: the contract rule id that puts it "
+                                               "out, e.g. conflict_rule.3. Omit if no declared "
+                                               "rule decides it — an invented id is discarded"},
                             "confidence": {"type": "number"},
                         },
                         "required": ["action"],
@@ -135,6 +139,14 @@ UPDATE_TOOL: dict = {
                                               "— a contemporaneous physician note, an outside "
                                               "record, a rule in the contract"},
                             "can_be_resolved_from_current_corpus": {"type": "boolean"},
+                            "status": {"type": "string",
+                                       "enum": ["UNRESOLVED", "ALREADY_RESOLVED",
+                                                "UNRESOLVABLE_FROM_CORPUS", "SPEC_DEPENDENT"],
+                                       "description":
+                                       "default UNRESOLVED. Say ALREADY_RESOLVED if the "
+                                       "recorded evidence settles it, UNRESOLVABLE_FROM_CORPUS "
+                                       "if no document in this record could, SPEC_DEPENDENT if "
+                                       "the contract itself does not say which reading wins"},
                         },
                         "required": ["unresolved_fact"],
                     },
@@ -286,7 +298,7 @@ def reason(*, spec_block: str, evidence: EvidenceLedger, ledger: CandidateLedger
 
 
 def apply_updates(ledger: CandidateLedger, result: ReasonerResult, *, step: int,
-                  known_evidence_ids: set[str] | None = None) -> list[str]:
+                  known_evidence_ids: set[str] | None = None, spec=None) -> list[str]:
     """THE ONLY WRITER. Touches the candidate ledger and nothing else.
 
     Returns the list of things it refused to apply — an id that does not exist, an action it
@@ -322,6 +334,16 @@ def apply_updates(ledger: CandidateLedger, result: ReasonerResult, *, step: int,
                                      reason=str(u.get("reason") or ""))
                     if u.get("not_a_target_value"):
                         ledger.by_id(cid).not_a_target_value = True
+                    if u.get("rejecting_rule"):
+                        # Recognised ids only. `parse_rule_citations` knows what the contract
+                        # declares and discards the rest without refusing anything — an
+                        # invented rule id recorded as a rule is worse than none, because a
+                        # reader checking the rejection would go looking for it.
+                        from ..contract.trace import parse_rule_citations
+                        known = parse_rule_citations(str(u["rejecting_rule"]), spec) \
+                            if spec is not None else [str(u["rejecting_rule"])]
+                        if known:
+                            ledger.by_id(cid).rejecting_rule = str(known[0])
                 elif action == "select_leading":
                     ledger.set_state(cid, "LEADING", step=step,
                                      reason=str(u.get("reason") or ""))
@@ -357,6 +379,14 @@ def apply_updates(ledger: CandidateLedger, result: ReasonerResult, *, step: int,
                 ledger.add_discriminator(d, step=step)
             except ValueError as e:
                 rejected.append(f"discriminator: {e}")
+            else:
+                got = ledger.discriminators[-1]
+                if not got["candidate_a"] and not got["candidate_b"]:
+                    # INVARIANT 3, reported rather than silently kept. A discriminator that
+                    # points at no candidate cannot drive an action, and a live run produced
+                    # "NEW" as a reference on every one it wrote.
+                    rejected.append(f"discriminator names no resolvable candidate: "
+                                    f"{got['unresolved_fact'][:60]}")
         elif str(d).strip():
             # The prose form, still accepted so a provider that ignores the object schema does
             # not lose the content — but it lands in `open_discriminators`, not in the

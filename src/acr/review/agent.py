@@ -378,7 +378,8 @@ class AuditMiddleware(AgentMiddleware):
                      evidence=evidence, ledger=ctx.candidates,
                      invoke=self._reasoner_invoke)
         known = {e.evidence_id for e in evidence.items if e.evidence_id}
-        refused = apply_updates(ctx.candidates, res, step=step, known_evidence_ids=known)
+        refused = apply_updates(ctx.candidates, res, step=step, known_evidence_ids=known,
+                                spec=ctx.spec)
         ctx.candidate_calls.append({"step": step, "why": why, "n_evidence": n,
                                     "induction": induction.to_dict(),
                                     **res.to_dict(), "refused": refused})

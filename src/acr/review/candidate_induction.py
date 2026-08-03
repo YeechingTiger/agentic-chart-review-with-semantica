@@ -29,7 +29,7 @@ import calendar as _calendar
 import re
 from dataclasses import dataclass, field
 
-from ..core.state import ANSWERABILITY  # noqa: F401  — re-exported; the ledger owns it
+from ..core.state import ANSWERABILITY, SEED_SOURCES  # noqa: F401  — the ledger owns both
 
 _MONTHS = {m.lower(): i for i, m in enumerate(_calendar.month_name) if m}
 _MONTHS.update({m.lower(): i for i, m in enumerate(_calendar.month_abbr) if m})
@@ -132,13 +132,13 @@ def extract_sources(spec, evidence) -> dict[str, list[tuple[str, str]]]:
 
     THREE PLACES A VALUE CAN COME FROM, and the third is the one a first version missed:
 
-      quote          a date written inside the recorded span
-      document_date  THE DOCUMENT'S OWN DATE. On a live SYNY03 run the extractor read only the
+      SPAN_LITERAL   a date written inside the recorded span
+      DOCUMENT_DATE  THE DOCUMENT'S OWN DATE. On a live SYNY03 run the extractor read only the
                      quotes, found one date in four spans, and the model went back to inventing
                      the other two — the exact behaviour this layer exists to stop. In a
                      clinical record the date that dates a diagnosis is usually in the header of
                      the note that states it, not in the sentence.
-      event_date     when the span says the event happened, where that differs from when the
+      EVENT_DATE     when the span says the event happened, where that differs from when the
                      note was written. A retrospective statement is this shape and
                      `decision_rule[2]` turns on it.
 
@@ -165,9 +165,9 @@ def extract_sources(spec, evidence) -> dict[str, list[tuple[str, str]]]:
 
         for f in fields:
             for v in EXTRACTORS[f.calendar](e.quote):
-                _add(v, "quote")
-        _add(normalise_date(str(getattr(e, "date", "") or "")), "document_date")
-        _add(normalise_date(str(getattr(e, "event_date", "") or "")), "event_date")
+                _add(v, "SPAN_LITERAL")
+        _add(normalise_date(str(getattr(e, "date", "") or "")), "DOCUMENT_DATE")
+        _add(normalise_date(str(getattr(e, "event_date", "") or "")), "EVENT_DATE")
         if pairs:
             out[e.evidence_id or f"E{i}"] = pairs
     return out
@@ -238,3 +238,34 @@ def seed_candidates(ledger, spec, evidence, *, step: int) -> InductionResult:
     ledger.rebuild_conflict_sets(step=step)
     res.conflict_sets = list(ledger.conflict_sets)
     return res
+
+
+def controller_input(ledger, *, coverage_facts=None, budget=None) -> dict:
+    """WHAT A STRATEGIC CONTROLLER MAY READ. Frozen before the Controller exists.
+
+    Defined now, and deliberately, because the alternative is discovering later that the
+    Controller reaches back into the raw evidence and redoes the candidate reasoning itself.
+    If it does that, A1.5 stops being an architecture layer and becomes a middle step something
+    routes around — and the reasoning that routed around it leaves no record. There is no chart
+    here, no document inventory, no span text: only the state this layer is responsible for
+    having made reliable.
+
+    LIVE CANDIDATES ONLY, and UNRESOLVED discriminators only. A rejected candidate stays in the
+    ledger forever — that is invariant 5, and it is what keeps "considered and ruled out"
+    distinguishable from "never thought of" — but it is a settled question, and a Controller
+    handed a settled question searches for an answer it already has.
+    """
+    live = [c for c in ledger.candidates if c.status in ("ACTIVE", "LEADING", "SELECTED")]
+    return {
+        "active_candidates": [
+            {"candidate_id": c.candidate_id, "value": dict(c.value), "status": c.status,
+             "supporting_evidence_ids": list(c.supporting_evidence_ids),
+             "contradicting_evidence_ids": list(c.contradicting_evidence_ids)}
+            for c in live],
+        "conflict_sets": list(ledger.conflict_sets),
+        "unresolved_discriminators": [d for d in ledger.discriminators
+                                      if d.get("status", "UNRESOLVED") == "UNRESOLVED"],
+        "answerability": {"status": ledger.answerability},
+        "coverage_facts": dict(coverage_facts or {}),
+        "remaining_budget": dict(budget or {}),
+    }

@@ -180,7 +180,7 @@ def test_the_reasoner_path_actually_executes_against_a_real_run_context():
     values = {c.value["date_of_initial_diagnosis"] for c in ctx.candidates.candidates}
     assert "20200101" in values, "the reasoner's own value is missing"
     seeded = [c for c in ctx.candidates.candidates if c.seed_method]
-    assert seeded and seeded[0].seed_sources == ("document_date",)
+    assert seeded and seeded[0].seed_sources == ("DOCUMENT_DATE",)
     assert ctx.candidate_calls[0]["ok"] is True and ctx.candidate_calls[0]["refused"] == []
     assert ctx.candidate_calls[0]["induction"]["n_seeded"] >= 1
 

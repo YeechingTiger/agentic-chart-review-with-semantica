@@ -154,6 +154,16 @@ CANDIDATE_STATES: tuple[str, ...] = ("ACTIVE", "LEADING", "REJECTED", "SELECTED"
 ANSWERABILITY: tuple[str, ...] = ("UNDETERMINED", "VALUE_AVAILABLE", "EVIDENCE_INSUFFICIENT",
                                   "CORPUS_INSUFFICIENT")
 
+#: Where a seeded value came from. Closed, because the whole point of recording it is to be
+#: able to say later what each source bought and what it cost.
+SEED_SOURCES: tuple[str, ...] = ("SPAN_LITERAL", "DOCUMENT_DATE", "EVENT_DATE")
+
+#: What a discriminator IS, once somebody has looked at it. A count of discriminators is not a
+#: measure of anything — three phrasings of "which date is earlier" is one open question — so
+#: the state is what a Strategic Controller would branch on.
+DISCRIMINATOR_STATES: tuple[str, ...] = ("UNRESOLVED", "ALREADY_RESOLVED",
+                                         "UNRESOLVABLE_FROM_CORPUS", "SPEC_DEPENDENT")
+
 
 @dataclass
 class Candidate:
@@ -194,9 +204,11 @@ class Candidate:
     #: seeded and a candidate the reasoner proposed are different objects for the metrics —
     #: candidate RECALL is about the first, candidate PRECISION about what survives the second.
     seeded_from: tuple[str, ...] = ()
-    #: WHICH KIND of place put this value on the table — `quote`, `document_date`, `event_date`.
-    #: A note's own date is the thing the reasoner most often has to reject, and separating
-    #: those rejections from wrong-reading ones is what keeps precision meaningful.
+    #: WHICH KIND of place put this value on the table. Named rather than free text because
+    #: the three have very different yield: a date written in a span is usually about something,
+    #: a document's own date is the thing the reasoner most often has to reject, and an event
+    #: date is rare and decisive. Separating them is what lets "the document-date source bought
+    #: us this much recall for this much burden" be a number instead of an impression.
     seed_sources: tuple[str, ...] = ()
     seed_method: str = ""
     #: Rejected because it is not a value for THIS question at all — the note's own service
@@ -205,6 +217,11 @@ class Candidate:
     #: this kind, and separating them is what keeps candidate PRECISION from being a count of
     #: the extractor's noise.
     not_a_target_value: bool = False
+    #: WHICH RULE PUT IT OUT, when the reasoner named one. `parse_rule_citations` already knows
+    #: the contract's declared ids and discards invented ones, so an id here is one the contract
+    #: really states. Kept apart from `rejection_reason` (the prose) because "rejected under
+    #: conflict_rule.3" is checkable against the contract and a sentence is not.
+    rejecting_rule: str = ""
     #: Every transition, with the step and the reason. On the candidate rather than only in the
     #: trace because manifests outlive traces, and "which candidate was dropped and why" has to
     #: be answerable from the manifest alone.
@@ -450,14 +467,42 @@ class CandidateLedger:
         self._emit("candidate_evidence_linked", candidate_id=cid, evidence_id=evidence_id,
                    role=role, step=step)
 
+    def resolve_ref(self, ref) -> str:
+        """A candidate id, or a VALUE, or a value's string form -> the candidate id.
+
+        INVARIANT 3. A candidate created in the same call has no id the model could have seen,
+        and a live run produced `"NEW"` and `"candidate_1"` as references because of it. The
+        model always knows the VALUE it just wrote, so a value resolves; a placeholder does not
+        and comes back empty rather than pointing at whatever happened to be first.
+        """
+        if not ref:
+            return ""
+        if isinstance(ref, dict):
+            key = _value_key(ref)
+            return next((c.candidate_id for c in self.candidates
+                         if _value_key(c.value) == key), "")
+        text = str(ref).strip()
+        if any(c.candidate_id == text for c in self.candidates):
+            return text
+        for c in self.candidates:
+            if text and (text in [str(v).strip() for v in c.value.values()]
+                         or text == c.abstention):
+                return c.candidate_id
+        return ""
+
     def add_discriminator(self, d: dict, *, step: int) -> None:
         """One competing pair, and what would settle it. Refuses one that names no fact."""
         fact = str((d or {}).get("unresolved_fact") or "").strip()
         if not fact:
             raise ValueError("a discriminator with no `unresolved_fact` names nothing; a "
                              "component downstream has to act on it")
-        row = {"candidate_a": str(d.get("candidate_a") or ""),
-               "candidate_b": str(d.get("candidate_b") or ""),
+        status = str(d.get("status") or "UNRESOLVED").strip().upper()
+        if status not in DISCRIMINATOR_STATES:
+            raise ValueError(f"discriminator status {status!r} is not one of "
+                             f"{DISCRIMINATOR_STATES}")
+        a, b = self.resolve_ref(d.get("candidate_a")), self.resolve_ref(d.get("candidate_b"))
+        row = {"candidate_a": a, "candidate_b": b,
+               "status": status,
                "unresolved_fact": fact,
                "evidence_needed": str(d.get("evidence_needed") or ""),
                "likely_source": [str(x) for x in (d.get("likely_source") or [])],

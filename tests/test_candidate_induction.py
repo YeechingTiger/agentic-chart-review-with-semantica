@@ -269,7 +269,7 @@ def test_a_candidate_records_which_kind_of_source_seeded_it():
     led = CandidateLedger()
     seed_candidates(led, DATE_SPEC, ev, step=1)
     kinds = {c.value["date_of_initial_diagnosis"]: set(c.seed_sources) for c in led.candidates}
-    assert kinds == {"20200401": {"document_date"}, "20200410": {"quote"}}
+    assert kinds == {"20200401": {"DOCUMENT_DATE"}, "20200410": {"SPAN_LITERAL"}}
 
 
 def test_an_event_date_is_seeded_when_the_span_carries_one():

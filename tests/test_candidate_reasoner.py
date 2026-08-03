@@ -78,7 +78,9 @@ def test_it_imports_nothing_that_could_touch_a_chart_a_gate_or_a_submission():
 def test_the_only_writer_takes_the_candidate_ledger_and_nothing_writable():
     """签名就是权限。给它 chart 或 gate,越权就只是下一个人手滑的距离。"""
     sig = inspect.signature(CR.apply_updates)
-    assert list(sig.parameters) == ["ledger", "result", "step", "known_evidence_ids"]
+    assert list(sig.parameters) == ["ledger", "result", "step", "known_evidence_ids", "spec"]
+    # `spec` is READ-ONLY here and only to recognise a rule id — `parse_rule_citations` never
+    # writes to it. The signature stays the permission boundary: no chart, no gate, no toolbox.
     assert sig.parameters["ledger"].annotation == "CandidateLedger"
     # `reason` likewise: three inputs and a seam, no chart, no gate, no toolbox.
     assert list(inspect.signature(CR.reason).parameters) == \
