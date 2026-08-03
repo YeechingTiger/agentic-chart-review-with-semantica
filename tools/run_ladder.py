@@ -110,8 +110,15 @@ EXPERIENCE_ARMS: list[tuple[str, str]] = [
 
 GROUPS = {"policy": POLICY_ARMS, "tactic": TACTIC_ARMS, "experience": EXPERIENCE_ARMS}
 
+#: EVERY chart with a `STORE.390.date_of_initial_diagnosis` ground truth — 21 informed plus the
+#: six held-out SYNY. The held-out six were left out of this list until 2026-08-03, which meant
+#: the ladder could only ever produce a number `analyze_arms.py` refuses to print: it will not
+#: fold an informed chart into a headline, and every chart here was informed.
 PATIENTS = ",".join(
-    [f"SYN{i:04d}" for i in range(1, 13)] + [f"SYNX{i:02d}" for i in range(1, 7)])
+    [f"SYN{i:04d}" for i in range(1, 13)]
+    + [f"SYNX{i:02d}" for i in range(1, 7)]
+    + [f"SYNK{i:02d}" for i in range(1, 4)]
+    + [f"SYNY{i:02d}" for i in range(1, 7)])
 
 
 def arms_for(group: str) -> list[tuple[str, str]]:
@@ -149,12 +156,18 @@ def main() -> int:
                     help="validate every arm and print what would run; spend nothing")
     ap.add_argument("--max-usd", type=float, default=3.0, help="per arm")
     ap.add_argument("--patients", default=PATIENTS)
+    #: `batch` runs each chart ONCE, so a repeat is a separate seed and a separate output root.
+    #: One root per seed rather than one directory per (arm, seed) cell, because `analyze_arms`
+    #: reads a root as a set of arms: three roots give three independent readings of the same
+    #: ladder, and an effect whose ranking flips between them is noise wearing a result's
+    #: clothes. Do not average them into one number without saying you did.
+    ap.add_argument("--seed", type=int, default=1234)
     args = ap.parse_args()
 
     arms = arms_for(args.group)
     resolved = preflight(arms)
     n_charts = len(args.patients.split(","))
-    print(f"group={args.group}  arms={len(arms)}  charts={n_charts}  "
+    print(f"group={args.group}  arms={len(arms)}  charts={n_charts}  seed={args.seed}  "
           f"profile={RUNTIME_PROFILE}  ceiling=${args.max_usd:.2f}/arm")
     for name, stack in resolved:
         print(f"  {name:<22} {', '.join(stack.names()) or '(base only)'}")
@@ -173,7 +186,7 @@ def main() -> int:
         print("dry run — every arm assembles and validates; nothing spent")
         return 0
 
-    out_root = ROOT / "runs" / f"ladder-{args.group}"
+    out_root = ROOT / "runs" / f"ladder-{args.group}-s{args.seed}"
     out_root.mkdir(parents=True, exist_ok=True)
     started, index = time.time(), []
     for name, clause in arms:
@@ -183,7 +196,7 @@ def main() -> int:
             [sys.executable, "-m", "acr.commands.cli", *BATCH_CMD,
              "--spec", SPEC, "--runtime-profile", RUNTIME_PROFILE,
              "--skills", clause, "--patients", args.patients,
-             "--seed", "1234", "--max-usd", str(args.max_usd),
+             "--seed", str(args.seed), "--max-usd", str(args.max_usd),
              "--out", str(out_root / name)],
             cwd=ROOT, capture_output=True, text=True, check=False,
             env={**os.environ, "PYTHONPATH": "src"})
