@@ -88,7 +88,7 @@ def _detectors(path: Path, *, min_term_chars: int, max_rejection_repeats: int,
 
 def _mode_inputs(store: LocalArtifactStore, mode: str, case_id: str, *,
                  gold: str, registry_reference: str):
-    from ..contract.spec_repair import load_gold
+    from ..contract.behaviour import load_gold
     if mode not in A.ATTRIBUTION_MODES:
         raise typer.BadParameter(f"--mode must be one of {A.ATTRIBUTION_MODES}")
     if mode == A.GOLD:

@@ -374,6 +374,41 @@ current directory and each parent, then a sibling checkout — and raises naming
 nothing is found, rather than letting a missing directory surface later as a puzzling
 `UNKNOWN_PATIENT`."""
 
+    # A workflow that runs the suite ALONE. The composed reading is the monorepo's job — a single
+    # checkout has every plane present and every import resolving, so it cannot fail the way a lone
+    # distribution can. This is the mode that rots silently: on 2026-08-03 four repositories passed
+    # 1,319 tests composed while three of them imported a module assigned to a fourth, and the only
+    # thing that would have caught it is a run with the siblings absent.
+    (repo_dir / ".github" / "workflows").mkdir(parents=True, exist_ok=True)
+    (repo_dir / ".github" / "workflows" / "ci.yml").write_text('''name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  isolated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv venv --python 3.12 && uv pip install -e ".[dev]"
+      - run: .venv/bin/ruff check src/ tests/ || true
+
+      # NO SIBLING IS CHECKED OUT, and that is the point. Tests whose fixture ships with another
+      # distribution SKIP and say which one; anything that ERRORS here is a dependency this
+      # repository has and has not declared.
+      - name: suite, with no sibling present
+        run: .venv/bin/python -m pytest -q -p no:randomly
+
+      - name: no test may ERROR — a skip is fine, an error is an undeclared dependency
+        run: |
+          set -o pipefail
+          out=$(.venv/bin/python -m pytest -q -p no:randomly 2>&1 | tail -1)
+          echo "$out"
+          case "$out" in *error*) exit 1 ;; esac
+''', encoding="utf-8")
+
     url = f"https://github.com/{owner}/{name}" if owner else f"<owner>/{name}"
     siblings = "\n".join(
         f"- [`{d}`]({url.rsplit('/', 1)[0]}/{d}) — {PROSE[d]['tagline']}" for d in spec["deps"]

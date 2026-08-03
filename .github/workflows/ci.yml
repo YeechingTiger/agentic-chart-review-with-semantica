@@ -1,0 +1,70 @@
+# The monorepo is the SOURCE OF TRUTH; the four distributions are generated from it by
+# `tools/split_repos.py` + `tools/scaffold_repos.py`. So this workflow is where the composed
+# properties are checked, because a single checkout is composed by construction — every plane is
+# present and every import resolves. What it cannot check is the ISOLATED property, and that is why
+# each generated repository carries its own workflow.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv venv --python 3.12 && uv pip install -e ".[dev]" pytest pytest-randomly ruff
+      - run: .venv/bin/ruff check src/ tests/ tools/
+
+      # Behaviour.
+      - run: .venv/bin/python -m pytest -q
+
+      # Shape. Every claim this repository makes about its own structure, as a check that can fail —
+      # module assignment, the distribution import boundary, an acyclic dependency graph, the
+      # namespace-package rule, card ownership, test routing, skill frontmatter. It exists because
+      # the four-way split passed 1,319 tests while three distributions imported a module assigned
+      # to a fourth without declaring it.
+      - run: .venv/bin/python tools/verify_structure.py
+
+      # Mechanisms. Does each declared mechanism do what it says, and is what it says right.
+      - run: .venv/bin/python tools/verify_mechanisms.py
+
+      # The contract lint, which must not regress. It currently reports 14 tier-1 failures across
+      # six specs and those are real; this asserts the NUMBER does not grow, because a lint whose
+      # failures nobody counts is a lint nobody reads.
+      - name: spec lint (14 tier-1 failures is the current, recorded floor)
+        run: |
+          set -o pipefail
+          n=$(PYTHONPATH=src .venv/bin/python -m acr.commands.cli spec lint assets/specs \
+              | grep -oE '[0-9]+ tier-1 failure' | grep -oE '^[0-9]+')
+          echo "tier-1 failures: $n"
+          test "$n" -le 14
+
+      # The split must be reproducible and lose nothing. `--dry-run` refuses when any module under
+      # src/acr/ is assigned to no distribution, which is the failure that does not announce itself:
+      # the losing repo keeps importing the name from an installed sibling all through development.
+      - run: .venv/bin/python tools/split_repos.py --out /tmp/split --dry-run
+
+  # The generated distributions, built and tested exactly as `tools/` would publish them. This is
+  # the composed reading; each repository's own workflow covers the isolated one.
+  distributions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv venv --python 3.12 && uv pip install -e . pyyaml
+      - run: .venv/bin/python tools/split_repos.py --out /tmp/split
+      - run: .venv/bin/python tools/scaffold_repos.py --out /tmp/split
+      - name: install all four into one environment and run each suite
+        run: |
+          set -euo pipefail
+          uv venv --python 3.12 /tmp/v
+          for r in /tmp/split/*/; do VIRTUAL_ENV=/tmp/v uv pip install -q --no-deps -e "$r"; done
+          VIRTUAL_ENV=/tmp/v uv pip install -q deepagents langchain langchain-openai litellm \
+            langgraph pydantic pyyaml typer rich pytest
+          for r in /tmp/split/*/; do
+            echo "=== $(basename "$r") ==="
+            ( cd "$r" && /tmp/v/bin/python -m pytest -q -p no:randomly )
+          done

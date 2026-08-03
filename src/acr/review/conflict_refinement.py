@@ -19,7 +19,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from ..contract.spec_repair import BehaviorSignature
+from ..contract.behaviour import BehaviorSignature
 
 CONFLICT_SCHEMA = "acr.review.conflict_refinement/1"
 

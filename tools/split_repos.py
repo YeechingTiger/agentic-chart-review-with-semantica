@@ -45,7 +45,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 #: them, and leaving them in the shared layer is what made `tests/test_layering.py`'s claim that the
 #: working planes "meet only through the shared layers" partly fictional. 2,256 code lines that
 #: layer 2 never imports. The split is where that gets fixed rather than restated.
-CONTRACT_SHARED = ("spec", "skill_invoke", "outcomes", "answer_contract", "answer_checks", "trace", "code_tables",
+CONTRACT_SHARED = ("spec", "skill_invoke", "behaviour", "outcomes", "answer_contract", "answer_checks", "trace", "code_tables",
                    "site_mapping", "strata", "case_requirements", "skills")
 
 #: name -> (one-line purpose, source paths, test files, runtime deps on siblings)
@@ -103,10 +103,14 @@ REPOS: dict[str, dict] = {
     },
 }
 
-#: The two scripts that perform the split itself. They belong to the archive repository, not to the
+#: The scripts that perform and police the split itself. `verify_structure` joins them because it
+#: imports this module's tables: it asks whether the DISTRIBUTION boundary holds, which is a question
+#: that only exists where the whole tree is present. Its answers belong in the monorepo's CI; each
+#: generated repository's own workflow asks the complementary question — does my suite pass with no
+#: sibling checked out. They belong to the archive repository, not to the
 #: harness: after the split they have no subject, and `scaffold_repos` imports `split_repos`, so a
 #: harness that took one and not the other would not import.
-SPLIT_TOOLS = ("split_repos.py", "scaffold_repos.py")
+SPLIT_TOOLS = ("split_repos.py", "scaffold_repos.py", "verify_structure.py")
 
 #: Tools that belong to a specific repo rather than to the harness.
 TOOL_HOMES = {"render_chain.py": "acr-eval"}

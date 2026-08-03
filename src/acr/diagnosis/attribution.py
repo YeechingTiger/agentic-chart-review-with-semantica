@@ -23,7 +23,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from ..contract.spec_repair import ChartObservableGold, safe_case_id
+from ..contract.behaviour import ChartObservableGold, safe_case_id
 from ..contract.trace import rule_catalog
 from ..core.local_artifacts import LocalArtifactStore, content_hash
 from ..evaluation import evals
@@ -781,7 +781,7 @@ def build_packet(*, manifest_path: str | Path, case_id: str, spec: Any, mode: st
     if str(manifest.get("spec_hash") or "") != spec.spec_hash:
         raise AttributionError(
             f"{mpath}: manifest spec hash does not match the supplied frozen spec")
-    from ..contract.spec_repair import BehaviorSignature
+    from ..contract.behaviour import BehaviorSignature
     signature = BehaviorSignature.from_manifest(manifest, case_id=case_id).to_dict()
     return AttributionPacket(
         case_id=safe_case_id(case_id), spec_id=spec.spec_id, spec_hash=spec.spec_hash,

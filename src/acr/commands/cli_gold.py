@@ -4,7 +4,9 @@ from __future__ import annotations
 import typer
 from rich.table import Table
 
-from ..contract import spec_repair as S
+# Every name this module uses — GOLD_SCHEMA, SpecRepairError, audit_gold, load_gold,
+# safe_case_id — is owned by `behaviour`, not by the repair machinery `spec_repair` holds.
+from ..contract import behaviour as S
 from ..core.cli_common import con, read_json
 from ..core.local_artifacts import LOCAL_ROOT_ENV, LocalArtifactError, LocalArtifactStore
 
