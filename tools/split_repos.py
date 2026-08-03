@@ -36,7 +36,6 @@ import argparse
 import pathlib
 import shutil
 import subprocess
-import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -70,6 +69,7 @@ REPOS: dict[str, dict] = {
                    "read/record/submit tools and an immutable record of what it did.",
         "src": ["src/acr/review/", "src/acr/commands/cli_chart.py"],
         "assets": ["assets/skills/", "assets/specs/", "assets/module_catalog/runtime_policies/"],
+        #: minus the cards other consumers own — applied in `collect`
         "deps": ["acr-contract"],
     },
     "acr-eval": {
@@ -132,6 +132,33 @@ REPOS: dict[str, dict] = {
     },
 }
 
+#: Tests that import no `acr` module at all, routed by what they are ABOUT. `test_adversarial_corpus`
+#: reads chart files and asserts the traps are where the ground truth says: it belongs with the data,
+#: and an import graph cannot see that because it imports nothing.
+TESTS_BY_SUBJECT = {"test_adversarial_corpus.py": "acr-corpus"}
+
+#: WHO OWNS WHICH METHOD CARD. `assets/skills/` held cards for FOUR different consumers in one
+#: directory, and the split is what made that visible: the five `slot: eval` cards are read by the
+#: evaluation agent, not by the chart-review agent, and `acr-eval`'s tests fail at once when they
+#: ship with the wrong repository. Two `slot: task` cards are about AUTHORING a contract rather than
+#: answering one, and `non-concordance-triage` explains a guideline verdict. Assigning by slot alone
+#: would have put all four in the wrong place.
+CARD_OWNERS = {
+    "acr-eval": ("eval-cluster-failures", "eval-contrast-traces", "eval-key-challenge",
+                 "eval-missed-evidence", "eval-overconfidence"),
+    "acr-spec-authoring": ("store-to-spec",),
+    #: `guideline-to-rules` has references and NO `SKILL.md`: the agent authoring it was killed
+    #: mid-work by an org spend limit, and the half-written card was committed. It travels with the
+    #: engine it teaches, and `tests/test_guideline_to_rules_skill.py` goes with it.
+    "acr-concordance": ("crc-guideline-registry-authoring", "non-concordance-triage",
+                        "guideline-to-rules"),
+}
+
+#: The two scripts that perform the split itself. They belong to the archive repository, not to the
+#: harness: after the split they have no subject, and `scaffold_repos` imports `split_repos`, so a
+#: harness that took one and not the other would not import.
+SPLIT_TOOLS = ("split_repos.py", "scaffold_repos.py")
+
 #: Tools that belong to a specific repo rather than to the harness.
 TOOL_HOMES = {
     "generate_corpus.py": "acr-corpus",
@@ -180,7 +207,11 @@ def assign_tests() -> dict[str, list[str]]:
             continue
         homes = set()
         for n in ast.walk(tree):
-            mods = ([n.module] if isinstance(n, ast.ImportFrom) and n.module
+            # `from acr.improvement import refine` names the PACKAGE in `n.module` and the module
+            # in the alias. Resolving only `n.module` sent three tests to the shared layer, because
+            # `src/acr/improvement.py` matches nothing and the fallback was contract.
+            mods = ([n.module] + [f"{n.module}.{a.name}" for a in n.names]
+                    if isinstance(n, ast.ImportFrom) and n.module and not n.level
                     else [a.name for a in n.names] if isinstance(n, ast.Import) else [])
             for m in mods:
                 pl = plane_of(m)
@@ -189,16 +220,33 @@ def assign_tests() -> dict[str, list[str]]:
                 # Resolve to a repo through the module path, so a `contract.*` module that moved
                 # out of the shared layer routes to the repo that took it.
                 mod_path = "src/" + m.replace(".", "/") + ".py"
+                if m.startswith("acr.commands.cli") and m.count(".") == 2:
+                    # `acr.commands.cli` is the composer: it mounts every sibling's group and
+                    # imports from all ten planes. A test that drives it is a test of the
+                    # composition, whatever else it touches.
+                    homes.update({"(composer)", "_"})
+                    continue
                 r = repo_of_source(mod_path) or repo_of_source(f"src/acr/{pl}/")
                 if r and r != "acr-contract":
                     homes.add(r)
+        if t.name in TESTS_BY_SUBJECT:
+            out[TESTS_BY_SUBJECT[t.name]].append(t.name)
+            continue
         out[next(iter(homes)) if len(homes) == 1 else "(composer)"
             if homes else "acr-contract"].append(t.name)
     return out
 
 
-def collect(spec: dict) -> list[str]:
+def collect(spec: dict, name: str | None = None) -> list[str]:
+    """Files this repo takes. Cards owned by another consumer are subtracted, and added back to the
+    owner, so `assets/skills/` splits four ways instead of travelling whole with the agent."""
+    others = {c for owner, cards in CARD_OWNERS.items() if owner != name for c in cards}
+    mine = CARD_OWNERS.get(name or "", ())
     files: list[str] = []
+    for card in mine:
+        d = ROOT / "assets" / "skills" / card
+        if d.is_dir():
+            files += [str(f.relative_to(ROOT)) for f in d.rglob("*") if f.is_file()]
     for key in ("src", "assets", "data", "docs"):
         for p in spec.get(key, []):
             base = ROOT / p
@@ -208,6 +256,9 @@ def collect(spec: dict) -> list[str]:
                               if f.is_file() and "__pycache__" not in f.parts]
             elif base.is_file():
                 files.append(p)
+    if others:
+        files = [f for f in files
+                 if not any(f.startswith(f"assets/skills/{c}/") for c in others)]
     return sorted(set(files))
 
 
@@ -220,7 +271,7 @@ def main() -> int:
     # tools/ -> harness, minus the ones with a specific home
     REPOS["acr-harness"]["src"] = [
         f"tools/{f.name}" for f in sorted((ROOT / "tools").glob("*.py"))
-        if TOOL_HOMES.get(f.name) is None and f.name != "split_repos.py"]
+        if TOOL_HOMES.get(f.name) is None and f.name not in SPLIT_TOOLS]
 
     tests = assign_tests()
     out = pathlib.Path(args.out).expanduser().resolve()
@@ -230,7 +281,7 @@ def main() -> int:
     print(f"source {sha[:12]}   ->   {out}\n")
     total = 0
     for name, spec in REPOS.items():
-        files = collect(spec)
+        files = collect(spec, name)
         total += len(files)
         print(f"{name:<22}{len(files):>5} files  {len(tests[name]):>3} tests  "
               f"deps={','.join(spec['deps']) or '-'}")
@@ -245,7 +296,7 @@ def main() -> int:
             continue
         if rel in COMPOSER_KEEPS:
             continue
-        if not any(rel in collect(s) for s in REPOS.values()):
+        if not any(rel in collect(sp, n) for n, sp in REPOS.items()):
             unassigned.append(rel)
     if unassigned:
         print(f"\n!! {len(unassigned)} source files assigned to NO repo:")
@@ -263,11 +314,18 @@ def main() -> int:
         dest = out / name
         if dest.exists():
             shutil.rmtree(dest)
-        for rel in collect(spec):
+        for rel in collect(spec, name):
             target = dest / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / rel, target)
-        for t in tests[name]:
+        # Test-local helper modules travel with any repo whose tests import them. A bare
+        # `from hooks_harness import ...` is not a third-party dependency, and a repo that takes the
+        # test without the helper fails at collection rather than at a useful place.
+        helpers = [h.name for h in (ROOT / "tests").glob("*.py")
+                   if h.name != "conftest.py" and not h.name.startswith("test_")
+                   and any(h.stem in (ROOT / "tests" / t).read_text(encoding="utf-8")
+                           for t in tests[name])]
+        for t in tests[name] + ["conftest.py"] + helpers:
             target = dest / "tests" / t
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / "tests" / t, target)
