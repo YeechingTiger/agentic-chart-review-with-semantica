@@ -3,7 +3,7 @@ name = "agentic-chart-review"
 version = "0.1.0"
 description = "Agentic EHR chart review: a ReAct-with-replanning agent that reviews clinical notes the way a human abstractor does, under a frozen, machine-checkable extraction specification."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "Xing He" }]
 keywords = ["ehr", "chart-review", "clinical-nlp", "agents", "langgraph", "litellm"]
@@ -40,7 +40,7 @@ packages = ["src/acr"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

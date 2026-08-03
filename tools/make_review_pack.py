@@ -8,10 +8,11 @@ artefacts are pasted whole, because a reviewer asked to judge a rule needs the r
 """
 
 from __future__ import annotations
-from acr.core import site
 
 import pathlib
 import subprocess
+
+from acr.core import site
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 

@@ -148,6 +148,9 @@ TESTS_BY_SUBJECT = {
     #: set, which now lives in four repositories, so it can only run where all four are present.
     "test_skills_load.py": "(composer)",
     "test_eval_skill_fence.py": "acr-eval",
+    #: Its subject is the CRC use-case bundle under `assets/usecase/`, which went with the
+    #: guideline plane. An import graph put it in the shared layer because it imports nothing.
+    "test_crc_full_normalization.py": "acr-concordance",
 }
 
 #: WHO OWNS WHICH METHOD CARD. `assets/skills/` held cards for FOUR different consumers in one

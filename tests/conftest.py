@@ -101,3 +101,31 @@ def _muzzle_provider(request, monkeypatch):
         return
     for name in PROVIDER_SEAMS:
         monkeypatch.setattr(f"acr.core.cli_common.{name}", _refuse(name))
+
+
+
+# ------------------------------------------------- fixtures that live in a sibling repository
+#
+# After the 2026-08-03 split the corpus lives in `acr-corpus` and the contracts and method cards in
+# `acr-chart-review`, so a repository's own suite may reach for a directory that is simply not
+# checked out. `acr.core.site._resolve` raises `FileNotFoundError` naming the variable to set and the
+# sibling to clone; this converts exactly that into a SKIP carrying the same message.
+#
+# A HOOKWRAPPER, not a plain hook. The first version of this called `item.runtest()` itself, which
+# bypasses pytest's own call protocol: the monorepo suite went from 2051 passing to 65 failing,
+# because the test body ran outside the machinery that manages its fixtures. A wrapper yields and
+# then replaces the recorded exception, which is the only way to reclassify an outcome without
+# taking over the execution.
+#
+# NARROW ON PURPOSE: it matches only the sentence `_resolve` produces. A genuinely missing file
+# inside this repository still FAILS, because "an asset that was supposed to travel and did not" is
+# the case this project most needs to hear about.
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call(item):
+    outcome = yield
+    exc = outcome.excinfo[1] if outcome.excinfo else None
+    if isinstance(exc, FileNotFoundError) and (
+            "Set ACR_" in str(exc) or "does not exist (" in str(exc)):
+        outcome.force_exception(
+            pytest.skip.Exception(f"fixture lives in a sibling repository: {exc}",
+                                  _use_item_location=True))
