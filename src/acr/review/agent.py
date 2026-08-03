@@ -77,10 +77,11 @@ from ..contract.outcomes import (
 )
 from ..contract.skills import skills_block
 from ..core.case_context import CaseContext
+from ..core.cli_common import code_sha
 from ..core.tool_surface import LIBRARY_TOOLS, ToolSurfaceError, assert_tool_surface  # noqa: F401
 from .coverage_planner import OPEN_REQUEST_OPENED, triggers_from_tool_result
 from .document_concepts import anchor_block, baseline_block
-from .run_manifest import prompt_asset_manifest
+from .run_manifest import chart_hash, experiment_config_hash, prompt_asset_manifest
 
 #: Tools whose results the coverage ledger must see. Named here rather than inferred from the
 #: toolbox, because this list answers "what counts as having looked" — a claim about the audit
@@ -1072,6 +1073,16 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         "spec_version": spec.spec_version,
         "trace": str(tracer.path),
         "runtime": "deepagents-hooks", "patient_id": chart.patient_id,
+        # WHICH CODE RAN. `code_sha()` has existed since early on and reached exactly two
+        # places -- the run DIRECTORY NAME and three pipeline artifacts -- so a manifest read
+        # on its own could not say what produced it. This file's own comment below names the
+        # defect ("`292dc90-dirty` is not a reproducible code identity") and did not fix it.
+        "code_sha": code_sha(),
+        # WHICH DOCUMENTS WERE READ. The generator is deterministic, so a chart whose content
+        # moves under a stable patient_id moved because somebody edited it. Tolerable on a
+        # development chart; on a held-out one, after a result has been scored against it, it
+        # is the edit that must not happen quietly.
+        "chart_hash": chart_hash(chart.dir),
         # WHAT THIS RUN WAS TOLD ABOUT THE CASE, as opposed to what it read. A reader asking
         # later why an answer named the wrong lesion cannot tell "was never told which" from
         # "was told and ignored it" unless this is written down, and it was not being written
@@ -1111,7 +1122,8 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # `table_version` would otherwise masquerade as the one an earlier run used. The lung
         # table gained eleven morphologies from one validation pass; manifests written either
         # side of that must not compare as equal.
-        "prompt_assets": prompt_asset_manifest(spec, runtime_profile_asset, skill_stack),
+        "prompt_assets": prompt_asset_manifest(spec, runtime_profile_asset, skill_stack,
+                                               tool_schemas=toolbox.schemas()),
         "answer": answer, "spec_gap": spec_gap, "gate_validated": ctx.gate_validated,
         "coverage_gate_validated": ctx.coverage_claim_earned,
         "coverage_activation": dict(ctx.coverage_state),
@@ -1236,6 +1248,25 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         "termination_reason": termination,
         "elapsed_s": elapsed_fn(), **claim, "evidence": evidence.to_list(),
     }
+    # WHICH ARM, as one value. Assembled after the manifest because it is a hash OVER the
+    # manifest's own identity keys — no allowlist inside `experiment_config_hash`, so the
+    # question "what counts as the arm" is answered here, where a reader of this function can
+    # see it, rather than inside a hashing utility nobody opens.
+    #
+    # Everything a paired comparison assumes is held constant goes in. What does NOT go in:
+    # patient_id (the axis a paired comparison varies), run_id, timestamps, and anything about
+    # what the run FOUND. A config hash that moved with the answer would be a per-run id.
+    manifest["experiment_config_hash"] = experiment_config_hash({
+        "spec_hash": manifest["spec_hash"],
+        "runtime_profile_ref": manifest.get("runtime_profile_ref"),
+        "runtime_profile_hash": manifest.get("runtime_profile_hash"),
+        "prompt_assets": manifest["prompt_assets"],
+        "model": manifest["model"],
+        "model_temperature": manifest.get("model_temperature"),
+        "sample_seed": manifest.get("sample_seed"),
+        "max_model_calls": manifest.get("max_model_calls"),
+        "code_sha": manifest["code_sha"],
+    })
     manifest_path = out_dir / f"{tracer.run_id}.manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2))
     manifest_path.chmod(0o600)
@@ -1422,6 +1453,11 @@ def _case_refused_manifest(spec, chart, case, refusal: dict, out_dir, run_id, mo
         "spec_id": spec.spec_id, "spec_hash": spec.spec_hash,
         "spec_version": spec.spec_version,
         "runtime_profile_id": runtime_profile.split("@", 1)[0],
+        # THE SAME IDENTITY KEYS AS A RUN THAT RAN. A refused case that carried fewer of them
+        # would be a manifest a directory-wide reader has to special-case, and the first reader
+        # to forget silently drops it from a denominator.
+        "code_sha": code_sha(),
+        "chart_hash": chart_hash(chart.dir),
         "case_context": case.to_dict(),
         "answer": refusal,
         "evidence": [],

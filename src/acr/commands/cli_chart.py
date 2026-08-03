@@ -101,6 +101,7 @@ def run(
         help="override the profile's skill assembly: comma-separated slot=value. "
              "`controller=controller-information-gain` replaces the controller, "
              "`tactics=+tactic-counterevidence` and `general=+chart-triage` append one, "
+             "`experience=experience-adapter` turns the develop-set prior on, "
              "`general=chart-triage|thread-chasing` replaces a whole list (`|` because "
              "comma already separates clauses), `controller=` clears the slot. "
              "Validated before any model call."),
@@ -185,6 +186,7 @@ def batch(
         help="override the profile's skill assembly: comma-separated slot=value. "
              "`controller=controller-information-gain` replaces the controller, "
              "`tactics=+tactic-counterevidence` and `general=+chart-triage` append one, "
+             "`experience=experience-adapter` turns the develop-set prior on, "
              "`general=chart-triage|thread-chasing` replaces a whole list (`|` because "
              "comma already separates clauses), `controller=` clears the slot. "
              "Parsed once before the loop, so a typo cannot be charged per patient."),
@@ -240,6 +242,14 @@ def consistency(
     runtime_profile: str = typer.Option(
         "current-stratified-coverage", "--runtime-profile"
     ),
+    skills: str = typer.Option(
+        "", "--skills",
+        help="override the profile's skill assembly: comma-separated slot=value, "
+             "same grammar as `acr chart run --skills`. Validated before any model call."),
+    seed: int = typer.Option(
+        1234, "--seed",
+        help="validation-sampling seed, SHARED by all N runs. Self-consistency is about the "
+             "model, so the runtime's own sampling must not vary between them"),
     out: str = typer.Option("runs", "--out"),
 ):
     """Run the same spec N times to measure SELF-consistency.
@@ -251,13 +261,15 @@ def consistency(
 
     sp = load_spec(spec)
     c = Corpus(Path(corpus))
+    stack = _skill_stack(runtime_profile, skills)
     run_dir = cli_common.unique_run_dir(out)
     outs = []
     for i in range(n):
         r = run_patient(spec=sp, corpus=c, patient_id=patient, out_dir=run_dir,
                         model=cli_common.chat_model(model, api_base, temperature),
-                        max_model_calls=max_steps, seed=1234, run_id=f"{patient}__c{i}",
-                        max_usd=max_usd, runtime_profile=runtime_profile)
+                        max_model_calls=max_steps, seed=seed, run_id=f"{patient}__c{i}",
+                        max_usd=max_usd, runtime_profile=runtime_profile,
+                        skill_stack=stack)
         outs.append(r)
         con.print(f"  run {i+1}/{n}: {r['answer'].get('status')} "
                   f"{json.dumps(r['answer'].get('value', {}), ensure_ascii=False)}")

@@ -150,16 +150,25 @@ class SkillStack:
     task: str | None = None
     controller: str | None = None
     tactics: tuple[str, ...] = ()
+    #: The develop-set prior, when a run is given one. A TUPLE and a separate slot from
+    #: `tactics` because it is the third factor of the three-factor experiment and has to be
+    #: switchable on its own: a prior is knowledge somebody measured elsewhere, a tactic is a
+    #: move this run may make. Declared in `SLOTS` since the 2026-08-02 split and unreachable
+    #: until 2026-08-03 -- the field was missing here, so the one card that declares
+    #: `slot: experience` could not be stacked and the factor could not be turned on at all.
+    experience: tuple[str, ...] = ()
     general: tuple[str, ...] = ()
 
     def names(self) -> tuple[str, ...]:
-        """Render order: the task, how to decide, the moves available, the standing habits."""
+        """Render order: the task, how to decide, the moves available, what somebody already
+        measured, the standing habits."""
         out: list[str] = []
         if self.task:
             out.append(self.task)
         if self.controller:
             out.append(self.controller)
         out.extend(self.tactics)
+        out.extend(self.experience)
         out.extend(self.general)
         return tuple(out)
 
@@ -167,6 +176,7 @@ class SkillStack:
         """Every named skill exists and declares the slot it was placed in."""
         placed = [(self.task, "task"), (self.controller, "controller")]
         placed += [(n, "tactic") for n in self.tactics]
+        placed += [(n, "experience") for n in self.experience]
         placed += [(n, "general") for n in self.general]
         seen: set[str] = set()
         for name, slot in placed:
@@ -201,7 +211,8 @@ def parse_skill_stack(spec: str, base: SkillStack,
     if not spec.strip():
         return base
     task, controller = base.task, base.controller
-    lists = {"tactics": list(base.tactics), "general": list(base.general)}
+    lists = {"tactics": list(base.tactics), "experience": list(base.experience),
+             "general": list(base.general)}
     for clause in spec.split(","):
         clause = clause.strip()
         if not clause:
@@ -210,10 +221,11 @@ def parse_skill_stack(spec: str, base: SkillStack,
             raise SkillError(f"skill override {clause!r}: expected slot=value")
         slot, _, value = clause.partition("=")
         slot, value = slot.strip(), value.strip()
-        if slot not in ("task", "controller", "tactics", "general"):
+        if slot not in ("task", "controller", "tactics", "experience", "general"):
             raise SkillError(
-                f"skill override: unknown slot {slot!r}; expected task, controller, tactics or "
-                f"general (the eval slot belongs to the evaluation agent, not a chart run). "
+                f"skill override: unknown slot {slot!r}; expected task, controller, tactics, "
+                f"experience or general (the eval slot belongs to the evaluation agent, not a "
+                f"chart run). "
                 f"`search` was renamed to `controller` on 2026-08-02 when the traversal tactics "
                 f"moved out of it.")
         if slot == "task":
@@ -225,7 +237,9 @@ def parse_skill_stack(spec: str, base: SkillStack,
         else:
             lists[slot] = [v for v in value.split("|") if v]
     out = SkillStack(task=task, controller=controller,
-                     tactics=tuple(lists["tactics"]), general=tuple(lists["general"]))
+                     tactics=tuple(lists["tactics"]),
+                     experience=tuple(lists["experience"]),
+                     general=tuple(lists["general"]))
     out.validate(skills_dir)
     return out
 
@@ -339,6 +353,8 @@ def skills_manifest(stack: SkillStack, skills_dir: Path | str | None = None) -> 
         slot_of[stack.controller] = "controller"
     for n in stack.tactics:
         slot_of[n] = "tactic"
+    for n in stack.experience:
+        slot_of[n] = "experience"
     for n in stack.general:
         slot_of[n] = "general"
     out = []

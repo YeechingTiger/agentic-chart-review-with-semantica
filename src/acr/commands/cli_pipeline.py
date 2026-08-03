@@ -185,6 +185,13 @@ def extract(
             "when comparing coverage arms"
         ),
     ),
+    # THE COHORT COMMAND COULD NOT EXPRESS A SEARCH ARM. `--runtime-profile` and `--seed` were
+    # here from the start and `--skills` was not, so an ablation over method cards was runnable
+    # one chart at a time and not over a cohort — which is the scale the ablations are for.
+    skills: str = typer.Option(
+        "", "--skills",
+        help="override the profile's skill assembly: comma-separated slot=value, "
+             "same grammar as `acr chart run --skills`. Validated before any model call."),
     limit: int = typer.Option(0, "--limit", help="first N patients only; 0 = all"),
     out: str = typer.Option("runs", "--out"),
     dry_run: bool = typer.Option(False, "--dry-run",
@@ -198,6 +205,11 @@ def extract(
     patient.
     """
     catalog, res = _resolve_or_die(specs_dir, variables)
+    # BEFORE the cohort is read and long before a model is built, for the reason `cli_chart`'s
+    # `_skill_stack` gives: a misspelt slot caught inside the per-patient `except` below would
+    # be reported once per chart, as if the cohort had failed, when what failed is one string.
+    from .cli_chart import _skill_stack
+    stack = _skill_stack(runtime_profile, skills)
     pids = read_cohort(cohort)
     if limit:
         pids = pids[:limit]
@@ -215,6 +227,8 @@ def extract(
                   f"will return SPEC_INSUFFICIENT / WRONG_DATA_SOURCE by design[/]")
     con.print(f"[bold]{len(pids)} patient(s) x {len(res.spec_ids)} spec(s) = "
               f"{len(pids) * len(res.spec_ids)} agent run(s)[/]")
+    con.print(f"[dim]profile {runtime_profile} · skills: "
+              f"{', '.join(stack.names()) or '(profile default)'}[/]")
     if dry_run:
         con.print("[dim]--dry-run: no model was called[/]")
         return
@@ -237,7 +251,7 @@ def extract(
                     model=cli_common.chat_model(model, api_base, temperature),
                     max_model_calls=max_steps, seed=seed or 1234,
                     run_id=f"{pid}__{sid}", max_usd=max_usd,
-                    runtime_profile=runtime_profile)
+                    runtime_profile=runtime_profile, skill_stack=stack)
             except Exception as e:  # noqa: BLE001
                 # One patient failing must not silently shrink the cohort: the row survives,
                 # carries the error, and the command exits non-zero at the end.

@@ -37,6 +37,7 @@ the next divergence is visible to a reader who never runs the test suite.
 """
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -395,7 +396,58 @@ def build_manifest(*, spec, patient_id: str, model: str, plan, coverage, threads
     }
 
 
-def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None) -> dict:
+def chart_hash(patient_dir) -> str:
+    """A content hash over the documents a run could read. Empty when it cannot be taken.
+
+    NAMES AND CONTENT BOTH, because both change what a run sees: the filename carries the
+    document type and the date, which is what `list_documents` and every date filter work off,
+    and the body is what a search matches. Hashing one without the other leaves a way to edit a
+    chart invisibly.
+
+    Why a run needs it at all: `tools/generate_corpus.py` is deterministic, so a chart whose
+    content moves under a stable `patient_id` moved because somebody edited it. That is
+    tolerable on the development charts and is exactly what must not happen quietly on a
+    held-out one after a result has been scored against it.
+
+    Returns "" rather than raising. A manifest that could not be written because a hash could
+    not be taken is a run lost to bookkeeping.
+    """
+    import hashlib
+    from pathlib import Path
+    d = Path(patient_dir)
+    if not d.is_dir():
+        return ""
+    h = hashlib.sha256()
+    try:
+        for f in sorted(d.glob("*.txt")):
+            h.update(f.name.encode("utf-8"))
+            h.update(b"\0")
+            h.update(f.read_bytes())
+            h.update(b"\0")
+    except OSError:
+        return ""
+    return h.hexdigest()[:16]
+
+
+def experiment_config_hash(config: dict) -> str:
+    """One value over everything that makes two runs the same arm.
+
+    NO ALLOWLIST. Whatever the caller passes is part of the arm, because the failure this
+    guards against is a field that mattered and was left out — and a hash with an allowlist
+    inside it decides that question in a place nobody looks. The caller assembles the dict at
+    the point where it knows what varied.
+
+    Canonical JSON, sorted keys, so two dicts describing one arm hash alike. The alternative to
+    this field is a reader comparing six identity keys by eye and being right every time.
+    """
+    import hashlib
+    blob = json.dumps(config, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+                      default=str)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+
+def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None,
+                          tool_schemas=None) -> dict:
     """The identity of every prompt block whose content can change a run's answer.
 
     Lives here rather than in `agent` because a manifest field belongs with the manifest, and
@@ -431,5 +483,24 @@ def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None) ->
         "value_domain": table_manifest(spec),
         "document_concepts": concepts_manifest(),
         "skills": skills,
+        # THE TOOL SURFACE IS PROMPT CONTENT. Every schema's `description` is rendered into
+        # every model call, and `submit_answer`'s is now BUILT FROM THE CONTRACT -- its enum
+        # and the prose under it come from the declared outcome space -- so the surface really
+        # does differ between contracts and between arms. Nothing hashed it until 2026-08-03,
+        # which is the same defect this block was added to fix, one entry further along.
+        #
+        # `None`, not `{}`, when no surface was supplied: `mcp_server` builds its own answer
+        # dict and an absent surface is a different fact from an unhashed one.
+        "tool_surface": _tool_surface(tool_schemas),
         "any_signed_off": False,
     }
+
+
+def _tool_surface(schemas) -> dict | None:
+    if schemas is None:
+        return None
+    import hashlib
+    names = [s["function"]["name"] for s in schemas]
+    blob = json.dumps(schemas, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return {"names": names, "n_tools": len(names),
+            "content_hash": hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]}

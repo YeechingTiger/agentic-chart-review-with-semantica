@@ -387,3 +387,53 @@ def test_the_skills_help_documents_every_form_of_the_syntax(command: str):
     assert "--skills" in flat
     for form in ("controller=", "tactics=+", "general=+", "|"):
         assert form in flat, f"{command} --help does not document {form!r}"
+
+
+# --------------------------------------------------------------------- 经验槽
+# 2026-08-02:`experience` 一直写在 SLOTS 里,`experience-adapter/SKILL.md` 也一直声明
+# `slot: experience`,但 `SkillStack` 没有这个字段,`parse_skill_stack` 直接拒绝这个名字。
+# 也就是说三因素实验里的第三个因素 —— 开发集总结出来的先验 —— 根本装不进任何一次运行。
+# 声明了一个槽而装不进去,和没有这个槽是两回事:前者在 SLOTS 的清单里看着是有的。
+
+def test_the_experience_slot_can_actually_be_stacked():
+    stack = parse_skill_stack("experience=experience-adapter", SkillStack())
+    assert stack.experience == ("experience-adapter",)
+    assert "experience-adapter" in stack.names()
+
+
+def test_experience_renders_after_the_tactics_and_before_the_standing_habits():
+    """先验是"有人替你查过的东西",它排在自选战术之后、每个臂都有的东西之前。"""
+    stack = SkillStack(controller="controller-reactive",
+                       tactics=("tactic-coverage-pool",),
+                       experience=("experience-adapter",),
+                       general=("tool-contract",))
+    assert stack.names() == ("controller-reactive", "tactic-coverage-pool",
+                             "experience-adapter", "tool-contract")
+
+
+def test_the_manifest_says_which_card_was_the_experience_one():
+    """否则"这一臂开了先验没有"只能靠卡名去猜。"""
+    rows = skills_manifest(SkillStack(experience=("experience-adapter",)))
+    assert [(r["skill"], r["slot"]) for r in rows] == [("experience-adapter", "experience")]
+
+
+def test_experience_appends_with_plus_like_the_other_list_slots(tmp_path: Path):
+    """两张先验卡:一份关键词先验加一份类型先验,是这个槽预期的形状。
+
+    树上现在只有一张 `slot: experience` 的卡,所以第二张在 tmp_path 里造 —— 测的是
+    `+` 这个机制,不是某张卡。
+    """
+    for n in ("prior-a", "prior-b"):
+        d = tmp_path / n
+        d.mkdir()
+        (d / "SKILL.md").write_text(
+            f"---\nname: {n}\ndescription: x\nslot: experience\n---\n\nbody\n",
+            encoding="utf-8")
+    base = parse_skill_stack("experience=prior-a", SkillStack(), tmp_path)
+    assert parse_skill_stack("experience=+prior-b", base, tmp_path).experience == (
+        "prior-a", "prior-b")
+
+
+def test_a_card_placed_in_the_wrong_slot_is_still_refused():
+    with pytest.raises(SkillError, match="declares slot"):
+        SkillStack(experience=("tool-contract",)).validate()

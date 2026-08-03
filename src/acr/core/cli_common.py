@@ -8,6 +8,7 @@ of the same experiment end up recorded under different identities.
 """
 from __future__ import annotations
 
+import functools
 import json
 import subprocess
 from datetime import UTC, datetime
@@ -46,9 +47,20 @@ CONCORD_SCHEMA = "acr.concord/1"
 EXPLAIN_SCHEMA = "acr.evaluation.explain/1"
 
 
+@functools.lru_cache(maxsize=1)
 def code_sha() -> str:
     """Short git sha, or 'dirty'/'nogit'. A run is only reproducible against the code that
-    produced it, so the code identity belongs in the run's name."""
+    produced it, so the code identity belongs in the run's name — and, since 2026-08-03, in
+    every manifest, which is what made the cost worth thinking about.
+
+    CACHED PER PROCESS, and that is the more correct answer rather than merely the cheaper one.
+    Two `git` subprocesses cost ~42ms; a batch of eighteen charts pays it eighteen times, and
+    the test suite paid it once per simulated run. But the reason to cache is that the code a
+    process is RUNNING was fixed when its modules were imported. A `git rev-parse` issued after
+    someone commits mid-session would report a sha whose code this process never loaded, and a
+    `-dirty` that appears halfway through a batch would split one experiment's runs across two
+    identities for an edit none of them saw. The value at import time is the honest one.
+    """
     try:
         sha = subprocess.run(["git", "rev-parse", "--short=7", "HEAD"],
                              capture_output=True, text=True, timeout=5).stdout.strip()
