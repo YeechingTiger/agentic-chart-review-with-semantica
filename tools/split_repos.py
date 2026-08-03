@@ -137,7 +137,18 @@ REPOS: dict[str, dict] = {
 #: Tests that import no `acr` module at all, routed by what they are ABOUT. `test_adversarial_corpus`
 #: reads chart files and asserts the traps are where the ground truth says: it belongs with the data,
 #: and an import graph cannot see that because it imports nothing.
-TESTS_BY_SUBJECT = {"test_adversarial_corpus.py": "acr-corpus"}
+TESTS_BY_SUBJECT = {
+    "test_adversarial_corpus.py": "acr-corpus",
+    #: A card's test belongs with the card. `assets/skills/` split four ways, so three of these
+    #: were testing an asset that had moved out from under them — which is the same class of bug as
+    #: the card assignment itself, one level up.
+    "test_store_to_spec_skill.py": "acr-spec-authoring",
+    "test_guideline_to_rules_skill.py": "acr-concordance",
+    #: Validates EVERY card in the tree against the slot contract. Its subject is the whole card
+    #: set, which now lives in four repositories, so it can only run where all four are present.
+    "test_skills_load.py": "(composer)",
+    "test_eval_skill_fence.py": "acr-eval",
+}
 
 #: WHO OWNS WHICH METHOD CARD. `assets/skills/` held cards for FOUR different consumers in one
 #: directory, and the split is what made that visible: the five `slot: eval` cards are read by the

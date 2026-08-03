@@ -178,7 +178,7 @@ def test_run_without_feature_flag_calls_deepagents_once_and_directly(tmp_path, m
     monkeypatch.setattr("acr.core.cli_common.chat_model", lambda *args, **kwargs: object())
     result = CliRunner().invoke(app, [
         "run", "SYN0001",
-        "--spec", str(ROOT / "assets/specs/STORE.400_522_523.site_histology_behavior.yaml"),
+        "--spec", str(ROOT / site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"),
         "--corpus", str(ROOT / str(site.corpus_root())),
         "--out", str(tmp_path / "baseline"),
     ])

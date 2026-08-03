@@ -8,9 +8,10 @@ import pytest
 
 from acr.contract import spec_repair as S
 from acr.contract.spec import load_spec
+from acr.core import site
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / "assets/specs/STORE.400_522_523.site_histology_behavior.yaml"
+SPEC = ROOT / site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
 
 
 def gold(*, case_id="CASE1", site="C341", derivability=S.DERIVABLE,

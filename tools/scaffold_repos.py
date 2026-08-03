@@ -438,6 +438,34 @@ failure presents as a missing module rather than as a conflict."""
                     """**This repository is data and scripts, not an importable package.** The install
 step brings in the test tooling and nothing else; run the scripts from the checkout. The siblings
 listed below are what you need installed for them to do anything.""")
+
+    fixtures = """
+### Shared fixtures
+
+The document corpus lives in `acr-corpus` and the task contracts and method cards live in
+`acr-chart-review`. They are DATA, found by path rather than imported, so they are not dependencies
+— clone the siblings beside this repository and everything resolves:
+
+```
+parent/
+  acr-corpus/          <- corpus/patients/
+  acr-chart-review/    <- assets/specs/, assets/skills/
+  {name}/              <- you are here
+```
+
+Or point at them explicitly, which is what a deployment with its own corpus does:
+
+```bash
+export ACR_CORPUS=/path/to/documents
+export ACR_SPECS=/path/to/contracts
+export ACR_SKILLS=/path/to/cards
+```
+
+`acr.core.site.corpus_root()` resolves the environment variable first, then the path under the
+current directory and each parent, then a sibling checkout — and raises naming the variable when
+nothing is found, rather than letting a missing directory surface later as a puzzling
+`UNKNOWN_PATIENT`."""
+
     url = f"https://github.com/{owner}/{name}" if owner else f"<owner>/{name}"
     siblings = "\n".join(
         f"- [`{d}`]({url.rsplit('/', 1)[0]}/{d}) — {PROSE[d]['tagline']}" for d in spec["deps"]
@@ -469,6 +497,7 @@ pytest -q
 ```
 
 {install_note}
+{fixtures}
 
 ## Depends on
 

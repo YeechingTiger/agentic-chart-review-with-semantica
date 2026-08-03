@@ -75,9 +75,9 @@ import pytest
 
 from acr.chartstore.corpus import Corpus
 from acr.contract.spec import load_spec
+from acr.core import site
 from acr.core.llm import LLMClient, LLMConfig, LLMResponse
 from acr.core.state import EvidenceLedger
-from acr.core import site
 from acr.review.answer_gate import check_threads, gate_answer
 from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
 from acr.review.coverage_planner import (

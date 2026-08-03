@@ -195,7 +195,7 @@ def test_runtime_provider_error_is_visible_in_manifest_degradation(tmp_path):
             raise RuntimeError("simulated provider failure")
 
     manifest = run_patient(
-        spec=load_spec(ROOT / "assets/specs/STORE.400_522_523.site_histology_behavior.yaml"),
+        spec=load_spec(ROOT / site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"),
         corpus=Corpus(ROOT / str(site.corpus_root())),
         patient_id="SYN0001",
         out_dir=tmp_path,
