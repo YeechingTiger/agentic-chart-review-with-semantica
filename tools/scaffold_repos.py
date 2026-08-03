@@ -60,6 +60,16 @@ PINS = {
 NOT_REQUIRED = {"scipy", "lc_callback", "openpyxl", "conftest", "hooks_harness"}
 OPTIONAL_EXTRAS = {"acr-chart-review": {"mcp": ["mcp>=1.0", "anyio>=4.0"]}}
 
+#: THE MARKER. Every commit this script makes carries it, and each generated repository's CI fails
+#: when HEAD does not. That is the whole mechanism behind "do not commit here": the generator
+#: force-pushes ONE commit, so any hand commit becomes HEAD and lacks the marker.
+#:
+#: It is a GUARDRAIL, not a lock — the string is copyable, and it is meant to stop an accident rather
+#: than an intent. The accident is specific and real: somebody fixes a typo in `acr-eval`, the next
+#: `scaffold_repos.py --push` force-pushes over it, and the fix is gone with no diff to look at. A
+#: red CI run is the warning that this is about to happen.
+GENERATED_MARKER = "[generated: do not commit here]"
+
 STDLIB = set(sys.stdlib_module_names)
 
 #: Per repo: the paragraph that says what it is for anyone who is not doing cancer registry work,
@@ -379,8 +389,25 @@ nothing is found, rather than letting a missing directory surface later as a puz
     # distribution can. This is the mode that rots silently: on 2026-08-03 four repositories passed
     # 1,319 tests composed while three of them imported a module assigned to a fourth, and the only
     # thing that would have caught it is a run with the siblings absent.
+    (repo_dir / ".generated-from").write_text(
+        f"# This repository is GENERATED. Edits belong in the source tree.\n"
+        f"#\n"
+        f"# The provenance is a tracked file and not only a commit message, so that a reader who\n"
+        f"# arrives at a diff rather than at a log can still see it. CI checks that HEAD's message\n"
+        f"# carries the generator's marker AND names the same source revision recorded here.\n"
+        f"source_repo: agentic-chart-review\n"
+        f"source_revision: {sha}\n"
+        f"generated_by: tools/scaffold_repos.py\n"
+        f"distribution: {name}\n", encoding="utf-8")
+
     (repo_dir / ".github" / "workflows").mkdir(parents=True, exist_ok=True)
-    (repo_dir / ".github" / "workflows" / "ci.yml").write_text('''name: ci
+    # Plain string plus a placeholder, NOT an f-string: this is shell inside YAML and it is full
+    # of `${...}` and `{print $2}`, every one of which an f-string would try to interpolate. The
+    # first version got that wrong in three places at once — doubled braces reaching the file
+    # verbatim, a `\n` becoming a real newline mid-`printf`, and one `run:` over-indented — and the
+    # result was a workflow YAML that does not parse, which GitHub reports as a missing workflow
+    # rather than as an error.
+    _CI = """name: ci
 
 on:
   push:
@@ -393,21 +420,53 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv venv --python 3.12 && uv pip install -e ".[dev]"
-      - run: .venv/bin/ruff check src/ tests/ || true
 
-      # NO SIBLING IS CHECKED OUT, and that is the point. Tests whose fixture ships with another
-      # distribution SKIP and say which one; anything that ERRORS here is a dependency this
-      # repository has and has not declared.
+      # NO SIBLING IS CHECKED OUT, and that is the point. A test whose fixture ships with another
+      # distribution SKIPS and says which one; anything that ERRORS here is a dependency this
+      # repository has and has not declared. The composed reading is the source tree's job — a
+      # single checkout has every plane present and cannot fail this way.
       - name: suite, with no sibling present
-        run: .venv/bin/python -m pytest -q -p no:randomly
-
-      - name: no test may ERROR — a skip is fine, an error is an undeclared dependency
         run: |
           set -o pipefail
-          out=$(.venv/bin/python -m pytest -q -p no:randomly 2>&1 | tail -1)
-          echo "$out"
-          case "$out" in *error*) exit 1 ;; esac
-''', encoding="utf-8")
+          .venv/bin/python -m pytest -q -p no:randomly 2>&1 | tee /tmp/out
+          tail -1 /tmp/out | grep -qi error && {
+            echo "::error::a test ERRORED with no sibling installed — that is an undeclared dependency"
+            exit 1
+          } || true
+
+  provenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # THIS REPOSITORY IS GENERATED. The generator force-pushes ONE commit, so a hand commit becomes
+      # HEAD and does not carry the marker. Failing here is the warning that the commit is about to
+      # be lost — silently, with no diff to look at, which is the whole reason to check. A guardrail
+      # against an accident, not a lock against an intent.
+      - name: HEAD must be a generated commit
+        run: |
+          set -euo pipefail
+          if ! git log -1 --pretty=%B | grep -qF '__MARKER__'; then
+            echo "::error::HEAD was not written by tools/scaffold_repos.py."
+            echo "Edits belong in the source tree named in .generated-from; a commit made here is"
+            echo "lost at the next generation. HEAD's message was:"
+            git log -1 --pretty=%B | sed 's/^/    /'
+            exit 1
+          fi
+
+      # And it must name the revision `.generated-from` records. Two sources for one fact is two
+      # facts, and the one nobody reads is the one that goes stale.
+      - name: the recorded source revision must match the commit message
+        run: |
+          set -euo pipefail
+          rev=$(awk '/^source_revision:/ {print $2}' .generated-from)
+          git log -1 --pretty=%B | grep -qF "${rev:0:12}" || {
+            echo "::error::.generated-from records $rev but HEAD's message does not name it."
+            exit 1
+          }
+"""
+    (repo_dir / ".github" / "workflows" / "ci.yml").write_text(
+        _CI.replace("__MARKER__", GENERATED_MARKER), encoding="utf-8")
 
     url = f"https://github.com/{owner}/{name}" if owner else f"<owner>/{name}"
     siblings = "\n".join(
@@ -486,10 +545,13 @@ def main() -> int:
         subprocess.run(
             ["git", "commit", "-q", "-m",
              f"{PROSE[name]['tagline']}\n\n"
-             f"Extracted from a single repository at {sha[:12]}. One of nine: the planes of that "
-             f"tree met only through shared types and through artifacts on disk, and making that "
-             f"boundary physical is what lets a failure in one of them localise.\n\n"
-             f"`acr` is a PEP 420 namespace package across all nine; no import statement changed."],
+             f"{GENERATED_MARKER}\n\n"
+             f"Generated from the source tree at {sha[:12]} by tools/scaffold_repos.py. One of "
+             f"four: those planes met only through shared types and through artifacts on disk, and "
+             f"making that boundary physical is what lets a failure in one of them localise.\n\n"
+             f"`acr` is a PEP 420 namespace package across all four; no import statement changed.\n"
+             f"Edits belong in the source tree. A commit made HERE is lost at the next generation, "
+             f"and this repository's CI fails on any HEAD that does not carry the marker above."],
             cwd=d, check=True)
         n = len(list(d.rglob("*")))
         print(f"  {name:<22}{n:>6} files  deps={len(REPOS[name]['deps'])} sibling(s)")
