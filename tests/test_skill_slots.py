@@ -38,6 +38,10 @@ def _skill_names() -> list[str]:
 
 @pytest.mark.parametrize("name", _skill_names())
 def test_every_skill_declares_a_known_slot(name: str):
+    import yaml as _y
+    _fm = _y.safe_load(_FM.match((SKILLS_DIR / name / "SKILL.md").read_text(encoding="utf-8")).group(1))
+    if str(_fm.get("kind") or "prose") != "prose":
+        pytest.skip("only prose skills are assembled into a prompt, so only they need a slot")
     slot = skill_slot(name)
     assert slot in SLOTS, f"{name}: slot {slot!r} not one of {SLOTS}"
 
@@ -47,6 +51,9 @@ def test_declared_slot_matches_the_file(name: str):
     """skill_slot 读的就是文件里那一行，不是别处推断的。"""
     text = (SKILLS_DIR / name / "SKILL.md").read_text(encoding="utf-8")
     fm = yaml.safe_load(_FM.match(text).group(1))
+    if str(fm.get("kind") or "prose") != "prose":
+        pytest.skip("a slot is where PROSE goes in a prompt; a script/llm/subagent skill is "
+                    "invoked through contract/skill_invoke.py and never rendered")
     assert fm["slot"] == skill_slot(name)
 
 

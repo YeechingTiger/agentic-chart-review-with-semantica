@@ -133,9 +133,15 @@ def skill_slot(name: str, skills_dir: Path | str | None = None) -> str:
     fm = _frontmatter(name, skills_dir)
     slot = fm.get("slot")
     if not slot:
+        # A slot is WHERE prose goes in a prompt, so only prose needs one. A script, an llm call or
+        # a subagent is invoked through `contract/skill_invoke.py` and never rendered, and demanding
+        # a slot for it would mean picking an assembly position for something that is not assembled.
+        if str(fm.get("kind") or "prose") != "prose":
+            return ""
         raise SkillError(
             f"skill {name!r} declares no `slot`. Add one of {list(SLOTS)} to its frontmatter; "
-            f"an undeclared slot cannot be assembled without guessing.")
+            f"an undeclared slot cannot be assembled without guessing. (Only `kind: prose` skills "
+            f"need one — a script or subagent skill is invoked, not rendered.)")
     if slot not in SLOTS:
         raise SkillError(
             f"skill {name!r} declares unknown slot {slot!r}; expected one of {list(SLOTS)}")
