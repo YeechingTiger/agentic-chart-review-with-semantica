@@ -14,8 +14,8 @@ directory here is owned by one of them:
 | `codes/` | contract | value-domain code tables, declared as `axes:` — a code system, not necessarily a cancer one |
 | `guidelines/` | contract | clinical guidelines the rule engine scores concordance against |
 | `contracts/` | contract | JSON Schemas for the spec extensions |
-| `skills/` | review + diagnosis | method cards. The `task` / `search` / `general` slots are the chart review agent's; the `eval` slot belongs to diagnosis and never enters a chart run |
-| `module_catalog/` | review + audit + evaluation | `runtime_controls/` and `runtime_policies/` are review's, `audit_rules/` is audit's, `evaluators/` is evaluation's — the subdirectories already carry the split |
+| `skills/` | review + diagnosis | method cards. The `task` / `policy` / `tactic` / `experience` / `general` slots are the chart review agent's; the `eval` slot belongs to diagnosis and never enters a chart run. (The policy slot was `search` until 2026-08-02 and `controller` until 2026-08-03.) |
+| `module_catalog/` | review + audit + evaluation | `runtime_policies/` is review's, `audit_rules/` is audit's, `evaluators/` is evaluation's — the subdirectories already carry the split. (`runtime_controls/` was removed 2026-08-03 with the RuntimeControl protocol.) |
 | `evaluators/` | evaluation | LLM evaluator definitions, loaded by `judge` |
 | `pipeline_catalog/` | evaluation | node conditions, dependencies, capability allowlists, budget ceilings |
 | `certification_catalog/` | evaluation | must-pass / must-fail fixtures and calibration cohorts |

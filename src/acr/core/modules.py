@@ -18,12 +18,16 @@ import yaml
 
 from .kernel import AssetRef, digest
 
+#: 一个 kind 只有在既有 Protocol 又有实现时才留在这里。2026-08-03 删掉了 `RUNTIME_CONTROL`
+#: 和 `REPAIR_STRATEGY`：两者的 Protocol 在同一天随各自唯一的实现一起删除
+#: (`review/runtime_controls.py`、`improvement/repair_loop.py`，生产代码零引用)，而 kind 留了
+#: 下来 —— 于是 `assets/module_catalog/runtime_controls/` 里五份 YAML 继续通过 `__post_init__`
+#: 的 kind 校验并被 `from_directory` 正常加载，声明着没有任何代码能运行的资产。校验放行是因为
+#: 名单里有这个名字，而名单是删除时唯一没人想起来改的地方。
 MODULE_KINDS = frozenset({
     "RUNTIME_POLICY",
-    "RUNTIME_CONTROL",
     "AUDIT_RULE",
     "EVALUATOR",
-    "REPAIR_STRATEGY",
 })
 RUNNER_TYPES = frozenset({"CODE", "LLM", "AGENT", "HUMAN"})
 TRUTH_MODES = frozenset({"BLIND", "REGISTRY_REFERENCE", "GOLD"})

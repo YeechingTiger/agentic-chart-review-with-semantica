@@ -764,98 +764,14 @@ def trajectory_integrity_audit(
     )
     return tuple(findings), incidents
 
-
-def runtime_control_conformance_audit(
-    asset: ModuleAsset, context: AuditContext
-) -> tuple[tuple[AuditFinding, ...], tuple[AuditIncident, ...]]:
-    """Detect a recorded hard-control denial that the final run bypassed.
-
-    This rule does not ask whether the gate is clinically effective.  It only
-    checks whether the implementation obeyed its own recorded deterministic
-    decision.
-    """
-    output_status = str(context.trajectory.output.get("status") or "")
-    output_values = context.trajectory.output.get("value") or {}
-    output_fields = (
-        set(output_values) if isinstance(output_values, Mapping) else set()
-    )
-    findings = []
-    for index, event in enumerate(context.application_events):
-        kind = str(event.get("kind") or "").lower()
-        seq = event.get("seq", index)
-        refused = set()
-        for key in (
-            "refused_fields",
-            "inadmissible_fields",
-            "rejected_fields",
-            "disallowed_fields",
-        ):
-            value = event.get(key)
-            if isinstance(value, str):
-                refused.add(value)
-            elif isinstance(value, (list, tuple, set)):
-                refused.update(str(row) for row in value)
-        verdict = event.get("verdict")
-        if isinstance(verdict, Mapping):
-            refused.update(
-                str(field)
-                for field, accepted in verdict.items()
-                if accepted is False
-            )
-        denied = (
-            kind in {"gate_decision", "answer_gate"}
-            and str(
-                event.get("decision")
-                or event.get("outcome")
-                or event.get("status")
-                or ""
-            ).upper()
-            in {"DENY", "REJECT", "REJECTED", "FAIL"}
-        )
-        overlapping = sorted(refused & output_fields)
-        if output_status != "FOUND" or (not denied and not overlapping):
-            continue
-        finding_kind = (
-            "HARD_GATE_BYPASS"
-            if denied
-            else "ADMISSIBILITY_CONTROL_BYPASS"
-        )
-        findings.append(AuditFinding(
-            finding_id=_finding_id(
-                asset, context, finding_kind, f"event:{seq}"
-            ),
-            rule_ref=asset.ref,
-            trajectory_id=context.trajectory.trajectory_id,
-            target_ref=_target(context, "GATE_DECISION", str(seq)),
-            kind=finding_kind,
-            severity="CRITICAL",
-            message=(
-                "final FOUND output contradicts a recorded deterministic "
-                "runtime-control denial"
-            ),
-            evidence=({
-                "source_type": "APPLICATION_EVENT",
-                "source_id": str(seq),
-                "refused_output_fields": overlapping,
-                "final_status": output_status,
-            },),
-        ))
-    incidents = tuple(
-        AuditIncident(
-            incident_id=_incident_id(
-                asset, context, row.kind, (row.finding_id,)
-            ),
-            rule_ref=asset.ref,
-            trajectory_id=context.trajectory.trajectory_id,
-            target_ref=row.target_ref,
-            kind=row.kind,
-            severity="CRITICAL",
-            finding_ids=(row.finding_id,),
-            rationale=row.message,
-        )
-        for row in findings
-    )
-    return tuple(findings), incidents
+# 2026-08-03 这里曾有 `runtime_control_conformance_audit`：一条检查"最终结果是否绕过了记录在案
+# 的硬控制拒绝"的审计规则。它不 import 任何东西，所以删掉 RuntimeControl 协议时它看起来毫发
+# 无伤 —— 它读的是 trace 事件里的 `refused_fields` / `inadmissible_fields` / `rejected_fields` /
+# `disallowed_fields`。而这四个键在 `src/` 里零处写入，在 runs/ 的 454 份 manifest 和 trace 里
+# 零次出现。也就是说：自它被写下起，它一次都不可能触发过。
+#
+# 这是"删一个机制会留下什么"的标准形状，而留下它的那次删除是我做的。一条读事件而不 import 类型
+# 的规则，在依赖图上是隐形的；判定它死掉的唯一办法是问"还有谁写它读的那些键"。
 
 
 def _audit_asset(
@@ -919,14 +835,6 @@ def builtin_audit_registry() -> AuditRuleRegistry:
                 "Verify content-addressed run artifacts remain reproducible.",
             ),
             trajectory_integrity_audit,
-        ),
-        (
-            _audit_asset(
-                "runtime-control-conformance-audit",
-                "audit.runtime_control_conformance.v1",
-                "Detect final results that bypass recorded hard-control denials.",
-            ),
-            runtime_control_conformance_audit,
         ),
     ):
         registry.register(asset, implementation)
