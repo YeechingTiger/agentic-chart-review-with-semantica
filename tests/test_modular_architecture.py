@@ -44,13 +44,7 @@ from acr.evaluation.evaluation_pipeline import (
     TruthContext,
     make_result,
 )
-from acr.improvement.repair_loop import RepairSignalRouter
 from acr.review.answer_gate import gate_answer
-from acr.review.runtime_controls import (
-    ProposedAction,
-    RunControlState,
-    builtin_runtime_control_registry,
-)
 from acr.review.runtime_profiles import (
     ALWAYS_COVERAGE_PROFILE,
     CONDITIONAL_COVERAGE_PROFILE,
@@ -806,7 +800,13 @@ def test_capability_broker_enforces_effective_patient_scope():
         broker.call("patient-chart-reader", subject_id="CASE-002")
 
 
-def test_audit_incident_routes_only_to_control_repair():
+def test_audit_catches_a_tool_call_that_leaves_the_patient_under_review():
+    """一次运行只应触及一个病人。这条测试钉住审计确实会发现越界,并且把发现变成一个可路由的信号。
+
+    2026-08-03 之前它还断言 `RepairSignalRouter` 把这个信号路由成 `SECURITY_CONTROL` 且不改
+    语义。那个路由器在生产代码里零引用,已删除;审计这一半是活的,所以断言退到信号本身 ——
+    越界被发现了,而且带着产出它的资产引用。
+    """
     events = ({
         "seq": 1,
         "kind": "tool",
@@ -822,39 +822,9 @@ def test_audit_incident_routes_only_to_control_repair():
     )
     incident = report.incidents[0]
     asset = registry.resolve("patient-boundary-audit")
-    obligation = RepairSignalRouter().route(
-        (incident.to_signal(asset.asset_ref),),
-        truth_mode="BLIND",
-    )[0]
-    assert obligation.repair_kind == "SECURITY_CONTROL"
-    assert not obligation.semantic_change
-
-
-def test_registry_spec_content_signal_creates_question_not_semantic_patch():
-    asset = builtin_evaluation_module_registry().resolve(
-        "gate-effectiveness"
-    )
-    invocation = EvaluationInvocation(
-        asset,
-        PipelineNode(
-            "gate", asset.ref, authority="SCREEN_ONLY"
-        ),
-        _context(),
-        {"trajectory": _context().resolve_channel("trajectory")},
-        (),
-        TaskBudget(),
-        "SCREEN_ONLY",
-    )
-    signal = make_result(
-        invocation, status="FLAG", reason="possible spec content issue"
-    ).to_signal(asset)
-    obligation = RepairSignalRouter().route(
-        (signal,),
-        truth_mode="REGISTRY_REFERENCE",
-        attribution={"primary_cause": {"cause": "SPEC_CONTENT"}},
-    )[0]
-    assert obligation.repair_kind == "CLINICIAN_QUESTION"
-    assert not obligation.semantic_change
+    signal = incident.to_signal(asset.asset_ref)
+    assert signal.signal_type == "AUDIT_INCIDENT"
+    assert signal.producer_ref == asset.asset_ref
 
 
 def test_coverage_policies_have_distinct_stopping_obligations():
@@ -877,21 +847,3 @@ def test_coverage_policies_have_distinct_stopping_obligations():
     )
     assert WitnessFirstPolicy().should_stop(state).stop
     assert not StratifiedCoveragePolicy().should_stop(state).stop
-
-
-def test_runtime_controls_are_inline_deterministic_modules():
-    registry = builtin_runtime_control_registry()
-    _, patient_control = registry.resolve("patient-scope-control")
-    decision = patient_control.check(
-        ProposedAction("TOOL_CALL", patient_id="CASE-002"),
-        RunControlState(patient_scope="CASE-001"),
-    )
-    assert decision.decision == "DENY"
-
-    _, answer_control = registry.resolve("evidence-answer-control")
-    requirement = answer_control.check(
-        ProposedAction("SUBMIT_ANSWER", answer={"status": "FOUND"}),
-        RunControlState(patient_scope="CASE-001", proof_valid=False),
-    )
-    assert requirement.decision == "REQUIRE"
-    assert requirement.requirement == "valid_evidence_proof"

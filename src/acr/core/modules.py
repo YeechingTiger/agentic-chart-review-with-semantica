@@ -868,11 +868,6 @@ class RuntimePolicy(Protocol):
 
 
 @runtime_checkable
-class RuntimeControl(Protocol):
-    def check(self, proposed_action: Any, run_state: Any) -> Any: ...
-
-
-@runtime_checkable
 class AuditRule(Protocol):
     def inspect(self, trajectory: Any, application_events: Any) -> Any: ...
     def correlate(self, findings: Any) -> Any: ...
@@ -883,7 +878,9 @@ class Evaluator(Protocol):
     def evaluate(self, context: Any) -> Any: ...
 
 
-@runtime_checkable
-class RepairStrategy(Protocol):
-    def route(self, signals: Any, attribution: Any, cluster: Any) -> Any: ...
-    def propose(self, obligation: Any) -> Any: ...
+# 2026-08-03 这里曾有 `RuntimeControl` 和 `RepairStrategy` 两个 protocol，各自的唯一实现
+# (`review/runtime_controls.py`、`improvement/repair_loop.py`) 在生产代码里零引用，删除时把
+# protocol 一起带走：一个没有实现者的 protocol，是同一份死代码往上挪了一层，而且读起来像是
+# 系统有这个能力。真正的强制在 `review/answer_gate.py`(答案义务)、`core/spend.py:74`
+# (预算上限)、`review/agent.py` 的 `_undeclared`(工具白名单)、`core/local_artifacts.py`
+# (病人衍生数据不出 worktree)，以及"一次运行只绑一个 PatientChart"这个对象图事实里。

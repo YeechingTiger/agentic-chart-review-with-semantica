@@ -257,8 +257,7 @@ The v2 analysis contracts add:
 - `audit_loop.py`: truth-blind application AuditRule → Finding → Incident;
 - `evaluation_pipeline.py`: typed channels, separate `TruthContext`, and EvaluationResult
   without audit incidents;
-- `runtime_profiles.py`: witness-first and current-stratified coverage profiles;
-- `repair_loop.py`: deterministic signal-to-owner repair routing.
+- `runtime_profiles.py`: witness-first and current-stratified coverage profiles.
 
 The v1 EvalLoop and its duplicated evaluator catalog have been removed. Current analysis
 uses `ModuleAsset` + `PipelineProfile`; causal attribution keeps its dedicated tool-using

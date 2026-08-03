@@ -49,10 +49,12 @@ repo 外本地 artifact；trajectory event 中的自由文本只保留 hash 和�
 `acr.modules` 只定义五类 module protocol：
 
 1. `RuntimePolicy`：搜索、coverage、扩展和停止策略。
-2. `RuntimeControl`：当前请求内的确定性 allow/deny/require。
-3. `AuditRule`：truth-blind 行为边界检查。
-4. `Evaluator`：CODE/LLM/AGENT/HUMAN 质量评价。
-5. `RepairStrategy`：从已确认 signal 路由到有 owner 的 repair obligation。
+2. `AuditRule`：truth-blind 行为边界检查。
+3. `Evaluator`：CODE/LLM/AGENT/HUMAN 质量评价。
+
+> 2026-08-03：本文曾列五类，另两类是 `RuntimeControl`(请求内 allow/deny/require) 和
+> `RepairStrategy`(signal → repair obligation 路由)。两者各自唯一的实现在生产代码里零引用，
+> 已连同 protocol 一并删除。第 8 节描述的 `acr.repair_loop` 保证从未在任何活路径上生效。
 
 YAML 只能引用显式注册的 `implementation_id`。系统不允许从 YAML 动态 import
 任意 Python 代码。
