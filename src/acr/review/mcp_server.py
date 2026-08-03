@@ -98,6 +98,7 @@ from ..contract.answer_contract import (
 )
 from ..contract.outcomes import KIND_ABSTAIN_EVIDENCE, status_kind
 from ..contract.spec import ExtractionSpec, load_specs
+from ..core import site
 from ..core.state import EvidenceLedger
 from .answer_gate import check_gate, gate_answer, keyword_hits_among_drawn
 from .coverage import (
@@ -216,7 +217,7 @@ class RunSession:
 class ChartReviewService:
     """Session state and handlers. The MCP layer is a shim over `call`."""
 
-    def __init__(self, corpus_root: str | Path, spec_dir: str | Path = "assets/specs", *,
+    def __init__(self, corpus_root: str | Path, spec_dir: str | Path = str(site.specs_root()), *,
                  seed_secret: bytes | None = None, truth_token: str | None = None,
                  corpus_vocabulary: bool = True):
         self.corpus = Corpus(Path(corpus_root))
@@ -948,8 +949,8 @@ def main() -> None:
     from mcp.server.stdio import stdio_server
 
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--corpus", default="corpus/patients")
-    ap.add_argument("--specs", default="assets/specs")
+    ap.add_argument("--corpus", default=str(site.corpus_root()))
+    ap.add_argument("--specs", default=str(site.specs_root()))
     args = ap.parse_args()
 
     service = ChartReviewService(args.corpus, args.specs)

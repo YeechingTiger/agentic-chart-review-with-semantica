@@ -43,10 +43,11 @@ from acr.contract.spec import (
     load_spec,
     weakest_status,
 )
+from acr.core import site
 from acr.core.llm import LLMClient, LLMConfig, LLMResponse
 
 ROOT = Path(__file__).resolve().parents[1]
-SPECS = ROOT / "assets" / "specs"
+SPECS = site.specs_root()
 SHB = SPECS / "STORE.400_522_523.site_histology_behavior.yaml"
 STAGE = SPECS / "STORE.700_880.stage.yaml"
 ALL_SPECS = sorted(SPECS.glob("*.yaml")) + sorted((SPECS / "ablation").glob("*.yaml"))
@@ -352,7 +353,7 @@ def test_a_gate_validated_run_is_still_not_reportable_as_validated(tmp_path):
 
     spec = load_spec(SHB)
     llm = _ScriptedLLM({"primary_site": "C341", "histology": "8140", "behavior": "3"})
-    manifest, _ = run_with_script(spec, Corpus(ROOT / "corpus" / "patients"), "SYN0001",
+    manifest, _ = run_with_script(spec, Corpus(site.corpus_root()), "SYN0001",
                                   tmp_path, llm, run_id="prov-test", max_model_calls=8)
 
     prov = manifest["provenance"]
@@ -372,7 +373,7 @@ def test_the_manifest_names_the_elements_that_dragged_the_status_down(tmp_path):
 
     spec = load_spec(SHB)
     llm = _ScriptedLLM({"primary_site": "C341", "histology": "8140", "behavior": "3"})
-    manifest, _ = run_with_script(spec, Corpus(ROOT / "corpus" / "patients"), "SYN0001",
+    manifest, _ = run_with_script(spec, Corpus(site.corpus_root()), "SYN0001",
                                   tmp_path, llm, run_id="prov-test-2", max_model_calls=8)
     prov = manifest["provenance"]
     assert set(prov["weakest_elements"]) <= set(prov["elements_used"])

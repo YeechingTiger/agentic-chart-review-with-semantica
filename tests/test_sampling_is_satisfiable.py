@@ -18,15 +18,16 @@ import pytest
 
 from acr.chartstore.corpus import Corpus
 from acr.contract.spec import load_spec
+from acr.core import site
 from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+SPEC = site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
 
 
 @pytest.fixture
 def ledger():
-    docs, _ = Corpus(ROOT / "corpus" / "patients").chart("SYN0002").list_documents(limit=100_000)
+    docs, _ = Corpus(site.corpus_root()).chart("SYN0002").list_documents(limit=100_000)
     return CoverageLedger(docs, strata_from_spec(load_spec(SPEC)), ForcedSampler(1234))
 
 

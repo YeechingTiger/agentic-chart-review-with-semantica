@@ -34,6 +34,7 @@ from acr.contract.code_tables import (
     load_table,
     prompt_block,
 )
+from acr.core import site
 
 
 @pytest.fixture(scope="module")
@@ -346,7 +347,7 @@ def test_a_spec_with_no_code_system_gets_no_block():
     """日期和 class-of-case 变量没有 ICD-O-3 值域。塞一墙肺形态码给它们忽略是提示词膨胀。"""
     from acr.contract.code_tables import code_domain_block
     from acr.contract.spec import load_specs as _lss
-    blocks = {sid: code_domain_block(sp) for sid, sp in _lss("assets/specs").items()}
+    blocks = {sid: code_domain_block(sp) for sid, sp in _lss(str(site.specs_root())).items()}
     assert blocks["STORE.400_522_523.site_histology_behavior"]
     assert not blocks["STORE.390.date_of_initial_diagnosis"]
     assert not blocks["STORE.610.class_of_case"]

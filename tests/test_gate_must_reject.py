@@ -33,6 +33,7 @@ from pathlib import Path
 
 from acr.chartstore.corpus import Corpus
 from acr.contract.spec import load_spec
+from acr.core import site
 from acr.review.coverage import (
     CoverageLedger,
     ForcedSampler,
@@ -42,12 +43,12 @@ from acr.review.coverage import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-STRATIFIED = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
-UNSTRATIFIED = ROOT / "assets" / "specs" / "ablation" / "STORE.400_522_523.unstratified.yaml"
+STRATIFIED = site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
+UNSTRATIFIED = site.specs_root() / "ablation" / "STORE.400_522_523.unstratified.yaml"
 
 
 def _fresh_ledger(spec, pid="SYN0002"):
-    docs, _ = Corpus(ROOT / "corpus" / "patients").chart(pid).list_documents(limit=100_000)
+    docs, _ = Corpus(site.corpus_root()).chart(pid).list_documents(limit=100_000)
     return CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(1234))
 
 
@@ -179,8 +180,8 @@ def test_ablation_needs_a_found_case():
     answer is FOUND, where matching cannot happen by default.
     """
     import json
-    gt2 = json.loads((ROOT / "corpus" / "patients" / "SYN0002" / "_ground_truth.json").read_text())
-    gt1 = json.loads((ROOT / "corpus" / "patients" / "SYN0001" / "_ground_truth.json").read_text())
+    gt2 = json.loads((site.corpus_root() / "SYN0002" / "_ground_truth.json").read_text())
+    gt1 = json.loads((site.corpus_root() / "SYN0001" / "_ground_truth.json").read_text())
     key = "STORE.400_522_523.site_histology_behavior"
 
     assert gt2["ground_truth"][key]["status"] == "EVIDENCE_INSUFFICIENT"
@@ -259,7 +260,7 @@ def test_an_unread_search_hit_is_reviewed_by_nothing():
     spec = load_spec(STRATIFIED)
     led = _fresh_ledger(spec)
     led.listed_documents = True
-    chart = Corpus(ROOT / "corpus" / "patients").chart("SYN0002")
+    chart = Corpus(site.corpus_root()).chart("SYN0002")
     for kw in ["pathology", "biopsy", "final diagnosis", "specimen", "carcinoma"]:
         led.note_search(kw, [h.note_id for h in chart.search(kw, max_hits=40)])
     for docs in led.pending_samples().values():

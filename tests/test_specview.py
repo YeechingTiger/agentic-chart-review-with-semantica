@@ -50,6 +50,7 @@ from typer.testing import CliRunner
 
 from acr.commands.cli import app
 from acr.contract.spec import load_spec
+from acr.core import site
 from acr.usecase.specview import (
     JARGON,
     MODEL_AUTHORED,
@@ -66,12 +67,12 @@ from acr.usecase.specview import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-SPECS = sorted((ROOT / "assets" / "specs").glob("*.yaml"))
-SHB = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
-STAGE = ROOT / "assets" / "specs" / "STORE.700_880.stage.yaml"
-DXDATE = ROOT / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
-RECUR = ROOT / "assets" / "specs" / "STORE.1860_1880.first_recurrence.yaml"
-COC = ROOT / "assets" / "specs" / "STORE.610.class_of_case.yaml"
+SPECS = sorted((site.specs_root()).glob("*.yaml"))
+SHB = site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
+STAGE = site.specs_root() / "STORE.700_880.stage.yaml"
+DXDATE = site.specs_root() / "STORE.390.date_of_initial_diagnosis.yaml"
+RECUR = site.specs_root() / "STORE.1860_1880.first_recurrence.yaml"
+COC = site.specs_root() / "STORE.610.class_of_case.yaml"
 
 runner = CliRunner()
 

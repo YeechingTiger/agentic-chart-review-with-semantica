@@ -19,14 +19,15 @@ import pytest
 from typer.testing import CliRunner
 
 from acr.commands.cli import app
+from acr.core import site
 from acr.improvement import labelling as lab
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = str(ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml")
+SPEC = str(site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml")
 #: A spec with no `evidence_rules`: it does not say what would establish its answer, so the
 #: standing question has no definition and `Requirement.from_spec` refuses it.
-UNLABELLABLE = str(ROOT / "assets" / "specs" / "STORE.610.class_of_case.yaml")
-CORPUS = str(ROOT / "corpus" / "patients")
+UNLABELLABLE = str(site.specs_root() / "STORE.610.class_of_case.yaml")
+CORPUS = str(site.corpus_root())
 
 runner = CliRunner()
 

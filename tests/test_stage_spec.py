@@ -69,6 +69,7 @@ import pytest
 from acr.chartstore.corpus import Corpus, DocMeta
 from acr.contract.answer_checks import check_answer, check_field_formats
 from acr.contract.spec import load_spec
+from acr.core import site
 from acr.review.coverage import (
     CoverageLedger,
     ForcedSampler,
@@ -78,8 +79,8 @@ from acr.review.coverage import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC_PATH = ROOT / "assets" / "specs" / "STORE.700_880.stage.yaml"
-CORPUS = ROOT / "corpus" / "patients"
+SPEC_PATH = site.specs_root() / "STORE.700_880.stage.yaml"
+CORPUS = site.corpus_root()
 
 
 @pytest.fixture(scope="module")

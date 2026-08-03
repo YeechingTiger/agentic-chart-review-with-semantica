@@ -44,8 +44,9 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from acr.chartstore.corpus import Corpus
 from acr.contract.spec import load_spec
+from acr.core import site
 
-SPEC = ROOT / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
+SPEC = site.specs_root() / "STORE.390.date_of_initial_diagnosis.yaml"
 
 #: Words too common to be a retrieval term in a clinical corpus. A vocabulary that includes
 #: "date" or "report" hits every document and would make reachability look total.
@@ -102,7 +103,7 @@ def main() -> int:
     spec = load_spec(SPEC)
     vocab = contract_vocabulary(spec)
     vset = set(vocab)
-    corpus = Corpus(ROOT / "corpus" / "patients")
+    corpus = Corpus(site.corpus_root())
     gold = {r["patient_id"]: r for r in json.loads((ROOT / "corpus" / "index.json").read_text())}
 
     print(f"contract vocabulary: {len(vocab)} words")

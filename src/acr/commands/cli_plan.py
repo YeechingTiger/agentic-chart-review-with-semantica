@@ -19,7 +19,7 @@ from ..authoring.intake import ModelClassifier, load_guidelines, route
 from ..contract import deps as depsmod
 from ..contract.concordance import GuidelineError
 from ..contract.registry_catalog import VariableCatalog
-from ..core import cli_common
+from ..core import cli_common, site
 from ..core.cli_common import API_BASE, MODEL, code_sha, con
 
 plan_app = typer.Typer(add_completion=False)
@@ -31,7 +31,7 @@ ASK_SCHEMA = "acr.routing/1"
 def ask(
     question: str = typer.Argument(..., help="a question, a variable name, a spec id, a STORE "
                                              "item, a guideline id or a recommendation id"),
-    specs_dir: str = typer.Option("assets/specs", "--specs", help="directory scanned for specs"),
+    specs_dir: str = typer.Option(str(site.specs_root()), "--specs", help="directory scanned for specs"),
     guidelines_dir: str = typer.Option("assets/guidelines", "--guidelines",
                                        help="directory scanned for guideline YAMLs"),
     skills_dir: str = typer.Option("skills", "--skills-dir",
@@ -214,7 +214,7 @@ def _render_deps(doc: dict, impact) -> None:
 @plan_app.command("deps")
 def deps_cmd(
     guideline: str = typer.Option(..., "--guideline", help="path to a guideline YAML"),
-    specs_dir: str = typer.Option("assets/specs", "--specs", help="directory scanned for specs"),
+    specs_dir: str = typer.Option(str(site.specs_root()), "--specs", help="directory scanned for specs"),
     spec: str = typer.Option("", "--spec",
                              help="report what editing this spec invalidates under --runs"),
     runs: str = typer.Option("runs", "--runs", help="tree scanned for concordance artifacts"),

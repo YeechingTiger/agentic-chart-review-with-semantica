@@ -26,6 +26,7 @@ import pytest
 
 from acr.chartstore.corpus import Corpus
 from acr.contract.spec import load_spec
+from acr.core import site
 from acr.review.coverage import (
     CoverageLedger,
     ForcedSampler,
@@ -39,8 +40,8 @@ from acr.review.coverage import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-CORPUS = ROOT / "corpus" / "patients"
-SHB = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+CORPUS = site.corpus_root()
+SHB = site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
 QUALIFYING = ["Onc-", "CT", "PET", "Pathology", "Imaging"]
 
 

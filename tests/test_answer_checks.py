@@ -44,9 +44,10 @@ from acr.contract.answer_checks import (
     field_rule_id,
 )
 from acr.contract.spec import ProvenanceError, load_spec
+from acr.core import site
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+SPEC = site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
 
 
 class F:

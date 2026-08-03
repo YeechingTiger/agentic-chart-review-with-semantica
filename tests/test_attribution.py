@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from acr.chartstore.corpus import Corpus
+from acr.core import site
 from acr.core.local_artifacts import LocalArtifactError, LocalArtifactStore
 from acr.diagnosis import attribution as A
 
@@ -144,7 +145,7 @@ def test_unadjudicated_mode_cannot_claim_human_adjudicated_evidence():
 
 def test_chart_reads_require_trace_then_probe_and_have_no_patient_argument():
     p = packet()
-    chart = Corpus(ROOT / "corpus/patients").chart("SYN0001")
+    chart = Corpus(ROOT / str(site.corpus_root())).chart("SYN0001")
     ctx = A.AttributionRuntimeContext(p, chart, max_chart_reads=2, max_usd=1.0)
     tools = {tool.name: tool for tool in A.attribution_tools(ctx)}
     assert "patient" not in tools["read_document"].args
@@ -187,7 +188,7 @@ def test_packet_and_probe_citations_are_resolved_not_merely_nonempty():
             "case_id": "CASE001", "adjudication": "UNRESOLVED",
             "registry_value": {"histology": "8140"},
         })
-    chart = Corpus(ROOT / "corpus/patients").chart("SYN0001")
+    chart = Corpus(ROOT / str(site.corpus_root())).chart("SYN0001")
     ctx = A.AttributionRuntimeContext(p, chart, max_chart_reads=0, max_usd=1.0)
     ctx.probes.append(A.AttributionProbe(
         "probe-1", "q", ("a", "b"), "d", confirmation=True))
@@ -316,7 +317,7 @@ def test_deepagents_runner_accepts_a_structured_runtime_attribution():
             return ChatResult(generations=[ChatGeneration(message=message)])
 
     report = A.run_attribution_agent(
-        packet=packet(), chart=Corpus(ROOT / "corpus/patients").chart("SYN0001"),
+        packet=packet(), chart=Corpus(ROOT / str(site.corpus_root())).chart("SYN0001"),
         model=Script(), max_model_calls=10, max_usd=1.0, max_chart_reads=0,
         skeptic_model=SkepticScript(),
     )

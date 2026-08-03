@@ -25,14 +25,15 @@ from typer.testing import CliRunner
 from acr.authoring import speclint
 from acr.commands.cli import app
 from acr.contract.spec import ExtractionSpec, load_spec
+from acr.core import site
 
 ROOT = Path(__file__).resolve().parents[1]
-SPECS = sorted((ROOT / "assets" / "specs").glob("*.yaml")) + sorted((ROOT / "assets" / "specs" / "ablation").glob("*.yaml"))
-DIAG = ROOT / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
-RECUR = ROOT / "assets" / "specs" / "STORE.1860_1880.first_recurrence.yaml"
-STAGE = ROOT / "assets" / "specs" / "STORE.700_880.stage.yaml"
-SHB = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
-COC = ROOT / "assets" / "specs" / "STORE.610.class_of_case.yaml"
+SPECS = sorted((site.specs_root()).glob("*.yaml")) + sorted((site.specs_root() / "ablation").glob("*.yaml"))
+DIAG = site.specs_root() / "STORE.390.date_of_initial_diagnosis.yaml"
+RECUR = site.specs_root() / "STORE.1860_1880.first_recurrence.yaml"
+STAGE = site.specs_root() / "STORE.700_880.stage.yaml"
+SHB = site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
+COC = site.specs_root() / "STORE.610.class_of_case.yaml"
 
 runner = CliRunner()
 
@@ -450,7 +451,7 @@ def test_the_cli_exits_non_zero_on_a_tier1_failure():
 
 
 def test_the_cli_lints_a_directory_and_prints_the_gate_table():
-    r = runner.invoke(app, ["spec", "lint", str(ROOT / "assets" / "specs")])
+    r = runner.invoke(app, ["spec", "lint", str(site.specs_root())])
     assert "GATE SATISFIABILITY" in r.stdout
     assert "0.1129" in r.stdout, "the bound actually earned by the declared n must be printed"
 
@@ -511,7 +512,7 @@ def test_every_shipped_spec_that_still_uses_substrings_is_named_by_the_lint():
     """Four specs still carry the retired expression. The lint is how that stays visible
     until each one has a Site Mapping built for it, instead of being silently wrong."""
     from acr.contract.spec import load_specs
-    offenders = {sid for sid, sp in load_specs(ROOT / "assets" / "specs").items()
+    offenders = {sid for sid, sp in load_specs(site.specs_root()).items()
                  if checks(speclint.lint_spec(sp), speclint.F10)}
     assert "STORE.400_522_523.site_histology_behavior" in offenders
     assert "STORE.700_880.stage" in offenders

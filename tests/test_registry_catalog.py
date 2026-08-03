@@ -22,9 +22,10 @@ from acr.contract.registry_catalog import (
     normalise_name,
 )
 from acr.contract.spec import load_specs
+from acr.core import site
 
 ROOT = Path(__file__).resolve().parents[1]
-SPECS = ROOT / "assets" / "specs"
+SPECS = site.specs_root()
 GUIDELINE = ROOT / "assets" / "guidelines" / "nccn_nsclc_subset.yaml"
 
 # Three tests here briefly skipped on UnprovenancedElementError, because assets/specs/*.yaml carried

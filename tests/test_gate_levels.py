@@ -31,10 +31,11 @@ import pytest
 
 from acr.chartstore.corpus import Corpus
 from acr.contract.spec import load_spec
+from acr.core import site
 from acr.review.coverage import CoverageLedger, ForcedSampler, evaluate_gate, strata_from_spec
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+SPEC = site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
 
 
 @pytest.fixture(scope="module")
@@ -43,7 +44,7 @@ def spec():
 
 
 def _ledger(pid: str, spec):
-    docs, _ = Corpus(ROOT / "corpus" / "patients").chart(pid).list_documents(limit=100_000)
+    docs, _ = Corpus(site.corpus_root()).chart(pid).list_documents(limit=100_000)
     return CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(1234))
 
 

@@ -37,6 +37,8 @@ import pathlib
 import shutil
 import subprocess
 
+from acr.core import site
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 #: `contract/` holds four modules that no runtime path touches — they belong to the planes that use
@@ -244,7 +246,7 @@ def collect(spec: dict, name: str | None = None) -> list[str]:
     mine = CARD_OWNERS.get(name or "", ())
     files: list[str] = []
     for card in mine:
-        d = ROOT / "assets" / "skills" / card
+        d = site.skills_root() / card
         if d.is_dir():
             files += [str(f.relative_to(ROOT)) for f in d.rglob("*") if f.is_file()]
     for key in ("src", "assets", "data", "docs"):

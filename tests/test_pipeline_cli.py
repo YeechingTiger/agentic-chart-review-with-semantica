@@ -31,6 +31,7 @@ from acr.commands.cli import (
     read_cohort,
 )
 from acr.contract.concordance import variables_from_answer
+from acr.core import site
 from acr.core.llm import LLMClient, LLMConfig, LLMResponse
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -115,7 +116,7 @@ def pipeline(tmp_path: Path) -> Path:
     """Six patients chosen so every L4 outcome and both L5 verdict families appear."""
     doc = {
         "schema": EXTRACT_SCHEMA, "created_utc": "2026-07-26T21:00:00+00:00",
-        "code_sha": "test", "corpus": "corpus/patients", "specs_dir": "assets/specs",
+        "code_sha": "test", "corpus": str(site.corpus_root()), "specs_dir": str(site.specs_root()),
         "cohort": "cohort.csv", "model": "test", "sample_seed": 7, "n_failed_runs": 0,
         "resolution": {"requested": ["primary_site", "histology", "behavior", "stage"],
                        "variables": [], "spec_ids": [SHB, STG]},

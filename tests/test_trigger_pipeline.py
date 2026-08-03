@@ -81,6 +81,7 @@ import pytest
 from acr.chartstore.corpus import Corpus
 from acr.contract.spec import load_spec
 from acr.contract.trace import Tracer
+from acr.core import site
 from acr.core.llm import LLMClient, LLMConfig, LLMResponse
 from acr.review import run_triggers
 from acr.review.answer_gate import check_threads
@@ -111,8 +112,8 @@ from acr.review.coverage_planner import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-SHB = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
-CORPUS = ROOT / "corpus" / "patients"
+SHB = site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
+CORPUS = site.corpus_root()
 
 #: A type the scripted planner assigns to `sample`, and which really does hold hits for the
 #: term that localises this tumour. Promoting it is the move the fourth trigger forces.
@@ -240,7 +241,7 @@ def _run(spec, chart, llm, tmp_path, run_id, *, max_steps=8, expansion_budget=No
     from hooks_harness import run_with_script
 
     from acr.chartstore.corpus import Corpus
-    corpus = Corpus(ROOT / "corpus" / "patients")
+    corpus = Corpus(site.corpus_root())
     ctx_out = []
     manifest, events = run_with_script(spec, corpus, chart.patient_id, tmp_path, llm,
                                        run_id=run_id, max_model_calls=max_steps,

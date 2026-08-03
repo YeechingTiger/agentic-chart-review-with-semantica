@@ -31,15 +31,16 @@ import yaml
 
 from acr.contract.answer_checks import check_field_formats, check_field_formats_detail
 from acr.contract.spec import ExtractionSpec, load_spec
+from acr.core import site
 from acr.review.coverage import StratumSpec
 
 ROOT = Path(__file__).resolve().parents[1]
-SKILL_DIR = ROOT / "assets" / "skills" / "store-to-spec"
+SKILL_DIR = site.skills_root() / "store-to-spec"
 SKILL = SKILL_DIR / "SKILL.md"
 FIELD_DESIGN = SKILL_DIR / "references" / "field-design.md"
 PROOF_OBLIGATIONS = SKILL_DIR / "references" / "proof-obligations.md"
-SPEC_PATHS = sorted((ROOT / "assets" / "specs").rglob("*.yaml"))
-STAGE = ROOT / "assets" / "specs" / "STORE.700_880.stage.yaml"
+SPEC_PATHS = sorted((site.specs_root()).rglob("*.yaml"))
+STAGE = site.specs_root() / "STORE.700_880.stage.yaml"
 
 # --------------------------------------------------------------------- known, current gaps
 #

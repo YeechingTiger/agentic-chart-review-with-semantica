@@ -33,9 +33,10 @@ from acr.commands.cli import app
 from acr.contract.concordance import _validate_condition, parse_guideline
 from acr.contract.registry_catalog import VariableCatalog
 from acr.contract.spec import load_spec
+from acr.core import site
 
 ROOT = Path(__file__).resolve().parents[1]
-SPECS = ROOT / "assets" / "specs"
+SPECS = site.specs_root()
 GUIDELINES = ROOT / "assets" / "guidelines"
 SHB = "STORE.400_522_523.site_histology_behavior"
 STG = "STORE.700_880.stage"

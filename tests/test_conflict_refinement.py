@@ -6,6 +6,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from acr.commands.cli import app
+from acr.core import site
 from acr.review import conflict_refinement as C
 
 SPEC_ID = "STORE.400_522_523.site_histology_behavior"
@@ -178,7 +179,7 @@ def test_run_without_feature_flag_calls_deepagents_once_and_directly(tmp_path, m
     result = CliRunner().invoke(app, [
         "run", "SYN0001",
         "--spec", str(ROOT / "assets/specs/STORE.400_522_523.site_histology_behavior.yaml"),
-        "--corpus", str(ROOT / "corpus/patients"),
+        "--corpus", str(ROOT / str(site.corpus_root())),
         "--out", str(tmp_path / "baseline"),
     ])
     assert result.exit_code == 0, result.output

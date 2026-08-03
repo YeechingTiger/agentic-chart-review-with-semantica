@@ -36,6 +36,7 @@ from typing import Any
 
 import yaml
 
+from ..core import site
 from .concordance import (
     _VAR_KEYS,
     INPUT_SOURCES,
@@ -410,7 +411,7 @@ def _enforce_exception_declaration(doc: dict, where: str) -> None:
                 f"only thing a clinical reviewer can disagree with.")
 
 
-def load_guideline_deps(path: str | Path, *, specs_dir: str | Path = "assets/specs",
+def load_guideline_deps(path: str | Path, *, specs_dir: str | Path = str(site.specs_root()),
                         catalog: VariableCatalog | None = None) -> GuidelineDeps:
     """Load a guideline for dependency analysis, refusing an undeclared exception list.
 

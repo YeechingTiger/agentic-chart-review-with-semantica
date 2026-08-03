@@ -77,6 +77,7 @@ from acr.chartstore.corpus import Corpus
 from acr.contract.spec import load_spec
 from acr.core.llm import LLMClient, LLMConfig, LLMResponse
 from acr.core.state import EvidenceLedger
+from acr.core import site
 from acr.review.answer_gate import check_threads, gate_answer
 from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
 from acr.review.coverage_planner import (
@@ -105,8 +106,8 @@ from acr.review.coverage_planner import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-SHB = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
-CORPUS = ROOT / "corpus" / "patients"
+SHB = site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
+CORPUS = site.corpus_root()
 
 #: A type this spec's `cannot_establish` stratum sweeps into `sample`. It is also the exact
 #: type the coverage module records a real error against: patient P03 was coded C349 (lung

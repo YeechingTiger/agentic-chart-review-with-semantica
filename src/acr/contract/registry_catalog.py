@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..core import site
 from .spec import ExtractionSpec, load_specs
 
 #: How a requested name reached a spec. Recorded on every resolution so an extract manifest
@@ -167,7 +168,7 @@ class VariableCatalog:
     directory: str = ""
 
     @classmethod
-    def from_directory(cls, directory: str | Path = "assets/specs") -> VariableCatalog:
+    def from_directory(cls, directory: str | Path = str(site.specs_root())) -> VariableCatalog:
         """Load `<directory>/*.yaml`, NON-recursively, exactly as `load_specs` does.
 
         The non-recursion is load-bearing, not an oversight inherited from `load_specs`:

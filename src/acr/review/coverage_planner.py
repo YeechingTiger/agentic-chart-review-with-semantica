@@ -70,6 +70,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..core import site
 from ..core.repo_paths import asset_dir
 
 # ==========================================================================================
@@ -206,7 +207,7 @@ class Trigger:
 #: over 7,965 real documents, and it already knows which markers are low precision. A second
 #: hand-written list in src/ would drift from it within a week and the two would disagree
 #: about what blocks an answer.
-SKILL_DIR = asset_dir("assets/skills") / "thread-chasing"
+SKILL_DIR = asset_dir(str(site.skills_root())) / "thread-chasing"
 MARKER_OBLIGATION_TABLE = SKILL_DIR / "SKILL.md"
 MARKER_BASE_RATE_TABLE = SKILL_DIR / "references" / "marker-catalogue.md"
 

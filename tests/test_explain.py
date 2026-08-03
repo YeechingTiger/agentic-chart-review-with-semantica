@@ -31,6 +31,7 @@ from typer.testing import CliRunner
 
 from acr.chartstore.corpus import Corpus
 from acr.commands.cli import app
+from acr.core import site
 from acr.evaluation.explain import (
     A_CARE_GAP,
     B_DOCUMENTATION_GAP,
@@ -179,7 +180,7 @@ def test_a_vacuous_gate_pass_is_not_a_documentation_proof():
     `aprime_SYN0002__20260726T035724Z` shipped exactly that: negative_basis GATE_VALIDATED,
     mode unstratified, strata []. It is a legitimate L2 abstention and it is not a proof.
     """
-    docs, _ = Corpus(ROOT / "corpus" / "patients").chart("SYN0002").list_documents(limit=100_000)
+    docs, _ = Corpus(site.corpus_root()).chart("SYN0002").list_documents(limit=100_000)
     led = CoverageLedger(docs, [], ForcedSampler(1234))
     led.listed_documents = True
     assert evaluate_gate({}, led.stratum_results()).verdict == "PASS", "precondition"
@@ -378,7 +379,7 @@ def _extract_doc(answer: dict, *, created_utc: str = STAMP, pid: str = "P1") -> 
     """One patient, one spec, in the shape `acr extract` writes."""
     return {
         "schema": "acr.extract/1", "created_utc": created_utc, "code_sha": "test",
-        "corpus": "corpus/patients", "specs_dir": "assets/specs", "cohort": "c.csv",
+        "corpus": str(site.corpus_root()), "specs_dir": str(site.specs_root()), "cohort": "c.csv",
         "model": "test", "sample_seed": 7, "n_failed_runs": 0,
         "specs": {SPEC: {"spec_id": SPEC}},
         "patients": [{"patient_id": pid, "runs": [], "errors": [],

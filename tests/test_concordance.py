@@ -40,6 +40,7 @@ from acr.contract.concordance import (
     variables_from_answer,
 )
 from acr.contract.spec import load_spec
+from acr.core import site
 
 ROOT = Path(__file__).resolve().parents[1]
 GUIDELINE = ROOT / "assets" / "guidelines" / "nccn_nsclc_subset.yaml"
@@ -187,7 +188,7 @@ def test_a_registry_sentinel_is_an_unknown_wearing_a_value(guideline):
 
 def test_the_sentinel_codes_are_values_the_specs_can_actually_emit(guideline):
     """A sentinel list guessed rather than read off the spec would silently never fire."""
-    stage = load_spec(ROOT / "assets" / "specs" / "STORE.700_880.stage.yaml")
+    stage = load_spec(site.specs_root() / "STORE.700_880.stage.yaml")
     allowable = {f.name: [str(v) for v in (f.allowable_values or [])] for f in stage.fields}
     for var in ("clinical_stage_group", "pathologic_stage_group"):
         assert set(guideline.unknown_value_codes[var]) <= set(allowable[var]), var
@@ -195,7 +196,7 @@ def test_the_sentinel_codes_are_values_the_specs_can_actually_emit(guideline):
             guideline.value_sets["stage_I"] + guideline.value_sets["stage_II_IIIA"]
             + guideline.value_sets["stage_IV"]), f"{var}: a sentinel is also a scored value"
 
-    coc = load_spec(ROOT / "assets" / "specs" / "STORE.610.class_of_case.yaml")
+    coc = load_spec(site.specs_root() / "STORE.610.class_of_case.yaml")
     coc_allowable = {str(v) for f in coc.fields for v in (f.allowable_values or [])}
     assert set(guideline.unknown_value_codes["class_of_case"]) <= coc_allowable
 
@@ -248,7 +249,7 @@ def test_spec_insufficient_input_is_unknown_not_absent(guideline):
     `data_source: outside_notes` and graph.py forces WRONG_DATA_SOURCE. Every treatment
     recommendation here is facility-attributed, so without a registry feed for [610] the
     honest answer is that none of them can be scored from notes alone."""
-    spec = load_spec(ROOT / "assets" / "specs" / "STORE.610.class_of_case.yaml")
+    spec = load_spec(site.specs_root() / "STORE.610.class_of_case.yaml")
     assert spec.data_source == "outside_notes"
     from_notes = variables_from_answer(
         {"status": "SPEC_INSUFFICIENT", "remedy_class": "WRONG_DATA_SOURCE", "value": {}},
@@ -496,7 +497,7 @@ def test_a_malformed_code_falls_out_of_the_population_and_that_is_l3s_job(guidel
     bearing, so that turning that check off has a visible cost here.
     """
     from acr.contract.answer_checks import check_field_formats
-    spec = load_spec(ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml")
+    spec = load_spec(site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml")
     assert check_field_formats(spec.fields, {"primary_site": "C3412"}), \
         "L3 must still reject the malformed code that L4 would silently drop"
     assert one(guideline, adjuvant_case(primary_site=found("C3412"))).outcome == "NOT_APPLICABLE"
@@ -669,7 +670,7 @@ def test_every_input_declares_where_it_would_come_from(guideline):
         "clinical_stage_group", "pathologic_stage_group"}
     assert "adjuvant_systemic_therapy_class" in by_source["not_yet_extractable"]
 
-    shipped = {load_spec(p).spec_id for p in (ROOT / "assets" / "specs").glob("*.yaml")}
+    shipped = {load_spec(p).spec_id for p in (site.specs_root()).glob("*.yaml")}
     for r in guideline.recommendations:
         for d in r.required_inputs:
             if d["source"] == "extraction_spec":
@@ -682,7 +683,7 @@ def test_a_bound_spec_really_does_emit_the_field_the_guideline_names(guideline):
     otherwise the flattening produces a name nothing reads and the rule blocks forever on a
     variable that was extracted successfully under a different name."""
     fields: dict[str, set[str]] = {}
-    for p in (ROOT / "assets" / "specs").glob("*.yaml"):
+    for p in (site.specs_root()).glob("*.yaml"):
         s = load_spec(p)
         fields[s.spec_id] = {f.name for f in s.fields}
     for r in guideline.recommendations:
@@ -697,7 +698,7 @@ def test_a_partial_answer_flattens_per_field_not_per_answer():
     """The real shape from `runs/aprime_SYN0002`: EVIDENCE_INSUFFICIENT overall, with
     `primary_site: C186` established anyway, because the spec permits exactly that. The
     field that carries a value is FOUND; the two the answer stayed silent about are not."""
-    spec = load_spec(ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml")
+    spec = load_spec(site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml")
     v = variables_from_answer(
         {"status": "EVIDENCE_INSUFFICIENT", "negative_basis": "GATE_VALIDATED",
          "value": {"primary_site": "C186"}},

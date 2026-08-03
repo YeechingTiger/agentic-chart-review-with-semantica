@@ -41,9 +41,10 @@ import pytest
 
 from acr.contract.answer_checks import check_field_formats_detail
 from acr.contract.spec import ExtractionSpec, load_spec
+from acr.core import site
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC_390 = ROOT / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
+SPEC_390 = site.specs_root() / "STORE.390.date_of_initial_diagnosis.yaml"
 
 
 @pytest.fixture(scope="module")

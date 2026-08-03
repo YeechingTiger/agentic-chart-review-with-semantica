@@ -7,7 +7,7 @@ from pathlib import Path
 import typer
 from rich.table import Table
 
-from ..core import cli_common
+from ..core import cli_common, site
 from ..core.cli_common import API_BASE, CORPUS, MODEL, con
 from ..core.local_artifacts import LOCAL_ROOT_ENV, LocalArtifactError, LocalArtifactStore
 from ..diagnosis import attribution as A
@@ -169,7 +169,7 @@ def attribute_case_payload(*, run: str, spec: str, case_id: str,
                            gold: str = "", eval_skills_prompt: str = "",
                            signal_type: str = "ATTRIBUTION_REPORT",
                            mode: str = "", registry_reference: str = "", case_map: str = "",
-                           corpus: str = "corpus/patients", model: str | None = None,
+                           corpus: str = str(site.corpus_root()), model: str | None = None,
                            api_base: str | None = None, max_model_calls: int = 12,
                            max_usd: float = 1.0, max_chart_reads: int = 12,
                            library_id: str = "default",

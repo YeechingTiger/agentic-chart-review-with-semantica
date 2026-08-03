@@ -33,14 +33,15 @@ import pytest
 from acr.chartstore.corpus import Corpus
 from acr.contract import outcomes as O
 from acr.contract.spec import ExtractionSpec, load_spec
+from acr.core import site
 from acr.core.state import EvidenceLedger
 from acr.review.answer_gate import gate_answer
 from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
 from acr.review.tools import Toolbox
 
 ROOT = Path(__file__).resolve().parents[1]
-CORPUS = ROOT / "corpus" / "patients"
-SPEC_390 = ROOT / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
+CORPUS = site.corpus_root()
+SPEC_390 = site.specs_root() / "STORE.390.date_of_initial_diagnosis.yaml"
 
 
 @pytest.fixture(scope="module")

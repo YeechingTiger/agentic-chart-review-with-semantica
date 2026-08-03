@@ -22,6 +22,7 @@ from acr.contract.skills import (
     skills_block,
     skills_manifest,
 )
+from acr.core import site
 
 SKILLS_DIR = Path(__file__).resolve().parents[1] / "assets" / "skills"
 _FM = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
@@ -166,8 +167,8 @@ def test_unknown_profile_still_falls_back_to_the_universal_block():
 # --- Task 3: `--skills` swaps one card without minting a profile -----------------------------
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
-CORPUS = ROOT / "corpus" / "patients"
+SPEC = site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
+CORPUS = site.corpus_root()
 
 
 def test_parse_replaces_the_search_slot():

@@ -18,12 +18,14 @@ from typing import TYPE_CHECKING
 import typer
 from rich.console import Console
 
+from . import site
+
 if TYPE_CHECKING:
     from .llm import LLMClient
 
 con = Console()
 
-CORPUS = typer.Option("corpus/patients", "--corpus", help="root directory of patient directories")
+CORPUS = typer.Option(str(site.corpus_root()), "--corpus", help="root directory of patient directories")
 MODEL = typer.Option(None, "--model", "-m", help="LiteLLM model string, e.g. ollama_chat/qwen3.6:35b")
 API_BASE = typer.Option(None, "--api-base", help="override provider base URL (vLLM, proxy, …)")
 

@@ -47,6 +47,8 @@ import subprocess
 import sys
 from collections import defaultdict
 
+from acr.core import site
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
@@ -76,7 +78,7 @@ def _exists_in_corpus(pid: str, value: str) -> bool:
         return False                      # a constructed partial date is in no document
     y, mo, d = value[:4], value[4:6], value[6:]
     for form in (f"{y}-{mo}-{d}", f"{mo}/{d}/{y}", f"{int(mo)}/{int(d)}/{y}"):
-        r = subprocess.run(["grep", "-rlF", form, str(ROOT / "corpus" / "patients" / pid)],
+        r = subprocess.run(["grep", "-rlF", form, str(site.corpus_root() / pid)],
                            capture_output=True, text=True, check=False)
         if r.stdout.strip():
             return True

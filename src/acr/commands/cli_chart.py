@@ -18,7 +18,7 @@ from rich.table import Table
 from ..chartstore.corpus import Corpus
 from ..contract.spec import load_spec, load_specs
 from ..contract.trace import load_trace, plan_summary
-from ..core import cli_common
+from ..core import cli_common, site
 from ..core.cli_common import API_BASE, CORPUS, MODEL, con
 
 chart_app = typer.Typer(add_completion=False)
@@ -50,7 +50,7 @@ def chart(patient: str, corpus: str = CORPUS):
 
 
 @chart_app.command("specs")
-def specs_cmd(directory: str = "assets/specs"):
+def specs_cmd(directory: str = str(site.specs_root())):
     """List available extraction specs with their freeze hashes."""
     t = Table("spec_id", "version", "hash", "source", "question")
     for s in load_specs(directory).values():

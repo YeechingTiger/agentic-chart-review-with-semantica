@@ -27,6 +27,7 @@ from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
 from acr.commands.cli import app
+from acr.core import site
 
 runner = CliRunner()
 ROOT = Path(__file__).resolve().parents[1]
@@ -195,7 +196,7 @@ def test_runtime_provider_error_is_visible_in_manifest_degradation(tmp_path):
 
     manifest = run_patient(
         spec=load_spec(ROOT / "assets/specs/STORE.400_522_523.site_histology_behavior.yaml"),
-        corpus=Corpus(ROOT / "corpus/patients"),
+        corpus=Corpus(ROOT / str(site.corpus_root())),
         patient_id="SYN0001",
         out_dir=tmp_path,
         model=BrokenProvider(),

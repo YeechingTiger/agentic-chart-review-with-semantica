@@ -12,6 +12,7 @@ from acr.audit.audit_loop import (
     builtin_audit_registry,
 )
 from acr.contract.spec import load_spec
+from acr.core import site
 from acr.core.kernel import (
     KernelContractError,
     TargetRef,
@@ -306,7 +307,7 @@ def test_partial_abstention_may_carry_a_malformed_populated_field_and_it_is_reco
     absorbing them silently.
     """
     spec = load_spec(
-        ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+        site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
     )
     verdict = gate_answer(
         spec,
@@ -473,7 +474,7 @@ def test_always_coverage_activates_even_for_complete_positive(monkeypatch):
 
 def test_clinical_contract_prompt_hides_retrieval_experience():
     spec = load_spec(
-        ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+        site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
     )
     full = spec.as_prompt_block()
     clinical = spec.as_prompt_block(view="clinical_contract")

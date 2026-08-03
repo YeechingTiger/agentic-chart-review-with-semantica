@@ -26,6 +26,8 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 
+from acr.core import site
+
 # --------------------------------------------------------------------------------------
 # Document-type vocabulary (matches the real platform's naming)
 # --------------------------------------------------------------------------------------
@@ -1929,7 +1931,7 @@ def build_patient(bp: Blueprint, out_root: Path) -> dict:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--out", default="corpus/patients", type=Path)
+    ap.add_argument("--out", default=str(site.corpus_root()), type=Path)
     a = ap.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
     index = [build_patient(bp, a.out) for bp in BLUEPRINTS]

@@ -44,9 +44,10 @@ from pathlib import Path
 
 import yaml
 
+from ..core import site
 from ..core.repo_paths import asset_dir
 
-SKILLS_DIR = asset_dir("assets/skills")
+SKILLS_DIR = asset_dir(str(site.skills_root()))
 
 #: A skill bigger than this is refused rather than truncated. Roughly 3k tokens: enough for real
 #: guidance, small enough that three of them do not dominate a prompt.

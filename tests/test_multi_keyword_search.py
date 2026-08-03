@@ -21,8 +21,9 @@ from __future__ import annotations
 import pytest
 
 from acr.chartstore.corpus import Corpus
+from acr.core import site
 
-CORPUS = "corpus/patients"
+CORPUS = str(site.corpus_root())
 
 
 @pytest.fixture(scope="module")

@@ -38,12 +38,13 @@ import pytest
 
 from acr.chartstore.corpus import Corpus
 from acr.contract.spec import load_spec
+from acr.core import site
 from acr.review.run_manifest import chart_hash, experiment_config_hash, prompt_asset_manifest
 from acr.review.tools.toolbox import build_tool_schemas
 
 ROOT = Path(__file__).resolve().parents[1]
-CORPUS = ROOT / "corpus" / "patients"
-SPEC_390 = ROOT / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
+CORPUS = site.corpus_root()
+SPEC_390 = site.specs_root() / "STORE.390.date_of_initial_diagnosis.yaml"
 
 
 @pytest.fixture(scope="module")

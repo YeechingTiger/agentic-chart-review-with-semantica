@@ -108,6 +108,61 @@ PSEUDONYM_MAP = Path(
     os.getenv("ACR_PSEUDONYM_MAP",
               str(Path.home() / ".acr" / "phi_pseudonym_map.json"))).expanduser()
 
+
+# ----------------------------------------------------------------- shared fixture directories
+#
+# THE CORPUS, THE CONTRACTS AND THE METHOD CARDS live in one repository each, and every other
+# repository reads them. Before the 2026-08-03 split they were all `<repo root>/corpus/patients`
+# and `<repo root>/assets/specs`, hardcoded at about 130 call sites — which is correct in a
+# monorepo and false everywhere else.
+#
+# THESE ARE FUNCTIONS, NOT CONSTANTS, and that is the whole design:
+#
+#   * A module constant is computed at import time, so it cannot see an environment a test sets
+#     afterwards, and it cannot fail at a moment when the failure would make sense.
+#   * The failure mode being fixed is a CONFUSING SYMPTOM. With the corpus missing, 24 tests
+#     reported `UNKNOWN_PATIENT` — which reads as "this chart is not in the corpus" and sent me
+#     looking at the corpus index. A resolver that raises `set ACR_CORPUS` costs one line and
+#     saves that hour.
+#
+# Resolution order, first hit wins: the environment variable; then `<cwd>/…` and each parent, so a
+# monorepo checkout needs no configuration; then a SIBLING CHECKOUT — `../acr-corpus/corpus/…` —
+# because side-by-side clones are how these repositories are actually developed and requiring
+# configuration for the common layout is how configuration gets ignored.
+
+def _resolve(env_var: str, relative: str, sibling_repo: str, what: str) -> Path:
+    override = os.getenv(env_var)
+    if override:
+        p = Path(override).expanduser()
+        if not p.exists():
+            raise FileNotFoundError(f"{env_var}={override!r} does not exist ({what})")
+        return p
+    here = Path.cwd().resolve()
+    for base in (here, *here.parents):
+        if (base / relative).is_dir():
+            return base / relative
+        if (base.parent / sibling_repo / relative).is_dir():
+            return base.parent / sibling_repo / relative
+    raise FileNotFoundError(
+        f"cannot find {what}. Looked for {relative!r} under {here} and its parents, and for a "
+        f"sibling checkout of {sibling_repo!r}. Set {env_var} to the directory, or clone "
+        f"{sibling_repo} beside this repository.")
+
+
+def corpus_root() -> Path:
+    """The document corpus. Ships in `acr-corpus`; `$ACR_CORPUS` overrides."""
+    return _resolve("ACR_CORPUS", "corpus/patients", "acr-corpus", "the document corpus")
+
+
+def specs_root() -> Path:
+    """The task contracts. Ships in `acr-chart-review`; `$ACR_SPECS` overrides."""
+    return _resolve("ACR_SPECS", "assets/specs", "acr-chart-review", "the task contracts")
+
+
+def skills_root() -> Path:
+    """The method cards. Ships in `acr-chart-review`; `$ACR_SKILLS` overrides."""
+    return _resolve("ACR_SKILLS", "assets/skills", "acr-chart-review", "the method cards")
+
 #: See the module docstring for the three defaults that were tried and what each one got wrong.
 #: `None` until a deployment says what an identifier looks like here.
 PERSON_ID_PATTERN = os.getenv("ACR_PERSON_ID_PATTERN") or None

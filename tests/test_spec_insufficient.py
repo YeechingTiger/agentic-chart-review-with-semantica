@@ -50,6 +50,7 @@ from acr.contract.answer_contract import (
 )
 from acr.contract.concordance import variables_from_answer
 from acr.contract.spec import load_spec
+from acr.core import site
 from acr.core.llm import LLMClient, LLMConfig, LLMResponse
 from acr.core.state import EvidenceLedger
 from acr.review import answer_gate as G
@@ -57,12 +58,12 @@ from acr.review.answer_gate import gate_answer
 from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
 
 ROOT = Path(__file__).resolve().parents[1]
-SHB = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
+SHB = site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
 #: `data_source: outside_notes`. Every run of it is FORCED to SPEC_INSUFFICIENT at finalize,
 #: which means every run of it hit the crash — a spec that is broken on 100% of charts by
 #: construction, shipped, with a test suite that never ran it end to end.
-OUTSIDE = ROOT / "assets" / "specs" / "STORE.610.class_of_case.yaml"
-CORPUS = ROOT / "corpus" / "patients"
+OUTSIDE = site.specs_root() / "STORE.610.class_of_case.yaml"
+CORPUS = site.corpus_root()
 
 #: A quote lifted verbatim from the shipped spec, so the gate's citation check has something
 #: true to accept. Not a patient quote — spec text only; nothing in this file touches a chart.
@@ -164,7 +165,7 @@ def _run(spec, chart, tmp_path, submit_args, finalize=None, max_steps=4):
                                                  "reasoning": "nothing established"},
                       finalize or {"status": "EVIDENCE_INSUFFICIENT", "value": {},
                                    "reasoning": "nothing established"})
-    manifest, _ = run_with_script(spec, Corpus(ROOT / "corpus" / "patients"), chart.patient_id,
+    manifest, _ = run_with_script(spec, Corpus(site.corpus_root()), chart.patient_id,
                                   tmp_path, llm, run_id="spec-insufficient",
                                   max_model_calls=max_steps)
     return manifest, llm
@@ -505,7 +506,7 @@ def test_the_mcp_surface_reports_it_too(shb, chart, tmp_path):
     signed the caller's value with it. Different symptom, same missing channel."""
     from acr.review.mcp_server import ChartReviewService
 
-    svc = ChartReviewService(str(CORPUS), str(ROOT / "assets" / "specs"))
+    svc = ChartReviewService(str(CORPUS), str(site.specs_root()))
     plan = svc.call("coverage.plan", {"patient": "SYN0002", "spec_id": shb.spec_id})
     rid = plan["run_id"]
 
@@ -530,7 +531,7 @@ def test_the_mcp_surface_will_not_sign_a_caller_supplied_gap_block(shb):
     downstream assumes has happened."""
     from acr.review.mcp_server import ChartReviewService
 
-    svc = ChartReviewService(str(CORPUS), str(ROOT / "assets" / "specs"))
+    svc = ChartReviewService(str(CORPUS), str(site.specs_root()))
     rid = svc.call("coverage.plan", {"patient": "SYN0002",
                                      "spec_id": shb.spec_id})["run_id"]
     out = svc.call("gate.check", {"run_id": rid, "answer": dict(
@@ -545,7 +546,7 @@ def test_the_mcp_forced_path_also_strips_the_value(outside):
     unavailable and the value has to be taken away at emission."""
     from acr.review.mcp_server import ChartReviewService
 
-    svc = ChartReviewService(str(CORPUS), str(ROOT / "assets" / "specs"))
+    svc = ChartReviewService(str(CORPUS), str(site.specs_root()))
     rid = svc.call("coverage.plan", {"patient": "SYN0002",
                                      "spec_id": outside.spec_id})["run_id"]
     hits = svc.call("chart.search", {"patient": "SYN0002", "query": "carcinoma",

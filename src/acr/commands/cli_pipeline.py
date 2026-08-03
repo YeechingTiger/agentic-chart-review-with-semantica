@@ -33,7 +33,7 @@ from ..contract.registry_catalog import (
     VariableResolutionError,
     check_guideline_bindings,
 )
-from ..core import cli_common
+from ..core import cli_common, site
 from ..core.cli_common import (
     API_BASE,
     CONCORD_SCHEMA,
@@ -166,7 +166,7 @@ def extract(
     cohort: str = typer.Option(..., "--cohort", help="csv/tsv/txt/json of patient ids"),
     variables: str = typer.Option(..., "--variables",
                                   help="comma list of variable names, spec ids or STORE items"),
-    specs_dir: str = typer.Option("assets/specs", "--specs", help="directory scanned for specs"),
+    specs_dir: str = typer.Option(str(site.specs_root()), "--specs", help="directory scanned for specs"),
     corpus: str = CORPUS,
     model: str = MODEL,
     api_base: str = API_BASE,
@@ -398,7 +398,7 @@ def concord(
                                help="when a variable is in both sources: error|extract|extra"),
     recommendations: str = typer.Option("", "--recommendations",
                                         help="comma list; default every recommendation"),
-    specs_dir: str = typer.Option("assets/specs", "--specs"),
+    specs_dir: str = typer.Option(str(site.specs_root()), "--specs"),
     out: str = typer.Option("", "--out", help="output JSON; default concord.json beside --input"),
 ):
     """L4: score a guideline over an extract. A rule engine — no model is called."""

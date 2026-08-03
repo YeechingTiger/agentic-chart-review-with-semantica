@@ -29,6 +29,7 @@ from pathlib import Path
 
 import pytest
 
+from acr.core import site
 from acr.review.mcp_server import (
     MCP_TOOLS,
     STEERING_ARGS,
@@ -38,8 +39,8 @@ from acr.review.mcp_server import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-CORPUS = ROOT / "corpus" / "patients"
-SPECS = ROOT / "assets" / "specs"
+CORPUS = site.corpus_root()
+SPECS = site.specs_root()
 SITE = "STORE.400_522_523.site_histology_behavior"
 
 # SYN0001 is the FOUND case (tissue diagnosis present); SYN0002 is the evidence-gap case

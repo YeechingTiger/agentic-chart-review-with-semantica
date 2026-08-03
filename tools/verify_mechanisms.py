@@ -32,13 +32,14 @@ sys.path.insert(0, str(ROOT / "src"))
 from acr.chartstore.corpus import Corpus
 from acr.contract import outcomes as OUTCOMES
 from acr.contract.spec import load_spec
+from acr.core import site
 from acr.core.modules import TRUTH_MODES
 from acr.evaluation import evals as E
 from acr.review.answer_gate import gate_answer
 from acr.review.coverage_planner import spec_declared_keywords
 from acr.review.tools.toolbox import TOOL_SCHEMAS, Toolbox, build_tool_schemas
 
-SPEC = ROOT / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
+SPEC = site.specs_root() / "STORE.390.date_of_initial_diagnosis.yaml"
 ATTRIBUTIONS = pathlib.Path("/tmp/acr-artifacts/error-cases/default/attributions.jsonl")
 
 FAILURES: list[str] = []
@@ -86,7 +87,7 @@ def m1_search(root: pathlib.Path) -> None:
     # Replay. The search tool is pure over (chart, query), so a recorded call re-run today must
     # return the same hit count. A drift here means the recorded traces describe a tool that no
     # longer exists, and every measurement taken off them is measuring history.
-    corpus = Corpus(ROOT / "corpus" / "patients")
+    corpus = Corpus(site.corpus_root())
     checked = mismatch = 0
     detail = []
     for _, rec in runs_of(root):
@@ -126,7 +127,7 @@ def m2_prior(root: pathlib.Path) -> None:
     print("\nM2  retrieval prior mechanism")
     spec = load_spec(SPEC)
     frozen = [k.lower() for k in spec_declared_keywords(spec)]
-    corpus = Corpus(ROOT / "corpus" / "patients")
+    corpus = Corpus(site.corpus_root())
 
     # The frozen-list check compares a RECORDED run against a spec on disk, so it is only
     # meaningful where the two are the same spec. Retrieval assets were taken out of this file
@@ -295,7 +296,7 @@ def _offered_statuses(spec) -> list:
 def _gate_fixture(spec):
     from acr.core.state import EvidenceLedger
     from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
-    chart = Corpus(ROOT / "corpus" / "patients").chart("SYN0002")
+    chart = Corpus(site.corpus_root()).chart("SYN0002")
     docs, _ = chart.list_documents(limit=100_000)
     return EvidenceLedger(), CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(7)), chart
 

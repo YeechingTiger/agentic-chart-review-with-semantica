@@ -44,9 +44,10 @@ import yaml
 
 from acr.contract import concordance as C
 from acr.contract.spec import Status
+from acr.core import site
 
 ROOT = Path(__file__).resolve().parents[1]
-SKILL_DIR = ROOT / "assets" / "skills" / "guideline-to-rules"
+SKILL_DIR = site.skills_root() / "guideline-to-rules"
 SKILL = SKILL_DIR / "SKILL.md"
 WORKED = SKILL_DIR / "references" / "worked-example.md"
 CATALOGUE = SKILL_DIR / "references" / "failure-catalogue.md"

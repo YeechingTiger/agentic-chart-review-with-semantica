@@ -41,9 +41,10 @@ from acr.commands.cli import EXTRACT_SCHEMA as CLI_EXTRACT_SCHEMA
 from acr.commands.cli import app
 from acr.contract.concordance import _VAR_KEYS, load_guideline, parse_guideline
 from acr.contract.registry_catalog import VariableCatalog
+from acr.core import site
 
 ROOT = Path(__file__).resolve().parents[1]
-SPECS = ROOT / "assets" / "specs"
+SPECS = site.specs_root()
 GUIDELINE = ROOT / "assets" / "guidelines" / "nccn_nsclc_subset.yaml"
 
 runner = CliRunner()

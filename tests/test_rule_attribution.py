@@ -85,6 +85,7 @@ from acr.contract.trace import (
     rule_citation_block,
     rule_index,
 )
+from acr.core import site
 from acr.core.state import Evidence, EvidenceLedger
 from acr.review.answer_gate import gate_answer
 from acr.review.coverage import (
@@ -98,8 +99,8 @@ from acr.review.coverage import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-SHB = ROOT / "assets" / "specs" / "STORE.400_522_523.site_histology_behavior.yaml"
-ALL_SPECS = sorted((ROOT / "assets" / "specs").rglob("*.yaml"))
+SHB = site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"
+ALL_SPECS = sorted((site.specs_root()).rglob("*.yaml"))
 
 
 def test_tracer_serializes_concurrent_event_sequence_and_file_order(tmp_path):
@@ -317,7 +318,7 @@ def test_the_manifest_rejection_row_points_at_the_quote_instead_of_copying_it(tm
 
 # ========================================= 3. (b) DETERMINISTIC: admissibility at gate time
 def _ledger(spec, pid="SYN0001"):
-    docs, _ = Corpus(ROOT / "corpus" / "patients").chart(pid).list_documents(limit=100_000)
+    docs, _ = Corpus(site.corpus_root()).chart(pid).list_documents(limit=100_000)
     return CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(7))
 
 
@@ -562,7 +563,7 @@ def _run(tmp_path, value, reasoning, run_id):
     from hooks_harness import run_with_script
 
     from acr.chartstore.corpus import Corpus
-    manifest, trace = run_with_script(_spec(), Corpus(ROOT / "corpus" / "patients"), "SYN0001",
+    manifest, trace = run_with_script(_spec(), Corpus(site.corpus_root()), "SYN0001",
                                       tmp_path, llm, run_id=run_id, max_model_calls=6)
     return llm, manifest, manifest, trace
 
@@ -647,7 +648,7 @@ def test_attribution_never_changes_a_gate_verdict(tmp_path):
     note = led.by_stratum["can_establish"][0]
     ledger.add(Evidence(note_id=note.note_id, doc_type=note.doc_type, date="2020-01-01",
                         start=0, end=10, quote="adenocarcinoma", supports="histology"))
-    chart = Corpus(ROOT / "corpus" / "patients").chart("SYN0001")
+    chart = Corpus(site.corpus_root()).chart("SYN0001")
     submitted = {"status": "FOUND", "value": {"primary_site": "C349", "histology": "8140"},
                  "reasoning": "rules_applied: decision_rule.1"}
     untraced = gate_answer(spec, submitted, evidence=ledger, coverage=led, chart=chart)
