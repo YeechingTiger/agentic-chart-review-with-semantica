@@ -65,250 +65,158 @@ STDLIB = set(sys.stdlib_module_names)
 #: Per repo: the paragraph that says what it is for anyone who is not doing cancer registry work,
 #: what it refuses to do, and the one thing it knows that a rewrite would not.
 PROSE: dict[str, dict[str, str]] = {
-    "acr-contract": {
-        "tagline": "A declarative extraction contract, and the record a run of it must leave.",
-        "what": """A **task contract** is a YAML file that states a question, the numbered decision
-rules that may establish an answer, the conflict rules that order them when two apply, the evidence
-rules that say what counts as support, and the closed set of outcomes a run is allowed to conclude.
-This package loads one, validates it, freezes it to a content hash, and defines the shape of the
-answer and the trace that come back.
-
-Nothing here runs an agent or reads a document. It is the vocabulary two other programs need in
-order to disagree about the same thing — which is why it is a separate distribution with a version
-number, and the only one of the nine that has one.""",
-        "generalises": """Any task where a human-authored rule set has to be executed against
-documents and the result has to be defensible afterwards: benefits eligibility, contract review,
-incident triage, regulatory conformance, systematic review screening. The word "chart" appears in
-this package's history, not in its interfaces.""",
-        "not": """- Does not call a model, open a document, or decide anything clinical.
-- Does not know what an identifier looks like at your site; see `acr/core/site.py`, which asks.
-- Does not validate that a contract is *correct* — only that it is complete and internally
-  consistent. Correctness is a clinician's job and `acr-spec-authoring` is where they do it.""",
-        "hard_won": """**Every enforced element needs a provenance record, or loading fails.**
-`load_spec` raises `UnprovenancedElementError` when a rule the runtime will act on carries no note
-of where it came from, and `StaleProvenanceError` when a record names an element that is no longer
-enforced. The default provenance is `model_authored`, deliberately, and not the manual named at the
-top of the file — because naming a standards body in a header is not evidence that the sentence
-three hundred lines down came out of it, and the opposite default lets a reviewer approve a
-fabricated rule believing a standards body wrote it.
-
-**The outcome space is a property of the contract, not of the code.** A run may conclude a value, or
-abstain because the evidence is insufficient, or abstain because the contract does not cover the
-case, or fail. Those are four different things and collapsing them loses the only signal that
-distinguishes "the record is silent" from "we never asked the right question".""",
-    },
-    "acr-corpus": {
-        "tagline": "A synthetic document corpus with declared ground truth, and the generator that "
-                   "makes it byte-identically.",
-        "what": """Twenty-seven synthetic patient records, 8,154 documents, each chart carrying a
-`_ground_truth.json` that states the answer AND why that answer is the answer. Six of them are
-**held out**: each was designed from a clause of a contract that no other chart exercises, and from
-no observed run result, so a method scored on them is not being scored on its own development set.
-
-`generate_corpus.py` is deterministic and seeded per patient. Regenerating produces the same bytes,
-which is what makes an edit to a held-out chart visible.""",
-        "generalises": """The pattern generalises even where the documents do not: a corpus whose
-traps are derived from the CONTRACT rather than from watching a system fail is the only kind you can
-score a method on twice. Six of these charts exist because the other twenty-one had already been
-used to design the methods being measured.""",
-        "not": """- Contains no real data. Nothing here is derived from a person.
-- Is not a benchmark leaderboard. There are twenty-seven charts; the held-out denominator is six,
-  and printing it small is the point.""",
-        "hard_won": """**This is a separate repository because a `.gitignore` could not freeze it.**
-The six held-out charts were generated on 2026-08-03 into a tree whose ignore file carried
-`*[0-9].txt`, written to catch iCloud conflict copies (`Name 2.txt`) but missing the space — and a
-document filename is `Doc-Type_2013-10-27.txt`, which ends in a digit. Already-tracked files were
-unaffected, so nothing looked wrong, and the six held-out charts went into version control with ONE
-file each. 1,589 documents were never committed.
-
-That inverts the one guarantee a held-out set exists for. A tag on a repository is a freeze; an
-ignore pattern is a hope.""",
-    },
     "acr-chart-review": {
-        "tagline": "Run one declarative contract over one document corpus, and leave a record that "
-                   "distinguishes a correct answer from a lucky one.",
-        "what": """The agent. It receives a contract, a corpus of a few hundred documents for one
-subject, and prose method cards assembled by slot; it gets seven tools — list, summarise-by-type,
-search, read, read-batch, record-evidence, submit — and it leaves a JSONL trace of every call plus a
-JSON manifest stamped with enough identity that two runs are comparable: the contract's hash, the
-corpus's content hash, the code SHA, the resolved arm.
+        "tagline": "Run one declarative contract over one document corpus, leave a record that "
+                   "distinguishes a correct answer from a lucky one, and compare arms over it.",
+        "what": """A **task contract** is a YAML file stating a question, the numbered decision rules
+that may establish an answer, the conflict rules that order them when two apply, the evidence rules
+that say what counts as support, and the closed set of outcomes a run may conclude. The agent
+receives one, plus a corpus of documents for one subject and prose method cards assembled by slot,
+and gets seven tools: list, summarise-by-type, search, read, read-batch, record-evidence, submit.
 
-The loop itself is off-the-shelf (deepagents / LangGraph). What is here is the part above it: the
-tools, the typed state, the gate on the submitted answer, the coverage plan that governs what may be
-opened, and the record.""",
+It leaves a JSONL trace of every call and a JSON manifest stamped with enough identity that two runs
+are comparable — the contract's hash, the corpus's content hash, the code SHA, the resolved arm.
+
+This repository holds the agent, the contract vocabulary it runs on, the synthetic corpus it is
+tested against, and the experiment harness that compares arms over it. Those four move together: a
+change to what a contract may say changes the agent, the charts that exercise it and the numbers the
+harness prints, in one commit.
+
+The loop itself is off the shelf (deepagents / LangGraph). Everything here sits on top of it.""",
         "generalises": """Substitute the corpus and the contract and nothing here knows the
-difference. The three assumptions are: the documents are text with a type and a date, the question
-is answerable from them, and somebody will later need to know WHY the answer was what it was.""",
-        "not": """- Does not score itself. Scoring is `acr-eval`, deliberately in another
-  distribution, because a runtime that can see the answer key is a runtime that will use it.
-- Does not edit its own prompts. That is `acr-improvement`.
-- Does not decide when a contract is wrong. It records that it could not answer and says which
-  clause was silent.""",
+difference. Three assumptions: the documents are text with a type and a date, the question is
+answerable from them, and somebody will later need to know WHY the answer was what it was. Benefits
+eligibility, contract review, incident triage, regulatory conformance, systematic-review screening —
+the word "chart" is in this package's history, not in its interfaces.""",
+        "not": """- Does not score itself. That is `acr-eval`, in another distribution on purpose: a
+  runtime that can see the answer key is a runtime that will use it.
+- Does not edit its own prompts, and does not derive its own priors. That is `acr-improvement`.
+- Does not know what an identifier looks like at your site. `acr/core/site.py` asks, and refuses to
+  proceed with a real corpus configured and no identifier shape declared.""",
         "hard_won": """**Most checks are advisory, and that was measured rather than chosen.** Five
 deterministic content checks were removed after destroying 58 correct values against 21 helps. The
 coverage gate went advisory after ~150 rejections of which 27 refused the reference value's exact
-tuple. A thread refusal went advisory at 28% reference-destroying. The pattern held every time: a
-rule that is right about the text is wrong about the answer more often than it is right.
+tuple. A thread refusal went advisory at 28% reference-destroying. Every time, a rule that was right
+about the text was wrong about the answer more often than it was right.
 
 **Of eleven wrong answers in the last valid batch, ZERO were retrieval failures.** `NEVER_LOOKED 0`,
-`READ_NOT_CITED 0`. The agent opened the document carrying the answer every single time and got the
-reading wrong. If you are about to invest in better search, measure this first — the tool for it
-ships in `acr-harness`.""",
+`READ_NOT_CITED 0` — the agent opened the document carrying the answer every single time and got the
+reading wrong. Measure that before investing in better search; `tools/measure_controller_value.py`
+is the script.
+
+**The corpus is a repository concern, not a `.gitignore` concern.** Six held-out charts were once
+generated into a tree whose ignore file carried `*[0-9].txt`, written for iCloud conflict copies
+(`Name 2.txt`) but missing the space — and a document filename ends in a digit. Already-tracked
+files were unaffected so nothing looked wrong, and the six went into version control with ONE file
+each. 1,589 documents were never committed, which inverted the one guarantee a held-out set exists
+for.""",
     },
     "acr-eval": {
-        "tagline": "Score, judge, attribute and audit completed runs — from the record alone.",
-        "what": """Four things that must not be one thing:
+        "tagline": "Score, judge, attribute and audit COMPLETED runs — from the record alone.",
+        "what": """Four things that must not become one thing:
 
-- **Score** a run against an answer key, deterministically, with detectors for the behaviours a
-  score cannot see (zero documents read, a search that cannot fail, a rejection loop).
-- **Judge** what no rule can score, fenced: a judged number is an OPINION and is refused wherever a
+- **Score** against an answer key, deterministically, with detectors for what a score cannot see:
+  zero documents read, a search that cannot fail, a rejection loop.
+- **Judge** what no rule can score, fenced — a judged number is an OPINION and is refused wherever a
   deterministic evaluator exists.
 - **Attribute** a wrong answer to a cause, by an agent that has never been shown the key.
 - **Audit** the trajectory truth-blind: did this run touch a subject it was not reviewing, did an
-  artifact leave its boundary, does a trace we already wrote to disk carry an identifier.
+  artifact leave its boundary, does a trace already on disk carry an identifier.
 
 Everything reads finished manifests and traces. Nothing re-runs anything.""",
-        "generalises": """Any agent that leaves a structured trace can be scored, judged, attributed
-and audited by this package; the reader is schema-tolerant across the drift of its own history.
-`RunRecord` is the interesting part — it pairs a manifest with its trace and every accessor on it is
-a scar from a field that moved.""",
+        "generalises": """Any agent leaving a structured trace can be scored, judged, attributed and
+audited by this package. `RunRecord` is the interesting part — it pairs a manifest with its trace
+and is schema-tolerant across its own history's drift; every accessor on it is a scar from a field
+that moved.""",
         "not": """- Never rewrites an answer. Three independent guards enforce that, because the
   first version of this plane did.
-- Never claims a conclusion above its truth mode. GOLD, REGISTRY_REFERENCE and BLIND are a
-  CEILING on what may be said, verified against the recorded runs.
+- Never claims a conclusion above its truth mode. GOLD, REGISTRY_REFERENCE and BLIND are a CEILING,
+  verified against the recorded runs.
 - Does not fix anything. Routing a finding to an owner is `acr-improvement`.""",
         "hard_won": """**This plane's own accuracy has never been measured, and the code says so.**
-`meta_evaluate_attributions` requires 30 adjudicated cases and a macro-F1 of 0.80 and has never
-run; there are 2 attribution records on disk. Treat its output as a hypothesis until that number
-exists. An evaluation plane nobody has evaluated is a plane with an unknown error rate, and the
-honest thing is to print that rather than to imply otherwise.""",
-    },
-    "acr-experience": {
-        "tagline": "Turn a labelled development set into retrieval assets an agent can be GIVEN.",
-        "what": """Read every document of a development set once, cheaply, against ONE requirement.
-Price each candidate term by what it actually retrieves. Write a retrieval plan. Certify it on a
-held-out test set before anything at scale is allowed to use it.
+`meta_evaluate_attributions` requires 30 adjudicated cases and macro-F1 0.80 and has never run;
+there are 2 attribution records on disk. Treat its output as a hypothesis until that number exists.
+An evaluation plane nobody has evaluated has an unknown error rate, and printing that is more honest
+than implying otherwise.
 
-The output is an INPUT to a run — a prior, handed to the agent in its own prompt slot. That is the
-distinction from `acr-improvement`, which changes the system itself.""",
-        "generalises": """Any retrieval task where the vocabulary of the question and the vocabulary
-of the corpus are different, which is most of them. The full scan is the expensive honest baseline
-that tells you whether an agent is earning anything over a query.""",
-        "not": """- Does not touch the runtime. It writes assets; the runtime chooses to load them.
-- Does not certify on the set it developed on. That refusal is the whole point of the two-set
-  split, and `answer_leak.py` is the guard that a derived term is not the answer it was derived
-  from.""",
-        "hard_won": """**A term derived from an answer is not evidence that the term works.** The
-guard exists because the failure is invisible: a keyword list derived from labelled data will score
-beautifully on that data and add nothing anywhere else.
-
-**And a caution about scope**: two of the six contracts this was built against have since had their
-keyword lists and strata REMOVED on purpose, because measurement showed the agent did better
-choosing its own terms. This plane refuses at the door rather than inventing assets for a contract
-shape that declares none — which is correct, and also means it may be solving a problem your task
-does not have. Measure retrieval reachability first.""",
+**An inert rule and a clean rule print the same zero.** `audit-phi-in-trace` reports
+`inert_rules` and `person_id_pattern_configured` alongside its counts, because "nothing is there"
+and "we could not look" are different results. One audit rule in this tree could never fire from the
+day it was written — it read four trace keys that nothing writes — and no count would have said
+so.""",
     },
     "acr-improvement": {
-        "tagline": "Reflective optimisation of the text an agent reads, routed from classified "
-                   "failures and never applied unvalidated.",
-        "what": """Every text parameter an agent reads is a parameter: the system prompt, the method
-cards, the clauses of the contract itself. This package takes classified failures, routes each one to
-the parameter that could have caused it, proposes an edit, and requires paired validation before the
-edit may stand.
+        "tagline": "Learn from finished runs and change what the next one is given.",
+        "what": """Two outputs, and the difference between them is the point:
+
+- **A prior the agent is GIVEN.** Read every document of a development set once, cheaply, against ONE
+  requirement. Price each candidate term by what it actually retrieves. Write a retrieval plan.
+  Certify it on a held-out set before anything at scale may use it. The result is an INPUT to a run.
+- **A change to the system ITSELF.** Every text parameter an agent reads is a parameter: the system
+  prompt, the method cards, the clauses of the contract. Take classified failures, route each to the
+  parameter that could have caused it, propose an edit, and require paired validation before it
+  stands.
 
 `BehaviorSignature` reduces a run to what it answered, what it cited, which rules it claimed and how
 it got there, hashed — so "these two runs behaved the same" is a comparison and not an
 impression.""",
-        "generalises": """Any prompted system whose behaviour you are trying to move deliberately.
-The routing is the substance: without it an optimiser reverse-engineers a story from the outcome and
-starts confidently rewriting rules that were never at fault.""",
-        "not": """- Never applies an edit. It proposes, and validation is a separate decision.
-- Never edits a clinical rule on its own authority. A semantic change requires gold AND human
-  adjudication; a REGISTRY_REFERENCE truth mode can only produce a question for a clinician.
-- Does not derive retrieval assets. That is `acr-experience`, and the split is between changing
-  the system and giving it an input.""",
-        "hard_won": """**Refuse a case id that looks like a real identifier, at the door.** Routing
-inputs carry case ids and the routed artifacts are written where a human will read them, so
-`FailureCase` raises rather than pseudonymising quietly. The shape of an identifier is deployment
-configuration (`acr-contract`'s `site.py`) and there is no default: three were tried and each was
-measured wrong somewhere nobody had looked.""",
-    },
-    "acr-spec-authoring": {
-        "tagline": "An arbitrary question becomes a declarative contract — checked for completeness, "
-                   "and put in front of the person who owns its decisions.",
-        "what": """Three things:
+        "generalises": """Any prompted system you are trying to move deliberately, and any retrieval
+task where the vocabulary of the question and the vocabulary of the corpus differ — which is most of
+them. The routing is the substance: without it an optimiser reverse-engineers a story from the
+outcome and starts confidently rewriting rules that were never at fault.""",
+        "not": """- Never applies an edit. It proposes; validation is a separate decision.
+- Never edits a domain rule on its own authority. A semantic change needs gold AND human
+  adjudication; a REGISTRY_REFERENCE truth mode can only produce a question for an expert.
+- Never certifies on the set it developed on.""",
+        "hard_won": """**A term derived from an answer is not evidence that the term works.**
+`answer_leak.py` guards it because the failure is invisible: a keyword list derived from labelled
+data scores beautifully on that data and adds nothing anywhere else.
 
-- **Intake**: an arbitrary question routes to a contract that can answer it, or to an explicit
-  statement of what is missing. Never to a guess.
-- **Lint**: eleven formal completeness checks in four tiers that cost four different things to run
-  and mean four different things when they pass. A single PASS over all four is the sentence this
-  tool exists to make unsayable.
-- **Review**: render a contract as a document a domain expert can read in ten minutes and mark up,
-  and record — with a content hash — that a named person approved one element as it was worded that
-  day. The next render reports the approval as withdrawn the moment the wording changes.""",
+**And a caution about scope.** Two of the six contracts this was built against have since had their
+keyword lists and strata REMOVED on purpose, because measurement showed the agent did better
+choosing its own terms. The deriving path refuses at the door rather than inventing assets for a
+contract that declares none — which is correct, and also means it may be solving a problem your task
+does not have. Measure retrieval reachability first; `tools/measure_agency.py` in
+`acr-chart-review`.""",
+    },
+    "acr-rules": {
+        "tagline": "The rules a domain expert owns: authored so they can read them, and executed so "
+                   "conformance is decided by rule and never by a model.",
+        "what": """Two halves of one job, and they are here together because they share a
+dependency — the intake router resolves a question against the same variable catalogue the
+conformance engine reads.
+
+- **Authoring.** An arbitrary question routes to a contract that can answer it, or to an explicit
+  statement of what is missing — never to a guess. Eleven formal completeness checks in four tiers
+  that cost four different things to run and mean four different things when they pass. Then: render
+  the contract as a document a domain expert reads in ten minutes and marks up, and record, with a
+  content hash, that a named person approved one element AS IT WAS WORDED THAT DAY.
+- **Conformance.** A rule engine with no model anywhere in its import closure. Read variables
+  somebody else extracted, evaluate a guideline over them, return conformance or not — and for a
+  non-conforming case, narrow to which of four causes survives: the care itself, the documentation,
+  the extraction, or a justified exception.""",
         "generalises": """Wherever the person who owns the rules cannot read the file the rules live
-in. The review renderer is the only part of this whole system whose user is not an engineer, and
-that is a gap most rule-executing systems have and do not name.""",
-        "not": """- Does not decide whether a rule is clinically right. It makes the rule legible and
-  records who said it was.
-- Does not run anything. A contract that lints clean is not a contract that works.""",
+in — which is most regulated domains — and wherever conformance over extracted structured data has
+to be defensible: clinical guidelines, regulatory checklists, contractual obligations, eligibility
+rules. The dependency direction is the useful part: it can say which variables a rule reads, and
+what breaks if one of them moves.""",
+        "not": """- Reaches no model in the conformance engine. Not a default — a property, and the
+  import closure is the proof.
+- Does not extract anything. It consumes an extract.
+- Does not decide whether a rule is RIGHT. It makes the rule legible and records who said it was.
+- Does not collapse the four causes into one number.""",
         "hard_won": """**Assent to a sentence is not assent to whatever that sentence is edited
-into.** Sign-off records carry the element's content hash for exactly that reason.
+into.** Sign-off records carry the element's content hash for exactly that reason, and the next
+render reports the approval as withdrawn the moment the wording changes.
+
+**Four causes, and they must not become one number.** A case can be non-conforming because the care
+was wrong, because the care was right and the note is silent, because the extraction missed it, or
+because a documented exception applies. Two of those are about the subject and two are about the
+pipeline. Report them apart or the metric gets optimised by improving extraction and nothing else.
 
 **Five of the eleven lint checks produce zero findings over all six shipped contracts.** They are
 regression guards in a passing state, not dead code — but do not read a clean lint as coverage. The
 14 tier-1 failures the shipped contracts DO produce are real and unfixed.""",
-    },
-    "acr-concordance": {
-        "tagline": "Given extracted variables, decide by rule whether a case conforms to a "
-                   "guideline — and when it does not, which cause is standing.",
-        "what": """A rule engine, with no model anywhere in its import closure. It reads variables
-somebody else extracted, evaluates a guideline over them, and returns conformance or
-non-conformance. Then, for a non-conforming case, it narrows to which of four causes survives:
-the care itself, the documentation, the extraction, or a justified exception.
-
-Everything after extraction is deterministic and replays from a file.""",
-        "generalises": """Any conformance question over extracted structured data — clinical
-guidelines, regulatory checklists, contractual obligations, eligibility rules. The dependency
-direction is the useful part: it can tell you which variables a rule reads, and what breaks if one
-of them moves.""",
-        "not": """- Reaches no model. Not a default — a property, and the import closure is the
-  proof.
-- Does not extract anything. It consumes an extract.
-- Does not collapse the four causes into one number. Two of them are about the patient and two are
-  about the pipeline, and a single "non-concordance rate" hides which.""",
-        "hard_won": """**Four causes, and they must not become one number.** A case can be
-non-conforming because the care was wrong, because the care was right and the note is silent,
-because the extraction missed it, or because an exception applies and is documented. Report them
-apart or the metric will be optimised by improving extraction and nothing else.""",
-    },
-    "acr-harness": {
-        "tagline": "Compare arms, not answers — and refuse the comparisons that would not mean "
-                   "anything.",
-        "what": """An experiment ladder. Each arm differs from the baseline in exactly one thing —
-one method card, one runtime profile, one prior — and the harness runs the arms over a corpus,
-records identity for every run, and analyses the results.
-
-It also holds the refusals, which is most of its value:
-
-- Refuses a comparison across mixed contract hashes, because that is the one axis under measurement.
-- Refuses to fold a chart that INFORMED a method's design into a headline number.
-- Refuses a headline over a batch where every chart is informed.
-- Refuses to price a model it has no rate for, rather than reporting zero.""",
-        "generalises": """Any A/B over a prompted system. The discipline is the transferable part:
-freeze the protocol and register the predictions before the first call, report strata apart, and let
-the analyser refuse rather than footnote.""",
-        "not": """- Does not score an answer. That is `acr-eval`; this asks whether an
-  INTERVENTION earned its place.
-- Does not average seeds into one number without saying so. An effect whose ranking flips between
-  seeds is noise wearing a result's clothes.""",
-        "hard_won": """**A footnote loses; a refusal holds.** The warning that informed charts must
-not enter a headline number was written as a footnote twice in this project's history and lost both
-times. It is now arithmetic that stops.
-
-**The protocol goes in before the first model call.** `docs/POLICY_LADDER_PROTOCOL.md` is the
-example, including a prediction registered AGAINST the thing being tested — because a prediction
-written afterwards is a description.""",
     },
 }
 

@@ -45,38 +45,27 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 #: them, and leaving them in the shared layer is what made `tests/test_layering.py`'s claim that the
 #: working planes "meet only through the shared layers" partly fictional. 2,256 code lines that
 #: layer 2 never imports. The split is where that gets fixed rather than restated.
-CONTRACT_SHARED = ("spec", "outcomes", "answer_contract", "answer_checks", "trace", "code_tables",
+CONTRACT_SHARED = ("spec", "skill_invoke", "outcomes", "answer_contract", "answer_checks", "trace", "code_tables",
                    "site_mapping", "strata", "case_requirements", "skills")
 
 #: name -> (one-line purpose, source paths, test files, runtime deps on siblings)
 #: A source path ending in `/` takes the whole directory; otherwise it is one file.
 REPOS: dict[str, dict] = {
-    "acr-contract": {
-        "purpose": "The shared vocabulary: what a task contract IS, what an answer may be, and what "
-                   "a run must leave behind.",
-        "src": [f"src/acr/contract/{m}.py" for m in CONTRACT_SHARED]
-               + ["src/acr/core/", "src/acr/chartstore/"],
-        "assets": ["assets/contracts/", "assets/codes/", "assets/pricing/"],
+    "acr-chart-review": {
+        "purpose": "Run one declarative contract over one document corpus, leave a record that "
+                   "distinguishes a correct answer from a lucky one, and compare arms over it.",
+        "src": ["src/acr/review/", "src/acr/core/", "src/acr/chartstore/",
+                *[f"src/acr/contract/{m}.py" for m in CONTRACT_SHARED],
+                "src/acr/commands/cli_chart.py", "src/acr/commands/cli.py"],
+        "assets": ["assets/skills/", "assets/specs/", "assets/codes/", "assets/pricing/",
+                   "assets/contracts/", "assets/module_catalog/runtime_policies/"],
+        "data": ["corpus/"],
+        "docs": ["docs/"],
         "deps": [],
     },
-    "acr-corpus": {
-        "purpose": "A synthetic document corpus with declared ground truth, and the deterministic "
-                   "generator that produces it.",
-        "src": ["tools/generate_corpus.py"],
-        "data": ["corpus/"],
-        "deps": ["acr-contract"],
-    },
-    "acr-chart-review": {
-        "purpose": "The agent: run one declarative contract over one document corpus, with seven "
-                   "read/record/submit tools and an immutable record of what it did.",
-        "src": ["src/acr/review/", "src/acr/commands/cli_chart.py"],
-        "assets": ["assets/skills/", "assets/specs/", "assets/module_catalog/runtime_policies/"],
-        #: minus the cards other consumers own — applied in `collect`
-        "deps": ["acr-contract"],
-    },
     "acr-eval": {
-        "purpose": "Score, judge, attribute and audit COMPLETED agent runs, from the record alone "
-                   "and never by re-running them.",
+        "purpose": "Score, judge, attribute and audit COMPLETED runs — from the record alone, and "
+                   "never by re-running them.",
         "src": ["src/acr/evaluation/evals.py", "src/acr/evaluation/judge.py",
                 "src/acr/evaluation/evaluation_pipeline.py",
                 "src/acr/evaluation/evaluation_modules.py",
@@ -88,88 +77,30 @@ REPOS: dict[str, dict] = {
         "assets": ["assets/module_catalog/audit_rules/", "assets/module_catalog/evaluators/",
                    "assets/evaluators/", "assets/certification_catalog/",
                    "assets/pipeline_catalog/"],
-        "deps": ["acr-contract"],
-    },
-    "acr-experience": {
-        "purpose": "Turn a labelled development set into retrieval assets an agent can be GIVEN: "
-                   "read every document once, price the words, certify on held-out data.",
-        "src": ["src/acr/improvement/labelling.py", "src/acr/improvement/derive.py",
-                "src/acr/improvement/assetdev.py", "src/acr/improvement/answer_leak.py",
-                "src/acr/commands/cli_label.py"],
-        "assets": ["assets/experience/"],
-        "deps": ["acr-contract"],
+        "deps": ["acr-chart-review"],
     },
     "acr-improvement": {
-        "purpose": "Reflective optimisation of the TEXT an agent reads — prompts, cards, "
-                   "specification clauses — routed from classified failures and never applied "
-                   "unvalidated.",
-        "src": ["src/acr/improvement/refine.py", "src/acr/contract/spec_repair.py",
-                "src/acr/commands/cli_refine.py", "src/acr/commands/cli_repair.py"],
-        "deps": ["acr-contract"],
+        "purpose": "Learn from finished runs and change what the next one is given: derive retrieval "
+                   "priors from a labelled set, and route classified failures at the text an agent "
+                   "reads.",
+        "src": ["src/acr/improvement/", "src/acr/contract/spec_repair.py",
+                "src/acr/commands/cli_label.py", "src/acr/commands/cli_refine.py",
+                "src/acr/commands/cli_repair.py"],
+        "assets": ["assets/experience/"],
+        "deps": ["acr-chart-review"],
     },
-    "acr-spec-authoring": {
-        "purpose": "An arbitrary question becomes a declarative contract, checked for completeness "
-                   "and put in front of the person who owns its decisions.",
+    "acr-rules": {
+        "purpose": "The rules a domain expert owns: turn a question into a contract they can read "
+                   "and approve, and judge by rule whether a case conforms to a guideline.",
         "src": ["src/acr/authoring/", "src/acr/usecase/",
-                "src/acr/contract/registry_catalog.py",
+                "src/acr/contract/concordance.py", "src/acr/contract/deps.py",
+                "src/acr/contract/registry_catalog.py", "src/acr/evaluation/explain.py",
                 "src/acr/commands/cli_spec.py", "src/acr/commands/cli_plan.py",
-                "src/acr/commands/cli_site_mapping.py"],
-        "deps": ["acr-contract"],
-    },
-    "acr-concordance": {
-        "purpose": "Given extracted variables, decide by RULE whether a case conforms to a "
-                   "guideline — and when it does not, which of four causes is standing.",
-        "src": ["src/acr/contract/concordance.py", "src/acr/contract/deps.py",
-                "src/acr/evaluation/explain.py",
-                "src/acr/commands/cli_pipeline.py", "src/acr/commands/cli_gold.py"],
+                "src/acr/commands/cli_site_mapping.py", "src/acr/commands/cli_pipeline.py",
+                "src/acr/commands/cli_gold.py"],
         "assets": ["assets/guidelines/", "assets/usecase/"],
-        "deps": ["acr-contract"],
+        "deps": ["acr-chart-review"],
     },
-    "acr-harness": {
-        "purpose": "Compare ARMS, not answers: run a controlled ladder over a corpus and refuse the "
-                   "comparisons that would not mean anything.",
-        "src": [],  # filled from tools/ below, minus the ones that belong elsewhere
-        "docs": ["docs/"],
-        "deps": ["acr-contract", "acr-chart-review", "acr-eval"],
-    },
-}
-
-#: Tests that import no `acr` module at all, routed by what they are ABOUT. `test_adversarial_corpus`
-#: reads chart files and asserts the traps are where the ground truth says: it belongs with the data,
-#: and an import graph cannot see that because it imports nothing.
-TESTS_BY_SUBJECT = {
-    "test_adversarial_corpus.py": "acr-corpus",
-    #: A card's test belongs with the card. `assets/skills/` split four ways, so three of these
-    #: were testing an asset that had moved out from under them — which is the same class of bug as
-    #: the card assignment itself, one level up.
-    "test_store_to_spec_skill.py": "acr-spec-authoring",
-    "test_guideline_to_rules_skill.py": "acr-concordance",
-    #: Validates EVERY card in the tree against the slot contract. Its subject is the whole card
-    #: set, which now lives in four repositories, so it can only run where all four are present.
-    "test_skills_load.py": "(composer)",
-    "test_eval_skill_fence.py": "acr-eval",
-    #: Its subject is the CRC use-case bundle under `assets/usecase/`, which went with the
-    #: guideline plane. An import graph put it in the shared layer because it imports nothing.
-    "test_crc_full_normalization.py": "acr-concordance",
-    #: Loads `tools/run_ladder.py` by path and validates every arm. The driver is the harness's.
-    "test_run_ladder_arms.py": "acr-harness",
-}
-
-#: WHO OWNS WHICH METHOD CARD. `assets/skills/` held cards for FOUR different consumers in one
-#: directory, and the split is what made that visible: the five `slot: eval` cards are read by the
-#: evaluation agent, not by the chart-review agent, and `acr-eval`'s tests fail at once when they
-#: ship with the wrong repository. Two `slot: task` cards are about AUTHORING a contract rather than
-#: answering one, and `non-concordance-triage` explains a guideline verdict. Assigning by slot alone
-#: would have put all four in the wrong place.
-CARD_OWNERS = {
-    "acr-eval": ("eval-cluster-failures", "eval-contrast-traces", "eval-key-challenge",
-                 "eval-missed-evidence", "eval-overconfidence"),
-    "acr-spec-authoring": ("store-to-spec",),
-    #: `guideline-to-rules` has references and NO `SKILL.md`: the agent authoring it was killed
-    #: mid-work by an org spend limit, and the half-written card was committed. It travels with the
-    #: engine it teaches, and `tests/test_guideline_to_rules_skill.py` goes with it.
-    "acr-concordance": ("crc-guideline-registry-authoring", "non-concordance-triage",
-                        "guideline-to-rules"),
 }
 
 #: The two scripts that perform the split itself. They belong to the archive repository, not to the
@@ -178,16 +109,43 @@ CARD_OWNERS = {
 SPLIT_TOOLS = ("split_repos.py", "scaffold_repos.py")
 
 #: Tools that belong to a specific repo rather than to the harness.
-TOOL_HOMES = {
-    "generate_corpus.py": "acr-corpus",
-    "render_chain.py": "acr-eval",
+TOOL_HOMES = {"render_chain.py": "acr-eval"}
+
+#: WHO OWNS WHICH METHOD CARD. `assets/skills/` held cards for four different consumers in one
+#: directory, and the split is what made that visible: the five `slot: eval` cards plus the PHI
+#: audit script are read by the evaluation plane, not by the agent, and `acr-eval`'s tests fail at
+#: once when they ship with the wrong repository. Two `slot: task` cards are about AUTHORING a
+#: contract rather than answering one, and `non-concordance-triage` explains a guideline verdict.
+#: Assigning by slot alone would have put all of those in the wrong place.
+CARD_OWNERS = {
+    "acr-eval": ("eval-cluster-failures", "eval-contrast-traces", "eval-key-challenge",
+                 "eval-missed-evidence", "eval-overconfidence", "audit-phi-in-trace"),
+    #: `guideline-to-rules` has references and NO `SKILL.md` — the agent authoring it was killed
+    #: mid-work by an org spend limit. It travels with the engine it teaches.
+    "acr-rules": ("store-to-spec", "crc-guideline-registry-authoring", "non-concordance-triage",
+                  "guideline-to-rules"),
 }
+
+#: Tests that import no `acr` module, or whose subject is an asset rather than a plane. An import
+#: graph cannot route these, and each one is a judgement worth writing down.
+TESTS_BY_SUBJECT = {
+    "test_adversarial_corpus.py": "acr-chart-review",   # subject is the corpus
+    "test_run_ladder_arms.py": "acr-chart-review",       # subject is tools/run_ladder.py
+    "test_store_to_spec_skill.py": "acr-rules",          # a card's test follows its card
+    "test_guideline_to_rules_skill.py": "acr-rules",
+    "test_crc_full_normalization.py": "acr-rules",       # subject is assets/usecase/crc
+    "test_eval_skill_fence.py": "acr-eval",
+    #: Validates EVERY card against the slot contract, and the cards live in three repositories, so
+    #: it can only mean anything where all three are present.
+    "test_skills_load.py": "(composer)",
+}
+
 
 #: Stays in the original repository, which becomes the COMPOSER: the `acr` console script that
 #: mounts every sibling's command group, the cross-plane tests, and the documents that are about the
 #: whole system rather than about one plane. `cli.py` imports from all ten planes and is the only
 #: fan-out hub in the tree; there is nowhere else it could live.
-COMPOSER_KEEPS = ("src/acr/commands/cli.py",)
+COMPOSER_KEEPS = ()
 
 #: Tests whose imports span more than one working plane, or which are ABOUT the composition. They
 #: stay in the original repository, which becomes the composer. Computed, not guessed — see
@@ -245,13 +203,16 @@ def assign_tests() -> dict[str, list[str]]:
                     homes.update({"(composer)", "_"})
                     continue
                 r = repo_of_source(mod_path) or repo_of_source(f"src/acr/{pl}/")
-                if r and r != "acr-contract":
+                # The agent's repo also owns the shared vocabulary, so importing `acr.contract.spec`
+                # is not evidence of belonging anywhere in particular. Everything imports it.
+                if r and r != "acr-chart-review":
                     homes.add(r)
         if t.name in TESTS_BY_SUBJECT:
             out[TESTS_BY_SUBJECT[t.name]].append(t.name)
             continue
+        # No working plane outside the agent's repo ⇒ it is the agent's test.
         out[next(iter(homes)) if len(homes) == 1 else "(composer)"
-            if homes else "acr-contract"].append(t.name)
+            if homes else "acr-chart-review"].append(t.name)
     return out
 
 
@@ -287,7 +248,7 @@ def main() -> int:
     args = ap.parse_args()
 
     # tools/ -> harness, minus the ones with a specific home
-    REPOS["acr-harness"]["src"] = [
+    REPOS["acr-chart-review"]["src"] += [
         f"tools/{f.name}" for f in sorted((ROOT / "tools").glob("*.py"))
         if TOOL_HOMES.get(f.name) is None and f.name not in SPLIT_TOOLS]
 

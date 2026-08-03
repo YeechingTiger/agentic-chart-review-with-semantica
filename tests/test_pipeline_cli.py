@@ -26,8 +26,14 @@ from acr.commands.cli import (
     CONCORD_SCHEMA,
     EXPLAIN_SCHEMA,
     EXTRACT_SCHEMA,
-    _variable_records,
     app,
+)
+
+# Imported from the module that DEFINES them, not from the composer that used to
+# re-export them. `acr.commands.cli` mounts sibling groups optionally now, so a
+# re-export there is a name that exists only when another distribution is installed.
+from acr.commands.cli_pipeline import (
+    _variable_records,
     read_cohort,
 )
 from acr.contract.concordance import variables_from_answer

@@ -318,12 +318,26 @@ def test_the_key_challenge_skill_exists_and_a_named_mode_offers_it():
     UNRESOLVED reference, not truth" whose disagreement may only be NEEDS_ADJUDICATION — which
     is exactly `key_dispute.correct_eval_verdict` on K03.
     """
-    from acr.commands.cli_signal import DEFAULT_TRUTH_MODE, EVAL_MODES
-    from acr.contract.skills import eval_skill_judges, skill_slot
+    from acr.contract.skills import SkillError, eval_skill_judges, skill_slot
 
+    # The card and the truth modes ship with the EVALUATION plane; the charts ship here. This
+    # assertion spans two distributions, so it says which one is absent rather than failing as
+    # though the card were malformed — `SkillError` covers both "not installed" and "written
+    # wrong", and only the second is this repository's problem.
+    try:
+        from acr.commands.cli_signal import DEFAULT_TRUTH_MODE, EVAL_MODES
+    except ImportError:
+        pytest.skip("truth modes live in acr-eval, which is not installed")
+    try:
+        slot = skill_slot("eval-key-challenge")
+    except SkillError as e:
+        if "no skill" not in str(e):
+            raise
+        pytest.skip(f"the eval-key-challenge card ships with acr-eval: {e}")
+
+    assert slot == "eval"
     assert "eval-key-challenge" in EVAL_MODES["REGISTRY_REFERENCE"]
     assert "eval-key-challenge" not in EVAL_MODES[DEFAULT_TRUTH_MODE]
-    assert skill_slot("eval-key-challenge") == "eval"
     assert "key_derivability" in eval_skill_judges("eval-key-challenge")
 
 

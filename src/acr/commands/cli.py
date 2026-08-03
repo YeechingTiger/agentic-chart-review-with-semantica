@@ -32,6 +32,8 @@ behaviour change wearing a refactor's clothes.
 """
 from __future__ import annotations
 
+import importlib
+
 import typer
 
 from ..core.cli_common import (  # noqa: F401 (re-export)
@@ -39,34 +41,16 @@ from ..core.cli_common import (  # noqa: F401 (re-export)
     EXPLAIN_SCHEMA,
     EXTRACT_SCHEMA,
 )
-from .cli_attribute import attribute_app
-from .cli_audit import audit_app
 from .cli_chart import chart_app
-from .cli_eval import eval_app
-from .cli_evaluation import evaluation_app
-from .cli_gold import gold_app
-from .cli_judge import judge_app
-from .cli_label import label_app
-from .cli_pipeline import _variable_records, pipeline_app, read_cohort  # noqa: F401 (re-export)
-from .cli_plan import plan_app
-from .cli_refine import refine_app
-from .cli_repair import repair_app
-from .cli_signal import signal_app
-from .cli_site_mapping import site_mapping_app
-from .cli_spec import spec_app
 
 app = typer.Typer(add_completion=False, help="Agentic EHR chart review.")
 
 app.add_typer(chart_app)
-app.add_typer(pipeline_app)
-app.add_typer(plan_app)
-app.add_typer(spec_app, name="spec")
 
 # The Site Mapping is neither a chart run nor a clinical decision: it is the local-name to
 # document-concept table that `doc_type_matches` used to approximate with a substring. Its own
 # group because three of its four commands read no chart and spend nothing, and because the
 # one that spends runs once per corpus rather than once per run.
-app.add_typer(site_mapping_app, name="site-mapping")
 
 # ------------------------------------------------------------------------ development plane
 # `assets` does not run the agent and does not read a chart: it develops the retrieval assets a
@@ -75,41 +59,81 @@ app.add_typer(site_mapping_app, name="site-mapping")
 # than kept as a private entry point because the loop it implements (measure -> propose ->
 # evolve -> certify -> adopt) is the only way anything in `assets/specs/` stops being a guess, and a
 # development tool nobody can find is a development tool nobody runs.
-from ..improvement.assetdev import assets_app
 
 # `derive` is the FIRST-ORDER member of that same family, and it comes before `assets` in the
 # order anyone should use them: count what the labelling already says, price it by grep, cut
 # the list, propose the read policy. `assets` hill-climbs, which only refines a list that
 # already exists. Both are mounted because the search is still worth running afterwards; the
 # derivation is what makes there be something to refine.
-from ..improvement.derive import derive_app
 
-app.add_typer(derive_app, name="derive")
-app.add_typer(assets_app, name="assets")
 
 # `label` comes before both of them in the order of the loop and did not exist as a command
 # until now: `derive` reads a labels.jsonl that only the full scan can produce, so the first
 # step of the develop plane was the one step nobody could take.
-app.add_typer(label_app, name="label")
-app.add_typer(refine_app, name="refine")
-app.add_typer(gold_app, name="gold")
-app.add_typer(repair_app, name="repair")
 
 # ------------------------------------------------------------------------------- eval plane
 # `eval` before `judge` deliberately. `eval dimensions` prints the precedence fence, and the
 # fence is the thing to read before reaching for a judge: where a deterministic evaluator
 # exists a judged opinion is refused, and no flag on `acr judge` will change that.
-app.add_typer(eval_app, name="eval")
 # `signal` is the one door to a signal about a completed run, whichever way it is produced. It
 # is a group of its own rather than `acr eval --kind agent` because `eval` promises it reaches
 # no model, and a group cannot keep that promise and also host the diagnostic agent.
-app.add_typer(signal_app, name="signal")
-app.add_typer(judge_app, name="judge")
-app.add_typer(evaluation_app, name="evaluation")
-app.add_typer(audit_app, name="audit")
 # Attribution is model-based and may read the same patient's chart, so it cannot live under
 # `eval`, whose import closure and CLI contract guarantee that no model is reachable.
-app.add_typer(attribute_app, name="attribute")
+
+
+
+# ----------------------------------------------------------------- optional sibling command groups
+#
+# ONE `acr` BINARY THAT GROWS WITH WHAT IS INSTALLED. After the 2026-08-03 split the working planes
+# ship as separate distributions into the same `acr.*` namespace, and this file is the single entry
+# point the owner asked for. It mounts a group when the distribution providing it is importable and
+# says nothing when it is not — so `pip install acr-chart-review` gives a CLI that runs charts, and
+# adding `acr-eval` beside it grows `acr eval`, `acr judge`, `acr audit` without editing anything.
+#
+# `ImportError` ONLY, and never a bare `except`. A group whose module is absent is a distribution
+# that is not installed, which is expected. A group whose module is present but RAISES on import is
+# broken, and swallowing that would hide it behind a subcommand that silently does not exist —
+# which is the hardest kind of missing to notice, because `acr --help` simply looks shorter.
+#: `(module path relative to `acr`, attribute, mount name or None for top level)`. The path is
+#: relative to `acr` and not to `acr.commands`, because two of these Typer apps live inside the plane
+#: that owns them (`improvement/derive.py`, `improvement/assetdev.py`) rather than in a `cli_*`
+#: module. Assuming `acr.commands` dropped `acr derive` and `acr assets` from the binary silently,
+#: which is exactly the failure the ImportError-only rule below exists to prevent — and I caused it
+#: by hand in the same edit that wrote that rule.
+_OPTIONAL: tuple[tuple[str, str, str | None], ...] = (
+    # acr-eval
+    ("commands.cli_eval", "eval_app", "eval"),
+    ("commands.cli_signal", "signal_app", "signal"),
+    ("commands.cli_judge", "judge_app", "judge"),
+    ("commands.cli_evaluation", "evaluation_app", "evaluation"),
+    ("commands.cli_audit", "audit_app", "audit"),
+    ("commands.cli_attribute", "attribute_app", "attribute"),
+    # acr-improvement
+    ("improvement.derive", "derive_app", "derive"),
+    ("improvement.assetdev", "assets_app", "assets"),
+    ("commands.cli_label", "label_app", "label"),
+    ("commands.cli_refine", "refine_app", "refine"),
+    ("commands.cli_repair", "repair_app", "repair"),
+    # acr-rules
+    ("commands.cli_spec", "spec_app", "spec"),
+    ("commands.cli_plan", "plan_app", None),
+    ("commands.cli_site_mapping", "site_mapping_app", "site-mapping"),
+    ("commands.cli_pipeline", "pipeline_app", None),
+    ("commands.cli_gold", "gold_app", "gold"),
+)
+
+MOUNTED: list[str] = []
+MISSING: list[str] = []
+
+for _mod, _attr, _name in _OPTIONAL:
+    try:
+        _m = importlib.import_module(f"acr.{_mod}")
+    except ImportError:
+        MISSING.append(_name or _mod)
+        continue
+    app.add_typer(getattr(_m, _attr), **({"name": _name} if _name else {}))
+    MOUNTED.append(_name or _mod)
 
 
 if __name__ == "__main__":
