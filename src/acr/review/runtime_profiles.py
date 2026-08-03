@@ -24,7 +24,6 @@ COVERAGE_NONE = "NONE"
 COVERAGE_ON_NEGATIVE_OR_MISSING = "ON_NEGATIVE_OR_MISSING"
 COVERAGE_ALWAYS = "ALWAYS"
 
-
 @dataclass(frozen=True)
 class RuntimePolicyContext:
     case_ref: str
@@ -40,7 +39,6 @@ class RuntimePolicyContext:
             raise ModuleContractError("runtime policy context needs case_ref")
         if self.max_rounds < 1 or self.max_documents < 1:
             raise ModuleContractError("runtime policy budgets must be positive")
-
 
 @dataclass(frozen=True)
 class SearchPlan:
@@ -61,7 +59,6 @@ class SearchPlan:
             "proof_obligations": list(self.proof_obligations),
         }
 
-
 @dataclass(frozen=True)
 class RuntimePolicyState:
     witness_found: bool = False
@@ -74,7 +71,6 @@ class RuntimePolicyState:
     documents_read: int = 0
     new_evidence_in_last_round: bool = True
 
-
 @dataclass(frozen=True)
 class SearchDecision:
     action: str
@@ -82,13 +78,11 @@ class SearchDecision:
     added_terms: tuple[str, ...] = ()
     added_document_types: tuple[str, ...] = ()
 
-
 @dataclass(frozen=True)
 class StopDecision:
     stop: bool
     reason: str
     answer_disposition: str
-
 
 class WitnessFirstPolicy:
     """Stop after a grounded witness and closed discovered conflicts."""
@@ -142,7 +136,6 @@ class WitnessFirstPolicy:
                 "EVIDENCE_INSUFFICIENT",
             )
         return StopDecision(False, "witness obligation remains open", "CONTINUE")
-
 
 class StratifiedCoveragePolicy:
     """Preserve the current stronger coverage behavior as a separate profile."""
@@ -215,7 +208,6 @@ class StratifiedCoveragePolicy:
             )
         return StopDecision(False, "coverage obligations remain open", "CONTINUE")
 
-
 class GuidelineOnlyPolicy(WitnessFirstPolicy):
     """Clinical contract plus unrestricted patient-inventory search, without task priors."""
 
@@ -233,7 +225,6 @@ class GuidelineOnlyPolicy(WitnessFirstPolicy):
                 "discovered_conflicts_closed",
             ),
         )
-
 
 class ConditionalNegativeCoveragePolicy(StratifiedCoveragePolicy):
     """Start without retrieval priors; activate the proof asset for negative-shaped claims."""
@@ -254,7 +245,6 @@ class ConditionalNegativeCoveragePolicy(StratifiedCoveragePolicy):
             ),
         )
 
-
 class AlwaysCoveragePolicy(StratifiedCoveragePolicy):
     """Experimental upper-bound arm: coverage is active before any answer may stand."""
 
@@ -274,7 +264,6 @@ class AlwaysCoveragePolicy(StratifiedCoveragePolicy):
             ),
         )
 
-
 class RuntimePolicyRegistry:
     def __init__(self) -> None:
         self.modules = ModuleRegistry()
@@ -293,7 +282,6 @@ class RuntimePolicyRegistry:
         asset = self.modules.resolve(ref)
         factory = self.modules.implementation(asset)
         return asset, factory()
-
 
 def builtin_runtime_policy_registry() -> RuntimePolicyRegistry:
     registry = RuntimePolicyRegistry()
@@ -389,7 +377,6 @@ def builtin_runtime_policy_registry() -> RuntimePolicyRegistry:
         registry.register(asset, implementation)
     return registry
 
-
 def resolve_runtime_policy(
     ref: str = DEFAULT_RUNTIME_PROFILE,
 ) -> tuple[
@@ -403,17 +390,6 @@ def resolve_runtime_policy(
     """Resolve an explicitly registered policy; arbitrary imports are never accepted."""
     return builtin_runtime_policy_registry().resolve(ref)
 
-
-def enforces_stratified_coverage(ref: str) -> bool:
-    """Whether a profile may issue a coverage attestation for a negative answer."""
-    asset, _ = resolve_runtime_policy(ref)
-    return asset.module_id in {
-        STRATIFIED_COVERAGE_PROFILE,
-        CONDITIONAL_COVERAGE_PROFILE,
-        ALWAYS_COVERAGE_PROFILE,
-    }
-
-
 def coverage_requirement(ref: str) -> str:
     """Return the profile's answer-level coverage requirement."""
     asset, _ = resolve_runtime_policy(ref)
@@ -426,7 +402,6 @@ def coverage_requirement(ref: str) -> str:
         return COVERAGE_ON_NEGATIVE_OR_MISSING
     return COVERAGE_NONE
 
-
 def starts_with_coverage_assets(ref: str) -> bool:
     """Whether task keywords and note-type strata are active from the first model call."""
     asset, _ = resolve_runtime_policy(ref)
@@ -435,7 +410,6 @@ def starts_with_coverage_assets(ref: str) -> bool:
         STRATIFIED_COVERAGE_PROFILE,
         WITNESS_FIRST_PROFILE,
     }
-
 
 def uses_clinical_contract_view(ref: str) -> bool:
     """Whether the model-facing spec must hide retrieval assets."""
@@ -446,7 +420,6 @@ def uses_clinical_contract_view(ref: str) -> bool:
         ALWAYS_COVERAGE_PROFILE,
     }
 
-
 def targeted_negative_basis(ref: str) -> str:
     """Name the non-coverage basis emitted by profiles that accept targeted abstention."""
     asset, _ = resolve_runtime_policy(ref)
@@ -455,7 +428,6 @@ def targeted_negative_basis(ref: str) -> str:
     if asset.module_id == WITNESS_FIRST_PROFILE:
         return "WITNESS_FIRST_BASELINE"
     return "TARGETED_SEARCH_ONLY"
-
 
 #: WHICH METHOD SKILLS EACH PROFILE OFFERS THE MODEL, BY SLOT. A skill is judgement guidance,
 #: so swapping one is exactly the kind of change an arm has to isolate — which is why this is a
@@ -482,11 +454,9 @@ _PROFILE_SKILLS: dict[str, SkillStack] = {
 
 _FALLBACK_SKILLS = SkillStack(general=("tool-contract", "coverage-judgement"))
 
-
 def runtime_policy_skills(module_id: str) -> SkillStack:
     """The method skills this profile renders into the system prompt, by slot."""
     return _PROFILE_SKILLS.get(module_id, _FALLBACK_SKILLS)
-
 
 def runtime_policy_instruction(module_id: str) -> str:
     """Short execution instruction that makes the selected profile observable to the agent."""
@@ -530,37 +500,3 @@ def runtime_policy_instruction(module_id: str) -> str:
             "a negative coverage claim."
         )
     raise ModuleContractError(f"unknown runtime policy {module_id!r}")
-
-
-@dataclass(frozen=True)
-class CoverageComparison:
-    baseline_profile_ref: str
-    treatment_profile_ref: str
-    patient_ids: tuple[str, ...]
-    seeds: tuple[int, ...]
-    metrics: Mapping[str, Mapping[str, float]]
-    paired_deltas: Mapping[str, float]
-    practical_improvement: bool
-    regression_reasons: tuple[str, ...] = ()
-
-    REQUIRED_METRICS = frozenset({
-        "chart_observable_accuracy",
-        "critical_miss_rate",
-        "overclaim_rate",
-        "abstention_accuracy",
-        "evidence_validity",
-        "documents_read",
-        "cost_usd",
-    })
-
-    def __post_init__(self) -> None:
-        if not self.patient_ids or not self.seeds:
-            raise ModuleContractError(
-                "coverage comparison needs paired patients and seeds"
-            )
-        for arm in ("baseline", "treatment"):
-            missing = self.REQUIRED_METRICS - set(self.metrics.get(arm, {}))
-            if missing:
-                raise ModuleContractError(
-                    f"coverage {arm} arm lacks metrics {sorted(missing)}"
-                )

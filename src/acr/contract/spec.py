@@ -64,7 +64,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Status = Literal["FOUND", "EVIDENCE_INSUFFICIENT", "SPEC_INSUFFICIENT"]
 
-
 class ProofObligation(BaseModel):
     model_config = ConfigDict(extra="allow")
     # Two grammars, both legal.
@@ -128,7 +127,6 @@ class ProofObligation(BaseModel):
         dt = self.for_negative.get("required_doc_types_read", []) if self.for_negative else []
         return list(dt) if isinstance(dt, list) else []
 
-
 class OutputField(BaseModel):
     model_config = ConfigDict(extra="allow")
     name: str
@@ -146,7 +144,6 @@ class OutputField(BaseModel):
     allowable_values: list[Any] | None = None
     nullable: bool = True
     description: str = ""
-
 
 # ---------------------------------------------------------------------------- provenance
 #: Where the CONTENT of an element came from. Not how much anyone trusts it — that is
@@ -178,10 +175,8 @@ _MANUAL_LOCATOR = re.compile(
 #: with the admission filed off.
 MODEL_AUTHORED_ADMISSION = "no external source"
 
-
 class ProvenanceError(ValueError):
     """A spec's provenance block does not hold up. Always fatal at load."""
-
 
 class UnprovenancedElementError(ProvenanceError):
     """An enforced element carries no provenance record.
@@ -199,14 +194,12 @@ class UnprovenancedElementError(ProvenanceError):
         lines += [f"  - {e.path}   [{e.kind}, read by {e.read_by}]" for e in self.elements]
         super().__init__("\n".join(lines))
 
-
 class StaleProvenanceError(ProvenanceError):
     """A record names an element the spec no longer has.
 
     The dangerous direction of drift: rename a stratum and its clinician sign-off keeps
     sitting in the file, attached to nothing, still counting as a signature to any reader.
     """
-
 
 @dataclass(frozen=True)
 class EnforcedElement:
@@ -226,7 +219,6 @@ class EnforcedElement:
     def hash(self) -> str:
         return _content_hash(self.value)
 
-
 def _content_hash(value: Any) -> str:
     """Hash of an element's content, canonicalised so YAML formatting cannot change it.
 
@@ -237,7 +229,6 @@ def _content_hash(value: Any) -> str:
     blob = json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
                       default=str)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
-
 
 class ProvenanceRecord(BaseModel):
     """Per-element provenance. One record, one enforced element, no exemptions.
@@ -273,11 +264,6 @@ class ProvenanceRecord(BaseModel):
     #: somebody's approval was overridden, which is the fact worth surfacing.
     sign_off_voided_by_edit: bool = False
 
-    @property
-    def rank(self) -> int:
-        return STATUS_ORDER.index(self.status)
-
-
 def _answer_check_key(chk: dict) -> str:
     """Identity of an answer_check, from its content rather than its position.
 
@@ -293,7 +279,6 @@ def _answer_check_key(chk: dict) -> str:
     nos = chk.get("nos_values") or ([chk["nos_value"]] if chk.get("nos_value") else [])
     return (f"{chk.get('field', '?')}.{chk.get('kind', 'not_less_specific')}"
             + (f".{nos[0]}" if nos else ""))
-
 
 def enforced_elements(spec: ExtractionSpec) -> list[EnforcedElement]:
     """Everything in this spec that the runtime reads and acts on, in declaration order.
@@ -412,7 +397,6 @@ def enforced_elements(spec: ExtractionSpec) -> list[EnforcedElement]:
         seen[e.path] = e
     return out
 
-
 def weakest_status(statuses: Iterable[str]) -> str:
     """The minimum, and `draft` for nothing at all.
 
@@ -421,7 +405,6 @@ def weakest_status(statuses: Iterable[str]) -> str:
     """
     ranks = [STATUS_ORDER.index(s) for s in statuses if s in STATUS_ORDER]
     return STATUS_ORDER[min(ranks)] if ranks else STATUS_ORDER[0]
-
 
 def _validate_record(spec_id: str, rec: ProvenanceRecord) -> None:
     """The honesty rules. Each one exists to close a way of writing a record that says less
@@ -473,7 +456,6 @@ def _validate_record(spec_id: str, rec: ProvenanceRecord) -> None:
                 f"{where}: status clinician_reviewed but {missing} not set. An unsigned "
                 "sign-off is the thing this whole block exists to make impossible; "
                 "element_hash_at_review is what a later edit is compared against.")
-
 
 def bind_provenance(spec: ExtractionSpec) -> None:
     """Attach each record to its element, void signatures on edited elements, then refuse
@@ -547,7 +529,6 @@ def bind_provenance(spec: ExtractionSpec) -> None:
     if unmarked:
         raise UnprovenancedElementError(spec.spec_id, unmarked)
 
-
 # ------------------------------------------------------------------ editorial provenance
 class ProvenanceFinding(BaseModel):
     """Something wrong with an EDITORIAL record, reported instead of raised.
@@ -567,12 +548,10 @@ class ProvenanceFinding(BaseModel):
     def __str__(self) -> str:  # pragma: no cover - trivial
         return f"{self.element}: {self.problem}"
 
-
 #: A missing editorial record is not silence, it is this. Rendered verbatim to the reviewer,
 #: because "we did not write down where this came from" and "we wrote down that a model made
 #: it up" are different states and only one of them is somebody having looked.
 ORIGIN_NOT_RECORDED = "origin_not_recorded"
-
 
 def editorial_records(spec: ExtractionSpec) -> tuple[dict[str, ProvenanceRecord],
                                                        list[ProvenanceFinding]]:
@@ -610,7 +589,6 @@ def editorial_records(spec: ExtractionSpec) -> tuple[dict[str, ProvenanceRecord]
         index[element] = rec
     return index, findings
 
-
 def editorial_findings(spec: ExtractionSpec,
                        known_elements: Iterable[str] | None = None,
                        attributed_elsewhere: Iterable[str] | None = None,
@@ -647,7 +625,6 @@ def editorial_findings(spec: ExtractionSpec,
         if element not in covered:
             findings.append(ProvenanceFinding(element=element, problem=ORIGIN_NOT_RECORDED))
     return findings
-
 
 class ExtractionSpec(BaseModel):
     model_config = ConfigDict(extra="allow")
@@ -951,11 +928,9 @@ class ExtractionSpec(BaseModel):
                   "  " + ", ".join(self.search_hints), ""]
         return "\n".join(L)
 
-
 def _indent(s: str, n: int = 2) -> str:
     pad = " " * n
     return "\n".join(pad + ln for ln in str(s).strip().splitlines())
-
 
 def load_spec(path: str | Path) -> ExtractionSpec:
     """Load and freeze a spec. Raises if any ENFORCED element is unprovenanced.
@@ -981,7 +956,6 @@ def load_spec(path: str | Path) -> ExtractionSpec:
         from .code_tables import load_table
         load_table(spec.value_domain)
     return spec
-
 
 def load_specs(directory: str | Path) -> dict[str, ExtractionSpec]:
     out: dict[str, ExtractionSpec] = {}

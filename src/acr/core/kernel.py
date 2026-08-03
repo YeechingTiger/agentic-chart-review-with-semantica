@@ -62,14 +62,11 @@ _RAW_TEXT_KEYS = frozenset({
     "text",
 })
 
-
 class KernelContractError(ValueError):
     """A stable-kernel object violated its public contract."""
 
-
 def _now() -> str:
     return datetime.now(UTC).isoformat()
-
 
 def canonical_json(value: Any) -> str:
     return json.dumps(
@@ -80,16 +77,13 @@ def canonical_json(value: Any) -> str:
         default=str,
     )
 
-
 def digest(value: Any) -> str:
     return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
-
 
 def normalized_hash(value: str | Mapping[str, Any] | Sequence[Any]) -> str:
     if isinstance(value, str) and _SHA256.fullmatch(value.lower()):
         return value.lower()
     return digest(value)
-
 
 @dataclass(frozen=True)
 class AssetRef:
@@ -126,49 +120,8 @@ class AssetRef:
     def ref(self) -> str:
         return f"{self.asset_id}@{self.version}"
 
-    @classmethod
-    def from_value(
-        cls,
-        *,
-        asset_id: str,
-        asset_type: str,
-        version: str,
-        value: Any,
-        local_ref: str = "",
-        status: str = "DRAFT",
-    ) -> AssetRef:
-        return cls(
-            asset_id=asset_id,
-            asset_type=asset_type,
-            version=version,
-            content_hash=digest(value),
-            local_ref=local_ref,
-            status=status,
-        )
-
-    @classmethod
-    def from_path(
-        cls,
-        path: str | Path,
-        *,
-        asset_id: str,
-        asset_type: str,
-        version: str,
-        status: str = "DRAFT",
-    ) -> AssetRef:
-        resolved = Path(path).resolve()
-        return cls(
-            asset_id=asset_id,
-            asset_type=asset_type,
-            version=version,
-            content_hash=hashlib.sha256(resolved.read_bytes()).hexdigest(),
-            local_ref=str(resolved),
-            status=status,
-        )
-
     def to_dict(self) -> dict[str, str]:
         return asdict(self)
-
 
 @dataclass(frozen=True)
 class ArtifactRef:
@@ -200,7 +153,6 @@ class ArtifactRef:
     def to_dict(self) -> dict[str, str]:
         return asdict(self)
 
-
 @dataclass(frozen=True)
 class TargetRef:
     """The exact run object a signal describes."""
@@ -228,7 +180,6 @@ class TargetRef:
             "detail": dict(self.detail),
         }
 
-
 @dataclass(frozen=True)
 class SignalEvidenceRef:
     """A non-copying pointer to evidence supporting an analysis signal."""
@@ -250,7 +201,6 @@ class SignalEvidenceRef:
 
     def to_dict(self) -> dict[str, str]:
         return asdict(self)
-
 
 @dataclass(frozen=True)
 class Trajectory:
@@ -323,14 +273,12 @@ class Trajectory:
             value["content_hash"] = digest(value)
         return value
 
-
 def _redacted_text(value: str) -> dict[str, Any]:
     return {
         "redacted": True,
         "sha256": hashlib.sha256(value.encode("utf-8")).hexdigest(),
         "length": len(value),
     }
-
 
 def _sanitize_event_value(value: Any, *, key: str = "") -> Any:
     """Remove source text while retaining stable structure for analysis."""
@@ -344,7 +292,6 @@ def _sanitize_event_value(value: Any, *, key: str = "") -> Any:
     if isinstance(value, str) and key in _RAW_TEXT_KEYS:
         return _redacted_text(value)
     return value
-
 
 class TrajectoryAdapter:
     """Build a canonical Trajectory from extraction manifest and trace artifacts."""
@@ -530,7 +477,6 @@ class TrajectoryAdapter:
             created_at=created_at,
         )
 
-
 @dataclass(frozen=True)
 class SignalEnvelope:
     """Thin common envelope; domain payloads retain their own schemas."""
@@ -560,10 +506,6 @@ class SignalEnvelope:
             raise KernelContractError("signal status and severity are required")
         if not str(self.payload_schema).strip():
             raise KernelContractError("signal payload_schema is required")
-
-    @property
-    def content_hash(self) -> str:
-        return digest(self.to_dict())
 
     def to_dict(self) -> dict[str, Any]:
         return {

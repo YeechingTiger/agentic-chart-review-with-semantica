@@ -52,14 +52,11 @@ _FORBIDDEN_CHANNEL_NAMES = frozenset({
 })
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
-
 class EvaluationPipelineError(ValueError):
     """An evaluation asset, context, task, or execution crossed a boundary."""
 
-
 def _now() -> str:
     return datetime.now(UTC).isoformat()
-
 
 def _contains_truth_key(value: Any) -> bool:
     if isinstance(value, Mapping):
@@ -72,7 +69,6 @@ def _contains_truth_key(value: Any) -> bool:
     elif isinstance(value, (list, tuple)):
         return any(_contains_truth_key(child) for child in value)
     return False
-
 
 @dataclass(frozen=True)
 class InputChannel:
@@ -116,7 +112,6 @@ class InputChannel:
             self.value if self.value is not None else self.artifact_ref
         )
 
-
 @dataclass(frozen=True)
 class TruthContext:
     """Truth is a separate capability, never a generic evaluator channel."""
@@ -153,7 +148,6 @@ class TruthContext:
             raise EvaluationPipelineError(
                 "GOLD TruthContext needs an accountable adjudication reference"
             )
-
 
 @dataclass(frozen=True)
 class EvaluationContext:
@@ -225,7 +219,6 @@ class EvaluationContext:
             f"trajectory {self.trajectory.trajectory_id} lacks channel {name!r}"
         )
 
-
 @dataclass(frozen=True)
 class EvaluationResult:
     """Quality result only; audit findings and incidents are different payloads."""
@@ -287,7 +280,6 @@ class EvaluationResult:
             payload=self.to_dict(),
         )
 
-
 @dataclass(frozen=True)
 class EvaluationInvocation:
     asset: ModuleAsset
@@ -301,15 +293,9 @@ class EvaluationInvocation:
     seed: int | None = None
     prior_results: Mapping[str, EvaluationResult] = field(default_factory=dict)
 
-
-EvaluatorImplementation = Callable[
-    [EvaluationInvocation, Mapping[str, Callable[..., Any]]],
-    EvaluationResult,
-]
 Condition = Callable[
     [EvaluationContext, Mapping[str, EvaluationResult]], bool
 ]
-
 
 class CapabilityBroker:
     """Runtime enforcement for already-intersected evaluator capabilities."""
@@ -369,7 +355,6 @@ class CapabilityBroker:
         })
         return result
 
-
 @dataclass(frozen=True)
 class EvaluationTask:
     task_id: str
@@ -402,7 +387,6 @@ class EvaluationTask:
             raise EvaluationPipelineError(
                 "evaluation local_output_root must be absolute"
             )
-
 
 class EvaluationStore:
     def __init__(self, local_store: LocalArtifactStore):
@@ -460,7 +444,6 @@ class EvaluationStore:
             "by_status": dict(sorted(by_status.items())),
             "by_module": dict(sorted(by_module.items())),
         }
-
 
 class EvaluationPipelineRunner:
     """Execute evaluator modules without hard-coding evaluator IDs."""
@@ -619,7 +602,6 @@ class EvaluationPipelineRunner:
                     self.store.add(result, asset)
             output[trajectory_id] = tuple(results)
         return output
-
 
 def make_result(
     invocation: EvaluationInvocation,

@@ -19,7 +19,7 @@ import json
 import math
 import re
 from collections import Counter
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -75,30 +75,23 @@ RETRIEVAL_PARAMETERS = {
 
 _PERSON_ID = re.compile(r"1168\d{12}")
 
-
 class SpecRepairError(ValueError):
     """A develop-plane artifact is incomplete, inconsistent, or unsafe to use."""
-
 
 class GoldNotUsable(SpecRepairError):
     """The supplied registry label has not become chart-observable gold."""
 
-
 class InvalidProposal(SpecRepairError):
     """A proposed edit violates the gradient-routing boundary."""
-
 
 class SealedSetReuse(SpecRepairError):
     """A sealed cohort was used after its one permitted certification read."""
 
-
 def _canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str)
 
-
 def _hash(*parts: Any) -> str:
     return hashlib.sha256("\0".join(_canonical(p) for p in parts).encode()).hexdigest()[:16]
-
 
 def _normalise(value: Any) -> Any:
     """Normalise values for equality without turning missing into an empty string."""
@@ -110,7 +103,6 @@ def _normalise(value: Any) -> Any:
         return [_normalise(v) for v in value]
     return value
 
-
 def _safe_case_id(value: Any) -> str:
     case_id = str(value or "").strip()
     if not case_id:
@@ -121,25 +113,20 @@ def _safe_case_id(value: Any) -> str:
             "develop-plane artifact")
     return case_id
 
-
 def safe_case_id(value: Any) -> str:
     """Validate a portable, pseudonymous case identifier."""
     return _safe_case_id(value)
-
 
 def artifact_hash(*parts: Any) -> str:
     """Return the stable short digest used to bind repair artifacts."""
     return _hash(*parts)
 
-
 def _portable_source(source: str) -> str:
     """Name a controlled input without copying a path that may contain a person id."""
     return f"manifest:{_hash(source)}" if source else ""
 
-
 def _portable_run_id(run_id: str) -> str:
     return f"run:{_hash(run_id)}" if _PERSON_ID.search(run_id) else run_id
-
 
 @dataclass(frozen=True)
 class GoldField:
@@ -166,7 +153,6 @@ class GoldField:
 
     def to_dict(self) -> dict:
         return {"status": self.status, "value": self.value, "reason_code": self.reason_code}
-
 
 @dataclass(frozen=True)
 class GoldEvidence:
@@ -206,7 +192,6 @@ class GoldEvidence:
         return {"note_id": self.note_id, "fields": list(self.fields), "stance": self.stance,
                 "quote": self.quote, "document_role": self.document_role,
                 "start": self.start, "end": self.end}
-
 
 @dataclass(frozen=True)
 class ChartObservableGold:
@@ -285,7 +270,6 @@ class ChartObservableGold:
             "adjudication_rationale": self.adjudication_rationale,
         }
 
-
 def load_gold(path: str | Path) -> dict[str, ChartObservableGold]:
     """Load the explicit gold contract; legacy answer keys are refused, not guessed."""
     p = Path(path)
@@ -313,7 +297,6 @@ def load_gold(path: str | Path) -> dict[str, ChartObservableGold]:
         out[gold.case_id] = gold
     return out
 
-
 def gold_document(cases: Iterable[ChartObservableGold]) -> dict:
     rows = list(cases)
     return {"schema": GOLD_SCHEMA, "cases": [r.to_dict() for r in rows],
@@ -323,7 +306,6 @@ def gold_document(cases: Iterable[ChartObservableGold]) -> dict:
                 "by_derivability": dict(Counter(r.chart_derivability for r in rows)),
                 "by_adjudication": dict(Counter(r.adjudication for r in rows)),
             }}
-
 
 def audit_gold(cases: Iterable[ChartObservableGold]) -> dict:
     rows = list(cases)
@@ -357,7 +339,6 @@ def audit_gold(cases: Iterable[ChartObservableGold]) -> dict:
             "n_findings": len(findings), "findings": findings,
             "repair_ready": not any(f["severity"] == "BLOCK" for f in findings)}
 
-
 def _rule_ids(manifest: Mapping[str, Any]) -> tuple[str, ...]:
     att = manifest.get("rule_attribution") or {}
     found: set[str] = set()
@@ -378,7 +359,6 @@ def _rule_ids(manifest: Mapping[str, Any]) -> tuple[str, ...]:
     walk(att)
     return tuple(sorted(found))
 
-
 def _evidence_refs(manifest: Mapping[str, Any]) -> tuple[tuple[str, str, tuple[str, ...]], ...]:
     answer = manifest.get("answer") or {}
     rows = manifest.get("evidence") or answer.get("evidence") or []
@@ -392,7 +372,6 @@ def _evidence_refs(manifest: Mapping[str, Any]) -> tuple[tuple[str, str, tuple[s
         fields = tuple(sorted(str(x) for x in (row.get("fields") or ())))
         out.add((note_id, str(row.get("stance") or "supports"), fields))
     return tuple(sorted(out))
-
 
 def _field_results(manifest: Mapping[str, Any]) -> dict[str, dict]:
     answer = manifest.get("answer") or {}
@@ -409,7 +388,6 @@ def _field_results(manifest: Mapping[str, Any]) -> dict[str, dict]:
     status = str(answer.get("status") or "")
     return {str(name): {"status": status, "value": value, "reason_code": ""}
             for name, value in (answer.get("value") or {}).items()}
-
 
 @dataclass(frozen=True)
 class BehaviorSignature:
@@ -586,7 +564,6 @@ class BehaviorSignature:
             "run_conditions": dict(self.run_conditions),
         }
 
-
 def matches_gold(signature: BehaviorSignature, gold: ChartObservableGold) -> bool:
     if not gold.usable_for_repair or signature.spec_id != gold.spec_id:
         return False
@@ -604,7 +581,6 @@ def matches_gold(signature: BehaviorSignature, gold: ChartObservableGold) -> boo
             return False
     return True
 
-
 def overclaims(signature: BehaviorSignature, gold: ChartObservableGold) -> bool:
     if not gold.usable_for_repair:
         return False
@@ -614,7 +590,6 @@ def overclaims(signature: BehaviorSignature, gold: ChartObservableGold) -> bool:
         if expected.status != FOUND and actual_status == FOUND:
             return True
     return False
-
 
 @dataclass(frozen=True)
 class BehaviorCluster:
@@ -637,7 +612,6 @@ class BehaviorCluster:
             "overclaim": self.overclaim,
         }
 
-
 @dataclass(frozen=True)
 class BehaviorDistribution:
     case_id: str
@@ -659,7 +633,6 @@ class BehaviorDistribution:
             "overclaim_rate": self.overclaim_rate, "gold_usable": self.gold_usable,
             "clusters": [c.to_dict() for c in self.clusters],
         }
-
 
 def cluster_behaviors(signatures: Sequence[BehaviorSignature],
                       gold: ChartObservableGold | None = None) -> BehaviorDistribution:
@@ -702,7 +675,6 @@ def cluster_behaviors(signatures: Sequence[BehaviorSignature],
         gold_usable=usable,
     )
 
-
 def behavior_document(distributions: Iterable[BehaviorDistribution]) -> dict:
     rows = list(distributions)
     return {
@@ -721,10 +693,8 @@ def behavior_document(distributions: Iterable[BehaviorDistribution]) -> dict:
         },
     }
 
-
 def _mean(values: Sequence[float]) -> float | None:
     return round(sum(values) / len(values), 6) if values else None
-
 
 def load_signatures(paths: Iterable[str | Path], *,
                     case_map: Mapping[str, str] | None = None) -> list[BehaviorSignature]:
@@ -748,7 +718,6 @@ def load_signatures(paths: Iterable[str | Path], *,
                 doc, source=str(p), case_id=mapping.get(original)))
     return out
 
-
 def _difference(a: Mapping[str, Any], b: Mapping[str, Any]) -> dict:
     out = {}
     for key in sorted(set(a) | set(b)):
@@ -756,7 +725,6 @@ def _difference(a: Mapping[str, Any], b: Mapping[str, Any]) -> dict:
         if _normalise(av) != _normalise(bv):
             out[key] = {"selected": av, "rejected": bv}
     return out
-
 
 def _spec_sections(spec: Any) -> dict:
     return {
@@ -772,7 +740,6 @@ def _spec_sections(spec: Any) -> dict:
         "search_hints": list(getattr(spec, "search_hints", ()) or ()),
         "answer_checks": list(getattr(spec, "answer_checks", ()) or ()),
     }
-
 
 @dataclass(frozen=True)
 class ContrastiveFailurePacket:
@@ -798,7 +765,6 @@ class ContrastiveFailurePacket:
             "spec_sections": dict(self.spec_sections),
             "repair_permitted": self.repair_permitted, "why": self.why,
         }
-
 
 def diagnose(distribution: BehaviorDistribution, gold: ChartObservableGold, spec: Any,
              ) -> ContrastiveFailurePacket:
@@ -852,7 +818,6 @@ def diagnose(distribution: BehaviorDistribution, gold: ChartObservableGold, spec
         gold.case_id, gold.spec_id, spec_hash, "NO_REPAIR_NEEDED",
         sel.representative.to_dict(), None, {}, gold.to_dict(), sections, False,
         "all observed behaviour is grounded-correct")
-
 
 @dataclass(frozen=True)
 class SpecPatchProposal:
@@ -950,7 +915,6 @@ class SpecPatchProposal:
                 self.change_class == ASSET and not self.requires_clinician_signoff),
         }
 
-
 def validate_proposal_for_packet(
         proposal: SpecPatchProposal,
         packet: ContrastiveFailurePacket) -> SpecPatchProposal:
@@ -964,23 +928,6 @@ def validate_proposal_for_packet(
             "proposal case/spec/failure does not match its packet: "
             f"expected {expected!r}, got {got!r}")
     return proposal
-
-
-class ContrastiveSpecRepairer:
-    """One-call proposal generator behind an injectable model seam."""
-
-    def __init__(self, proposer: Callable[[Mapping[str, Any]], Mapping[str, Any]]):
-        self.proposer = proposer
-
-    def propose(self, packet: ContrastiveFailurePacket, *, spec_text: str) -> SpecPatchProposal:
-        if not packet.repair_permitted:
-            raise InvalidProposal(f"{packet.case_id}: repair is not permitted: {packet.why}")
-        raw = self.proposer(packet.to_dict())
-        if not isinstance(raw, Mapping):
-            raise InvalidProposal("proposal model returned a non-object")
-        return validate_proposal_for_packet(
-            SpecPatchProposal.from_dict(raw, spec_text=spec_text), packet)
-
 
 @dataclass(frozen=True)
 class InstancePair:
@@ -1000,7 +947,6 @@ class InstancePair:
             "before_grounded": self.before_grounded, "after_grounded": self.after_grounded,
             "before_overclaim": self.before_overclaim, "after_overclaim": self.after_overclaim,
         }
-
 
 @dataclass(frozen=True)
 class PairedValidationReport:
@@ -1027,13 +973,11 @@ class PairedValidationReport:
             "per_instance": [p.to_dict() for p in self.pairs],
         }
 
-
 def _best_distribution_value(d: BehaviorDistribution, attr: str) -> bool:
     """Read the modal cluster, with ties resolved against acceptance."""
     best = max(c.count for c in d.clusters)
     tied = [c for c in d.clusters if c.count == best]
     return bool(tied and all(bool(getattr(c, attr)) for c in tied))
-
 
 def _validation_metrics(
         distributions: Sequence[BehaviorDistribution],
@@ -1094,7 +1038,6 @@ def _validation_metrics(
             if n else None
         ),
     }
-
 
 def paired_validate(before: Sequence[BehaviorDistribution],
                     after: Sequence[BehaviorDistribution],
@@ -1178,7 +1121,6 @@ def paired_validate(before: Sequence[BehaviorDistribution],
         refusal_reasons=tuple(reasons),
         metrics={"before": before_metrics, "after": after_metrics, "delta": deltas})
 
-
 def min_zero_error_n(max_error_rate: float, confidence: float = 0.95) -> int:
     """Exact zero-event binomial sample size: (1-p)^n <= 1-confidence."""
     if not 0 < max_error_rate < 1:
@@ -1186,7 +1128,6 @@ def min_zero_error_n(max_error_rate: float, confidence: float = 0.95) -> int:
     if not 0 < confidence < 1:
         raise SpecRepairError("confidence must be strictly between 0 and 1")
     return math.ceil(math.log(1 - confidence) / math.log(1 - max_error_rate))
-
 
 @dataclass(frozen=True)
 class SealedCertification:

@@ -176,9 +176,6 @@ TRIGGER_ZERO_HIT_SEARCH = "ZERO_HIT_SEARCH"
 TRIGGER_UNLISTED_ANSWER_TERM = "UNLISTED_ANSWER_TERM"
 TRIGGER_UNSETTLED_THREAD = "UNSETTLED_THREAD"
 TRIGGER_GATE_OBLIGATION_UNREACHABLE = "GATE_OBLIGATION_UNREACHABLE"
-TRIGGERS = (TRIGGER_ZERO_HIT_SEARCH, TRIGGER_UNLISTED_ANSWER_TERM, TRIGGER_UNSETTLED_THREAD,
-            TRIGGER_GATE_OBLIGATION_UNREACHABLE)
-
 
 @dataclass(frozen=True)
 class Trigger:
@@ -203,7 +200,6 @@ class Trigger:
                 "note_id": self.note_id, "doc_type": self.doc_type, "marker": self.marker,
                 "step": self.step, "terms_proposed": list(self.terms_proposed),
                 "types_proposed": list(self.types_proposed)}
-
 
 # ================================================================== the marker catalogue
 #: The catalogue is NOT written here. It lives in `assets/skills/thread-chasing/`, it was measured
@@ -282,7 +278,6 @@ MECHANICALLY_DISCHARGEABLE_MARKERS = frozenset({MARKER_TRUNCATED})
 #: judgement, and the model is the thing being asked to make it.
 BLOCKING_MARKERS = frozenset({MARKER_TRUNCATED})
 
-
 def marker_blocks_answer(marker: str) -> bool:
     """True when an unsettled thread on `marker` may refuse an answer.
 
@@ -330,7 +325,6 @@ OPEN_REQUEST_STATUSES: dict[str, str] = {
         "read whole, so nothing was opened and nothing is owed",
 }
 
-
 class OpenRequest(dict):
     """What `request_open` did, as a status the caller has to NAME.
 
@@ -377,7 +371,6 @@ class OpenRequest(dict):
             f" and this one is {self.get('status')!r}. Branch on `.status`, or ask `.opened` "
             "if the only thing you need to know is whether new debt was added.")
 
-
 # ---------------------------------------------------- how much of a document has been read
 #: `fully_read` answers False for three different situations and a mechanical discharge has
 #: to be able to tell them apart: a `read_section` contributes true offsets and no document
@@ -394,7 +387,6 @@ _TICKED = re.compile(r"`([^`]+)`")
 _LOW_PRECISION_SENTENCE = re.compile(
     r"most instances of (?P<markers>(?:`[^`]+`(?:\s*(?:,|and)\s*)?)+)[^.]*ordinary clinic chatter")
 
-
 @dataclass(frozen=True)
 class Marker:
     text: str
@@ -410,7 +402,6 @@ class Marker:
     def to_dict(self) -> dict:
         return {"marker": self.text, "obligation": self.obligation[:200],
                 "low_precision": self.low_precision}
-
 
 @dataclass(frozen=True)
 class MarkerCatalogue:
@@ -444,10 +435,8 @@ class MarkerCatalogue:
                 "n_markers": len(self.markers),
                 "markers": [m.to_dict() for m in self.markers]}
 
-
 def _clean(cell: str) -> str:
     return " ".join(cell.replace("**", "").split()).strip()
-
 
 def load_marker_catalogue(skill_dir: str | Path | None = None) -> MarkerCatalogue:
     """Parse the thread-chasing skill's own tables into the marker set the runtime enforces.
@@ -520,7 +509,6 @@ def load_marker_catalogue(skill_dir: str | Path | None = None) -> MarkerCatalogu
                            source=f"{obligations}" + (f" + {rates}" if rates.exists() else ""),
                            degraded=degraded)
 
-
 # ==================================================================== the open-thread ledger
 @dataclass
 class OpenThread:
@@ -550,7 +538,6 @@ class OpenThread:
                 "opened_at_step": self.opened_at_step, "state": self.state,
                 "resolution": self.resolution[:400],
                 "resolved_at_step": self.resolved_at_step}
-
 
 class OpenThreadLedger:
     """Open threads block submission. Dismissal is allowed, and it is recorded.
@@ -855,7 +842,6 @@ class OpenThreadLedger:
             "threads": [t.to_dict() for t in self.threads],
         }
 
-
 # ======================================================================= the expansion budget
 @dataclass(frozen=True)
 class ExpansionBudget:
@@ -902,7 +888,6 @@ class ExpansionBudget:
                 "max_documents_opened_by_promotion": self.max_documents_opened_by_promotion,
                 "max_revisions": self.max_revisions}
 
-
 # =========================================================================== the revision
 @dataclass(frozen=True)
 class PlanRevision:
@@ -936,39 +921,6 @@ class PlanRevision:
                 "dismiss_threads": [{"thread_id": t, "reason": r}
                                     for t, r in self.dismiss_threads]}
 
-    @classmethod
-    def from_json(cls, j: Any) -> PlanRevision:
-        """Parse the model's reply. Anything unrecognised is dropped, never guessed at."""
-        j = j if isinstance(j, dict) else {}
-        terms = tuple(str(t).strip().lower() for t in (j.get("add_terms") or [])
-                      if str(t).strip())
-        proms: list[tuple[str, str]] = []
-        for p in (j.get("promote_types") or []):
-            if isinstance(p, dict):
-                t, to = str(p.get("type", "")).strip(), str(p.get("to", "")).strip()
-            elif isinstance(p, (list, tuple)) and len(p) == 2:
-                t, to = str(p[0]).strip(), str(p[1]).strip()
-            else:
-                continue
-            if t and to in POLICIES:
-                proms.append((t, to))
-        opens: list[tuple[str, str, str]] = []
-        for o in (j.get("open_threads") or []):
-            if isinstance(o, dict) and str(o.get("note_id", "")).strip():
-                opens.append((str(o["note_id"]).strip(),
-                              str(o.get("marker", "") or "agent_reported").strip().lower(),
-                              str(o.get("why", "")).strip()))
-        def _pairs(key: str, second: str) -> tuple[tuple[str, str], ...]:
-            out: list[tuple[str, str]] = []
-            for r in (j.get(key) or []):
-                if isinstance(r, dict) and str(r.get("thread_id", "")).strip():
-                    out.append((str(r["thread_id"]).strip(), str(r.get(second, "")).strip()))
-            return tuple(out)
-        return cls(add_terms=terms, promote_types=tuple(proms), open_threads=tuple(opens),
-                   resolve_threads=_pairs("resolve_threads", "how"),
-                   dismiss_threads=_pairs("dismiss_threads", "reason"))
-
-
 @dataclass(frozen=True)
 class PlanSnapshot:
     """The plan reduced to what monotonicity is defined over."""
@@ -978,7 +930,6 @@ class PlanSnapshot:
 
     def as_map(self) -> dict[str, str]:
         return dict(self.policies)
-
 
 def check_monotone(before: PlanSnapshot, after: PlanSnapshot) -> list[str]:
     """Every way a candidate plan fails to be a superset of the current one.
@@ -1002,7 +953,6 @@ def check_monotone(before: PlanSnapshot, after: PlanSnapshot) -> list[str]:
             v.append(f"type demoted: {t!r} {pol} -> {a[t]} — the audited party may not choose "
                      f"to look at less")
     return v
-
 
 @dataclass
 class RevisionOutcome:
@@ -1036,7 +986,6 @@ class RevisionOutcome:
                 "thread_noops": self.thread_noops,
                 "refused": self.refused, "refusal_class": self.refusal_class}
 
-
 #: Refusal classes, so a directory of manifests can be counted without reading prose.
 REFUSED_NOT_MONOTONE = "NOT_MONOTONE"
 REFUSED_BUDGET = "BUDGET_EXHAUSTED"
@@ -1047,7 +996,6 @@ REFUSED_REDUNDANT_TERM = "REDUNDANT_TERM"
 #: affordable, and it moves nothing -- the exact shape of the SYN0001 deadlock, where nine
 #: such revisions were each reported back as APPLIED.
 REFUSED_THREAD_NOOP = "THREAD_NOOP"
-
 
 # ------------------------------------------------------------------ what makes two terms one
 def normalise_term(raw: str) -> str:
@@ -1066,7 +1014,6 @@ def normalise_term(raw: str) -> str:
     the agent is still charged for.
     """
     return re.sub(r"\s+", " ", str(raw or "")).strip().lower()
-
 
 def redundant_against(candidate: str, existing: Iterable[str]) -> str | None:
     """The already-planned term that makes `candidate` retrieve nothing new, or None.
@@ -1091,14 +1038,12 @@ def redundant_against(candidate: str, existing: Iterable[str]) -> str | None:
             return e
     return None
 
-
 def _redundant_why(term: str, covered_by: str) -> str:
     """Named terms, both of them: a refusal the agent cannot act on is one it repeats."""
     return (f"{REFUSED_REDUNDANT_TERM}: {term!r} was NOT added and cost no term budget — the "
             f"plan already searches {covered_by!r}, and search is case-insensitive substring "
             f"matching, so every document {term!r} could return is already returned. Ask for "
             f"a term the plan does not already cover, or a SHORTER one, which is broader.")
-
 
 @dataclass
 class CoveragePlan:
@@ -1401,7 +1346,6 @@ class CoveragePlan:
                 "uncertain": self.uncertain, "confidence": self.confidence,
                 "rationale": self.rationale}
 
-
 # ==================================================================== building the plan
 def spec_declared_keywords(spec) -> list[str]:
     """The spec's own term list: the falsification baseline, and nothing else.
@@ -1425,12 +1369,10 @@ def spec_declared_keywords(spec) -> list[str]:
             out.append(k)
     return out
 
-
 def _blank_plan(spec) -> CoveragePlan:
     init = spec_declared_keywords(spec)
     return CoveragePlan(initial_keywords=list(init), keywords=list(init),
                         n_fields=max(1, len(getattr(spec, "fields", []) or [])))
-
 
 def plan_from_spec(spec, chart) -> CoveragePlan:
     """The plan the runtime can always build: the spec's strata, projected onto this chart.
@@ -1468,7 +1410,6 @@ def plan_from_spec(spec, chart) -> CoveragePlan:
             p.rationale[t] = "matched no stratum; unjudged defaults to search, not to junk"
     return p
 
-
 def plan_from_patient_inventory(spec, chart) -> CoveragePlan:
     """An unbiased retrieval surface for the guideline-only experiment.
 
@@ -1491,7 +1432,6 @@ def plan_from_patient_inventory(spec, chart) -> CoveragePlan:
             for t in types
         },
     )
-
 
 PLAN_PROMPT = """You are planning the document coverage for one chart review.
 
@@ -1537,7 +1477,6 @@ Reply with JSON only:
   "keywords":["..."],
   "uncertain":["<types you are least sure about>"]}}"""
 
-
 def inventory(chart) -> list[dict]:
     """Type name, count and date span. Names and metadata only -- no document text."""
     by: dict[str, list] = {}
@@ -1551,14 +1490,12 @@ def inventory(chart) -> list[dict]:
                     "from": ds[0] if ds else "?", "to": ds[-1] if ds else "?"})
     return out
 
-
 def documents_by_type(chart) -> dict[str, int]:
     docs, _ = chart.list_documents(limit=100_000)
     out: dict[str, int] = {}
     for d in docs:
         out[d.doc_type] = out.get(d.doc_type, 0) + 1
     return out
-
 
 def plan_coverage(spec, chart, llm) -> CoveragePlan:
     """Ask once, up front, what to read / search / sample for THIS patient.
@@ -1610,7 +1547,6 @@ def plan_coverage(spec, chart, llm) -> CoveragePlan:
                                                      "planner; not declared by the spec"})
     return p
 
-
 # ==================================================================== trigger detection
 _WORD = re.compile(r"[A-Za-z][A-Za-z\-]{3,}")
 #: Words that carry no retrieval signal. Short and boring on purpose: this list only shapes
@@ -1620,7 +1556,6 @@ _STOP = {"the", "and", "with", "this", "that", "from", "were", "was", "have", "h
          "patient", "report", "note", "date", "name", "history", "clinical", "final",
          "impression", "diagnosis", "specimen", "left", "right", "there", "which", "been",
          "also", "into", "these", "those", "than", "then", "when", "will", "would", "should"}
-
 
 def _candidate_terms(text: str, current: Iterable[str], limit: int) -> tuple[str, ...]:
     have = [c.lower() for c in current]
@@ -1634,11 +1569,9 @@ def _candidate_terms(text: str, current: Iterable[str], limit: int) -> tuple[str
             break
     return tuple(out)
 
-
 #: How many candidate terms a single trigger may suggest. A parameter and not a literal in
 #: the loop, because it is the difference between a readable trigger and a wall of tokens.
 MAX_SUGGESTED_TERMS = 8
-
 
 def triggers_from_tool_result(name: str, args: dict, result: dict, *, plan: CoveragePlan,
                               catalogue: MarkerCatalogue, step: int,
@@ -1703,7 +1636,6 @@ def triggers_from_tool_result(name: str, args: dict, result: dict, *, plan: Cove
                 observation=f"cited quote matches no current search term: {quote[:200]!r}",
                 terms_proposed=_candidate_terms(quote, plan.keywords, MAX_SUGGESTED_TERMS)))
     return out
-
 
 def gate_obligation_triggers(missing: Sequence[str], *, plan: CoveragePlan,
                              unread_hit_types: Sequence[str] = (), step: int = 0) -> list[Trigger]:

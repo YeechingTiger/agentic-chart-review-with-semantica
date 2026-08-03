@@ -58,7 +58,6 @@ Disposition = Literal[
     "out_of_scope_before_anchor", "out_of_scope_after_observable_end",
 ]
 
-
 # ---------------------------------------------------------------------------- statistics
 def clopper_pearson_upper(hits: int, n: int, confidence: float = 0.95) -> float:
     """One-sided upper bound on a binomial rate. 1.0 when nothing was sampled.
@@ -89,10 +88,6 @@ def clopper_pearson_upper(hits: int, n: int, confidence: float = 0.95) -> float:
                 hi = mid
         return hi
 
-
-
-
-
 def unmapped_doc_types(docs: Sequence[DocMeta], specs: Sequence[StratumSpec],
                        mapping: SiteMapping | None) -> list[str]:
     """Type names in this chart that a `means:`-declaring stratification cannot speak for.
@@ -107,7 +102,6 @@ def unmapped_doc_types(docs: Sequence[DocMeta], specs: Sequence[StratumSpec],
     _, unknown = mapping.coverage_of(d.doc_type for d in docs)
     return unknown
 
-
 # ---------------------------------------------------------------------------- sampling
 #: Domain separator for the derived sampling seed. Public on purpose: on the CLI the seed
 #: does not need to be unguessable, it needs to be NON-NEGOTIABLE. Set
@@ -117,7 +111,6 @@ SEED_DOMAIN = b"acr.sample_seed/1"
 #: Recorded next to every derived seed so a reader can tell a derivation from a draw.
 SEED_DERIVED = "derived:hmac(patient,spec_id)"
 SEED_CALLER = "caller_supplied"
-
 
 def derive_sample_seed(patient_id: str, spec_id: str, secret: bytes | None = None) -> int:
     """The sampling seed for one (patient, spec) question, derived rather than drawn.
@@ -139,7 +132,6 @@ def derive_sample_seed(patient_id: str, spec_id: str, secret: bytes | None = Non
     mac = hmac.new(key, f"{patient_id}|{spec_id}".encode(), hashlib.sha256)
     return int.from_bytes(mac.digest()[:4], "big") % (2**31)
 
-
 class ForcedSampler:
     """Draws validation samples. The agent never chooses these.
 
@@ -157,7 +149,6 @@ class ForcedSampler:
         if n >= len(pool):
             return list(pool)
         return self._rng.sample(list(pool), n)
-
 
 # ---------------------------------------------------------------------------- windows
 @dataclass
@@ -177,9 +168,7 @@ class Window:
             "n_documents_any_type": self.n_documents_any_type,
         }
 
-
 DEFAULT_SCHEDULE = [{"from_months": 0, "to_months": None, "interval_months": 6}]
-
 
 def _parse_schedule(schedule: Any) -> list[dict]:
     if schedule in (None, "PLACEHOLDER_REQUIRES_CLINICAL_INPUT"):
@@ -193,7 +182,6 @@ def _parse_schedule(schedule: Any) -> list[dict]:
         })
     return out or DEFAULT_SCHEDULE
 
-
 def _months(iso: str | None) -> int | None:
     if not iso:
         return None
@@ -204,10 +192,8 @@ def _months(iso: str | None) -> int | None:
         return int(s[:-1])
     return None
 
-
 def _add_months(d: date, m: int) -> date:
     return d + timedelta(days=int(round(m * 30.4375)))
-
 
 def enumerate_windows(anchor: date, horizon: date, schedule: Any = None) -> list[Window]:
     segs = _parse_schedule(schedule)
@@ -226,7 +212,6 @@ def enumerate_windows(anchor: date, horizon: date, schedule: Any = None) -> list
         out.append(Window(cur, nxt))
         cur = nxt
     return out
-
 
 def clip_and_judge(
     windows: list[Window],
@@ -281,7 +266,6 @@ def clip_and_judge(
             break
     return windows
 
-
 # ---------------------------------------------------------------------------- results
 def keyword_was_searched(keyword: str, searched_terms: Iterable[str]) -> bool:
     """Did a search that actually ran cover `keyword`?
@@ -299,7 +283,6 @@ def keyword_was_searched(keyword: str, searched_terms: Iterable[str]) -> bool:
     if not k:
         return False
     return any(k in (t or "").strip().lower() for t in searched_terms)
-
 
 @dataclass
 class StratumResult:
@@ -337,7 +320,6 @@ class StratumResult:
 
     def to_dict(self) -> dict:
         return asdict(self)
-
 
 class CoverageLedger:
     """The single record of what the agent actually did.
@@ -390,13 +372,6 @@ class CoverageLedger:
     def note_read(self, note_id: str, doc_type: str) -> None:
         if note_id not in self.read_notes:
             self.read_notes.append(note_id)
-        if doc_type and doc_type not in self.doc_types_touched:
-            self.doc_types_touched.append(doc_type)
-
-    def note_section(self, note_id: str, section: str, doc_type: str = "") -> None:
-        key = f"{note_id}#{section}"
-        if key not in self.read_sections:
-            self.read_sections.append(key)
         if doc_type and doc_type not in self.doc_types_touched:
             self.doc_types_touched.append(doc_type)
 
@@ -624,14 +599,11 @@ class CoverageLedger:
             lines.append("  ".join(bits))
         return "\n".join(lines)
 
-
-
 # --------------------------------------------------------------- admissibility, written down
 #: What `establishes` verdicts mean. Three values, not two, and the third is the point.
 ADMITTED = "ADMITTED"
 REFUSED = "REFUSED"
 UNDECLARED = "UNDECLARED"
-
 
 def admissibility_for_citations(spec, coverage: CoverageLedger, evidence: Sequence[dict],
                                 fields: Sequence[str] = ()) -> list[dict]:
@@ -720,7 +692,6 @@ def admissibility_for_citations(spec, coverage: CoverageLedger, evidence: Sequen
         out.append(rec)
     return out
 
-
 @dataclass
 class GateResult:
     verdict: str = "FAIL"
@@ -747,7 +718,6 @@ class GateResult:
 
     def to_dict(self) -> dict:
         return asdict(self)
-
 
 def evaluate_gate(gate_spec: dict, strata: Sequence[StratumResult],
                   windows: Sequence[Window] | None = None,
@@ -948,7 +918,6 @@ def evaluate_gate(gate_spec: dict, strata: Sequence[StratumResult],
     # Reading the verdict off `advisories` too would reinstate the gate under a new name.
     g.verdict = "PASS" if not g.missing else "FAIL"
     return g
-
 
 def summarise_windows(windows: Sequence[Window], *, snapshot: date | None = None) -> dict:
     """through_date, the finality call, and the gap list a human would need."""

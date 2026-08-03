@@ -44,10 +44,8 @@ _AUTHORITY_RANK = {name: index for index, name in enumerate(AUTHORITIES)}
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+-]*$")
 _VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
 
-
 class ModuleContractError(ValueError):
     """A module asset, profile, task grant, or implementation is invalid."""
-
 
 @dataclass(frozen=True)
 class CapabilityRequest:
@@ -85,7 +83,6 @@ class CapabilityRequest:
             scope=str(value.get("scope") or "patient_under_review"),
             version=str(value.get("version") or "1.0.0"),
         )
-
 
 @dataclass(frozen=True)
 class ModuleAsset:
@@ -297,7 +294,6 @@ class ModuleAsset:
             value["source"] = self.source
         return value
 
-
 def load_module_asset(path: str | Path) -> ModuleAsset:
     source = Path(path).resolve()
     value = yaml.safe_load(source.read_text(encoding="utf-8"))
@@ -307,9 +303,7 @@ def load_module_asset(path: str | Path) -> ModuleAsset:
         raise ModuleContractError(f"{source}: unsupported module schema")
     return ModuleAsset.from_dict(value, source=str(source))
 
-
 Implementation = Callable[..., Any]
-
 
 class ModuleRegistry:
     """Asset registry plus an explicit allowlist of local implementations."""
@@ -388,22 +382,10 @@ class ModuleRegistry:
                 "is not explicitly registered"
             ) from exc
 
-    def validate(self) -> None:
-        missing = sorted({
-            asset.implementation_id
-            for asset in self._assets.values()
-            if asset.implementation_id not in self._implementations
-        })
-        if missing:
-            raise ModuleContractError(
-                f"unregistered module implementations: {missing}"
-            )
-
     def all_assets(self) -> tuple[ModuleAsset, ...]:
         return tuple(
             sorted(self._assets.values(), key=lambda row: (row.module_id, row.version))
         )
-
 
 @dataclass(frozen=True)
 class TaskBudget:
@@ -421,7 +403,6 @@ class TaskBudget:
             and self.max_chart_reads <= ceiling.max_chart_reads
             and self.max_usd <= ceiling.max_usd
         )
-
 
 @dataclass(frozen=True)
 class PipelineNode:
@@ -478,7 +459,6 @@ class PipelineNode:
             ),
             authority=str(value.get("authority") or "OBSERVE"),
         )
-
 
 @dataclass(frozen=True)
 class PipelineProfile:
@@ -624,7 +604,6 @@ class PipelineProfile:
             value["source"] = self.source
         return value
 
-
 def load_pipeline_profile(path: str | Path) -> PipelineProfile:
     source = Path(path).resolve()
     value = yaml.safe_load(source.read_text(encoding="utf-8"))
@@ -633,7 +612,6 @@ def load_pipeline_profile(path: str | Path) -> PipelineProfile:
     if value.get("schema") not in {None, "acr.pipeline_profile/1"}:
         raise ModuleContractError(f"{source}: unsupported pipeline schema")
     return PipelineProfile.from_dict(value, source=str(source))
-
 
 class PipelineRegistry:
     def __init__(self) -> None:
@@ -676,7 +654,6 @@ class PipelineRegistry:
         return tuple(
             sorted(self._profiles.values(), key=lambda row: row.ref)
         )
-
 
 @dataclass(frozen=True)
 class CertificationSuite:
@@ -744,7 +721,6 @@ class CertificationSuite:
             source=source,
         )
 
-
 def load_certification_suite(path: str | Path) -> CertificationSuite:
     source = Path(path).resolve()
     value = yaml.safe_load(source.read_text(encoding="utf-8"))
@@ -755,7 +731,6 @@ def load_certification_suite(path: str | Path) -> CertificationSuite:
             f"{source}: unsupported certification schema"
         )
     return CertificationSuite.from_dict(value, source=str(source))
-
 
 class CertificationRegistry:
     def __init__(self) -> None:
@@ -786,14 +761,6 @@ class CertificationRegistry:
         self._suites[suite.ref] = suite
         self._by_module[suite.module_ref].append(suite)
 
-    def resolve(self, ref: str) -> CertificationSuite:
-        try:
-            return self._suites[ref]
-        except KeyError as exc:
-            raise ModuleContractError(
-                f"unknown certification suite {ref!r}"
-            ) from exc
-
     def for_module(self, module_ref: str) -> tuple[CertificationSuite, ...]:
         return tuple(self._by_module.get(module_ref, ()))
 
@@ -810,7 +777,6 @@ class CertificationRegistry:
                     f"{suite.ref}: cannot certify {asset.module_kind} in the "
                     "analysis certification registry"
                 )
-
 
 def effective_capabilities(
     asset: ModuleAsset,
@@ -847,7 +813,6 @@ def effective_capabilities(
         )
     return tuple(rows)
 
-
 def narrowed_authority(asset: ModuleAsset, node: PipelineNode, task: str) -> str:
     """Return the narrowest authority granted by asset, profile, and task."""
     for value in (asset.maximum_authority, node.authority, task):
@@ -863,24 +828,20 @@ def narrowed_authority(asset: ModuleAsset, node: PipelineNode, task: str) -> str
         )
     return task
 
-
 @runtime_checkable
 class RuntimePolicy(Protocol):
     def plan(self, run_context: Any) -> Any: ...
     def revise(self, state: Any, new_evidence: Any) -> Any: ...
     def should_stop(self, state: Any) -> Any: ...
 
-
 @runtime_checkable
 class AuditRule(Protocol):
     def inspect(self, trajectory: Any, application_events: Any) -> Any: ...
     def correlate(self, findings: Any) -> Any: ...
 
-
 @runtime_checkable
 class Evaluator(Protocol):
     def evaluate(self, context: Any) -> Any: ...
-
 
 # 2026-08-03 这里曾有 `RuntimeControl` 和 `RepairStrategy` 两个 protocol，各自的唯一实现
 # (`review/runtime_controls.py`、`improvement/repair_loop.py`) 在生产代码里零引用，删除时把

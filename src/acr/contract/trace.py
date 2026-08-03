@@ -59,7 +59,6 @@ from .answer_checks import answer_check_rule_id, field_rule_id
 def _now() -> str:
     return datetime.now(UTC).isoformat()
 
-
 # ===========================================================================================
 #                                     RULE IDENTITY
 # ===========================================================================================
@@ -107,10 +106,8 @@ MAX_KEPT_UNRECOGNISED = 20
 #: which is forty copies of one message. The trace keeps every one of them.
 MAX_KEPT_REJECTION_ROWS = 50
 
-
 def _slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", str(s).strip().lower()).strip("_") or "x"
-
 
 def _text_of(raw: Any) -> str:
     """One canonical string for a rule, whatever shape the YAML gave it."""
@@ -120,10 +117,8 @@ def _text_of(raw: Any) -> str:
         return f"IF {raw['if']} THEN {raw['then']}"
     return json.dumps(raw, sort_keys=True, ensure_ascii=False, default=str)
 
-
 def _sha(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()[:12]
-
 
 @dataclass(frozen=True)
 class RuleRef:
@@ -158,7 +153,6 @@ class RuleRef:
         if self.ambiguous_id:
             d["ambiguous_id"] = True
         return d
-
 
 def rule_catalog(spec: Any) -> list[RuleRef]:
     """Every rule in `spec`, with an identifier that is the same on every run of this version.
@@ -285,15 +279,12 @@ def rule_catalog(spec: Any) -> list[RuleRef]:
             final.append(r)
     return final
 
-
 def rule_index(spec: Any) -> dict[str, RuleRef]:
     return {r.rule_id: r for r in rule_catalog(spec)}
-
 
 def rule_catalog_hash(catalog: Sequence[RuleRef]) -> str:
     """Identifies the catalog, so an attribution can be checked against the rules it names."""
     return _sha("\n".join(f"{r.rule_id}:{r.text_sha}" for r in catalog))
-
 
 def rule_citation_block(spec: Any, max_chars: int = 160) -> str:
     """The ASK for the self-report channel: cite rules by an identifier the spec declares.
@@ -319,7 +310,6 @@ def rule_citation_block(spec: Any, max_chars: int = 160) -> str:
         t = " ".join(r.text.split())
         L.append(f"  {r.rule_id}  {t[:max_chars]}{'…' if len(t) > max_chars else ''}")
     return "\n".join(L)
-
 
 def parse_rule_citations(source: Any, known: Iterable[str]) -> tuple[list[str], list[str]]:
     """Pull rule identifiers out of an agent's self-report. Returns (recognised, unknown).
@@ -349,7 +339,6 @@ def parse_rule_citations(source: Any, known: Iterable[str]) -> tuple[list[str], 
         if tok not in target:
             target.append(tok)
     return good, bad
-
 
 @dataclass
 class Tracer:
@@ -656,62 +645,6 @@ class Tracer:
         }
 
     # export --------------------------------------------------------------------
-    def write_manifest(self, manifest: dict) -> Path:
-        p = self.path.with_suffix(".manifest.json")
-        p.write_text(json.dumps(manifest, indent=2, ensure_ascii=False, default=str) + "\n", encoding="utf-8")
-        return p
-
-    def to_capg(self, name: str = "") -> dict:
-        """Observation-tree shape: {id, name, observations:[{id,name,type,parent_observation_id,...}]}."""
-        obs: list[dict] = []
-        root = f"{self.run_id}-root"
-        obs.append({"id": root, "name": name or "chart-review", "type": "SPAN",
-                    "parent_observation_id": None, "start_time": self.events[0]["ts"] if self.events else _now()})
-        for ev in self.events:
-            oid = f"{self.run_id}-{ev['seq']}"
-            if ev["kind"] == "plan":
-                # The plan is the RETRIEVAL plan now — read_all / search / sample plus the
-                # term list — not a list of prose goals. Rendered as todos with the policy as
-                # the status, because that is the shape the CAPG adapter consumes and because
-                # "which types was this run allowed to open, at this revision" is the thing a
-                # provenance graph should be able to show. `plan_todos` also accepts the old
-                # list-of-goals shape, so traces recorded before this change still render.
-                obs.append({"id": oid, "name": "write_todos", "type": "EVENT",
-                            "parent_observation_id": root, "start_time": ev["ts"],
-                            "output": {"todos": plan_todos(ev.get("plan"))}})
-            elif ev["kind"] == "tool":
-                obs.append({"id": oid, "name": ev["tool"], "type": "TOOL",
-                            "parent_observation_id": root, "start_time": ev["ts"],
-                            "input": ev.get("args"), "output": ev.get("result")})
-            elif ev["kind"] == "llm":
-                obs.append({"id": oid, "name": "generation", "type": "GENERATION",
-                            "parent_observation_id": root, "start_time": ev["ts"],
-                            "output": {"content": ev.get("content", "")}})
-            elif ev["kind"] in ("reflect", "answer_rejected"):
-                obs.append({"id": oid, "name": ev["kind"], "type": "EVENT",
-                            "parent_observation_id": root, "start_time": ev["ts"], "output": ev})
-        return {"id": self.run_id, "name": name or "chart-review", "observations": obs}
-
-
-def plan_todos(plan: Any) -> list[dict]:
-    """One renderer for both plan shapes, so a trace directory stays readable across the cut.
-
-    The revisable plan used to be a list of {id, goal, rationale} that governed nothing. It
-    is now `coverage_planner.CoveragePlan.to_dict()`, which governs what may be opened. Both
-    shapes exist on disk under `runs/`, and a reader that handles only the new one silently
-    renders 37 historical runs as empty.
-    """
-    if isinstance(plan, dict):
-        rows = [{"content": f"{policy}: {t}", "status": policy}
-                for policy in ("read_all", "search", "sample")
-                for t in (plan.get(policy) or [])]
-        if plan.get("keywords"):
-            rows.append({"content": "search terms: " + ", ".join(plan["keywords"]),
-                         "status": "keywords"})
-        return rows
-    return [{"content": s.get("goal", ""), "status": s.get("status", "")}
-            for s in (plan or []) if isinstance(s, dict)]
-
 
 def plan_summary(plan: Any) -> str:
     """One line for a terminal trace listing. Same two shapes; see `plan_todos`."""
@@ -724,7 +657,6 @@ def plan_summary(plan: Any) -> str:
                 + (f" (+{added} added)" if added else "")
                 + (f" promotions={proms}" if proms else ""))
     return " | ".join(s.get("goal", "")[:34] for s in (plan or []) if isinstance(s, dict))
-
 
 def load_trace(path: str | Path) -> list[dict]:
     return [json.loads(ln) for ln in Path(path).read_text(encoding="utf-8").splitlines() if ln.strip()]

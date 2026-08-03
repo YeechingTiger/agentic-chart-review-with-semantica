@@ -28,7 +28,6 @@ from ..core.local_artifacts import LocalArtifactStore
 from ..core.modules import ModuleAsset, ModuleRegistry
 
 AUDIT_SEVERITIES = frozenset({"INFO", "WARN", "CRITICAL", "IRB"})
-AUDIT_STATUSES = frozenset({"PASS", "FINDING", "INCIDENT"})
 
 _INSTITUTIONAL_PERSON = re.compile("1168" + r"\d{12}")
 _EMAIL = re.compile(r"(?<![\w.-])[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}(?![\w.-])")
@@ -63,10 +62,8 @@ OUTBOUND_TOOLS = frozenset({
     "webhook",
 })
 
-
 class AuditContractError(ValueError):
     """An audit rule attempted to cross its truth or output boundary."""
-
 
 def _fingerprint(value: str) -> str:
     key = os.environ.get("ACR_PHI_FINGERPRINT_KEY", "")
@@ -75,7 +72,6 @@ def _fingerprint(value: str) -> str:
     return hmac.new(
         key.encode("utf-8"), value.encode("utf-8"), hashlib.sha256
     ).hexdigest()[:16]
-
 
 def _walk(value: Any, path: str = "root"):
     if isinstance(value, Mapping):
@@ -86,7 +82,6 @@ def _walk(value: Any, path: str = "root"):
             yield from _walk(child, f"{path}[{index}]")
     elif isinstance(value, str):
         yield path, value
-
 
 def _private_or_local_host(host: str) -> bool:
     value = host.lower().strip("[]")
@@ -106,7 +101,6 @@ def _private_or_local_host(host: str) -> bool:
         ))
     )
 
-
 def _outbound_event(event: Mapping[str, Any]) -> bool:
     tool = str(event.get("tool") or event.get("name") or "")
     tool = tool.lower().split(".")[-1]
@@ -118,7 +112,6 @@ def _outbound_event(event: Mapping[str, Any]) -> bool:
         if match and not _private_or_local_host(match.group(1)):
             return True
     return False
-
 
 @dataclass(frozen=True)
 class AuditContext:
@@ -156,7 +149,6 @@ class AuditContext:
             "git_root": self.git_root,
             "runtime_evidence_refs": self.runtime_evidence_refs,
         })
-
 
 @dataclass(frozen=True)
 class AuditFinding:
@@ -218,7 +210,6 @@ class AuditFinding:
             payload=self.to_dict(),
         )
 
-
 @dataclass(frozen=True)
 class AuditIncident:
     incident_id: str
@@ -264,7 +255,6 @@ class AuditIncident:
             payload=self.to_dict(),
         )
 
-
 @dataclass(frozen=True)
 class AuditReport:
     trajectory_id: str
@@ -292,12 +282,10 @@ class AuditReport:
             "input_hash": self.input_hash,
         }
 
-
 AuditImplementation = Callable[
     [ModuleAsset, AuditContext],
     tuple[tuple[AuditFinding, ...], tuple[AuditIncident, ...]],
 ]
-
 
 class AuditRuleRegistry:
     """Truth-blind AuditRule assets backed by explicit CODE implementations."""
@@ -322,7 +310,6 @@ class AuditRuleRegistry:
 
     def all(self) -> tuple[ModuleAsset, ...]:
         return self.modules.all_assets()
-
 
 class AuditRunner:
     def __init__(
@@ -357,7 +344,6 @@ class AuditRunner:
             self.store.add(report, assets)
         return report
 
-
 class AuditStore:
     """Local append-only audit signal store, separate from evaluation results."""
 
@@ -385,7 +371,6 @@ class AuditStore:
                 idempotency_key=signal.signal_id,
             )
 
-
 def _finding_id(
     asset: ModuleAsset,
     context: AuditContext,
@@ -395,7 +380,6 @@ def _finding_id(
     return "AF-" + digest(
         [asset.ref, context.input_hash, kind, locator]
     )[:20]
-
 
 def _incident_id(
     asset: ModuleAsset,
@@ -407,7 +391,6 @@ def _incident_id(
         [asset.ref, context.input_hash, kind, *sorted(finding_ids)]
     )[:20]
 
-
 def _target(
     context: AuditContext, kind: str = "SECURITY_BOUNDARY", target_id: str = ""
 ) -> TargetRef:
@@ -415,7 +398,6 @@ def _target(
         kind=kind,
         target_id=target_id or context.trajectory.trajectory_id,
     )
-
 
 def patient_boundary_audit(
     asset: ModuleAsset, context: AuditContext
@@ -465,7 +447,6 @@ def patient_boundary_audit(
         finding_ids=ids,
         rationale="one or more tool calls crossed the declared patient boundary",
     ),)
-
 
 def phi_provider_audit(
     asset: ModuleAsset, context: AuditContext
@@ -608,7 +589,6 @@ def phi_provider_audit(
             ))
     return tuple(findings), tuple(incidents)
 
-
 def undeclared_tool_audit(
     asset: ModuleAsset, context: AuditContext
 ) -> tuple[tuple[AuditFinding, ...], tuple[AuditIncident, ...]]:
@@ -655,7 +635,6 @@ def undeclared_tool_audit(
         for row in findings
     )
     return tuple(findings), incidents
-
 
 def local_artifact_audit(
     asset: ModuleAsset, context: AuditContext
@@ -718,7 +697,6 @@ def local_artifact_audit(
     )
     return tuple(findings), incidents
 
-
 def trajectory_integrity_audit(
     asset: ModuleAsset, context: AuditContext
 ) -> tuple[tuple[AuditFinding, ...], tuple[AuditIncident, ...]]:
@@ -773,7 +751,6 @@ def trajectory_integrity_audit(
 # 这是"删一个机制会留下什么"的标准形状，而留下它的那次删除是我做的。一条读事件而不 import 类型
 # 的规则，在依赖图上是隐形的；判定它死掉的唯一办法是问"还有谁写它读的那些键"。
 
-
 def _audit_asset(
     module_id: str, implementation_id: str, description: str
 ) -> ModuleAsset:
@@ -791,7 +768,6 @@ def _audit_asset(
         owner="platform-governance",
         tags=("audit", "application-events"),
     )
-
 
 def builtin_audit_registry() -> AuditRuleRegistry:
     registry = AuditRuleRegistry()

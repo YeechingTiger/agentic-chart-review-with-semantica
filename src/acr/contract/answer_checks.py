@@ -76,11 +76,6 @@ from dataclasses import dataclass
 
 from .spec import _answer_check_key
 
-
-def _norm(s: str) -> str:
-    return re.sub(r"\s+", " ", (s or "")).strip().lower()
-
-
 #: THE KINDS `check_answer_detail` DISPATCHES ON. Deliberately empty.
 #:
 #: `acr.contract.spec.bind_provenance` reads this set and REFUSES to load a spec that declares an
@@ -93,7 +88,6 @@ def _norm(s: str) -> str:
 #: Re-adding a kind here means re-adding a word list. Before doing that, read the measurement
 #: in the module docstring: five kinds, 122 firings, 58 correct values destroyed.
 ANSWER_CHECK_KINDS: frozenset[str] = frozenset()
-
 
 # --------------------------------------------------------------------------- rule identity
 # The id functions live here, next to the code that applies the rules, and are imported by
@@ -112,11 +106,9 @@ def answer_check_rule_id(chk, position: int | None = None) -> str:
         return f"answer_check.{_answer_check_key(chk)}"
     return f"answer_check.unparsed#{position if position is not None else 0}"
 
-
 def field_rule_id(kind: str, name: str) -> str:
     """`field_format.<field>` / `field_allowable_values.<field>`."""
     return f"{kind}.{name}"
-
 
 @dataclass(frozen=True)
 class Violation:
@@ -151,7 +143,6 @@ class Violation:
             d["quote"] = self.quote
         return d
 
-
 def check_answer(checks, value: dict, evidence, searched=()) -> list[str]:
     """Always empty. No clinical answer_check kind is implemented -- see the module docstring.
 
@@ -161,7 +152,6 @@ def check_answer(checks, value: dict, evidence, searched=()) -> list[str]:
     """
     return [v.message for v in check_answer_detail(checks, value, evidence, searched)]
 
-
 def check_answer_detail(checks, value: dict, evidence, searched=()) -> list[Violation]:
     """Always empty. See `ANSWER_CHECK_KINDS` and the module docstring.
 
@@ -170,7 +160,6 @@ def check_answer_detail(checks, value: dict, evidence, searched=()) -> list[Viol
     function exists is worse than a function that truthfully returns nothing.
     """
     return []
-
 
 # --------------------------------------------------------------------------- calendars
 # THE SECOND STEP, and the reason there is a second step at all.
@@ -204,7 +193,6 @@ def check_answer_detail(checks, value: dict, evidence, searched=()) -> list[Viol
 # needed instead was `year_imputed`.
 UNKNOWN = "99"
 
-
 def _partial_date_ccyymmdd(s: str) -> str:
     """Return why this is not a representable partial date, or "" if it is one."""
     if not re.fullmatch(r"\d{8}", s):
@@ -234,7 +222,6 @@ def _partial_date_ccyymmdd(s: str) -> str:
         return f"{yyyy}-{mm} has {last} days, so day {dd} does not exist"
     return ""
 
-
 def _earliest_denoted(s: str):
     """The earliest real date a partial-date notation could mean, or None if it means nothing.
 
@@ -254,7 +241,6 @@ def _earliest_denoted(s: str):
         return datetime.date(y, mm, dd)
     except ValueError:
         return None
-
 
 def check_dates_not_after(fields, value: dict, not_after) -> list[Violation]:
     """Dates no case could witness: later than the last document that could report them.
@@ -293,7 +279,6 @@ def check_dates_not_after(fields, value: dict, not_after) -> list[Violation]:
                      f"year and set year_imputed.")))
     return out
 
-
 #: The calendar kinds `check_field_formats_detail` dispatches on. A field declaring one that
 #: is absent here does not load -- same rule as `ANSWER_CHECK_KINDS`, and for the same reason:
 #: a declared validator that never runs looks exactly like one that ran and found nothing.
@@ -301,15 +286,12 @@ CALENDAR_KINDS: dict[str, Callable[[str], str]] = {
     "partial_date_ccyymmdd": _partial_date_ccyymmdd,
 }
 
-
 class UnknownCalendarKindError(ValueError):
     """A field declares a calendar validator nothing implements."""
-
 
 def check_field_formats(fields, value: dict) -> list[str]:
     """The messages only; `check_field_formats_detail` is the attributable form."""
     return [v.message for v in check_field_formats_detail(fields, value)]
-
 
 def check_field_formats_detail(fields, value: dict) -> list[Violation]:
     """Enforce the `format` and `allowable_values` the spec already declares per field.

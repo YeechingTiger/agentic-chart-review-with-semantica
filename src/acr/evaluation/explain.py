@@ -100,10 +100,8 @@ NO_GROUND_TRUTH_NOTICE = (
     "The deterministic eliminations are auditable; the cause finally chosen is not."
 )
 
-
 class ExplanationClaimError(AssertionError):
     """A cause was asserted that the deterministic scaffold did not leave available."""
-
 
 # ---------------------------------------------------------------------------- inputs
 @dataclass(frozen=True)
@@ -152,7 +150,6 @@ class VariableResult:
             return {self.output_field: self.value.get(self.output_field)}
         return dict(self.value)
 
-
 # ---------------------------------------------------------------------------- the proof
 @dataclass(frozen=True)
 class CoverageProof:
@@ -168,7 +165,6 @@ class CoverageProof:
 
     def to_dict(self) -> dict:
         return asdict(self)
-
 
 def assess_coverage_proof(vr: VariableResult, *,
                           max_elusion_upper: float = DEFAULT_MAX_ELUSION_UPPER) -> CoverageProof:
@@ -229,13 +225,11 @@ def assess_coverage_proof(vr: VariableResult, *,
 
     return CoverageProof(vr.name, not missing, mode, complete, worst, max_elusion_upper, missing)
 
-
 def _as_float(v: Any, default: float) -> float:
     try:
         return float(v)
     except (TypeError, ValueError):
         return default
-
 
 # ---------------------------------------------------------------------------- standings
 @dataclass(frozen=True)
@@ -247,7 +241,6 @@ class CauseStanding:
 
     def to_dict(self) -> dict:
         return asdict(self)
-
 
 def _standing_b(absent: Sequence[VariableResult],
                 proofs: Sequence[CoverageProof]) -> CauseStanding:
@@ -267,7 +260,6 @@ def _standing_b(absent: Sequence[VariableResult],
         [f"{p.variable}: can_establish exhaustively reviewed, elusion <= "
          f"{p.worst_elusion_upper:.3f} (cap {p.max_elusion_upper}), evidence still absent"
          for p in proofs])
-
 
 def _standing_a(absent: Sequence[VariableResult], present: Sequence[VariableResult],
                 b: CauseStanding, d: CauseStanding) -> CauseStanding:
@@ -301,7 +293,6 @@ def _standing_a(absent: Sequence[VariableResult], present: Sequence[VariableResu
         because.append("a documented exception is on the record (see D); if an adjudicator "
                        "accepts its scope, this is not a care gap")
     return CauseStanding(A_CARE_GAP, standing, CAUSE_OWNER[A_CARE_GAP], because)
-
 
 def _standing_c(driving: Sequence[VariableResult],
                 truth: Mapping[str, Mapping[str, Any] | None] | None) -> CauseStanding:
@@ -345,7 +336,6 @@ def _standing_c(driving: Sequence[VariableResult],
                          [("registry ground truth exists for every driving variable and "
                            "agrees with what we extracted")])
 
-
 def _standing_d(exceptions: Sequence[VariableResult],
                 proofs: Sequence[CoverageProof]) -> CauseStanding:
     """A justified exception needs its own evidence, held to the primary variable's standard.
@@ -378,10 +368,8 @@ def _standing_d(exceptions: Sequence[VariableResult],
                           f"the primary variable (elusion <= {p.worst_elusion_upper:.3f})"
                           for p in proofs])
 
-
 def _norm_code(v: Any) -> str:
     return str(v if v is not None else "").strip().upper()
-
 
 # ---------------------------------------------------------------------------- scaffold
 @dataclass(frozen=True)
@@ -395,14 +383,6 @@ class ExplanationScaffold:
 
     def standing(self, cause: str) -> str:
         return next(c.standing for c in self.causes if c.cause == cause)
-
-    @property
-    def open_causes(self) -> list[str]:
-        return [c.cause for c in self.causes if c.standing == OPEN]
-
-    @property
-    def eliminated_causes(self) -> list[str]:
-        return [c.cause for c in self.causes if c.standing == ELIMINATED]
 
     @property
     def available_causes(self) -> list[str]:
@@ -427,7 +407,6 @@ class ExplanationScaffold:
             lines.append(f"  [{c.standing:<10}] {c.cause}  -> {c.owner}")
             lines.extend(f"       {b}" for b in c.because)
         return "\n".join(lines)
-
 
 def scaffold_explanation(
     *,
@@ -483,7 +462,6 @@ def scaffold_explanation(
         causes=causes, proofs=proofs + exc_proofs)
     return ExplanationScaffold(case_id, recommendation_id, verdict, causes,
                                proofs + exc_proofs, packet)
-
 
 # ---------------------------------------------------------------------------- the packet
 def prepare_case_packet(*, case_id: str, recommendation_id: str, verdict: str,
@@ -542,7 +520,6 @@ def prepare_case_packet(*, case_id: str, recommendation_id: str, verdict: str,
         "validation_status": NO_GROUND_TRUTH_NOTICE,
     }
 
-
 def _variable_packet(v: VariableResult) -> dict:
     return {
         "name": v.name,
@@ -558,7 +535,6 @@ def _variable_packet(v: VariableResult) -> dict:
                      for e in v.evidence],
         "coverage": _ledger_summary(v.coverage_attested),
     }
-
 
 def _ledger_summary(led: Mapping[str, Any] | None) -> dict:
     """Counters only. The agent must not be handed the ledger as something to argue with."""
@@ -576,7 +552,6 @@ def _ledger_summary(led: Mapping[str, Any] | None) -> dict:
                    for s in (led.get("strata") or [])],
         "suspected_recognition_failures": len(led.get("suspected_recognition_failures") or []),
     }
-
 
 # ---------------------------------------------------------------------------- enforcement
 def assert_cause_is_earned(scaffold: ExplanationScaffold, chosen: str) -> None:
@@ -601,7 +576,6 @@ def assert_cause_is_earned(scaffold: ExplanationScaffold, chosen: str) -> None:
         why = next(c.because for c in scaffold.causes if c.cause == chosen)
         raise ExplanationClaimError(
             f"cannot choose {chosen} — eliminated by the coverage ledger: {'; '.join(why)}")
-
 
 # ------------------------------------------------- the artifacts a verdict was computed from
 #: 64 bits of sha256 — the truncation `spec.py` already uses for a spec hash. Long enough that
@@ -633,10 +607,8 @@ MISSING_EXTRACT = (
     "extract binds by content; anything else additionally needs --allow-unbound-extract "
     "and comes out stamped UNBOUND.")
 
-
 class ArtifactBindingError(ValueError):
     """The extract handed to explain is not the one the concordance verdict was computed from."""
-
 
 def artifact_digest(doc: Mapping[str, Any]) -> str:
     """Content identity of one artifact — insensitive to its filename and its formatting.
@@ -652,7 +624,6 @@ def artifact_digest(doc: Mapping[str, Any]) -> str:
     blob = json.dumps(doc, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
                       default=str)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:ARTIFACT_DIGEST_CHARS]
-
 
 @dataclass(frozen=True)
 class ExtractBinding:
@@ -671,7 +642,6 @@ class ExtractBinding:
 
     def to_dict(self) -> dict:
         return asdict(self)
-
 
 def resolve_bound_extract(
     concord: Mapping[str, Any], *,
@@ -732,7 +702,6 @@ def resolve_bound_extract(
         raise ArtifactBindingError(_refusal(binding))
     return extract, binding
 
-
 def _expected_extract_digest(concord: Mapping[str, Any], recorded: str,
                              load: Callable[[str], Mapping[str, Any]]) -> tuple[str, str, list]:
     """What the extract SHOULD digest to, and how strongly we know it.
@@ -763,16 +732,13 @@ def _expected_extract_digest(concord: Mapping[str, Any], recorded: str,
     return artifact_digest(ref), BOUND_BY_REFERENCE, [
         f"checked against the artifact concord names ({recorded})"]
 
-
 def _absent_patients(concord: Mapping[str, Any], extract: Mapping[str, Any]) -> list[str]:
     have = {str(p.get("patient_id")) for p in (extract.get("patients") or [])}
     return [str(p.get("patient_id")) for p in (concord.get("patients") or [])
             if str(p.get("patient_id")) not in have]
 
-
 def _resolved(p: str) -> str:
     return str(Path(p).resolve()) if p else ""
-
 
 def _refusal(b: ExtractBinding) -> str:
     return ("refusing to explain from an unbound extract. " + ". ".join(b.because) + ". "
@@ -782,7 +748,6 @@ def _refusal(b: ExtractBinding) -> str:
             "ledgers inside the extract — swap the extract and the case is filed against a "
             "different owner. Hand it the artifact concord scored, or pass "
             "--allow-unbound-extract to run anyway and have every scaffold stamped UNBOUND.")
-
 
 def side_input_record(path: str, doc: Any) -> dict:
     """Identity of an artifact explain reads that no upstream stage names.
@@ -801,7 +766,6 @@ def side_input_record(path: str, doc: Any) -> dict:
             "note": ("nothing upstream names the registry snapshot this should be, so this is "
                      "provenance only — it records which file produced the C standings, it "
                      "does not verify the file was the right one")}
-
 
 def mark_binding(outdoc: dict, binding: ExtractBinding) -> dict:
     """Stamp the run, every scaffold, and every packet with the inputs they came from.

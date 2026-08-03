@@ -93,23 +93,18 @@ KEY_BEARING_NAMES = {
     "ground_truth", "gold", "truth", "registryvalue", "registry_value",
 }
 
-
 class AttributionError(ValueError):
     """An attribution packet or report crossed an evidence or authority boundary."""
 
-
 def _now() -> str:
     return datetime.now(UTC).isoformat()
-
 
 def _canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
                       default=str)
 
-
 def _event_id(*parts: Any) -> str:
     return hashlib.sha256("\0".join(_canonical(p) for p in parts).encode()).hexdigest()
-
 
 def _scan_blind(value: Any, path: str = "packet") -> None:
     if isinstance(value, Mapping):
@@ -123,7 +118,6 @@ def _scan_blind(value: Any, path: str = "packet") -> None:
         for index, child in enumerate(value):
             _scan_blind(child, f"{path}[{index}]")
 
-
 def _replace(value: Any, old: str, new: str) -> Any:
     if not old:
         return value
@@ -134,7 +128,6 @@ def _replace(value: Any, old: str, new: str) -> Any:
     if isinstance(value, (list, tuple)):
         return [_replace(v, old, new) for v in value]
     return value
-
 
 @dataclass(frozen=True)
 class ArtifactRef:
@@ -148,7 +141,6 @@ class ArtifactRef:
 
     def to_dict(self) -> dict:
         return asdict(self)
-
 
 @dataclass(frozen=True)
 class AttributionPacket:
@@ -226,7 +218,6 @@ class AttributionPacket:
             ),
         }
 
-
 @dataclass(frozen=True)
 class AttributionProbe:
     probe_id: str
@@ -243,7 +234,6 @@ class AttributionProbe:
             "expected_discriminator": self.expected_discriminator,
             "confirmation": self.confirmation, "chart_reads": list(self.chart_reads),
         }
-
 
 @dataclass(frozen=True)
 class EvidenceRef:
@@ -277,7 +267,6 @@ class EvidenceRef:
 
     def to_dict(self) -> dict:
         return asdict(self)
-
 
 @dataclass(frozen=True)
 class TargetEvent:
@@ -316,7 +305,6 @@ class TargetEvent:
 
     def to_dict(self) -> dict:
         return asdict(self)
-
 
 @dataclass(frozen=True)
 class CounterfactualTest:
@@ -366,7 +354,6 @@ class CounterfactualTest:
             "evidence": [ref.to_dict() for ref in self.evidence],
         }
 
-
 @dataclass(frozen=True)
 class SkepticReview:
     """Structured opposition to the investigator's proposed root cause."""
@@ -412,7 +399,6 @@ class SkepticReview:
             "evidence": [ref.to_dict() for ref in self.evidence],
             "reviewer": self.reviewer,
         }
-
 
 @dataclass(frozen=True)
 class CauseFinding:
@@ -490,7 +476,6 @@ class CauseFinding:
             "mechanism": self.mechanism,
             "counterfactual_prediction": self.counterfactual_prediction,
         }
-
 
 @dataclass(frozen=True)
 class AttributionReport:
@@ -647,7 +632,6 @@ class AttributionReport:
             created_at=str(value.get("created_at") or _now()),
         )
 
-
 def meta_evaluate_attributions(
     predictions: Sequence[Mapping[str, Any]],
     adjudications: Sequence[Mapping[str, Any]],
@@ -754,7 +738,6 @@ def meta_evaluate_attributions(
         ],
     }
 
-
 def load_registry_references(path: str | Path) -> dict[str, dict]:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     if raw.get("schema") != REGISTRY_REFERENCE_SCHEMA:
@@ -772,12 +755,10 @@ def load_registry_references(path: str | Path) -> dict[str, dict]:
         out[case_id] = dict(row)
     return out
 
-
 def trace_path_for_manifest(manifest_path: str | Path) -> Path | None:
     path = Path(manifest_path)
     candidate = path.with_name(path.name.replace(".manifest.json", ".jsonl"))
     return candidate if candidate.is_file() and candidate != path else None
-
 
 def build_packet(*, manifest_path: str | Path, case_id: str, spec: Any, mode: str,
                  detector_findings: Sequence[Mapping[str, Any]] = (),
@@ -813,7 +794,6 @@ def build_packet(*, manifest_path: str | Path, case_id: str, spec: Any, mode: st
         registry_reference=dict(registry_reference) if registry_reference else None,
     )
 
-
 # ======================================================================== zero-cost screen
 def field_disagreements(answer: Mapping[str, Any], reference: Mapping[str, Any]) -> list[str]:
     values = answer.get("value") or {}
@@ -823,7 +803,6 @@ def field_disagreements(answer: Mapping[str, Any], reference: Mapping[str, Any])
         field for field, expected in reference.items()
         if str(values.get(field) or "") != str(expected or "")
     )
-
 
 def selection_reasons(packet: AttributionPacket) -> tuple[str, ...]:
     """Deterministic reasons a case enters the expensive attribution queue."""
@@ -863,7 +842,6 @@ def selection_reasons(packet: AttributionPacket) -> tuple[str, ...]:
             if gold.status != "FOUND" and status == "FOUND" and field in (answer.get("value") or {}):
                 reasons.append(f"overclaim:{field}")
     return tuple(sorted(set(reasons)))
-
 
 def derive_target_events(packet: AttributionPacket) -> tuple[TargetEvent, ...]:
     """Turn screening signals into explicit questions the investigator may select."""
@@ -925,7 +903,6 @@ def derive_target_events(packet: AttributionPacket) -> tuple[TargetEvent, ...]:
     unique = {event.event_id: event for event in events}
     return tuple(unique[key] for key in sorted(unique))
 
-
 def batch_behavior_conflicts(packets: Sequence[AttributionPacket]) -> dict[str, tuple[str, ...]]:
     """Flag cases whose repeated runs induce more than one structured behavior."""
     grouped: dict[str, set[str]] = defaultdict(set)
@@ -942,7 +919,6 @@ def batch_behavior_conflicts(packets: Sequence[AttributionPacket]) -> dict[str, 
         case: ("behavioral_entropy_nonzero",) if len(signatures) > 1 else ()
         for case, signatures in grouped.items()
     }
-
 
 # ==================================================================== append-only case store
 @dataclass(frozen=True)
@@ -966,7 +942,6 @@ class ErrorCaseEvent:
             "run_ref": dict(self.run_ref), "reasons": list(self.reasons),
             "detail": dict(self.detail), "created_at": self.created_at,
         }
-
 
 @dataclass(frozen=True)
 class AdjudicationEvent:
@@ -994,7 +969,6 @@ class AdjudicationEvent:
             "evidence": [x.to_dict() for x in self.evidence], "created_at": self.created_at,
         }
 
-
 @dataclass(frozen=True)
 class ErrorCluster:
     cluster_id: str
@@ -1013,7 +987,6 @@ class ErrorCluster:
             "contributing_tags": list(self.contributing_tags),
             "label": self.label, "summary": self.summary,
         }
-
 
 class ErrorCaseLibrary:
     """Four append-only JSONL ledgers below one local-only directory."""
@@ -1086,7 +1059,6 @@ class ErrorCaseLibrary:
             prior["lifecycle"] = row["decision"]
         return out
 
-
 def cluster_reports(reports: Iterable[AttributionReport]) -> list[ErrorCluster]:
     """Group by deterministic structure; prose is not part of cluster identity."""
     grouped: dict[str, list[AttributionReport]] = defaultdict(list)
@@ -1133,7 +1105,6 @@ def cluster_reports(reports: Iterable[AttributionReport]) -> list[ErrorCluster]:
         ))
     return out
 
-
 def summarize_library(library: ErrorCaseLibrary) -> dict:
     reports = [
         AttributionReport.from_dict(row)
@@ -1158,7 +1129,6 @@ def summarize_library(library: ErrorCaseLibrary) -> dict:
         ],
         "clusters": [c.to_dict() for c in cluster_reports(reports)],
     }
-
 
 # ================================================================ deepagents attribution
 @dataclass
@@ -1193,10 +1163,8 @@ class AttributionRuntimeContext:
         self.probes[self.active_probe] = replace(
             current, chart_reads=current.chart_reads + (description,))
 
-
 def _tool_payload(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, default=str)[:24000]
-
 
 def _packet_ref_exists(ref: str, packet: AttributionPacket) -> bool:
     """Resolve a model citation to an exact field in the immutable input packet."""
@@ -1225,10 +1193,8 @@ def _packet_ref_exists(ref: str, packet: AttributionPacket) -> bool:
             return False
     return value is not None
 
-
 def _citation_errors(finding: CauseFinding, ctx: AttributionRuntimeContext) -> list[str]:
     return _reference_errors(finding.evidence, ctx)
-
 
 def _reference_errors(
         references: Sequence[EvidenceRef], ctx: AttributionRuntimeContext) -> list[str]:
@@ -1266,7 +1232,6 @@ def _reference_errors(
         elif ref.kind == "probe" and ref.ref not in {p.probe_id for p in ctx.probes}:
             errors.append(f"probe ref {ref.ref!r} was not opened in this attribution")
     return errors
-
 
 def _report_from_submission(value: Mapping[str, Any], ctx: AttributionRuntimeContext
                             ) -> AttributionReport:
@@ -1308,7 +1273,6 @@ def _report_from_submission(value: Mapping[str, Any], ctx: AttributionRuntimeCon
     if module_errors:
         raise AttributionError("; ".join(module_errors))
     return report
-
 
 def attribution_tools(ctx: AttributionRuntimeContext) -> list[Any]:
     """The complete tool surface: packet readers, same-patient chart probes, typed output."""
@@ -1769,7 +1733,6 @@ def attribution_tools(ctx: AttributionRuntimeContext) -> list[Any]:
                  }}),
     ]
 
-
 def _attribution_system_prompt(
         packet: AttributionPacket, modules: Sequence[Any] = (),
         eval_skills_prompt: str = "") -> str:
@@ -1841,7 +1804,6 @@ Do not emit chain-of-thought. Store only concise rationales, rival causes, citat
 counterfactual observations, skeptic objections, and the final structured report.
 """
 
-
 def _message_text(message: Any) -> str:
     content = getattr(message, "content", "")
     if isinstance(content, str):
@@ -1853,7 +1815,6 @@ def _message_text(message: Any) -> str:
             for block in content
         )
     return str(content or "")
-
 
 def _independent_skeptic_review(
     *,
@@ -1936,7 +1897,6 @@ def _independent_skeptic_review(
             reviewer="INDEPENDENT_MODEL",
         ), None
 
-
 def _apply_independent_skeptic(
     report: AttributionReport,
     review: SkepticReview,
@@ -1964,7 +1924,6 @@ def _apply_independent_skeptic(
         confirmation_new_conflict=True,
         termination_reason="independent skeptic conflict; human review required",
     )
-
 
 def run_attribution_agent(*, packet: AttributionPacket, chart: Any, model: Any,
                           max_model_calls: int = 12, max_usd: float = 1.0,
@@ -2133,47 +2092,3 @@ def run_attribution_agent(*, packet: AttributionPacket, chart: Any, model: Any,
             spend=ctx.spend.report(), probes=tuple(ctx.probes),
             gate_rejections=tuple(ctx.submission_rejections[-20:]))
     return report
-
-
-def default_runtime_attribution(packet: AttributionPacket) -> AttributionReport | None:
-    """Return a no-model confirmed report for a mechanically proven runtime failure.
-
-    This is intentionally narrow.  It prevents paying a model to rediscover a rejection loop,
-    but it never labels a clinical value wrong and never diagnoses a semantic spec defect.
-    """
-    detector = next(
-        (row for row in packet.detector_findings
-         if row.get("detector") in ("rejection_loop", "patient_crossover")
-         and row.get("severity") in ("CRITICAL", "IRB")),
-        None,
-    )
-    if detector is None:
-        return None
-    cause = (
-        "RUNTIME_OR_PROVIDER" if detector.get("detector") == "patient_crossover"
-        else "ANSWER_CHECK_OR_GATE"
-    )
-    primary = CauseFinding(
-        cause=cause, status="CONFIRMED", evidence_class="DETERMINISTIC",
-        rationale=str(detector.get("message") or detector.get("detector")),
-        evidence=(EvidenceRef("detector", str(detector["detector"])),),
-        parameter_id=(
-            "answer_check_rejection_messages"
-            if detector.get("detector") == "rejection_loop" else "agent_system_prompt"
-        ),
-        route_owner="engineer",
-    )
-    return AttributionReport(
-        case_id=packet.case_id, spec_id=packet.spec_id, mode=packet.mode,
-        primary_cause=primary, contributing_causes=(),
-        alternatives_considered=("clinical value error", "retrieval failure"),
-        probes=(AttributionProbe(
-            probe_id="deterministic-confirmation", question="Can the trace disprove this "
-            "mechanically detected runtime failure?",
-            alternatives=(cause, "detector false positive"),
-            expected_discriminator="detector evidence remains reproducible",
-            confirmation=True,
-        ),),
-        termination_reason="deterministic runtime fact confirmed",
-        confirmation_performed=True, confirmation_new_conflict=False,
-    )

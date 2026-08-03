@@ -36,18 +36,14 @@ CONVERGED = "CONVERGED"
 NO_CONFLICT = "NO_CONFLICT"
 REVIEW_REQUIRED = "REVIEW_REQUIRED"
 
-
 class ConflictRefinementError(ValueError):
     """The optional wrapper was configured inconsistently."""
-
 
 def _canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str)
 
-
 def _hash(value: Any) -> str:
     return hashlib.sha256(_canonical(value).encode()).hexdigest()[:16]
-
 
 def _semantic_result(signature: BehaviorSignature) -> dict:
     fields = {
@@ -55,7 +51,6 @@ def _semantic_result(signature: BehaviorSignature) -> dict:
         for name, row in sorted(signature.field_results.items())
     }
     return fields or {"__answer__": {"status": signature.answer_status, "value": None}}
-
 
 @dataclass(frozen=True)
 class Hypothesis:
@@ -85,10 +80,6 @@ class Hypothesis:
     @property
     def evidence_note_ids(self) -> tuple[str, ...]:
         return tuple(sorted(n for n, _, _ in self.signature.evidence_refs))
-
-    @property
-    def unresolved_count(self) -> int:
-        return len(self.signature.proof_obligations)
 
     @property
     def degradation_count(self) -> int:
@@ -131,7 +122,6 @@ class Hypothesis:
             out["manifest"] = dict(self.manifest)
         return out
 
-
 @dataclass(frozen=True)
 class Conflict:
     kind: str
@@ -143,7 +133,6 @@ class Conflict:
         return {"kind": self.kind, "field": self.field,
                 "alternatives": list(self.alternatives),
                 "hypothesis_ids": list(self.hypothesis_ids)}
-
 
 @dataclass(frozen=True)
 class ConflictSet:
@@ -180,7 +169,6 @@ class ConflictSet:
             "Agreement is not proof. If the chart cannot close these conflicts, abstain or "
             "leave the relevant obligation open; do not force a consensus.")
         return "\n".join(lines)
-
 
 def detect_conflicts(hypotheses: Sequence[Hypothesis]) -> ConflictSet:
     if not hypotheses:
@@ -264,12 +252,10 @@ def detect_conflicts(hypotheses: Sequence[Hypothesis]) -> ConflictSet:
                 "obligation")
     return ConflictSet(tuple(conflicts), tuple(dict.fromkeys(queries)))
 
-
 def _converged(hypotheses: Sequence[Hypothesis]) -> bool:
     """Every candidate in the latest round must be usable and semantically agree."""
     return bool(hypotheses and all(h.usable for h in hypotheses)
                 and len({_canonical(h.field_results) for h in hypotheses}) == 1)
-
 
 def _progress(previous: Sequence[Hypothesis], current: Sequence[Hypothesis],
               previous_conflicts: ConflictSet, current_conflicts: ConflictSet) -> bool:
@@ -278,7 +264,6 @@ def _progress(previous: Sequence[Hypothesis], current: Sequence[Hypothesis],
     new_evidence = {note for h in current for note in h.evidence_note_ids}
     return bool(new_evidence - old_evidence
                 or len(current_conflicts.conflicts) < len(previous_conflicts.conflicts))
-
 
 @dataclass(frozen=True)
 class ConflictRefinementResult:
@@ -302,9 +287,7 @@ class ConflictRefinementResult:
             "reason": self.reason,
         }
 
-
 Runner = Callable[..., Mapping[str, Any]]
-
 
 def run_conflict_refinement(*, runner: Runner, candidates_per_round: int,
                             max_rounds: int, runner_kwargs: Mapping[str, Any],

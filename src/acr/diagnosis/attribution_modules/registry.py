@@ -10,9 +10,7 @@ from typing import Any
 class ModuleRegistryError(ValueError):
     pass
 
-
 Validator = Callable[[Any, Any], list[str]]
-
 
 @dataclass(frozen=True)
 class AttributionStage:
@@ -36,13 +34,11 @@ class AttributionStage:
         if self.module_id in self.requires:
             raise ModuleRegistryError(f"{self.module_id}: cannot depend on itself")
 
-
 @dataclass(frozen=True)
 class AttributionStageProfile:
     name: str
     modules: tuple[str, ...]
     description: str
-
 
 class AttributionStageRegistry:
     def __init__(self) -> None:
@@ -108,9 +104,3 @@ class AttributionStageRegistry:
                 f"{sorted(key for key, n in indegree.items() if n)}"
             )
         return tuple(result)
-
-    def all_modules(self) -> tuple[AttributionStage, ...]:
-        return tuple(self._modules[key] for key in sorted(self._modules))
-
-    def profiles(self) -> tuple[AttributionStageProfile, ...]:
-        return tuple(self._profiles[key] for key in sorted(self._profiles))

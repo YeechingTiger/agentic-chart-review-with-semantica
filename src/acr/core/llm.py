@@ -28,7 +28,6 @@ import litellm
 litellm.suppress_debug_info = True
 litellm.drop_params = True  # silently drop params a given provider doesn't support
 
-
 @dataclass
 class LLMConfig:
     model: str = "ollama_chat/qwen3.6:35b"
@@ -58,7 +57,6 @@ class LLMConfig:
                 setattr(cfg, k, v)
         return cfg
 
-
 @dataclass
 class LLMResponse:
     content: str
@@ -72,7 +70,6 @@ class LLMResponse:
     @property
     def total_tokens(self) -> int:
         return self.prompt_tokens + self.completion_tokens
-
 
 class LLMClient:
     """Thin, provider-agnostic chat client with tool-calling."""
@@ -179,18 +176,6 @@ class LLMClient:
             msgs.append({"role": "system", "content": f"Reply with JSON only: {schema_hint}"})
         txt = self.chat(msgs).content.strip()
         return extract_json(txt)
-
-    def usage(self) -> dict:
-        return {
-            "llm_calls": self.calls,
-            "prompt_tokens": self.prompt_tokens,
-            "completion_tokens": self.completion_tokens,
-            "total_tokens": self.prompt_tokens + self.completion_tokens,
-            "cached_tokens": self.cached_tokens,
-            "reasoning_fallbacks": self.reasoning_fallbacks,
-            "empty_completions": self.empty_completions,
-        }
-
 
 def extract_json(text: str, require: str | None = None) -> dict:
     """Best-effort JSON extraction from a model reply.

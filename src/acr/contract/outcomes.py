@@ -79,15 +79,12 @@ DEFAULT_SPACE: dict[str, dict[str, Any]] = {
     },
 }
 
-
 class OutcomeSpaceError(ValueError):
     """A contract's `result.status` block does not describe a usable outcome space."""
-
 
 def _block(spec: Any) -> dict[str, Any]:
     raw = getattr(spec, "result", None) or {}
     return raw if isinstance(raw, dict) else {}
-
 
 def declared_statuses(spec: Any) -> dict[str, dict[str, Any]]:
     """status name -> its declaration, in the order the contract writes them.
@@ -122,12 +119,10 @@ def declared_statuses(spec: Any) -> dict[str, dict[str, Any]]:
         out[str(name)] = d
     return out
 
-
 def submittable_statuses(spec: Any) -> tuple[str, ...]:
     """The enum `submit_answer` offers. Declaration order, `submittable: false` removed."""
     return tuple(n for n, d in declared_statuses(spec).items()
                  if d.get("submittable", True) is not False)
-
 
 def status_kind(spec: Any, status: str) -> str | None:
     """The kind, or None for a status this contract does not declare.
@@ -138,22 +133,14 @@ def status_kind(spec: Any, status: str) -> str | None:
     d = declared_statuses(spec).get(str(status or ""))
     return str(d["kind"]) if d else None
 
-
 def statuses_of_kind(spec: Any, *kinds: str) -> tuple[str, ...]:
     return tuple(n for n, d in declared_statuses(spec).items() if d.get("kind") in kinds)
-
 
 def is_value(spec: Any, status: str) -> bool:
     return status_kind(spec, status) == KIND_VALUE
 
-
-def is_abstention(spec: Any, status: str) -> bool:
-    return status_kind(spec, status) in (KIND_ABSTAIN_EVIDENCE, KIND_ABSTAIN_SPEC)
-
-
 def abstention_statuses(spec: Any) -> tuple[str, ...]:
     return statuses_of_kind(spec, KIND_ABSTAIN_EVIDENCE, KIND_ABSTAIN_SPEC)
-
 
 def default_evidence_abstention(spec: Any) -> str:
     """The status the RUNTIME writes when it downgrades an answer it will not let stand.
@@ -168,7 +155,6 @@ def default_evidence_abstention(spec: Any) -> str:
     """
     found = statuses_of_kind(spec, KIND_ABSTAIN_EVIDENCE)
     return found[0] if found else "EVIDENCE_INSUFFICIENT"
-
 
 def undeclared_status_message(spec: Any, status: str) -> list[str]:
     """What to tell an agent that submitted something outside the space.

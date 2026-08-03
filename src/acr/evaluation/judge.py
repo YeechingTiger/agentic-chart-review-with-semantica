@@ -92,37 +92,30 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol
 
 
 # ============================================================================== refusals
 class JudgeRefusal(Exception):
     """Base: the judge declined. Never catch this to retry with different arguments."""
 
-
 class DeterministicEvaluatorExists(JudgeRefusal):
     """The dimension is decided by code. A model opinion may not stand in for it."""
-
 
 class DimensionNotJudgeable(JudgeRefusal):
     """Not one of the three dimensions where judging is legitimate."""
 
-
 class RegistryUnavailable(JudgeRefusal):
     """The precedence registry could not be queried, so precedence is unknown."""
-
 
 class AnswerKeyLeak(JudgeRefusal):
     """The key reached a dimension it would contaminate."""
 
-
 class JudgeCannotGate(JudgeRefusal):
     """A judged verdict was used to accept, adopt, validate or gate something."""
 
-
 class MixedEvidence(JudgeRefusal):
     """A judged number and a deterministic number were about to be averaged together."""
-
 
 # ============================================================================ evidence class
 #: Strings, not booleans. `deterministic=False` on a dict that lost the field reads as
@@ -181,34 +174,15 @@ PERMITTED_USES = ("RANK", "SCREEN", "FLAG_FOR_HUMAN")
 FORBIDDEN_USES = ("GATE", "ADOPT", "VALIDATE", "ACCEPT", "REJECT", "PUBLISH", "AUTO_MERGE",
                   "MARK_REVIEWED", "SIGN_OFF")
 
-
 def _now() -> str:
     return datetime.now(UTC).isoformat()
-
 
 def _norm(dimension: Any) -> str:
     """Case and whitespace folded BEFORE the registry lookup — otherwise ` Histology `
     misses a registry keyed on `histology` and the precedence check is bypassed by a typo."""
     return str(dimension or "").strip().lower()
 
-
 # ================================================================================ the seams
-@runtime_checkable
-class PrecedenceRegistry(Protocol):
-    """The query shape this module requires of `acr.evaluation.evals`' precedence registry.
-
-    One method, one question: does a deterministic evaluator exist for this dimension?
-    Return the evaluator (or any truthy handle) if one does, None if none does. Whether it
-    is currently enabled, configured or passing is deliberately not asked — EXISTENCE is
-    what decides precedence, so a disabled evaluator still forbids judging rather than
-    silently handing the dimension to a model.
-
-    `_lookup` also accepts `evaluator_for(dimension)` and a plain Mapping, so this module
-    does not block on the exact name the sibling module lands with.
-    """
-
-    def deterministic_evaluator_for(self, dimension: str) -> Any | None: ...
-
 
 class JudgeModel(Protocol):
     """The whole model seam. `model_id` is mandatory: a verdict whose producing model is
@@ -217,7 +191,6 @@ class JudgeModel(Protocol):
     model_id: str
 
     def ask(self, prompt: str) -> Mapping[str, Any]: ...
-
 
 def _lookup(registry: Any, dimension: str) -> Any | None:
     """Ask the registry, and fail CLOSED on anything unexpected.
@@ -243,7 +216,6 @@ def _lookup(registry: Any, dimension: str) -> Any | None:
     raise RegistryUnavailable(f"{type(registry).__name__} implements no known precedence "
                               f"query (deterministic_evaluator_for / evaluator_for / Mapping)")
 
-
 # ================================================================================== packets
 @dataclass(frozen=True)
 class BlindPacket:
@@ -253,7 +225,6 @@ class BlindPacket:
     artifacts: Mapping[str, Any] = field(default_factory=dict)
     subject_id: str = ""
 
-
 @dataclass(frozen=True)
 class KeyedPacket:
     """Triage only. `judge()` refuses this for every blinded dimension."""
@@ -262,7 +233,6 @@ class KeyedPacket:
     artifacts: Mapping[str, Any] = field(default_factory=dict)
     answer_key: Mapping[str, Any] = field(default_factory=dict)
     subject_id: str = ""
-
 
 def _scan_for_key(obj: Any, path: str = "artifacts") -> None:
     if isinstance(obj, Mapping):
@@ -277,7 +247,6 @@ def _scan_for_key(obj: Any, path: str = "artifacts") -> None:
         for i, v in enumerate(obj):
             _scan_for_key(v, f"{path}[{i}]")
 
-
 def blind_packet(trace: Sequence[Mapping[str, Any]] = (),
                  artifacts: Mapping[str, Any] | None = None,
                  subject_id: str = "") -> BlindPacket:
@@ -288,7 +257,6 @@ def blind_packet(trace: Sequence[Mapping[str, Any]] = (),
     return BlindPacket(trace=tuple(dict(e) for e in trace), artifacts=arts,
                        subject_id=str(subject_id))
 
-
 def keyed_packet(trace: Sequence[Mapping[str, Any]] = (),
                  artifacts: Mapping[str, Any] | None = None,
                  answer_key: Mapping[str, Any] | None = None,
@@ -296,14 +264,12 @@ def keyed_packet(trace: Sequence[Mapping[str, Any]] = (),
     return KeyedPacket(trace=tuple(dict(e) for e in trace), artifacts=dict(artifacts or {}),
                        answer_key=dict(answer_key or {}), subject_id=str(subject_id))
 
-
 # =================================================================================== lenses
 @dataclass(frozen=True)
 class Lens:
     key: str
     question: str
     catches: str          # the failure mode this lens exists to catch, and no other lens does
-
 
 #: The BUILT-IN panels, for the dimensions this module has always exposed through `judge()`.
 #: A NEW evaluation need does not come here: it is a YAML in `assets/evaluators/`, loaded by
@@ -390,7 +356,6 @@ LENSES: dict[str, tuple[Lens, ...]] = {
     ),
 }
 
-
 def _lenses_for(dimension: str) -> tuple[Lens, ...]:
     lenses = LENSES[dimension]
     # Repetition is not a panel. Three askings of one question measure sampling noise; three
@@ -399,7 +364,6 @@ def _lenses_for(dimension: str) -> tuple[Lens, ...]:
         raise ValueError(f"{dimension}: duplicate lens question — repetition, not a panel")
     return lenses
 
-
 # ================================================================================== verdicts
 @dataclass(frozen=True)
 class LensReading:
@@ -407,7 +371,6 @@ class LensReading:
     score: float | None            # None = the model returned nothing usable; NOT zero
     observation: str = ""
     concerns: tuple[str, ...] = ()
-
 
 @dataclass(frozen=True)
 class Verdict:
@@ -444,14 +407,12 @@ class Verdict:
                                    list(r.concerns), "observation": r.observation}
                                   for r in self.lens_readings]}
 
-
 # ==================================================================================== judge
 #: Trace keys the judge is shown. An allowlist, not a denylist: the prompt is built from
 #: named fields, so an attribute bolted onto an event or a packet subclass cannot ride into
 #: the model's context unnoticed.
 TRACE_KEYS_SHOWN = ("seq", "kind", "tool", "args", "result", "verdict", "reason", "content",
                     "plan")
-
 
 def _render(packet: BlindPacket | KeyedPacket) -> str:
     body: dict[str, Any] = {
@@ -461,7 +422,6 @@ def _render(packet: BlindPacket | KeyedPacket) -> str:
         body["answer_key"] = packet.answer_key
     return json.dumps(body, indent=1, ensure_ascii=False, default=str)[:PACKET_CHAR_BUDGET]
 
-
 def _prompt(dimension: str, lens: Lens, rendered: str) -> str:
     return (f"You are screening one case for a human reviewer. Dimension: {dimension}.\n"
             f"You are NOT deciding anything: your output orders a human's reading queue.\n\n"
@@ -469,7 +429,6 @@ def _prompt(dimension: str, lens: Lens, rendered: str) -> str:
             f"THE CASE:\n{rendered}\n\n"
             f'Reply with JSON only: {{"score": <{SCORE_MIN}-{SCORE_MAX}, higher is better>, '
             f'"observation": "<what you saw, citing the packet>", "concerns": ["..."]}}')
-
 
 def _read_lens(lens: Lens, raw: Any) -> LensReading:
     m: Mapping[str, Any] = raw if isinstance(raw, Mapping) else {}
@@ -485,7 +444,6 @@ def _read_lens(lens: Lens, raw: Any) -> LensReading:
     if score is None or not SCORE_MIN <= score <= SCORE_MAX:
         return LensReading(lens.key, None, obs, concerns)
     return LensReading(lens.key, score, obs, concerns)
-
 
 def judge(dimension: str, packet: BlindPacket | KeyedPacket, *,
           registry: Any, model: JudgeModel) -> Verdict:
@@ -544,7 +502,6 @@ def judge(dimension: str, packet: BlindPacket | KeyedPacket, *,
         concerns=tuple(c for r in readings for c in r.concerns),
         incomplete=len(scored) != len(readings))
 
-
 # ============================================================== measurements and the split
 @dataclass(frozen=True)
 class Measurement:
@@ -562,7 +519,6 @@ class Measurement:
                              f"is no measurement to carry forward")
         return cls(v.dimension, v.score, EV_JUDGED, f"{v.judge_model}@{v.judged_at}")
 
-
 def deterministic_measurement(dimension: str, score: float, *, registry: Any) -> Measurement:
     """Stamp DETERMINISTIC — and prove the claim against the same registry `judge()` asks.
 
@@ -576,7 +532,6 @@ def deterministic_measurement(dimension: str, score: float, *, registry: Any) ->
             f"nothing deterministic evaluates {dim!r}, so this number cannot be stamped "
             f"{EV_DETERMINISTIC}. Register the evaluator, or carry it as {EV_JUDGED}.")
     return Measurement(dim, float(score), EV_DETERMINISTIC, source=repr(ev))
-
 
 def aggregate(measurements: Sequence[Measurement]) -> dict:
     """Mean of measurements that share an evidence class. Raises on a mixed set.
@@ -596,7 +551,6 @@ def aggregate(measurements: Sequence[Measurement]) -> dict:
     return {"evidence_class": cls, "n": len(measurements),
             "mean": sum(m.score for m in measurements) / len(measurements),
             "dimensions": sorted(m.dimension for m in measurements)}
-
 
 def combine_explicitly(measurements: Sequence[Measurement], *, judged_weight: float) -> dict:
     """One number, on request, with the split preserved beside it.
@@ -633,7 +587,6 @@ def combine_explicitly(measurements: Sequence[Measurement], *, judged_weight: fl
                    "sources": sorted({m.source for m in jud})},
         "validation_status": NOT_VALIDATED if jud else "", "notice": JUDGED_NOTICE if jud else ""}
 
-
 # ================================================================ what a verdict may be used for
 def apply_verdict(verdict: Verdict, use: str) -> dict:
     """The only door out of this module, and it opens onto three uses.
@@ -652,7 +605,6 @@ def apply_verdict(verdict: Verdict, use: str) -> dict:
     return {"use": u, "evidence_class": EV_JUDGED, "disposition": FOR_HUMAN_REVIEW,
             "validation_status": NOT_VALIDATED, "verdict": verdict.to_dict()}
 
-
 def rank(verdicts: Sequence[Verdict], *, worst_first: bool) -> list[Verdict]:
     """Order verdicts. Unscored cases sort to the human's end of the list either way —
     'the judge could not read this' is a reason for a person to look, not a reason to skip."""
@@ -661,7 +613,6 @@ def rank(verdicts: Sequence[Verdict], *, worst_first: bool) -> list[Verdict]:
     return sorted(verdicts, key=lambda v: (v.score is not None,
                                            v.score if v.score is not None else 0.0),
                   reverse=not worst_first)
-
 
 def screen_for_human(verdicts: Sequence[Verdict], *, flag_at_or_below: float,
                      queue_size: int) -> dict:
@@ -687,7 +638,6 @@ def screen_for_human(verdicts: Sequence[Verdict], *, flag_at_or_below: float,
         "n_not_shown": max(0, len(flagged) - size), "flag_at_or_below": cut,
         "evidence_class": EV_JUDGED, "validation_status": NOT_VALIDATED,
         "notice": JUDGED_NOTICE}
-
 
 # ================================================ AN EVALUATOR IS A SPEC FILE, NOT CODE
 # A new evaluation need is a new YAML in `assets/evaluators/`. Nobody deploys code to ask a new
@@ -721,18 +671,14 @@ def screen_for_human(verdicts: Sequence[Verdict], *, flag_at_or_below: float,
 class EvaluatorSpecInvalid(JudgeRefusal):
     """The YAML is not a loadable evaluator. Refused at load, before any spend."""
 
-
 class EvaluatorCannotFail(JudgeRefusal):
     """No case it must reject, or it did not reject the case it declared it would."""
-
 
 class ToolScopeViolation(JudgeRefusal):
     """A judge tool was declared or invoked outside the patient under review."""
 
-
 class JudgeBudgetExceeded(JudgeRefusal):
     """The judge fleet hit its declared call or cost ceiling. Refused, not throttled."""
-
 
 COST_TRACE_ONLY = "trace_only"
 COST_READS_DOCUMENTS = "reads_documents"
@@ -768,7 +714,6 @@ EVALUATOR_FIELDS = ("evaluator_id", "dimension", "cost_class", "prompt", "contex
 REQUIRED_OUTPUT = ("score", "reason")
 OPTIONAL_OUTPUT = ("cot",)
 
-
 def _str_list(value: Any, what: str) -> tuple[str, ...]:
     if isinstance(value, str) or not isinstance(value, (list, tuple)):
         raise EvaluatorSpecInvalid(f"{what} must be a list, got {type(value).__name__}")
@@ -779,14 +724,12 @@ def _str_list(value: Any, what: str) -> tuple[str, ...]:
         raise EvaluatorSpecInvalid(f"{what} has a duplicate entry: {sorted(items)}")
     return items
 
-
 @dataclass(frozen=True)
 class ToolGrant:
     """One declared tool and the scope it is bounded to. Both are load-checked."""
 
     name: str
     scope: str
-
 
 @dataclass(frozen=True)
 class EvaluatorSpec:
@@ -822,7 +765,6 @@ class EvaluatorSpec:
                 "must_pass": list(self.must_pass), "must_fail": list(self.must_fail),
                 "source": self.source}
 
-
 def _check_dimension(dimension: str, registry: Any) -> str:
     """ENFORCEMENT 1. The precedence fence, at load, per sub-question.
 
@@ -842,7 +784,6 @@ def _check_dimension(dimension: str, registry: Any) -> str:
             f"evaluator means the adjacent question that has no exact answer, declare that "
             f"sub-question instead — the fence is per sub-question, not per dimension.")
     return dim
-
 
 def _check_context(context: Any, dimension: str, cost_class: str) -> tuple[str, ...]:
     """ENFORCEMENT 2. Declared, closed, and the answer key withheld by the file itself."""
@@ -865,7 +806,6 @@ def _check_context(context: Any, dimension: str, cost_class: str) -> tuple[str, 
                 f"context {c!r} cannot be assembled under cost_class {cost_class!r}: reading "
                 f"what the agent did not read means opening documents. Declare {need!r}.")
     return ctx
-
 
 def _check_tools(tools: Any, cost_class: str) -> tuple[ToolGrant, ...]:
     """ENFORCEMENT 3. Declared, bounded to the patient under review, priced honestly."""
@@ -907,7 +847,6 @@ def _check_tools(tools: Any, cost_class: str) -> tuple[ToolGrant, ...]:
             f"overstates access is as unreviewable as one that understates it.")
     return tuple(grants)
 
-
 def _check_cases(data: Mapping[str, Any]) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """ENFORCEMENT 4. A case it must pass AND a case it must REJECT, or it does not load."""
     for fieldname in ("must_pass", "must_fail"):
@@ -926,7 +865,6 @@ def _check_cases(data: Mapping[str, Any]) -> tuple[tuple[str, ...], tuple[str, .
                                   f"evaluator cannot be wrong, which is the defect itself")
     return passes, fails
 
-
 def _check_output(output: Any) -> Mapping[str, str]:
     if not isinstance(output, Mapping):
         raise EvaluatorSpecInvalid("output must be a mapping, e.g. "
@@ -943,7 +881,6 @@ def _check_output(output: Any) -> Mapping[str, str]:
     if out.get("cot") not in (None, "optional"):
         raise EvaluatorSpecInvalid("output.cot may only be 'optional'")
     return out
-
 
 def parse_evaluator(data: Mapping[str, Any], *, registry: Any, source: str = "",
                     expect_id: str | None = None) -> EvaluatorSpec:
@@ -992,7 +929,6 @@ def parse_evaluator(data: Mapping[str, Any], *, registry: Any, source: str = "",
         output=_check_output(data.get("output")),
         must_pass=must_pass, must_fail=must_fail, source=source)
 
-
 def load_evaluator(path: str | Path, *, registry: Any) -> EvaluatorSpec:
     """Load one `assets/evaluators/*.yaml`. Refuses rather than degrades."""
     import yaml  # local: this module stays importable without a YAML parser present
@@ -1000,7 +936,6 @@ def load_evaluator(path: str | Path, *, registry: Any) -> EvaluatorSpec:
     p = Path(path)
     return parse_evaluator(yaml.safe_load(p.read_text(encoding="utf-8")) or {},
                            registry=registry, source=str(p), expect_id=p.stem)
-
 
 def load_evaluators(directory: str | Path, *, registry: Any) -> dict[str, EvaluatorSpec]:
     """Load every evaluator in a directory. One bad file refuses the whole load.
@@ -1021,7 +956,6 @@ def load_evaluators(directory: str | Path, *, registry: Any) -> dict[str, Evalua
     if not out:
         raise EvaluatorSpecInvalid(f"no evaluators found in {d}")
     return out
-
 
 # ------------------------------------------------------- ENFORCEMENT 5: a judge run is a run
 @dataclass(frozen=True)
@@ -1047,7 +981,6 @@ class JudgeRunRecord:
                 "context_injected": list(self.context_injected),
                 "tools_granted": list(self.tools_granted), "evidence_class": EV_JUDGED,
                 "validation_status": NOT_VALIDATED}
-
 
 class JudgeLedger:
     """Rate limit and cost accounting for a judge fleet. Every ceiling is stated by the caller.
@@ -1106,7 +1039,6 @@ class JudgeLedger:
                 "max_cost_usd": self.max_cost_usd, "by_cost_class": by_class,
                 "runs": [r.to_dict() for r in self.records]}
 
-
 def scoped_tool_broker(spec: EvaluatorSpec, *, patient_under_review: str, backend: Any):
     """ENFORCEMENT 3 at call time. The declared scope, enforced on every invocation.
 
@@ -1134,7 +1066,6 @@ def scoped_tool_broker(spec: EvaluatorSpec, *, patient_under_review: str, backen
 
     return call
 
-
 # ------------------------------------------------------------------ running a loaded evaluator
 def build_context(spec: EvaluatorSpec, available: Mapping[str, Any]) -> dict:
     """ENFORCEMENT 2 at injection time. Exactly the declared variables, no more, no less.
@@ -1149,7 +1080,6 @@ def build_context(spec: EvaluatorSpec, available: Mapping[str, Any]) -> dict:
         raise EvaluatorSpecInvalid(f"{spec.evaluator_id} declares context {missing}, which the "
                                    f"harness did not supply; refusing to judge without it")
     return {c: available[c] for c in spec.context}
-
 
 def _evaluator_prompt(spec: EvaluatorSpec, context: Mapping[str, Any]) -> tuple[str, bool]:
     """Render the declared context, and SAY SO when it did not all fit.
@@ -1178,7 +1108,6 @@ def _evaluator_prompt(spec: EvaluatorSpec, context: Mapping[str, Any]) -> tuple[
             f'{"0 or 1" if n == 2 else f"1..{n}"}, higher is better>, '
             f'"reason": "<why, citing the case>"{cot}}}', truncated)
 
-
 def _normalised_score(spec: EvaluatorSpec, raw: Any) -> float | None:
     """The declared scale onto [0, 1]. Anything off-scale is None, never zero.
 
@@ -1194,7 +1123,6 @@ def _normalised_score(spec: EvaluatorSpec, raw: Any) -> float | None:
     if spec.scale == "binary":
         return v if v in (0.0, 1.0) else None
     return (v - 1) / (n - 1) if 1 <= v <= n else None
-
 
 def run_evaluator(spec: EvaluatorSpec, available_context: Mapping[str, Any], *,
                   registry: Any, model: JudgeModel, ledger: JudgeLedger,
@@ -1236,7 +1164,6 @@ def run_evaluator(spec: EvaluatorSpec, available_context: Mapping[str, Any], *,
         n_model_calls=1, cost_usd=ledger.price[spec.cost_class],
         context_injected=spec.context, tools_granted=spec.tool_names))
     return verdict, rec
-
 
 def certify_evaluator(spec: EvaluatorSpec, *, run_case, pass_at_or_above: float,
                       fail_at_or_below: float) -> dict:
