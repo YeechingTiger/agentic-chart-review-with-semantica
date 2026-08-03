@@ -73,6 +73,15 @@ def protocol(pids: list[str]) -> dict:
                    "reasoner prompt", "conflict construction", "discriminator schema"],
         "note": ("A failure found during this round is recorded, not fixed. Fixing while "
                  "measuring turns a metric into a diary."),
+        # WHAT THIS BATCH REPLACES, so nobody joins two datasets that are not comparable. The
+        # first attempt (5e2ba7b-dirty) had 35 of 42 runs die on a TypeError in
+        # `apply_updates`; its reasoner and ledger numbers are void and its directory is
+        # marked. The FROZEN SURFACE is unchanged — seeder sources, normalisation, candidate
+        # identity, reasoner prompt, conflict construction, discriminator schema are all
+        # byte-identical — so this is still A1.5-v1. Only a crash was fixed, in a feature that
+        # crashed 100% of the times it was reached and therefore had no measured behaviour.
+        "supersedes": {"code_sha": "5e2ba7b-dirty",
+                       "why": "35/42 RUNTIME_ERROR; reasoner and ledger numbers void"},
     }
 
 
