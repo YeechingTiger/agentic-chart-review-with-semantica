@@ -139,6 +139,17 @@ class RunContext:
     #: is how an unearned ledger gets stamped `GATE_VALIDATED`.
     coverage_unreachable: list = field(default_factory=list)
     declared: set[str] = field(default_factory=set)
+    #: THE CANDIDATE LEDGER, when the arm is on. None means the arm is off, which is a
+    #: different fact from an on-arm run that declared nothing — the manifest keeps them apart.
+    candidates: Any = None
+    #: The reasoner is called when new evidence has arrived, not on every turn. This is how it
+    #: knows. Counting spans rather than turns bounds the calls to "turns that recorded
+    #: something" plus one, instead of one per turn on a run that reads for six turns straight.
+    candidates_seen_evidence: int = 0
+    candidate_calls: list = field(default_factory=list)
+    #: The model object the reasoner calls. The RUN'S OWN model, so its tokens land in the same
+    #: spend account and its cost shows up in the arm comparison rather than beside it.
+    reasoner_model: Any = None
 
     @property
     def gate_validated(self) -> bool:
@@ -259,6 +270,9 @@ class AuditMiddleware(AgentMiddleware):
         so yesterday's plan is not still in the thread arguing with today's.
         """
         self.ctx.n_model_calls += 1
+        # BEFORE the prompt is assembled, so the ledger reflects everything recorded up to this
+        # turn. Its output does not enter `parts` — see `_reason_about_candidates`.
+        self._reason_about_candidates(why="new_evidence")
         parts = ["PLAN (current):\n" + self.ctx.plan.render(self._docs_by_type())]
         if (
             self.ctx.coverage_active
@@ -315,6 +329,88 @@ class AuditMiddleware(AgentMiddleware):
                 f"with a reason")
         return ("UNSETTLED THREADS — each of these blocks submit_answer until it is settled:\n"
                 + "\n".join(rows))
+
+    # ------------------------------------------------------------------ candidate reasoner
+    def _reason_about_candidates(self, *, why: str) -> None:
+        """One structured call whose only output is candidate updates. AN OBSERVER IN PHASE A.
+
+        Called when new evidence has arrived since the last time, and once more before the gate
+        rules. Not on every turn: a run that reads six documents in a row would otherwise pay
+        six calls to be told the same thing.
+
+        WHAT IT DOES NOT DO, and the omission is the design: its ledger is NOT rendered back
+        into the main loop's prompt. That keeps this arm's search flow identical to the
+        baseline's apart from cost, so the first question — is this state reliable? — can be
+        answered before anything is allowed to act on it. The Strategic Controller is the
+        component that consumes it, and it is deliberately not built yet: a controller reading
+        an unreliable candidate state would make more elaborate decisions on worse information.
+
+        Never raises. The answer does not depend on this succeeding.
+        """
+        from ..review.candidate_reasoner import apply_updates, reason
+        ctx = self.ctx
+        if ctx.candidates is None:
+            return
+        # THE EVIDENCE LEDGER LIVES ON THE TOOLBOX, not on the context. `RunContext` holds the
+        # coverage ledger and the plan directly and reaches evidence through `toolbox.evidence`;
+        # a first version of this method read `ctx.evidence` and every run died on its first
+        # turn with an AttributeError. Caught by a live smoke run and not by eleven structural
+        # tests, none of which executed this line — which is why one is added beside them.
+        evidence = getattr(ctx.toolbox, "evidence", None)
+        if evidence is None:
+            return
+        n = len(evidence.items)
+        if n == 0 or n == ctx.candidates_seen_evidence:
+            return
+        ctx.candidates_seen_evidence = n
+        step = ctx.n_model_calls
+        res = reason(spec_block=self._spec_block_for_reasoner(),
+                     evidence=evidence, ledger=ctx.candidates,
+                     invoke=self._reasoner_invoke)
+        known = {e.evidence_id for e in evidence.items if e.evidence_id}
+        refused = apply_updates(ctx.candidates, res, step=step, known_evidence_ids=known)
+        ctx.candidate_calls.append({"step": step, "why": why, "n_evidence": n,
+                                    **res.to_dict(), "refused": refused})
+        ctx.tracer.emit("candidate_reasoner", severity="info", provenance="SELF_REPORTED",
+                        step=step, why=why, n_evidence=n, ok=res.ok, error=res.error,
+                        n_updates=len(res.updates), refused=refused,
+                        ledger=ctx.candidates.to_dict())
+
+    def _select_submitted(self, submitted: dict) -> None:
+        """Mark the submitted value SELECTED, declaring it first if it was never a candidate.
+
+        The declaration is labelled so nobody reads it as the reasoner's work. It is the
+        runtime saying: this is what went out, and here is where it sat in the set.
+        """
+        ctx = self.ctx
+        if ctx.candidates is None:
+            return
+        value = {k: v for k, v in (submitted.get("value") or {}).items()
+                 if str(v if v is not None else "").strip()}
+        label = "" if value else str(submitted.get("status") or "")
+        try:
+            declared = {c.candidate_id for c in ctx.candidates.candidates}
+            c = ctx.candidates.declare(value, step=ctx.n_model_calls, label=label)
+            if c.candidate_id not in declared:
+                c.label = (label or "submitted; never declared as a candidate")
+            ctx.candidates.set_state(c.candidate_id, "SELECTED", step=ctx.n_model_calls,
+                                     reason="submitted and accepted by the gate")
+        except (KeyError, ValueError):
+            pass                                # a bookkeeping failure must not end a run
+
+    def _spec_block_for_reasoner(self) -> str:
+        """The contract as the main loop was shown it, so both are reasoning about one text."""
+        try:
+            return self.ctx.spec.as_prompt_block()
+        except Exception:                       # noqa: BLE001 - a prompt is not worth a crash
+            return str(getattr(self.ctx.spec, "spec_id", ""))
+
+    def _reasoner_invoke(self, messages, tools):
+        """The provider seam. The run's own model, so cost and telemetry stay in one account."""
+        model = getattr(self.ctx, "reasoner_model", None)
+        if model is None:
+            raise RuntimeError("no model bound for the candidate reasoner")
+        return model.bind_tools(tools, tool_choice="update_candidates").invoke(messages)
 
     def _triggers_block(self) -> str:
         """What was detected mechanically since the last call. DRAINED, so it is said once.
@@ -488,6 +584,11 @@ class AuditMiddleware(AgentMiddleware):
     def _gate_answer(self, request: ToolCallRequest) -> ToolMessage:
         """One gate, shared with `graph.py`. A rejection carries the way out, not just a no."""
         submitted = dict(self.ctx.toolbox.submitted or {})
+        # ONE LAST PASS BEFORE THE GATE RULES, so the recorded candidate set is the one that was
+        # standing when the answer was submitted rather than one turn stale. The gate does not
+        # see it and cannot refuse over it: this is a structural module, and the ordering here
+        # says so — the reasoner runs, then the gate rules on the submission alone.
+        self._reason_about_candidates(why="before_submit")
         verdict = self.ctx.gate(submitted)
         if verdict.get("coverage_activated"):
             self.ctx.coverage_state["active"] = True
@@ -510,6 +611,11 @@ class AuditMiddleware(AgentMiddleware):
                 verdict.get("coverage_claim_earned", False)
             )
             self.ctx.answer = submitted
+            # WHAT WAS ACTUALLY SENT, recorded against the candidate set. Declared if the
+            # reasoner never named it, because "the run submitted a value its own candidate
+            # reasoner never considered" is the single most useful thing this ledger can say,
+            # and it is only visible if the submitted value is in the ledger to be compared.
+            self._select_submitted(submitted)
             if verdict.get("negative_basis"):
                 self.ctx.answer["negative_basis"] = verdict["negative_basis"]
             out = {"accepted": True}
@@ -891,6 +997,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
                      max_usd: float = 5.0, seed_record: dict | None = None,
                      runtime_profile_asset=None, runtime_policy_plan=None,
                      case: CaseContext | None = None,
+                     candidates=None,
                      coverage_plan=None, coverage_state: dict | None = None,
                      # The stack that was actually rendered into `system_prompt`, so the manifest
                      # records what the model received rather than re-deriving it from the profile
@@ -914,6 +1021,11 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
                      runtime_profile_asset=runtime_profile_asset,
                      runtime_policy_plan=runtime_policy_plan,
                      coverage_plan=coverage_plan,
+                     candidates=candidates,
+                     # The reasoner calls the RUN'S OWN model: same provider, same temperature,
+                     # same usage callbacks, so its cost lands in this run's account and shows
+                     # up in the arm comparison rather than beside it.
+                     reasoner_model=model,
                      coverage_state=coverage_state or {})
     # The typed channel goes in with the chart tools, so it is declared, audited by
     # `wrap_tool_call`, and counted in the tool surface like everything else.
@@ -1089,6 +1201,11 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # down at all. `null` fields are the honest report that nothing was supplied.
         "case_context": (case.to_dict() if case is not None
                          else CaseContext(patient_id=chart.patient_id).to_dict()),
+        # THE CANDIDATE SET, when the arm is on. `null` means the arm was OFF — a different
+        # fact from an on-arm run that declared nothing, and a directory-wide reader has to be
+        # able to tell those apart or "the ledger was empty" absorbs both.
+        "candidates": (ctx.candidates.to_dict() if ctx.candidates is not None else None),
+        "candidate_reasoner_calls": list(ctx.candidate_calls),
         "runtime_profile_id": (
             runtime_profile_asset.module_id
             if runtime_profile_asset is not None
@@ -1474,6 +1591,7 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
                 additional_task_context: str = "",
                 runtime_profile: str = "current-stratified-coverage",
                 case: CaseContext | None = None,
+                candidates: bool = False,
                 skill_stack=None) -> dict:
     """Assemble the ledgers, tools and gate for one patient and run it.
 
@@ -1607,10 +1725,16 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
     effective_stack = (skill_stack if skill_stack is not None
                        else runtime_policy_skills(runtime_profile_asset.module_id))
 
+    # THE CANDIDATE ARM, off by default. Everything about it is behind this one boolean, so
+    # the baseline path is byte-identical to every run recorded before it existed.
+    from ..core.state import CandidateLedger
+    candidate_ledger = CandidateLedger() if candidates else None
+
     t0 = time.time()
     return run_chart_review(
         spec=spec, chart=chart, toolbox=toolbox, coverage=coverage, evidence=evidence,
         plan=plan, threads=threads, catalogue=markers, tracer=tracer, gate=gate, case=case,
+        candidates=candidate_ledger,
         model=model, tools=tools,
         # THE RULE IDENTIFIERS GO IN THE PROMPT, not only into the finalize question. The
         # self-report channel asks at submit time which decision rule was applied, and
