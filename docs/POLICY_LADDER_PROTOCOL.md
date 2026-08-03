@@ -70,3 +70,29 @@ exactly this reason. **No commits while the batch is in flight.**
   its own development set. It was written from the same failures those charts were designed from.
 - Any arm below `B0-base` ⇒ a card that makes the model worse, which is a result and belongs in
   the record next to the two falsified attempts in `docs/CANDIDATE_LEDGER_REMOVED.md`.
+
+---
+
+## The 2026-08-03 run was ABANDONED. Do not read the manifests in `runs/ladder-policy-s1234/` as this experiment.
+
+Started 11:08, stopped by the owner about 90 minutes in. What is on disk:
+
+| arm | charts completed |
+|---|---|
+| `B0-base` | 27 of 27 |
+| `pol-reactive` | 27 of 27 |
+| `pol-infogain` | partial |
+| `pol-hypothesis-set` | none |
+
+Seeds 2345 and 3456 never started. 75 manifests exist against a protocol that calls for 324.
+
+**Why this note is here rather than nowhere.** Two complete arms invite exactly one comparison —
+`B0-base` against `pol-reactive`, 27 charts each — and that comparison is not the experiment. It is
+one seed, so it cannot separate a card's effect from run-to-run variance at temperature 1.0, which
+is the whole reason the protocol specifies three. Reporting it would be the mistake this document
+was written to prevent, made against this document's own data.
+
+The four registered predictions stand unmeasured. The partial data is kept because deleting it
+would leave nothing to explain the gap in `runs/`, and because `B0-base` at `ded2fc8` over all 27
+charts is a usable FLOOR for the current contract — the previous floor was stale, the spec hash
+having moved twice. Use it as a floor. Do not use it as an arm comparison.
