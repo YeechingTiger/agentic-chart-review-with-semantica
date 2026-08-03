@@ -365,15 +365,27 @@ class AuditMiddleware(AgentMiddleware):
         ctx.candidates_seen_evidence = n
         step = ctx.n_model_calls
 
-        # SEED FIRST, DETERMINISTICALLY. Phase A measured that a reasoner asked to both DISCOVER
-        # the values in the evidence and REASON between them does the second and skips the
-        # first: thirteen candidates, not one pair value-against-value, and on a chart built so
-        # three sources give three dates it declared one candidate with nothing contradicting.
-        # For a date target the discovery half is close to mechanical, so it is done here and
-        # the reasoner is handed a set to compare rather than a blank page.
-        from .candidate_induction import seed_candidates
-        induction = seed_candidates(ctx.candidates, ctx.spec, evidence, step=step)
-
+        # NO MECHANICAL SEEDING. A1.5 extracted every type-compatible value from the evidence and
+        # seeded them all, on the principle that over-inclusion is safe because pruning is
+        # recorded. Measured, it was not safe and it was not general:
+        #
+        #   * it only functioned on DATES. Three of five contracts declare no field the extractor
+        #     recognised, so the whole layer no-opped SILENTLY and wrote `n_declared: 0` — which
+        #     in a manifest is indistinguishable from "the model found nothing".
+        #   * over-inclusion has a bill. All three SYN0002 runs rejected the gold answer as
+        #     "the progress note's own service date", because seeding every document date had
+        #     taught the reasoner that document dates are noise — and on that chart the document
+        #     date IS the answer.
+        #   * clear-stratum false competition ran at 40%: values the extractor put on the table
+        #     and the reasoner did not take off it.
+        #   * and the principle itself is an artifact of ONE value-space shape. A date has an
+        #     unbounded value space so its candidates must be found in the record. A categorical
+        #     target with `value_domain: icdo3_lung` has a DECLARED table, and "seed everything"
+        #     there means seeding several hundred codes. Enumerate-then-prune was never general.
+        #
+        # The candidate space comes from the reasoner. What that costs is known and is not being
+        # papered over: Phase A measured that it then declares roughly one candidate per run and
+        # has never once put two competing VALUES on the table.
         res = reason(spec_block=self._spec_block_for_reasoner(),
                      evidence=evidence, ledger=ctx.candidates,
                      invoke=self._reasoner_invoke)
@@ -381,13 +393,7 @@ class AuditMiddleware(AgentMiddleware):
         refused = apply_updates(ctx.candidates, res, step=step, known_evidence_ids=known,
                                 spec=ctx.spec)
         ctx.candidate_calls.append({"step": step, "why": why, "n_evidence": n,
-                                    "induction": induction.to_dict(),
                                     **res.to_dict(), "refused": refused})
-        # TWO PROVENANCES IN ONE EVENT, marked apart. The seeded values are DETERMINISTIC — a
-        # regex over recorded spans — and the updates are SELF_REPORTED. Collapsing them would
-        # let a candidate the extractor found be read as one the model thought of.
-        ctx.tracer.emit("candidate_induction", severity="info", provenance="DETERMINISTIC",
-                        step=step, **induction.to_dict())
         ctx.tracer.emit("candidate_reasoner", severity="info", provenance="SELF_REPORTED",
                         step=step, why=why, n_evidence=n, ok=res.ok, error=res.error,
                         n_updates=len(res.updates), refused=refused,

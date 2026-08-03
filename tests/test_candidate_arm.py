@@ -173,16 +173,12 @@ def test_the_reasoner_path_actually_executes_against_a_real_run_context():
     assert ev.items and ev.items[0].evidence_id == "E1"
 
     mw._reason_about_candidates(why="new_evidence")
-    # TWO candidates, and that is the seeder working: one is the value the (fake) reasoner
-    # returned, the other is the document's own date, which A1.5 seeds deliberately because in
-    # a clinical record the date that dates a diagnosis is usually in the note's header rather
-    # than in the sentence quoted from it. Rejecting it is the reasoner's job and is recorded.
+    # ONE candidate: the one the (fake) reasoner returned. The mechanical seeder is gone, so
+    # the candidate space is whatever the reasoner puts there and nothing else.
     values = {c.value["date_of_initial_diagnosis"] for c in ctx.candidates.candidates}
-    assert "20200101" in values, "the reasoner's own value is missing"
-    seeded = [c for c in ctx.candidates.candidates if c.seed_method]
-    assert seeded and seeded[0].seed_sources == ("DOCUMENT_DATE",)
+    assert values == {"20200101"}
+    assert ctx.candidates.candidates[0].supporting_evidence_ids == ("E1",)
     assert ctx.candidate_calls[0]["ok"] is True and ctx.candidate_calls[0]["refused"] == []
-    assert ctx.candidate_calls[0]["induction"]["n_seeded"] >= 1
 
     # Called again with nothing new: no second call.
     mw._reason_about_candidates(why="new_evidence")

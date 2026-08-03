@@ -154,10 +154,6 @@ CANDIDATE_STATES: tuple[str, ...] = ("ACTIVE", "LEADING", "REJECTED", "SELECTED"
 ANSWERABILITY: tuple[str, ...] = ("UNDETERMINED", "VALUE_AVAILABLE", "EVIDENCE_INSUFFICIENT",
                                   "CORPUS_INSUFFICIENT")
 
-#: Where a seeded value came from. Closed, because the whole point of recording it is to be
-#: able to say later what each source bought and what it cost.
-SEED_SOURCES: tuple[str, ...] = ("SPAN_LITERAL", "DOCUMENT_DATE", "EVENT_DATE")
-
 #: What a discriminator IS, once somebody has looked at it. A count of discriminators is not a
 #: measure of anything — three phrasings of "which date is earlier" is one open question — so
 #: the state is what a Strategic Controller would branch on.
@@ -200,17 +196,6 @@ class Candidate:
     created_at_step: int = 0
     updated_at_step: int = 0
     rejection_reason: str = ""
-    #: WHICH SPANS PUT THIS VALUE ON THE TABLE, and by what method. A candidate the extractor
-    #: seeded and a candidate the reasoner proposed are different objects for the metrics —
-    #: candidate RECALL is about the first, candidate PRECISION about what survives the second.
-    seeded_from: tuple[str, ...] = ()
-    #: WHICH KIND of place put this value on the table. Named rather than free text because
-    #: the three have very different yield: a date written in a span is usually about something,
-    #: a document's own date is the thing the reasoner most often has to reject, and an event
-    #: date is rare and decisive. Separating them is what lets "the document-date source bought
-    #: us this much recall for this much burden" be a number instead of an impression.
-    seed_sources: tuple[str, ...] = ()
-    seed_method: str = ""
     #: Rejected because it is not a value for THIS question at all — the note's own service
     #: date, a treatment date, a date about another entity — as opposed to rejected because a
     #: rival reading beat it. The seeder is deliberately over-inclusive, so most rejections are
@@ -230,8 +215,7 @@ class Candidate:
     def to_dict(self) -> dict:
         d = asdict(self)
         for k in ("supporting_evidence_ids", "contradicting_evidence_ids",
-                  "unresolved_discriminators", "state_history", "seeded_from",
-                  "seed_sources"):
+                  "unresolved_discriminators", "state_history"):
             d[k] = list(d[k])
         return d
 
@@ -364,8 +348,7 @@ class CandidateLedger:
             self._emit("conflict_sets_changed", n=len(self.conflict_sets), step=step)
 
     def declare(self, value: dict, *, step: int, state: str | None = None, label: str = "",
-                abstention: str = "", confidence: float | None = None,
-                seeded_from=None, seed_sources=None, seed_method: str = "") -> Candidate:
+                abstention: str = "", confidence: float | None = None) -> Candidate:
         """Create, or update the existing candidate with this literal value.
 
         `state=None` MEANS LEAVE IT ALONE, and the default is None rather than "ACTIVE" for one
@@ -388,14 +371,6 @@ class CandidateLedger:
                     c.label = label                # keep the fuller statement of the reason
                 if abst:
                     c.abstention = abst
-                for e in (seeded_from or ()):
-                    if e not in c.seeded_from:
-                        c.seeded_from = (*c.seeded_from, e)
-                for k in (seed_sources or ()):
-                    if k not in c.seed_sources:
-                        c.seed_sources = (*c.seed_sources, k)
-                if seed_method and not c.seed_method:
-                    c.seed_method = seed_method
                 if confidence is not None:
                     c.confidence = confidence
                 if state is not None and state != c.status:
@@ -408,8 +383,6 @@ class CandidateLedger:
         c = Candidate(candidate_id=f"C{len(self.candidates) + 1}", value=dict(value or {}),
                       status=(state or "ACTIVE"), label=label, abstention=abst,
                       confidence=confidence,
-                      seeded_from=tuple(seeded_from or ()),
-                      seed_sources=tuple(seed_sources or ()), seed_method=seed_method,
                       created_at_step=step, updated_at_step=step)
         self.candidates.append(c)
         self._emit("candidate_declared", candidate_id=c.candidate_id, value=c.value,
@@ -536,6 +509,34 @@ class CandidateLedger:
         self.events.append({"kind": kind, **payload})
 
     # -- reporting -----------------------------------------------------------------
+    def controller_input(self, *, coverage_facts=None, budget=None) -> dict:
+        """WHAT A STRATEGIC CONTROLLER MAY READ. Frozen before the Controller exists.
+
+        Lives on the ledger because the ledger is what it reads. There is no chart here, no
+        document inventory, no span text: a Controller that may reach back into the raw evidence
+        and redo the candidate reasoning itself turns this layer into a step something routes
+        around, and the reasoning that routed around it leaves no record.
+
+        LIVE CANDIDATES ONLY, and UNRESOLVED discriminators only. A rejected candidate stays in
+        the ledger forever — that is what keeps "considered and ruled out" distinguishable from
+        "never thought of" — but it is a settled question, and a Controller handed a settled
+        question searches for an answer it already has.
+        """
+        live = [c for c in self.candidates if c.status in ("ACTIVE", "LEADING", "SELECTED")]
+        return {
+            "active_candidates": [
+                {"candidate_id": c.candidate_id, "value": dict(c.value), "status": c.status,
+                 "supporting_evidence_ids": list(c.supporting_evidence_ids),
+                 "contradicting_evidence_ids": list(c.contradicting_evidence_ids)}
+                for c in live],
+            "conflict_sets": list(self.conflict_sets),
+            "unresolved_discriminators": [d for d in self.discriminators
+                                          if d.get("status", "UNRESOLVED") == "UNRESOLVED"],
+            "answerability": {"status": self.answerability},
+            "coverage_facts": dict(coverage_facts or {}),
+            "remaining_budget": dict(budget or {}),
+        }
+
     def to_dict(self) -> dict:
         return {
             "schema": "acr.core.state/candidates/1",

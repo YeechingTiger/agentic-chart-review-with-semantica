@@ -13,13 +13,18 @@ WHY FOUR LAYERS AND NOT ONE NUMBER. A good final ledger can hide two opposite fa
 seeder never surfaced a candidate, or the seeder surfaced it and the reasoner wrongly deleted
 it — and those have different owners and different fixes. Scored together they cancel.
 
-  1 SEEDER      mechanical, no model. Recomputed here from each run's own recorded evidence,
-                which also proves the mechanism is deterministic rather than asserting it.
-  2 REASONER    what it did to a set it was handed. Gold-answer SURVIVAL is the one that
-                matters most: a wrong selection is recoverable by a Controller, a deleted gold
-                candidate is not.
-  3 LEDGER      is the end state usable — real conflicts visible, false ones absent.
-  4 DISCRIMINATOR   six discriminators are not six successes. Canonicalised first.
+  1 REASONER    the candidate space is now ENTIRELY the reasoner's — the mechanical seeder was
+                removed after it was measured to work on dates only, to cost SYN0002 its gold
+                answer three times out of three, and to leave 40% of clear charts in false
+                competition. Gold-answer SURVIVAL matters most: a wrong selection is recoverable
+                by a Controller, a deleted candidate is not.
+  2 LEDGER      is the end state usable — real conflicts visible, false ones absent.
+  3 DISCRIMINATOR   six discriminators are not six successes. Canonicalised first.
+
+THE SEEDER LAYER IS GONE FROM THIS FILE. Its numbers — gold recall, seed burden, per-source
+marginal recall — measured a mechanism that no longer exists, and they were only ever computable
+for a date target. Leaving them here as zeroes would read as a mechanism that produced nothing
+rather than one that was removed.
 
 STRATA ARE REPORTED APART. `clear` is the only place false competition can be measured and
 `competing` the only place recall can; one pooled number would let a system that declares
@@ -40,12 +45,8 @@ from collections import defaultdict
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from acr.contract.spec import load_spec
-from acr.core.state import CandidateLedger, Evidence, EvidenceLedger
-from acr.review.candidate_induction import seed_candidates
 
 ANALYZER_VERSION = "a15-analyzer/1"
-SPEC = ROOT / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
 STRATA = ("clear", "competing", "no_answer")
 
 #: Words that make two discriminators the same question. Canonicalising before counting,
@@ -82,56 +83,7 @@ def _value(c: dict) -> str:
     return str((c.get("value") or {}).get("date_of_initial_diagnosis") or "")
 
 
-# ------------------------------------------------------------------ layer 1: the seeder
-def reseed(spec, manifest: dict):
-    """Recompute the seeding from THIS RUN'S OWN recorded evidence.
-
-    Two jobs in one pass. It scores the seeder on its own, apart from anything the reasoner
-    then did; and because it is deterministic, replaying it and comparing against what the run
-    recorded is the mechanism-stability check rather than an assertion that one exists.
-    """
-    ev = EvidenceLedger()
-    for e in manifest.get("evidence") or []:
-        x = Evidence(e.get("note_id", ""), e.get("doc_type", ""), e.get("date", ""),
-                     int(e.get("start", 0)), int(e.get("end", 0)), e.get("quote", ""),
-                     e.get("supports", ""), e.get("stance", "supports"), e.get("entity", ""))
-        x.evidence_id = e.get("evidence_id", "")
-        x.event_date = e.get("event_date", "")
-        x.admissibility = e.get("admissibility", "UNJUDGED")
-        ev.add(x)
-    led = CandidateLedger()
-    seed_candidates(led, spec, ev, step=0)
-    return led
-
-
-def seeder_row(spec, m: dict, gold: dict) -> dict:
-    led = reseed(spec, m)
-    seeded = {_value(c.to_dict()): c for c in led.candidates}
-    gc = set(gold["gold_candidates"])
-    by_source: dict[str, set[str]] = defaultdict(set)
-    for v, c in seeded.items():
-        for src in c.seed_sources:
-            by_source[src].add(v)
-    # INDEPENDENT MARGINAL RECALL: what would be lost if this source were removed. The only
-    # way to answer "what did DOCUMENT_DATE buy" — a source that only ever re-finds values
-    # another source also found has bought nothing and still costs the reasoner a rejection.
-    marginal = {}
-    for src in ("SPAN_LITERAL", "DOCUMENT_DATE", "EVENT_DATE"):
-        others = set().union(*[s for k, s in by_source.items() if k != src]) if by_source else set()
-        marginal[src] = len((by_source.get(src, set()) & gc) - others)
-    return {
-        "n_seeded": len(seeded),
-        "hit": len(gc & set(seeded)),
-        "missed": sorted(gc - set(seeded)),
-        "non_target": len(set(seeded) - gc),
-        "by_source": {k: {"n": len(v), "gold": len(v & gc), "non_target": len(v - gc),
-                          "marginal_recall": marginal[k]}
-                      for k, v in sorted(by_source.items())},
-        "seeded_values": sorted(seeded),
-    }
-
-
-# ------------------------------------------------------------------ layer 2: the reasoner
+# ------------------------------------------------------------------ layer 1: the reasoner
 def reasoner_row(m: dict, gold: dict, seeded: set[str]) -> dict:
     led = m.get("candidates") or {}
     cands = led.get("candidates") or []
@@ -231,7 +183,7 @@ def _pct(num, den) -> str:
 
 def main() -> int:
     root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "runs/a15eval")
-    spec, corpus = load_spec(SPEC), _corpus()
+    corpus = _corpus()
     proto = root / "protocol.json"
     print(f"{root}   analyzer={ANALYZER_VERSION}")
     if proto.exists():
@@ -258,37 +210,16 @@ def main() -> int:
         if not g.get("stratum"):
             continue
         for i, m in enumerate(ms):
-            s = seeder_row(spec, m, g)
-            r = reasoner_row(m, g, set(s["seeded_values"]))
+            # `seeded` is now empty: every candidate is the reasoner's. What used to be
+            # "noise the extractor added" is no longer a category.
+            r = reasoner_row(m, g, set())
             rows.append({"pid": pid, "rep": i, "stratum": g["stratum"], "gold": g,
-                         "seed": s, "reason": r, "ledger": ledger_row(m, g),
+                         "reason": r, "ledger": ledger_row(m, g),
                          "disc": discriminator_row(m, g)})
 
     # ---- mechanism determinism: the seeder must be identical across repeats -------------
-    print("\n=== MECHANISM STABILITY (must be 100%) ===")
-    # SAME EVIDENCE IN, SAME SEEDING OUT. A first version of this check compared the seeded set
-    # ACROSS REPEATS and reported 5/14 — which measured the model choosing different spans to
-    # record, not the seeder. The seeder's input is the evidence a run recorded; comparing its
-    # output across runs with different inputs is comparing two different questions.
-    flaky = replay_mismatch = 0
-    for pid, ms in sorted(runs.items()):
-        g = corpus.get(pid, {"gold_candidates": []})
-        for m in ms:
-            a = tuple(seeder_row(spec, m, g)["seeded_values"])
-            b = tuple(seeder_row(spec, m, g)["seeded_values"])
-            flaky += a != b
-            recorded = tuple(sorted({_value(c) for c in (m["candidates"]["candidates"] or [])
-                                     if c.get("seed_method")}))
-            replay_mismatch += a != recorded
-    n = sum(len(v) for v in runs.values())
-    print(f"  replaying the same evidence gives the same seeding: {_pct(n - flaky, n)}")
-    print(f"  the replay matches what the run itself recorded:    {_pct(n - replay_mismatch, n)}")
-    ev_varies = sum(1 for pid, ms in runs.items()
-                    if len({tuple(sorted((e["note_id"], e["start"], e["end"])
-                                         for e in (m.get("evidence") or []))) for m in ms}) > 1)
-    print(f"  (the EVIDENCE the model chose to record varies on {ev_varies}/{len(runs)} cases — "
-          f"that is LLM variability and is reported below, not here)")
 
+    print("\n=== INVARIANTS ===")
     inv = {"answerability_in_candidates": sum(r["ledger"]["answerability_in_candidates"]
                                               for r in rows),
            "dangling_discriminator_refs": sum(r["disc"]["dangling"] for r in rows)}
@@ -311,32 +242,20 @@ def main() -> int:
             closure over the loop variable would score every stratum against the last one."""
             return sum(f(r[k]) for r in _sel)
 
-        print("  SEEDER    gold recall "
-              f"{_pct(S('seed', lambda s: s['hit']), S('seed', lambda s: s['hit'] + len(s['missed'])))}"
-              f"   burden {S('seed', lambda s: s['n_seeded']) / len(sel):.1f} seeded/run, "
-              f"{S('seed', lambda s: s['non_target']) / len(sel):.1f} non-target/run")
-        miss = sorted({v for r in sel for v in r["seed"]["missed"]})
-        if miss:
-            print(f"            never seeded: {miss}")
-        by_src: dict[str, dict] = defaultdict(lambda: defaultdict(int))
-        for r in sel:
-            for k, v in r["seed"]["by_source"].items():
-                for kk, vv in v.items():
-                    by_src[k][kk] += vv
-        for k in ("SPAN_LITERAL", "DOCUMENT_DATE", "EVENT_DATE"):
-            v = by_src.get(k)
-            if v:
-                print(f"              {k:<14} n={v['n']:<4} gold={v['gold']:<4} "
-                      f"non-target={v['non_target']:<4} marginal_recall={v['marginal_recall']}")
 
         print("  REASONER  gold retention "
               f"{_pct(S('reason', lambda x: x['gold_retained']), S('reason', lambda x: x['gold_expected']))}"
               f"   gold answer survives "
               f"{_pct(sum(1 for r in sel if r['reason']['gold_answer_survives']), len(sel))}")
-        print(f"            rejection precision "
-              f"{_pct(S('reason', lambda x: x['reject_correct']), S('reason', lambda x: x['reject_total']))}"
-              f"   recall "
-              f"{_pct(S('reason', lambda x: x['reject_recall_num']), S('reason', lambda x: x['reject_recall_den']))}")
+        # WITHOUT A SEEDER THERE IS NO EXTRACTOR NOISE, so a rejected value that was never a
+        # gold candidate is one the reasoner PROPOSED AND THEN TOOK BACK. Under the old
+        # semantics those counted as correctly-pruned noise and the number read as precision;
+        # printing it that way now would credit the reasoner for cleaning up after itself.
+        n_rej = S("reason", lambda x: x["reject_total"])
+        on_gold = S("reason", lambda x: x["reject_recall_num"])
+        print(f"            rejected {n_rej}: {on_gold} were gold losers "
+              f"(recall {_pct(on_gold, S('reason', lambda x: x['reject_recall_den']))}), "
+              f"{n_rej - on_gold} were its own proposals retracted")
         wrong = sorted({v for r in sel for v in r["reason"]["gold_wrongly_rejected"]})
         if wrong:
             print(f"            WRONGLY REJECTED a gold candidate: {wrong}")

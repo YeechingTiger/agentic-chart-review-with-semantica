@@ -24,15 +24,20 @@ from acr.core.state import (
     ANSWERABILITY,
     CANDIDATE_STATES,
     DISCRIMINATOR_STATES,
-    SEED_SOURCES,
     Candidate,
     CandidateLedger,
 )
-from acr.review import candidate_induction as CI
 from acr.review import candidate_reasoner as CR
 
 #: 冻结的版本名。改了下面任何一个被钉住的表面,就得改它。
-A15_VERSION = "A1.5-v1"
+#:
+#: A1.5-v1 的机械 seeder 已经**删掉**了 —— 它只在日期上能跑(五份契约里三份静默 no-op)、
+#: 过度包含使 SYN0002 三次运行全部丢掉 gold 答案、clear 层 40% 假竞争,而且"枚举再筛"这条
+#: 原则本身是无界值域的产物:`value_domain: icdo3_lung` 那种目标,候选空间是一张声明好的表,
+#: "把所有可能值 seed 进来"意味着几百个码。
+#:
+#: 留下来的是候选账本本身和那次独立调用。名字跟着动,于是两个版本的数字接不到一起。
+A15_VERSION = "A1.5-v2-no-seeder"
 
 
 # ====================================================================== 冻结的表面
@@ -42,19 +47,8 @@ def test_the_frozen_surface_is_what_v1_says_it_is():
     assert CANDIDATE_STATES == ("ACTIVE", "LEADING", "REJECTED", "SELECTED")
     assert ANSWERABILITY == ("UNDETERMINED", "VALUE_AVAILABLE", "EVIDENCE_INSUFFICIENT",
                              "CORPUS_INSUFFICIENT")
-    assert SEED_SOURCES == ("SPAN_LITERAL", "DOCUMENT_DATE", "EVENT_DATE")
     assert DISCRIMINATOR_STATES == ("UNRESOLVED", "ALREADY_RESOLVED",
                                     "UNRESOLVABLE_FROM_CORPUS", "SPEC_DEPENDENT")
-
-
-def test_the_seeder_reads_three_sources_and_no_more():
-    """seed 来源是 v1 冻结的一部分。多一个来源会同时改变 recall 和 burden 两个指标,
-    在一轮评价中途加它,两个数字就都不再指同一个东西。"""
-    src = inspect.getsource(CI.extract_sources)
-    # One call site per source. The fourth `_add(` is the closure's own definition.
-    assert src.count("_add(v, ") + src.count("_add(normalise_date(") == 3
-    for name in SEED_SOURCES:
-        assert name in src
 
 
 def test_the_candidate_field_set_is_frozen():
@@ -63,8 +57,7 @@ def test_the_candidate_field_set_is_frozen():
         "candidate_id", "value", "status", "abstention", "label",
         "supporting_evidence_ids", "contradicting_evidence_ids",
         "unresolved_discriminators", "confidence", "created_at_step", "updated_at_step",
-        "rejection_reason", "seeded_from", "seed_sources", "seed_method",
-        "not_a_target_value", "rejecting_rule", "state_history"}
+        "rejection_reason", "not_a_target_value", "rejecting_rule", "state_history"}
 
 
 def test_the_discriminator_shape_is_frozen():
@@ -143,8 +136,7 @@ def test_invariant_4_an_answerability_status_never_becomes_a_value_candidate():
 def test_invariant_5_a_rejected_candidate_stays_with_everything_that_put_it_out():
     """物理删掉一个候选,就回到了"从没考虑过" —— 而那正是 A1 的问题。"""
     led = CandidateLedger()
-    c = led.declare({"d": "20200401"}, step=1, seeded_from=["E3"],
-                    seed_sources=["DOCUMENT_DATE"], seed_method="evidence_value_extraction")
+    c = led.declare({"d": "20200401"}, step=1)
     led.link(c.candidate_id, "E3", "supports", step=1)
     led.set_state(c.candidate_id, "REJECTED", step=6,
                   reason="confirmatory; superseded by the earlier clinical impression")
@@ -154,7 +146,6 @@ def test_invariant_5_a_rejected_candidate_stays_with_everything_that_put_it_out(
     assert got["status"] == "REJECTED"
     assert got["rejection_reason"] and got["rejecting_rule"] == "conflict_rule.3"
     assert got["supporting_evidence_ids"] == ["E3"]
-    assert got["seeded_from"] == ["E3"] and got["seed_sources"] == ["DOCUMENT_DATE"]
     assert [(h["to"], h["step"]) for h in got["state_history"]] == [("REJECTED", 6)]
 
 
@@ -172,14 +163,13 @@ def test_the_controller_input_is_defined_before_the_controller_is():
     如果 Controller 允许回去读原始 evidence 自己重做候选推理,A1.5 就失去了架构意义 ——
     它会变成一个被绕过的中间层,而绕过它的那次推理没有任何记录。
     """
-    from acr.review.candidate_induction import controller_input
     led = CandidateLedger()
     a = led.declare({"d": "20100517"}, step=1)
     led.declare({"d": "20100522"}, step=1)
     led.link(a.candidate_id, "E1", "supports", step=1)
     led.add_discriminator({"candidate_a": "C1", "candidate_b": "C2",
                            "unresolved_fact": "which qualifies"}, step=1)
-    ci = controller_input(led, coverage_facts={"n_read": 5}, budget={"usd_left": 1.0})
+    ci = led.controller_input(coverage_facts={"n_read": 5}, budget={"usd_left": 1.0})
 
     assert set(ci) == {"active_candidates", "conflict_sets", "unresolved_discriminators",
                        "answerability", "coverage_facts", "remaining_budget"}
@@ -197,12 +187,11 @@ def test_the_controller_input_is_defined_before_the_controller_is():
 def test_only_live_candidates_reach_the_controller_but_the_rejected_stay_in_the_ledger():
     """Controller 要决定的是还没解决的选择。已经结案的东西留在账本里给读的人,
     不进它的输入 —— 否则它会对着一个已经解决的冲突继续搜。"""
-    from acr.review.candidate_induction import controller_input
     led = CandidateLedger()
     led.declare({"d": "A"}, step=1)
     led.declare({"d": "B"}, step=1)
     led.set_state("C2", "REJECTED", step=2, reason="x")
-    ci = controller_input(led)
+    ci = led.controller_input()
     assert [c["candidate_id"] for c in ci["active_candidates"]] == ["C1"]
     assert len(led.candidates) == 2
 
@@ -210,10 +199,9 @@ def test_only_live_candidates_reach_the_controller_but_the_rejected_stay_in_the_
 @pytest.mark.parametrize("state", ["ALREADY_RESOLVED", "UNRESOLVABLE_FROM_CORPUS"])
 def test_a_settled_discriminator_does_not_reach_the_controller(state):
     """"已经解决"和"这个语料解决不了"都不是可以驱动下一步搜索的东西。"""
-    from acr.review.candidate_induction import controller_input
     led = CandidateLedger()
     led.declare({"d": "A"}, step=1)
     led.declare({"d": "B"}, step=1)
     led.add_discriminator({"candidate_a": "C1", "candidate_b": "C2",
                            "unresolved_fact": "which is earlier", "status": state}, step=1)
-    assert controller_input(led)["unresolved_discriminators"] == []
+    assert led.controller_input()["unresolved_discriminators"] == []

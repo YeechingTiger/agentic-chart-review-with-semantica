@@ -311,11 +311,10 @@ def test_the_reasoner_sets_answerability_without_creating_a_candidate_for_it():
     assert led.candidates == []
 
 
-def test_rejecting_a_seeded_value_records_that_it_was_not_a_target_value():
-    """"看到了这个日期、因为它是文档自己的日期而排除"和"从没考虑过"必须长得不一样。"""
+def test_rejecting_a_value_records_that_it_was_not_a_target_value():
+    """"考虑过并排除了"和"从没考虑过"必须长得不一样。"""
     led = CandidateLedger()
-    led.declare({"d": "20200101"}, step=1, seeded_from=["E1"],
-                seed_method="evidence_value_extraction")
+    led.declare({"d": "20200101"}, step=1)
     r = CR.reason(spec_block="c", evidence=_evidence(), ledger=led,
                   invoke=lambda m, t: _reply([{"action": "reject", "candidate_id": "C1",
                                                "not_a_target_value": True,
