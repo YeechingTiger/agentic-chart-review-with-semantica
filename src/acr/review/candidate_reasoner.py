@@ -264,8 +264,8 @@ def apply_updates(ledger: CandidateLedger, result: ReasonerResult, *, step: int,
                 state = str(u.get("state") or "ACTIVE").strip().upper()
                 if state not in ("ACTIVE", "LEADING"):
                     state = "ACTIVE"
-                c = ledger.declare(value, step=step, label=(abst or label), state=state,
-                                   confidence=_num(u.get("confidence")))
+                c = ledger.declare(value, step=step, label=label, abstention=abst,
+                                   state=state, confidence=_num(u.get("confidence")))
                 cid = c.candidate_id
             elif action in ("update", "reject", "select_leading"):
                 if not cid:

@@ -133,7 +133,19 @@ class Candidate:
     #: "was the submitted answer ever declared as a candidate" be an exact comparison.
     value: dict = field(default_factory=dict)
     status: str = "ACTIVE"
-    #: The model's short name for this reading. Free text, matched against nothing.
+    #: THE ABSTENTION THIS CANDIDATE IS, when it is one. Normalised to the bare status token —
+    #: `EVIDENCE_INSUFFICIENT`, not "EVIDENCE_INSUFFICIENT: no document establishes one" —
+    #: because it is the IDENTITY of an abstention candidate and prose cannot be one.
+    #:
+    #: A live run made the case: the reasoner declared an abstention labelled with a whole
+    #: sentence, the runtime then looked for the submitted status as a bare token, the two did
+    #: not match, and one abstention became two candidates — the second stamped "submitted;
+    #: never declared as a candidate". That stamp is the single most useful thing this ledger
+    #: says (on SYNY04 it was TRUE and pointed at a real disagreement between the reasoner and
+    #: the run), so it must not be manufactured by a difference in spelling.
+    abstention: str = ""
+    #: The model's short name for this reading, prose included. Matched against nothing —
+    #: normalising identity does not mean discarding the reason.
     label: str = ""
     supporting_evidence_ids: tuple[str, ...] = ()
     contradicting_evidence_ids: tuple[str, ...] = ()
@@ -159,6 +171,24 @@ class Candidate:
         return d
 
 
+_STATUS_TOKEN = None
+
+
+def normalise_abstention(text: str) -> str:
+    """The leading status token of an abstention, or the whole string when there is none.
+
+    `"EVIDENCE_INSUFFICIENT: no document establishes one"` -> `EVIDENCE_INSUFFICIENT`. A
+    SCREAMING_SNAKE run at the start is a status; anything else is left exactly as written,
+    because guessing at an identity is how two different readings quietly become one.
+    """
+    global _STATUS_TOKEN
+    if _STATUS_TOKEN is None:
+        import re
+        _STATUS_TOKEN = re.compile(r"^\s*([A-Z][A-Z0-9_]{3,})\b")
+    m = _STATUS_TOKEN.match(str(text or ""))
+    return m.group(1) if m else str(text or "").strip()
+
+
 def _value_key(value: dict, label: str = "") -> str:
     """Identity by the LITERAL value, with no semantic folding.
 
@@ -174,7 +204,7 @@ def _value_key(value: dict, label: str = "") -> str:
     """
     import json
     if not value:
-        return f"abstain:{label.strip().lower()}"
+        return f"abstain:{normalise_abstention(label).lower()}"
     return json.dumps({str(k): str(v).strip() for k, v in sorted((value or {}).items())},
                       sort_keys=True, ensure_ascii=False)
 
@@ -222,15 +252,23 @@ class CandidateLedger:
 
     # -- writes --------------------------------------------------------------------
     def declare(self, value: dict, *, step: int, state: str = "ACTIVE", label: str = "",
-                confidence: float | None = None) -> Candidate:
-        """Create, or update the existing candidate with this literal value."""
+                abstention: str = "", confidence: float | None = None) -> Candidate:
+        """Create, or update the existing candidate with this literal value.
+
+        An abstention candidate carries no value, so its identity is `abstention` normalised to
+        its status token — see `normalise_abstention`. Its prose goes to `label` and is kept.
+        """
         if state not in CANDIDATE_STATES:
             raise ValueError(f"candidate state {state!r} is not one of {CANDIDATE_STATES}")
-        key = _value_key(value, label)
+        abst = normalise_abstention(abstention) if abstention else ""
+        label = label or (abstention if abstention else "")
+        key = _value_key(value, abstention or label)
         for c in self.candidates:
-            if _value_key(c.value, c.label) == key:
-                if label:
-                    c.label = label
+            if _value_key(c.value, c.abstention or c.label) == key:
+                if label and len(label) > len(c.label):
+                    c.label = label                # keep the fuller statement of the reason
+                if abst:
+                    c.abstention = abst
                 if confidence is not None:
                     c.confidence = confidence
                 if state != c.status:
@@ -241,7 +279,7 @@ class CandidateLedger:
         # Minted by the runtime, never supplied. A model-invented id is re-invented differently
         # next turn and every pointer to it stops resolving.
         c = Candidate(candidate_id=f"C{len(self.candidates) + 1}", value=dict(value or {}),
-                      status=state, label=label, confidence=confidence,
+                      status=state, label=label, abstention=abst, confidence=confidence,
                       created_at_step=step, updated_at_step=step)
         self.candidates.append(c)
         self._emit("candidate_declared", candidate_id=c.candidate_id, value=c.value,

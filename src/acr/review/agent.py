@@ -387,12 +387,17 @@ class AuditMiddleware(AgentMiddleware):
             return
         value = {k: v for k, v in (submitted.get("value") or {}).items()
                  if str(v if v is not None else "").strip()}
-        label = "" if value else str(submitted.get("status") or "")
+        # An abstention goes in as an ABSTENTION, not as a label. The two identities have to be
+        # computed the same way or the reasoner's "EVIDENCE_INSUFFICIENT: no document
+        # establishes one" and the runtime's bare "EVIDENCE_INSUFFICIENT" become two candidates
+        # and the second is stamped as never declared — manufacturing the one finding this
+        # ledger exists to report.
+        abstention = "" if value else str(submitted.get("status") or "")
         try:
             declared = {c.candidate_id for c in ctx.candidates.candidates}
-            c = ctx.candidates.declare(value, step=ctx.n_model_calls, label=label)
+            c = ctx.candidates.declare(value, step=ctx.n_model_calls, abstention=abstention)
             if c.candidate_id not in declared:
-                c.label = (label or "submitted; never declared as a candidate")
+                c.label = "submitted; never declared as a candidate"
             ctx.candidates.set_state(c.candidate_id, "SELECTED", step=ctx.n_model_calls,
                                      reason="submitted and accepted by the gate")
         except (KeyError, ValueError):

@@ -237,3 +237,46 @@ def test_a_create_may_declare_itself_leading_in_one_step():
     led = CandidateLedger()
     c = led.declare({"d": "A"}, step=1, state="LEADING")
     assert led.leading().candidate_id == c.candidate_id
+
+
+# --------------------------------------------------------------- 弃权候选的身份
+
+def test_an_abstention_candidate_is_identified_by_its_status_not_by_its_prose():
+    """真实运行里的一个缺陷,而且它盖住了一个真发现。
+
+    SYNX06 上 reasoner 声明了一个弃权候选,label 是 "EVIDENCE_INSUFFICIENT: No document..."。
+    运行随后提交了 EVIDENCE_INSUFFICIENT,运行时用裸状态去找它 —— label 不同,于是又建了一个
+    候选,标成"提交了但从没声明过"。**同一个弃权被记成两个候选,而且被记成了一次未声明提交。**
+
+    "运行提交了一个它自己的候选推理从没考虑过的值"是这个账本能说的最有用的一句话
+    (SYNY04 上就是真的),所以它不能被身份判断的口径差别污染。
+    """
+    led = CandidateLedger()
+    a = led.declare({}, step=1, abstention="EVIDENCE_INSUFFICIENT: No document establishes one")
+    b = led.declare({}, step=4, abstention="EVIDENCE_INSUFFICIENT")
+    assert a.candidate_id == b.candidate_id
+    assert len(led.candidates) == 1
+    assert led.candidates[0].abstention == "EVIDENCE_INSUFFICIENT"
+
+
+def test_the_prose_survives_in_the_label():
+    """归一化的是身份,不是内容。模型写的那句话是它的理由,不能丢。"""
+    led = CandidateLedger()
+    c = led.declare({}, step=1, abstention="CORPUS_INSUFFICIENT: record starts after transfer")
+    assert c.abstention == "CORPUS_INSUFFICIENT"
+    assert "starts after transfer" in c.label
+
+
+def test_two_different_abstentions_are_still_two_candidates():
+    led = CandidateLedger()
+    led.declare({}, step=1, abstention="EVIDENCE_INSUFFICIENT: nothing here")
+    led.declare({}, step=1, abstention="CORPUS_INSUFFICIENT: nothing at all")
+    assert len(led.candidates) == 2
+
+
+def test_an_abstention_with_no_recognisable_status_keeps_the_whole_string():
+    """没有可辨认的状态标记时不猜。整串就是身份,两个不同的串就是两个候选。"""
+    led = CandidateLedger()
+    led.declare({}, step=1, abstention="i am not sure")
+    led.declare({}, step=1, abstention="i am also not sure")
+    assert len(led.candidates) == 2
