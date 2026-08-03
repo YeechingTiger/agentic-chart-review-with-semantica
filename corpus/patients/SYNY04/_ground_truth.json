@@ -1,0 +1,59 @@
+{
+  "patient_id": "SYNY04",
+  "evidence_pattern": "a season and a year are all the record offers",
+  "designer_notes": "The contract's third boundary case is this exact shape ('diagnosed in the spring of 2010' -> 20100499) and no chart has ever produced one, so the season table has been rendered into every prompt for weeks and applied to nothing. The flags are the second half: a run that answers 20191099 and leaves all three false has given a date it invented two components of and said it read them.",
+  "informed_module_design": false,
+  "designed_from": "contract_clause: date_imputation (seasonal phrase -> month, flagged)",
+  "n_documents": 307,
+  "date_range": [
+    "2010-01-29",
+    "2021-07-20"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20191099",
+      "status": "FOUND",
+      "flags": {
+        "year_imputed": false,
+        "month_imputed": true,
+        "day_imputed": true
+      },
+      "why": "The transfer-of-care note of 2020-01-27 says the cancer was diagnosed 'in the fall of 2019' at another institution, the outside pathology never arrived, and nothing else in the chart names a date. date_imputation maps fall to month 10 and the day is unknown, giving 20191099 with month_imputed and day_imputed true and year_imputed FALSE \u2014 the year was stated outright."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C182",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "EVIDENCE_INSUFFICIENT",
+      "why": "No pathology in the record; histology must NOT be inferred from imaging."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2010-01-29",
+        "end": "2021-07-20"
+      },
+      "expected_through_date": "2021-07-20",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "dx_date": "20191099",
+    "naive_answer": "20200127",
+    "requires": "applying the season table and flagging which components it made up"
+  }
+}

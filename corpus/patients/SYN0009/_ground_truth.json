@@ -2,6 +2,8 @@
   "patient_id": "SYN0009",
   "evidence_pattern": "interior follow-up gap; genuinely no recurrence",
   "designer_notes": "Two-year hole in the middle of surveillance. Nothing recurred, but the chart cannot show that. Must be Unknown (99).",
+  "informed_module_design": true,
+  "designed_from": "",
   "n_documents": 314,
   "date_range": [
     "2008-06-16",

@@ -2,6 +2,8 @@
   "patient_id": "SYN0010",
   "evidence_pattern": "interior follow-up gap; recurrence happened elsewhere during it",
   "designer_notes": "Same shape as SYN0009, but the patient recurred during the hole and was treated at another hospital. NOTHING about that appears here. Also Unknown (99) \u2014 and an implementation that distinguishes it from SYN0009 is cheating.",
+  "informed_module_design": true,
+  "designed_from": "",
   "n_documents": 317,
   "date_range": [
     "2008-07-13",

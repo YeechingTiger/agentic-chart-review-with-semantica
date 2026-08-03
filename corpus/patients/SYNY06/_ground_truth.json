@@ -1,0 +1,54 @@
+{
+  "patient_id": "SYNY06",
+  "evidence_pattern": "suspicious imaging weeks before the biopsy \u2014 the later date wins",
+  "designer_notes": "THE INVERSE TRAP, and the only one in the corpus. SYNX01, SYNX02, SYNX05 and SYNY01 all reward reaching for the earliest date, so a card written from them learns 'earlier wins' and cannot be told apart from a card that learned the rule. Here the earliest candidate is inadmissible. A policy that only generalises in one direction fails exactly here and nowhere else.",
+  "informed_module_design": false,
+  "designed_from": "contract_clause: evidence_rules.does_not_count[2] (imaging is not a diagnosis)",
+  "n_documents": 325,
+  "date_range": [
+    "2012-12-12",
+    "2024-05-08"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20221115",
+      "status": "FOUND",
+      "why": "The CT of 2022-10-08 reads 'HIGHLY SUSPICIOUS FOR MALIGNANCY' and recommends tissue sampling. evidence_rules.does_not_count[2] excludes a radiology report that merely describes a suspicious mass absent a physician's diagnostic statement, and no such statement exists before the biopsy. The pathology of 2022-11-15 is the first admissible witness."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C251",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2012-12-12",
+        "end": "2024-05-08"
+      },
+      "expected_through_date": "2024-05-08",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "dx_date": "20221115",
+    "naive_answer": "20221008",
+    "requires": "refusing an early candidate the evidence rules exclude"
+  }
+}

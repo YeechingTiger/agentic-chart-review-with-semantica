@@ -2,6 +2,8 @@
   "patient_id": "SYNX04",
   "evidence_pattern": "pathology deferred to an addendum filed under another type",
   "designer_notes": "P05's 8046 error given somewhere further to go. The deferred report is the only Surgical-Pathology-Report in the chart, so an arm that sweeps the pathology type finds a document that answers nothing; the addendum is filed under Surgical-Pathology-Document three weeks later. Following the words 'SEE ADDENDUM' is the only cheap route, which is what thread-chasing is for.",
+  "informed_module_design": true,
+  "designed_from": "observed_failure: addenda filed under another type were never opened",
   "n_documents": 299,
   "date_range": [
     "2013-08-05",

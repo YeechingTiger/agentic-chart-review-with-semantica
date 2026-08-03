@@ -2,6 +2,8 @@
   "patient_id": "SYN0001",
   "evidence_pattern": "tissue-confirmed; cytology precedes pathology",
   "designer_notes": "Exercises the [390] cytology-vs-pathology boundary case and a clean 00 (disease-free, no recurrence).",
+  "informed_module_design": true,
+  "designed_from": "",
   "n_documents": 321,
   "date_range": [
     "2013-04-14",

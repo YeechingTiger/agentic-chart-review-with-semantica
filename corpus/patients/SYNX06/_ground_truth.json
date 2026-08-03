@@ -1,7 +1,9 @@
 {
   "patient_id": "SYNX06",
   "evidence_pattern": "the diagnosis exists only in dictation shorthand",
-  "designer_notes": "No full word appears anywhere: not adenocarcinoma, not carcinoma, not malignant, not diagnosis. A run searching the contract's own vocabulary comes back empty and concludes the chart is silent. 'adeno' hits and 'adenocarcinoma' does not, which is precisely the shorter-stem move the search-native card advises \u2014 so this chart tests whether that advice is followed rather than merely rendered.",
+  "designer_notes": "No full word appears anywhere: not adenocarcinoma, not carcinoma, not malignant, not diagnosis. A run searching the contract's own vocabulary comes back empty and concludes the chart is silent. 'adeno' hits and 'adenocarcinoma' does not, which is precisely the shorter-stem move the controller-reactive card advises \u2014 so this chart tests whether that advice is followed rather than merely rendered.",
+  "informed_module_design": true,
+  "designed_from": "observed_failure: the contract's own vocabulary missed; informed the stem-widening advice in controller-reactive",
   "n_documents": 317,
   "date_range": [
     "2011-09-20",

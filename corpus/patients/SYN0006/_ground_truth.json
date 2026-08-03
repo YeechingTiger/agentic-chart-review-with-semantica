@@ -2,6 +2,8 @@
   "patient_id": "SYN0006",
   "evidence_pattern": "patient declined biopsy \u2014 radiographic diagnosis only",
   "designer_notes": "Second evidence-gap probe with a different mechanism (patient refusal, documented in prose).",
+  "informed_module_design": true,
+  "designed_from": "",
   "n_documents": 306,
   "date_range": [
     "2013-08-04",

@@ -57,6 +57,21 @@ BACKGROUND_YEARS = 10          # decade of routine care before the index diagnos
 
 # --------------------------------------------------------------------------------------
 # Patient blueprints — each encodes what the ground truth should be and why
+#
+# THREE POPULATIONS, and `informed_module_design` is what separates them.
+#
+#   SYN0001-0012  built before any method card existed, to vary the CLINICAL situation —
+#                 in situ, metastatic at presentation, the recurrence trichotomy. No card was
+#                 written from them. But they appear in every ladder run the cards were then
+#                 revised against, and nobody has traced which card moved because of which
+#                 chart. They therefore carry the DEFAULT, `informed_module_design=True`,
+#                 with `designed_from` left empty — which reads as "nobody recorded where this
+#                 came from, so it is treated as informed". Marking twelve charts clean on a
+#                 belief nobody checked is the failure this flag exists to prevent.
+#   SYNX / SYNK   informed, and the provenance is known: each names the run behaviour that
+#                 produced its trap.
+#   SYNY01-Y06    held out. Every trap derived from a contract clause no other chart
+#                 exercises, named in `designed_from` and checkable against the contract.
 # --------------------------------------------------------------------------------------
 @dataclass
 class Blueprint:
@@ -78,10 +93,66 @@ class Blueprint:
     #   normal     regular surveillance to the end
     #   interior   records, then a 2-year hole, then records again  -> true gap
     #   truncated  records stop at last contact and never resume    -> NOT a gap
+    #   terminal   NOTHING after the index date. For SYNY01, where the index date is the
+    #              patient's death: the generic arcs below emitted surveillance and pharmacy
+    #              claims for eight months afterwards, which is a corpus bug that reads from
+    #              outside exactly like a chart nobody checked.
     followup: str = "normal"
     gap_years: tuple[int, int] = (2, 4)     # years after dx that the interior hole spans
     truncate_after_years: float = 2.0       # for followup == "truncated"
     expect: dict = field(default_factory=dict)   # machine-assertable expectations
+
+    # ---- WHAT THE ANSWER IS, when it is not a plain date ----------------------------
+    #: The recorded STORE.390 status. `FOUND` for every chart that has an answer; a chart
+    #: whose CORRECT answer is an abstention has to be able to say so, and until SYNY05 none
+    #: could — so `CORPUS_INSUFFICIENT` was an outcome the contract declared, the tool offered,
+    #: and no chart in the corpus could ever score as right.
+    #: How many years of routine care precede the index date. `BACKGROUND_YEARS` for every
+    #: chart but one: SYNY05's whole premise is that this institution's record BEGINS after the
+    #: diagnosis, and a decade of prior notes would make that false — the diagnosis would fall
+    #: inside the observed window and the correct answer would be EVIDENCE_INSUFFICIENT rather
+    #: than CORPUS_INSUFFICIENT. The chart is short as a result, and the shortness IS the
+    #: finding: a record this thin cannot establish a date and saying so is the right answer.
+    background_years: int = BACKGROUND_YEARS
+    #: Which ancillary types may appear in the background noise. `OTHER_TYPES` for every chart
+    #: but two, and the exception is a defect found by writing the tests rather than by reading
+    #: the generator: `ancillary_note`'s Endoscopy branch writes "Mucosal lesion noted in the
+    #: {site_text}. Biopsies obtained." — background noise that names the TUMOUR SITE and
+    #: claims tissue. On SYNY01 that put fourteen notes saying biopsies were obtained into a
+    #: chart whose death summary says none were, and whose whole premise is that no tissue
+    #: exists. A chart that contradicts its own ground truth is not a hard case; it is a wrong
+    #: one.
+    #:
+    #: NARROWED PER CHART rather than fixed in `ancillary_note`, and that is a deliberate
+    #: refusal. Rewriting that branch would change the bytes of all twenty-one existing charts,
+    #: and this module promises byte-identical regeneration because every recorded pilot number
+    #: was measured on those bytes. The latent version of the same problem on SYN0002 (tissue
+    #: at an outside hospital, and Endoscopy notes here claiming biopsies) is recorded and NOT
+    #: fixed for that reason.
+    background_types: tuple[str, ...] = ()
+    dx_status: str = "FOUND"
+    #: The imputation flags the answer carries. Empty means all three false. A chart that
+    #: forces an approximated year or a season-derived month is the only way to find out
+    #: whether the three flags are filled in or left at their default.
+    dx_flags: dict = field(default_factory=dict)
+
+    # ---- WHETHER THIS CHART MAY BE SCORED AS A HEADLINE NUMBER ----------------------
+    #: True when the chart's design was informed by watching a module perform.
+    #:
+    #: SYNX01-06 were built by watching runs fail, and the search cards were then written from
+    #: the same failures — SYNX06's own designer note says it tests "precisely the shorter-stem
+    #: move the controller-reactive card advises". Scoring those cards on those charts is
+    #: scoring them on their own development set, and until 2026-08-03 nothing in the tree
+    #: recorded that. `docs/MODULE_LADDER_EXPERIMENT.md:138` named the flag and no code had it.
+    #:
+    #: DEFAULTS TO TRUE, and the direction is the point: the failure mode being guarded against
+    #: is a contaminated chart silently counted as clean, so a chart that does not claim to be
+    #: held out is treated as informed. Claiming it requires naming where the design came from.
+    informed_module_design: bool = True
+    #: Where the trap came from, in words a reader can check against the artefact named.
+    #: `contract_clause: <clause>` for a held-out chart — the clause must be one the contract
+    #: states and no other chart exercises. Required whenever `informed_module_design` is False.
+    designed_from: str = ""
 
     # ---- ADVERSARIAL LAYOUT ---------------------------------------------------------
     #: Which retrieval trap this chart is built around; "" is the ordinary layout above.
@@ -320,6 +391,11 @@ BLUEPRINTS = [
                "follow-up notes never starts."),
         expect={"dx_date": "20190312", "naive_answer": "20210608",
                 "requires": "two hops: retrospective remark -> the imaging it names"},
+        # INFORMED BY A RUN, and the flag defaults to True so this is the recorded
+        # state either way. `designed_from` is set because the provenance is known
+        # and specific, and a reader deciding whether to trust a number over this
+        # chart needs the sentence, not the boolean.
+        designed_from="observed_failure: naive passes took the workup date; the retrospective clause was the fix",
     ),
     Blueprint(
         pid="SYNX02", pattern="first-course treatment precedes any documented diagnosis",
@@ -339,6 +415,11 @@ BLUEPRINTS = [
                "and must instead have swept the document inventory by type."),
         expect={"dx_date": "20200510", "naive_answer": "20200620",
                 "requires": "sweeping a type that states no diagnosis"},
+        # INFORMED BY A RUN, and the flag defaults to True so this is the recorded
+        # state either way. `designed_from` is set because the provenance is known
+        # and specific, and a reader deciding whether to trust a number over this
+        # chart needs the sentence, not the boolean.
+        designed_from="observed_failure: runs abstained where treatment preceded any documented diagnosis",
     ),
     Blueprint(
         pid="SYNX03", pattern="ambiguous cytology with NO clinical impression — the biopsy dates it",
@@ -359,6 +440,11 @@ BLUEPRINTS = [
                "document, and only reading both charts distinguishes them."),
         expect={"dx_date": "20220309", "naive_answer": "20220214",
                 "requires": "noticing an ABSENT document, not finding a present one"},
+        # INFORMED BY A RUN, and the flag defaults to True so this is the recorded
+        # state either way. `designed_from` is set because the provenance is known
+        # and specific, and a reader deciding whether to trust a number over this
+        # chart needs the sentence, not the boolean.
+        designed_from="observed_failure: the cytology-vs-biopsy ordering was applied without checking the impression",
     ),
     Blueprint(
         pid="SYNX04", pattern="pathology deferred to an addendum filed under another type",
@@ -377,6 +463,11 @@ BLUEPRINTS = [
                "ADDENDUM' is the only cheap route, which is what thread-chasing is for."),
         expect={"dx_date": "20230824", "naive_answer": "20230803",
                 "requires": "following a pointer out of the document that raised it"},
+        # INFORMED BY A RUN, and the flag defaults to True so this is the recorded
+        # state either way. `designed_from` is set because the provenance is known
+        # and specific, and a reader deciding whether to trust a number over this
+        # chart needs the sentence, not the boolean.
+        designed_from="observed_failure: addenda filed under another type were never opened",
     ),
     Blueprint(
         pid="SYNX05", pattern="the first diagnosis is a clinical impression buried in a diabetes note",
@@ -397,6 +488,11 @@ BLUEPRINTS = [
                "type prior."),
         expect={"dx_date": "20181107", "naive_answer": "20190215",
                 "requires": "reading a type the prior calls unable to establish"},
+        # INFORMED BY A RUN, and the flag defaults to True so this is the recorded
+        # state either way. `designed_from` is set because the provenance is known
+        # and specific, and a reader deciding whether to trust a number over this
+        # chart needs the sentence, not the boolean.
+        designed_from="observed_failure: a type prior demoted the note that held the answer",
     ),
     Blueprint(
         pid="SYNX06", pattern="the diagnosis exists only in dictation shorthand",
@@ -421,6 +517,11 @@ BLUEPRINTS = [
                "followed rather than merely rendered."),
         expect={"dx_date": "20210917", "naive_answer": "EVIDENCE_INSUFFICIENT",
                 "requires": "widening to a stem after the contract's own words miss"},
+        # INFORMED BY A RUN, and the flag defaults to True so this is the recorded
+        # state either way. `designed_from` is set because the provenance is known
+        # and specific, and a reader deciding whether to trust a number over this
+        # chart needs the sentence, not the boolean.
+        designed_from="observed_failure: the contract's own vocabulary missed; informed the stem-widening advice in controller-reactive",
     ),
 
     # ==================================================================================
@@ -464,6 +565,11 @@ BLUEPRINTS = [
                                "exactly the subpopulation where records are incomplete"),
         },
         expect={"chart_answer": "EVIDENCE_INSUFFICIENT", "registry_value": "20210315"},
+        # INFORMED BY A RUN, and the flag defaults to True so this is the recorded
+        # state either way. `designed_from` is set because the provenance is known
+        # and specific, and a reader deciding whether to trust a number over this
+        # chart needs the sentence, not the boolean.
+        designed_from="observed_failure: evaluation called an unverifiable key an agent error",
     ),
     Blueprint(
         pid="SYNK02", pattern="the key is a transcription error — no document carries that date",
@@ -492,6 +598,11 @@ BLUEPRINTS = [
                                "abstractor's error rate"),
         },
         expect={"chart_answer": "20200614", "registry_value": "20200714"},
+        # INFORMED BY A RUN, and the flag defaults to True so this is the recorded
+        # state either way. `designed_from` is set because the provenance is known
+        # and specific, and a reader deciding whether to trust a number over this
+        # chart needs the sentence, not the boolean.
+        designed_from="observed_failure: evaluation could not report that the key itself was wrong",
     ),
     Blueprint(
         pid="SYNK03", pattern="two defensible readings — the chart itself does not settle it",
@@ -524,6 +635,208 @@ BLUEPRINTS = [
                                "reported as an agent error never reaches whoever owns the spec"),
         },
         expect={"chart_answer": "AMBIGUOUS", "registry_value": "20210510"},
+        # INFORMED BY A RUN, and the flag defaults to True so this is the recorded
+        # state either way. `designed_from` is set because the provenance is known
+        # and specific, and a reader deciding whether to trust a number over this
+        # chart needs the sentence, not the boolean.
+        designed_from="observed_failure: evaluation named a winner where the contract supports both readings",
+    ),
+
+    # ==================================================================================
+    # HELD OUT (SYNY01-Y06)
+    #
+    # WHY A SECOND ADVERSARIAL SET EXISTS. SYNX01-06 were designed by watching runs fail, and
+    # the search cards were then written from the same failures — SYNX06's own designer note
+    # says it tests "precisely the shorter-stem move the controller-reactive card advises".
+    # Scoring those cards on those charts is scoring them on their own development set. That
+    # was true from the day the cards were written and nothing in the tree recorded it;
+    # `docs/MODULE_LADDER_EXPERIMENT.md:138` named the flag and no code had it.
+    #
+    # THE RULE THAT MAKES THESE HELD OUT, and it is checkable rather than promised: every trap
+    # is derived from a CLAUSE THE CONTRACT STATES AND NO OTHER CHART EXERCISES, named in
+    # `designed_from`. Not one came from a run result, a card's failure mode, or an arm's
+    # score. A reader who doubts it can open the contract and the other twenty-one charts.
+    #
+    # The six unexercised clauses, and what each one costs a run that has not read it:
+    #
+    #   Y01  decision_rule[4]            death-certificate-only: the date of death IS the date
+    #   Y02  decision_rule[5]            an unidentifiable year must be APPROXIMATED
+    #   Y03  conflict_rules[4]           earliest wins AND every conflicting source is cited
+    #   Y04  date_imputation             a season is the only thing the record offers
+    #   Y05  abstention.CORPUS_INSUFFICIENT   the right answer is that the record starts too late
+    #   Y06  evidence_rules.does_not_count[2]  suspicious imaging is not a diagnosis
+    #
+    # Y06 is in the set for a second reason. Y01, and SYNX01/02/05 before it, all reward
+    # reaching for the EARLIEST date; a card written from those learns "earlier wins". Y06 runs
+    # that backwards: the earliest candidate is inadmissible and the later one is the answer.
+    # ==================================================================================
+    Blueprint(
+        pid="SYNY01", pattern="death certificate only — nothing ante-mortem names a cancer",
+        trap="death_certificate_only",
+        site_text="head of pancreas", site_code="C250",
+        histology_text="adenocarcinoma", histology_code="8140", behavior="3",
+        dx_date="20220419", index_date="20220419",
+        dx_date_why=("Nothing before the death names a malignancy: the three preceding visits "
+                     "record decline, weight loss and jaundice and no more. The Death-Summary "
+                     "of 2022-04-19 states metastatic adenocarcinoma of the pancreas as the "
+                     "cause of death, which is a physician's diagnostic statement, and "
+                     "decision_rule[4] puts the date of a death-certificate-only case at the "
+                     "date of death."),
+        tissue=False, recurrence_type="99", recurrence_date="",
+        imaging=[], followup="terminal",
+        # No Endoscopy in the background: it would claim biopsies in a chart whose premise is
+        # that no tissue was ever obtained. See `background_types`.
+        background_types=("EKG", "Procedure-Note", "Fluoroscopy-Up-to-1-Hr"),
+        notes=("No tissue was ever obtained and no oncology referral was completed, so there "
+               "is nothing earlier to find. A run that reads the decline notes and stops "
+               "returns EVIDENCE_INSUFFICIENT and is wrong by one document — one whose type "
+               "appears nowhere else in the corpus, so no type prior can point at it."),
+        expect={"dx_date": "20220419", "naive_answer": "EVIDENCE_INSUFFICIENT",
+                "requires": "opening a document type that occurs once in the whole corpus"},
+        informed_module_design=False,
+        designed_from="contract_clause: decision_rule[4] (autopsy / death certificate only)",
+    ),
+    Blueprint(
+        pid="SYNY02", pattern="the year cannot be read anywhere and must be approximated",
+        trap="year_only_approximate",
+        site_text="sigmoid colon", site_code="C187",
+        histology_text="adenocarcinoma", histology_code="8140", behavior="3",
+        dx_date="20159999", index_date="20190604",
+        dx_date_why=("No document states a diagnosis date. The establishing-care note of "
+                     "2019-06-04 says the cancer was treated 'roughly four years ago' at an "
+                     "outside hospital, and the pharmacy feed carries an adjuvant capecitabine "
+                     "course beginning 2015-08-17 — which cannot establish a diagnosis but does "
+                     "bound the year. decision_rule[5]: the year is APPROXIMATED to 2015 and "
+                     "month and day are then unknown, so 20159999 with year_imputed true."),
+        tissue=False, recurrence_type="00", recurrence_date="",
+        imaging=[],
+        dx_status="FOUND",
+        dx_flags={"year_imputed": True, "month_imputed": False, "day_imputed": False},
+        # No Endoscopy in the background: this chart's ground truth says there is no
+        # pathology in the record, and that branch claims biopsies. See `background_types`.
+        background_types=("EKG", "Procedure-Note", "Fluoroscopy-Up-to-1-Hr"),
+        notes=("THE CHART THE `20999999` DEFECT NEEDED. Two E4 runs put 99 in the YEAR slot "
+               "because decision_rule[5] orders an approximation and no field could record "
+               "that one had been made; the value space now can, and nothing tested it. Note "
+               "which flags are true: the year was approximated, the month and day are simply "
+               "not recorded — a distinction one boolean could not make, and the reason there "
+               "are three. The hard anchor is in a claims feed, which is a source class a run "
+               "reading only clinical note types never opens."),
+        expect={"dx_date": "20159999", "naive_answer": "EVIDENCE_INSUFFICIENT",
+                "requires": "approximating a year from a non-clinical source class"},
+        informed_module_design=False,
+        designed_from="contract_clause: decision_rule[5] (the year must be approximated)",
+    ),
+    Blueprint(
+        pid="SYNY03", pattern="three admissible sources give three different dates",
+        trap="three_sources_disagree",
+        site_text="left breast", site_code="C504",
+        histology_text="invasive ductal carcinoma", histology_code="8500", behavior="3",
+        dx_date="20200302", index_date="20200401",
+        dx_date_why=("Three sources, three dates. Cytology 2020-03-02 reads 'suspicious for "
+                     "invasive ductal carcinoma' AND an oncology note of the same day records "
+                     "a clinical impression of malignancy, so conflict_rules[1] makes the "
+                     "cytology date diagnostic. Pathology 2020-04-01 confirms. A later "
+                     "oncology note asserts the diagnosis was made 2020-04-10. Earliest that "
+                     "satisfies the rules wins."),
+        tissue=True, recurrence_type="00", recurrence_date="",
+        imaging=["Mammography-Diagnostic-Bilat"],
+        notes=("The arithmetic is not the test — SYN0001 already has a two-source version and "
+               "runs get it right. conflict_rules[4] additionally demands that EVERY "
+               "conflicting source be cited and the conflict resolved, which is the half of "
+               "the proof obligation nothing has ever exercised. A run that answers 20200302 "
+               "citing only the cytology has the right value and has not met the obligation, "
+               "and those are two different results."),
+        expect={"dx_date": "20200302", "naive_answer": "20200401",
+                "requires": "citing all three conflicting sources, not only the winner"},
+        informed_module_design=False,
+        designed_from="contract_clause: conflict_rules[4] (cite every conflicting source)",
+    ),
+    Blueprint(
+        pid="SYNY04", pattern="a season and a year are all the record offers",
+        trap="seasonal_phrase",
+        site_text="ascending colon", site_code="C182",
+        histology_text="adenocarcinoma", histology_code="8140", behavior="3",
+        dx_date="20191099", index_date="20200127",
+        dx_date_why=("The transfer-of-care note of 2020-01-27 says the cancer was diagnosed "
+                     "'in the fall of 2019' at another institution, the outside pathology "
+                     "never arrived, and nothing else in the chart names a date. "
+                     "date_imputation maps fall to month 10 and the day is unknown, giving "
+                     "20191099 with month_imputed and day_imputed true and year_imputed "
+                     "FALSE — the year was stated outright."),
+        tissue=False, recurrence_type="00", recurrence_date="",
+        imaging=[],
+        dx_status="FOUND",
+        dx_flags={"year_imputed": False, "month_imputed": True, "day_imputed": True},
+        # No Endoscopy in the background: this chart's ground truth says there is no
+        # pathology in the record, and that branch claims biopsies. See `background_types`.
+        background_types=("EKG", "Procedure-Note", "Fluoroscopy-Up-to-1-Hr"),
+        notes=("The contract's third boundary case is this exact shape ('diagnosed in the "
+               "spring of 2010' -> 20100499) and no chart has ever produced one, so the "
+               "season table has been rendered into every prompt for weeks and applied to "
+               "nothing. The flags are the second half: a run that answers 20191099 and "
+               "leaves all three false has given a date it invented two components of and "
+               "said it read them."),
+        expect={"dx_date": "20191099", "naive_answer": "20200127",
+                "requires": "applying the season table and flagging which components it made up"},
+        informed_module_design=False,
+        designed_from="contract_clause: date_imputation (seasonal phrase -> month, flagged)",
+    ),
+    Blueprint(
+        pid="SYNY05", pattern="the record begins after the diagnosis and never says when",
+        trap="record_starts_after",
+        site_text="rectum", site_code="C209",
+        histology_text="adenocarcinoma", histology_code="8140", behavior="3",
+        dx_date="", index_date="20210308",
+        dx_date_why=("CORPUS_INSUFFICIENT. Every note is surveillance and every one refers to "
+                     "the diagnosis only as history; the chart states no date, no season, no "
+                     "interval and no treatment start, and the outside records are named as "
+                     "absent. This is not 'the chart was searched and does not establish one' "
+                     "— it is that the documents which would carry it are not in this corpus."),
+        tissue=False, recurrence_type="99", recurrence_date="",
+        imaging=[],
+        dx_status="CORPUS_INSUFFICIENT",
+        background_years=0,
+        notes=("THE FIRST CHART WHOSE CORRECT ANSWER IS AN ABSTENTION. CORPUS_INSUFFICIENT was "
+               "declared in the contract and offered by the tool with no chart that could ever "
+               "score it right, so the status could only ever be measured as a mistake. It is "
+               "also the control for the opposite error: a smoke run on 2026-08-02 returned "
+               "CORPUS_INSUFFICIENT on SYNX06, where the answer was present in dictation "
+               "shorthand — a retrieval failure presenting as a fact about the corpus. Neither "
+               "direction is measurable without a chart on each side. THAT OBSERVATION IS WHY "
+               "THE GAP WAS NOTICED; the trap itself is derived from the contract's own "
+               "abstention block, and no card's behaviour shaped it."),
+        expect={"dx_date": "CORPUS_INSUFFICIENT", "naive_answer": "EVIDENCE_INSUFFICIENT",
+                "requires": "telling an absent record apart from a silent one"},
+        informed_module_design=False,
+        designed_from="contract_clause: abstention.CORPUS_INSUFFICIENT",
+    ),
+    Blueprint(
+        pid="SYNY06", pattern="suspicious imaging weeks before the biopsy — the later date wins",
+        trap="imaging_only_early",
+        site_text="body of pancreas", site_code="C251",
+        histology_text="adenocarcinoma", histology_code="8140", behavior="3",
+        dx_date="20221115", index_date="20221115",
+        dx_date_why=("The CT of 2022-10-08 reads 'HIGHLY SUSPICIOUS FOR MALIGNANCY' and "
+                     "recommends tissue sampling. evidence_rules.does_not_count[2] excludes a "
+                     "radiology report that merely describes a suspicious mass absent a "
+                     "physician's diagnostic statement, and no such statement exists before "
+                     "the biopsy. The pathology of 2022-11-15 is the first admissible witness."),
+        tissue=True, recurrence_type="00", recurrence_date="",
+        imaging=[],
+        # Same reason as SYNY01: the earliest admissible witness must be the 2022-11-15
+        # pathology, and sixteen background notes claiming biopsies of the same organ put
+        # earlier tissue claims in front of it.
+        background_types=("EKG", "Procedure-Note", "Fluoroscopy-Up-to-1-Hr"),
+        notes=("THE INVERSE TRAP, and the only one in the corpus. SYNX01, SYNX02, SYNX05 and "
+               "SYNY01 all reward reaching for the earliest date, so a card written from them "
+               "learns 'earlier wins' and cannot be told apart from a card that learned the "
+               "rule. Here the earliest candidate is inadmissible. A policy that only "
+               "generalises in one direction fails exactly here and nowhere else."),
+        expect={"dx_date": "20221115", "naive_answer": "20221008",
+                "requires": "refusing an early candidate the evidence rules exclude"},
+        informed_module_design=False,
+        designed_from="contract_clause: evidence_rules.does_not_count[2] (imaging is not a diagnosis)",
     ),
 ]
 
@@ -829,6 +1142,192 @@ def positive_cytology_note(bp, name, sex, dob, d) -> str:
     return _hdr(bp, name, sex, dob, "Surgical-Pathology-Document", d) + "\n".join(body) + "\n"
 
 
+# ======================================================================================
+# HELD-OUT NOTE BUILDERS (SYNY01-Y06)
+#
+# The rule that makes these held out, and it is checkable by a reader rather than promised:
+# EVERY TRAP BELOW IS DERIVED FROM A CLAUSE THE CONTRACT STATES AND NO OTHER CHART EXERCISES.
+# The clause is named in the blueprint's `designed_from`. None of them was derived from a run
+# result, a card's failure mode, or an arm's score — which is the whole difference between
+# this set and SYNX01-06, and the only reason a number computed over these six means anything
+# about a card that was written before they existed.
+#
+# House style is the same as the adversarial builders above, for the same reason: a trap that
+# announces itself typographically is a label, and a model can learn a label without learning
+# to look.
+# ======================================================================================
+
+
+def death_summary_note(bp, name, sex, dob, d) -> str:
+    """decision_rule[4]: death-certificate-only, so the date of death IS the date of diagnosis.
+
+    Nothing ante-mortem names a cancer anywhere in this chart. The physician completing the
+    summary is stating the diagnosis for the first time, which `counts_as_evidence[2]` admits,
+    and `decision_rule[4]` then fixes the date at the death rather than at the discovery.
+    """
+    body = [
+        "CIRCUMSTANCES:",
+        f"  Patient expired {d.isoformat()} at home under hospice care. Pronounced by "
+        "attending.",
+        "",
+        "SUMMARY:",
+        "  Progressive decline over the preceding eight weeks with anorexia, weight loss and",
+        "  jaundice. No tissue was obtained and no oncology referral was completed.",
+        "",
+        "CAUSE OF DEATH:",
+        "  I. a. Hepatic failure",
+        f"     b. Metastatic {bp.histology_text or 'carcinoma'} of the {bp.site_text}",
+        "  No autopsy requested.",
+        "",
+        "COMPLETED BY:",
+        "  Attending physician of record.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, "Death-Summary", d) + "\n".join(body) + "\n"
+
+
+def year_only_note(bp, name, sex, dob, dtype, d, years_ago: int) -> str:
+    """decision_rule[5]: the year cannot be identified, so it is APPROXIMATED.
+
+    Deliberately says "roughly" and gives no month. On its own this is one soft anchor; the
+    chart carries a second, hard one (adjuvant therapy in the pharmacy feed) so the year is
+    determined and the case is scorable rather than a matter of taste. Finding the second is
+    the retrieval work.
+    """
+    body = [
+        "REASON FOR VISIT:",
+        "  Establishing care. Transferred from out of state.",
+        "",
+        "HISTORY:",
+        f"  {bp.histology_text.capitalize() if bp.histology_text else 'Carcinoma'} of the "
+        f"{bp.site_text}, treated roughly {years_ago} years ago at an outside hospital.",
+        "  The patient cannot recall the month and no outside records have been received.",
+        "  Treatment was completed and there has been no further therapy since.",
+        "",
+        "ASSESSMENT:",
+        "  Long-term survivor. Continue surveillance.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, dtype, d) + "\n".join(body) + "\n"
+
+
+def adjuvant_pharmacy_note(bp, name, sex, dob, d, agent: str) -> str:
+    """The hard anchor for the approximated year: adjuvant therapy has a start date.
+
+    A pharmacy claim is not a diagnostic statement and cannot establish the diagnosis. What it
+    can do is bound the year, which is exactly what an approximation needs and exactly the sort
+    of source a run looking only at clinical note types never opens.
+    """
+    body = ["FILLED PRESCRIPTIONS (external claims feed):", ""]
+    for k in range(3):
+        dd = d + timedelta(days=21 * k)
+        body.append(f"  {dd.isoformat()}   {agent:32s} qty 84   ADJUVANT CYCLE {k + 1}")
+    body.append("")
+    return _hdr(bp, name, sex, dob, RX_TYPE, d) + "\n".join(body) + "\n"
+
+
+def three_way_note(bp, name, sex, dob, dtype, d, stated: date) -> str:
+    """conflict_rules[4]: sources disagree, so take the earliest that satisfies the rules AND
+    cite every one of them.
+
+    This note asserts a THIRD date in prose. It is a physician's diagnostic statement, so it is
+    admissible; it is also later than the cytology and disagrees with the pathology. A run that
+    picks correctly and cites one source has still not met the proof obligation.
+    """
+    body = [
+        "INTERVAL HISTORY:",
+        f"  Referred following the {bp.site_text} work-up.",
+        "",
+        "ASSESSMENT:",
+        f"  {bp.histology_text.capitalize() if bp.histology_text else 'Carcinoma'} of the "
+        f"{bp.site_text}.",
+        f"  Per the referring service the diagnosis was made on {stated.isoformat()}.",
+        "",
+        "PLAN:",
+        "  Staging complete. Proceed to multidisciplinary review.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, dtype, d) + "\n".join(body) + "\n"
+
+
+def seasonal_note(bp, name, sex, dob, dtype, d, season: str, year: int) -> str:
+    """date_imputation: a seasonal phrase is the only thing the record offers.
+
+    The contract's third boundary case is exactly this shape and no chart has ever produced
+    one. The answer needs the season table AND both imputation flags; the year is stated
+    outright, so `year_imputed` must stay false — which is the distinction one boolean could
+    not make.
+    """
+    body = [
+        "REASON FOR REFERRAL:",
+        "  Transfer of care. Requesting surveillance.",
+        "",
+        "HISTORY OF PRESENT ILLNESS:",
+        f"  The patient reports that {bp.histology_text or 'carcinoma'} of the "
+        f"{bp.site_text} was diagnosed in the {season} of {year}",
+        "  at another institution. Resection followed; no adjuvant therapy was given.",
+        "  Outside pathology has been requested and is not yet available.",
+        "",
+        "ASSESSMENT:",
+        "  Establish surveillance. Obtain outside records.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, dtype, d) + "\n".join(body) + "\n"
+
+
+def history_only_note(bp, name, sex, dob, dtype, d, rng) -> str:
+    """The record begins after the diagnosis and never says when it was.
+
+    No date, no season, no interval, no treatment start. The correct answer is
+    CORPUS_INSUFFICIENT — the documents that would carry the date are not in this corpus — and
+    it is a DIFFERENT report from EVIDENCE_INSUFFICIENT, which says the chart was searched and
+    the documents it does hold do not establish one. Until this chart existed the contract
+    declared the status, the tool offered it, and nothing could ever score it as right.
+    """
+    body = [
+        "INTERVAL HISTORY:",
+        f"  Surveillance visit. History of {bp.histology_text or 'carcinoma'} of the "
+        f"{bp.site_text},",
+        "  managed in full at another health system before transfer. No outside records are",
+        "  present in this chart.",
+        "",
+        "EXAM:",
+        "  Well appearing. Weight stable. No palpable adenopathy.",
+        "",
+        "ASSESSMENT:",
+        f"  No evidence of disease at {rng.choice(['this', 'today\'s'])} visit.",
+        "",
+        "PLAN:",
+        "  Continue interval surveillance.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, dtype, d) + "\n".join(body) + "\n"
+
+
+def suspicious_imaging_note(bp, name, sex, dob, dtype, d) -> str:
+    """does_not_count[2]: radiology describing a suspicious mass, with no physician statement.
+
+    THE INVERSE TRAP, and it is the reason this chart is in the set. SYNX01, SYNX02 and SYNX05
+    all reward reaching for the EARLIEST date, so a card written from them learns "earlier
+    wins". Here the earliest candidate is inadmissible and the later one is the answer. A rule
+    that generalises has to survive being run backwards.
+    """
+    body = [
+        "CLINICAL HISTORY:",
+        "  Abdominal pain, weight loss.",
+        "",
+        "FINDINGS:",
+        f"  A {3 + (d.day % 4)}.1 cm mass is identified in the {bp.site_text}, with irregular",
+        "  margins and heterogeneous enhancement. Regional nodes measure up to 11 mm.",
+        "",
+        "IMPRESSION:",
+        f"  Mass in the {bp.site_text}, HIGHLY SUSPICIOUS FOR MALIGNANCY.",
+        "  Tissue sampling is recommended for definitive diagnosis.",
+        "",
+    ]
+    return _hdr(bp, name, sex, dob, dtype, d) + "\n".join(body) + "\n"
+
+
 def progress_note(bp, name, sex, dob, dtype, d, rng, *, kind: str) -> str:
     """kind: initial | interval | disease_free | recurrence | gap_outside | gap_declined | conflict"""
     lines = ["SUBJECTIVE:"]
@@ -1033,6 +1532,84 @@ def _emit_trap(bp: Blueprint, emit, name, sex, dob, dx: date, rng) -> None:
         emit(onc, dx + timedelta(days=2),
              progress_note(bp, name, sex, dob, onc, dx + timedelta(days=2), rng, kind="initial"))
 
+    # ---- held-out traps (SYNY01-Y06) ------------------------------------------------
+    elif bp.trap == "death_certificate_only":
+        # `tissue=False`, and NOTHING ante-mortem names a cancer. The decline is written as
+        # decline: weight loss, jaundice, hospice. The first and only diagnostic statement in
+        # the chart is on the death summary, and decision_rule[4] puts the date there.
+        for k, off in enumerate((-84, -49, -21)):
+            hd = dx + timedelta(days=off)
+            emit("GI-Gen-MD-OP-Progress-Note", hd,
+                 progress_note(bp, name, sex, dob, "GI-Gen-MD-OP-Progress-Note", hd, rng,
+                               kind="interval"))
+        emit("Death-Summary", dx, death_summary_note(bp, name, sex, dob, dx))
+
+    elif bp.trap == "year_only_approximate":
+        # TWO anchors and neither is a date. The soft one is prose ("roughly four years ago")
+        # in a note whose own date does the arithmetic; the hard one is an adjuvant course in
+        # the pharmacy feed, which cannot establish a diagnosis but can bound a year. The
+        # answer is an APPROXIMATED year with month and day unknown -- 20159999 shaped, which
+        # is the notation two E4 runs reached for and wrote as 20999999 instead.
+        anchor = date(dx.year - 4, 8, 17)
+        emit(RX_TYPE, anchor, adjuvant_pharmacy_note(bp, name, sex, dob, anchor,
+                                                     "CAPECITABINE 500MG TAB"))
+        gi = "GI-Gen-MD-OP-Progress-Note"
+        emit(gi, dx, year_only_note(bp, name, sex, dob, gi, dx, 4))
+        emit(gi, dx + timedelta(days=190),
+             progress_note(bp, name, sex, dob, gi, dx + timedelta(days=190), rng,
+                           kind="disease_free"))
+
+    elif bp.trap == "three_sources_disagree":
+        # Three admissible sources, three dates, and the earliest is the answer. The point is
+        # not the arithmetic -- it is that `conflict_rules[4]` demands EVERY conflicting source
+        # be cited, and a run that picks right and cites one has not met the obligation.
+        cyto = _d(bp.dx_date)
+        emit("Surgical-Pathology-Document", cyto, cytology_note(bp, name, sex, dob, cyto))
+        emit("Onc-Med-MD-OP-Progress-Note", cyto,
+             progress_note(bp, name, sex, dob, "Onc-Med-MD-OP-Progress-Note", cyto, rng,
+                           kind="initial"))
+        emit("Surgical-Pathology-Report", dx,
+             pathology_note(bp, name, sex, dob, "Surgical-Pathology-Report", dx))
+        stated = dx + timedelta(days=9)
+        emit("Onc-Med-MD-OP-Progress-Note", stated + timedelta(days=5),
+             three_way_note(bp, name, sex, dob, "Onc-Med-MD-OP-Progress-Note",
+                            stated + timedelta(days=5), stated))
+
+    elif bp.trap == "seasonal_phrase":
+        # `tissue=False`: the resection was elsewhere and the outside pathology never arrived.
+        # A season and a year is everything the record offers, which is the contract's own
+        # third boundary case and has never been generated.
+        gi = "GI-Gen-MD-OP-Progress-Note"
+        # `_d` cannot parse this chart's own answer, and that is the answer being correct:
+        # `20191099` is a partial date, month known and day unknown. Take the year off the
+        # string rather than round-tripping through a `date` the notation cannot become.
+        emit(gi, dx, seasonal_note(bp, name, sex, dob, gi, dx, "fall", int(bp.dx_date[:4])))
+        emit(gi, dx + timedelta(days=180),
+             progress_note(bp, name, sex, dob, gi, dx + timedelta(days=180), rng,
+                           kind="disease_free"))
+
+    elif bp.trap == "record_starts_after":
+        # `tissue=False`, no imaging, no interval, no season, no treatment start. Every note is
+        # surveillance and every one of them refers to the diagnosis only as history. The
+        # correct answer is CORPUS_INSUFFICIENT and there is nothing to find that would change
+        # it -- which is what makes it a test of the ABSTENTION rather than of retrieval.
+        onc = "Onc-Med-MD-OP-Progress-Note"
+        for k in range(9):
+            hd = dx + timedelta(days=119 * k)
+            emit(onc, hd, history_only_note(bp, name, sex, dob, onc, hd, rng))
+
+    elif bp.trap == "imaging_only_early":
+        # THE INVERSE TRAP. Suspicious imaging with no physician statement is inadmissible by
+        # `does_not_count[2]`, so the answer is the LATER biopsy. Every other adversarial chart
+        # rewards reaching earlier; a rule that only generalises in one direction fails here.
+        early = _d(bp.index_date) - timedelta(days=38)
+        emit("Abd-Pelvis-CT-W-Contr", early,
+             suspicious_imaging_note(bp, name, sex, dob, "Abd-Pelvis-CT-W-Contr", early))
+        emit("Surgical-Pathology-Report", dx,
+             pathology_note(bp, name, sex, dob, "Surgical-Pathology-Report", dx))
+        emit(onc, dx + timedelta(days=3),
+             progress_note(bp, name, sex, dob, onc, dx + timedelta(days=3), rng, kind="initial"))
+
     else:
         raise ValueError(
             f"{bp.pid}: unknown trap {bp.trap!r}. Add a branch here, or the chart generates "
@@ -1087,7 +1664,7 @@ def build_patient(bp: Blueprint, out_root: Path) -> dict:
     # establish anything about the tumour. These populate the cannot_establish stratum.
     # Type mix follows the distribution actually observed in the reference corpus
     # (RxHub and routine progress notes dominate; imaging and pathology are rare).
-    start = dx - timedelta(days=365 * BACKGROUND_YEARS)
+    start = dx - timedelta(days=365 * bp.background_years)
     day = start
     while day < dx - timedelta(days=10):
         if rng.random() < 0.80:
@@ -1097,7 +1674,7 @@ def build_patient(bp: Blueprint, out_root: Path) -> dict:
             d2 = day + timedelta(days=rng.randint(0, 20))
             emit(t, d2, progress_note(bp, name, sex, dob, t, d2, rng, kind="interval"))
         if rng.random() < 0.35:
-            t = rng.choice(OTHER_TYPES)
+            t = rng.choice(list(bp.background_types) or OTHER_TYPES)
             d2 = day + timedelta(days=rng.randint(0, 25))
             emit(t, d2, ancillary_note(bp, name, sex, dob, t, d2, rng))
         if rng.random() < 0.20:      # incidental imaging, NOT about the tumour
@@ -1135,7 +1712,9 @@ def build_patient(bp: Blueprint, out_root: Path) -> dict:
         emit(onc, cd, progress_note(bp, name, sex, dob, onc, cd, rng, kind="conflict"))
 
     # --- follow-up arc, encoding the recurrence ground truth ---
-    if bp.followup in ("interior", "truncated"):
+    if bp.followup == "terminal":
+        pass                                    # the index date is the last day of the record
+    elif bp.followup in ("interior", "truncated"):
         # Observable-period controls. Surveillance is emitted on a schedule and then either
         # holed out in the middle (interior) or stopped dead (truncated).
         onc = "Onc-Med-MD-OP-Progress-Note"
@@ -1190,7 +1769,7 @@ def build_patient(bp: Blueprint, out_root: Path) -> dict:
     # gap in EVERY document type, not just the oncology notes
     last_day = max(d for _, d in written)
     pd_ = dx + timedelta(days=25)
-    while pd_ <= last_day:
+    while bp.followup != "terminal" and pd_ <= last_day:
         yrs = (pd_ - dx).days / 365.25
         in_hole = bp.followup == "interior" and bp.gap_years[0] <= yrs < bp.gap_years[1]
         past_end = bp.followup == "truncated" and yrs > bp.truncate_after_years
@@ -1199,15 +1778,38 @@ def build_patient(bp: Blueprint, out_root: Path) -> dict:
         pd_ += timedelta(days=rng.randint(26, 40))
 
     obs_end = max(d for _, d in written)
+    # A chart may not CLAIM to be held out without naming where its trap came from. The claim
+    # is the thing a headline number rests on, and an unbacked claim is worse than the default.
+    if not bp.informed_module_design and not bp.designed_from.strip():
+        raise ValueError(
+            f"{bp.pid}: informed_module_design=False with no `designed_from`. A chart that is "
+            f"held out has to say what clause of the contract its trap came from, because that "
+            f"is the sentence a reader checks against the contract. Without it the claim is "
+            f"unfalsifiable and the chart is treated as informed.")
     gt = {
         "patient_id": bp.pid,
         "evidence_pattern": bp.pattern,
         "designer_notes": bp.notes,
+        # WHETHER THIS CHART MAY BE SCORED AS A HEADLINE NUMBER. See the Blueprint field: the
+        # SYNX charts were designed by watching runs fail and the cards were written from the
+        # same failures, so a card's score on them is a score on its own development set.
+        # `tools/analyze_arms.py` refuses to fold the two populations together.
+        "informed_module_design": bp.informed_module_design,
+        "designed_from": bp.designed_from,
         "n_documents": len(written),
         "date_range": [min(d for _, d in written).isoformat(), max(d for _, d in written).isoformat()],
         "ground_truth": {
             "STORE.390.date_of_initial_diagnosis": {
-                "value": bp.dx_date, "status": "FOUND", "why": bp.dx_date_why},
+                # `value` is null for an abstention rather than "" — an empty string is a value
+                # the field's format would reject, and a reader cannot tell it from a value
+                # nobody filled in.
+                "value": bp.dx_date or None,
+                "status": bp.dx_status,
+                # The three imputation flags, present only when the answer carries one. A chart
+                # whose date is fully read from the record declares nothing, which is the same
+                # as declaring all three false and is shorter to read.
+                **({"flags": bp.dx_flags} if bp.dx_flags else {}),
+                "why": bp.dx_date_why},
             "STORE.400_522_523.site_histology_behavior": {
                 "primary_site": bp.site_code,
                 "histology": bp.histology_code or None,

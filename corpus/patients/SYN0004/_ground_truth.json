@@ -2,6 +2,8 @@
   "patient_id": "SYN0004",
   "evidence_pattern": "documented recurrence after a disease-free interval",
   "designer_notes": "Requires the agent to establish BOTH (a) a disease-free interval and (b) the later pulmonary recurrence. Distant recurrence in lung only -> 52.",
+  "informed_module_design": true,
+  "designed_from": "",
   "n_documents": 322,
   "date_range": [
     "2009-03-07",

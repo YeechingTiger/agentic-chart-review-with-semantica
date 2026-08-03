@@ -2,6 +2,8 @@
   "patient_id": "SYNK01",
   "evidence_pattern": "the key rests on an outside report that is not in this chart",
   "designer_notes": "The key is CORRECT and unreachable. The only in-chart reference is a transfer note saying the biopsy was done elsewhere in March. An agent that answers EVIDENCE_INSUFFICIENT has read the chart correctly and will be scored as having missed \u2014 and an evaluation that calls that an agent error is teaching it to produce dates it cannot support.",
+  "informed_module_design": true,
+  "designed_from": "observed_failure: evaluation called an unverifiable key an agent error",
   "n_documents": 312,
   "date_range": [
     "2011-08-05",

@@ -2,6 +2,8 @@
   "patient_id": "SYN0003",
   "evidence_pattern": "never disease-free \u2014 metastatic at presentation",
   "designer_notes": "Distant metastasis at diagnosis -> STORE [1880] code 70 (never disease-free). An agent that codes 00 here is wrong: there was never a disease-free interval.",
+  "informed_module_design": true,
+  "designed_from": "",
   "n_documents": 298,
   "date_range": [
     "2011-01-21",

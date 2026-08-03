@@ -1,0 +1,54 @@
+{
+  "patient_id": "SYNY01",
+  "evidence_pattern": "death certificate only \u2014 nothing ante-mortem names a cancer",
+  "designer_notes": "No tissue was ever obtained and no oncology referral was completed, so there is nothing earlier to find. A run that reads the decline notes and stops returns EVIDENCE_INSUFFICIENT and is wrong by one document \u2014 one whose type appears nowhere else in the corpus, so no type prior can point at it.",
+  "informed_module_design": false,
+  "designed_from": "contract_clause: decision_rule[4] (autopsy / death certificate only)",
+  "n_documents": 291,
+  "date_range": [
+    "2012-04-21",
+    "2022-04-19"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20220419",
+      "status": "FOUND",
+      "why": "Nothing before the death names a malignancy: the three preceding visits record decline, weight loss and jaundice and no more. The Death-Summary of 2022-04-19 states metastatic adenocarcinoma of the pancreas as the cause of death, which is a physician's diagnostic statement, and decision_rule[4] puts the date of a death-certificate-only case at the date of death."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C250",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "EVIDENCE_INSUFFICIENT",
+      "why": "No pathology in the record; histology must NOT be inferred from imaging."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "99",
+      "date": null,
+      "status": "EVIDENCE_INSUFFICIENT",
+      "observable_period": {
+        "start": "2012-04-21",
+        "end": "2022-04-19"
+      },
+      "expected_through_date": "2022-04-19",
+      "followup_shape": "terminal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "dx_date": "20220419",
+    "naive_answer": "EVIDENCE_INSUFFICIENT",
+    "requires": "opening a document type that occurs once in the whole corpus"
+  }
+}

@@ -2,6 +2,8 @@
   "patient_id": "SYNX05",
   "evidence_pattern": "the first diagnosis is a clinical impression buried in a diabetes note",
   "designer_notes": "The pathology of 2019-02-15 is three months later and is the obvious answer. The real one is one clause inside a routine diabetes visit \u2014 a specialty nobody searches for an oncology diagnosis, in a note type whose prior says it can establish nothing. Rewards sweeping the inventory by type over trusting a type prior.",
+  "informed_module_design": true,
+  "designed_from": "observed_failure: a type prior demoted the note that held the answer",
   "n_documents": 287,
   "date_range": [
     "2009-02-17",

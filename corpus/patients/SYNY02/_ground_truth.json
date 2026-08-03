@@ -1,0 +1,59 @@
+{
+  "patient_id": "SYNY02",
+  "evidence_pattern": "the year cannot be read anywhere and must be approximated",
+  "designer_notes": "THE CHART THE `20999999` DEFECT NEEDED. Two E4 runs put 99 in the YEAR slot because decision_rule[5] orders an approximation and no field could record that one had been made; the value space now can, and nothing tested it. Note which flags are true: the year was approximated, the month and day are simply not recorded \u2014 a distinction one boolean could not make, and the reason there are three. The hard anchor is in a claims feed, which is a source class a run reading only clinical note types never opens.",
+  "informed_module_design": false,
+  "designed_from": "contract_clause: decision_rule[5] (the year must be approximated)",
+  "n_documents": 316,
+  "date_range": [
+    "2009-06-06",
+    "2020-11-25"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20159999",
+      "status": "FOUND",
+      "flags": {
+        "year_imputed": true,
+        "month_imputed": false,
+        "day_imputed": false
+      },
+      "why": "No document states a diagnosis date. The establishing-care note of 2019-06-04 says the cancer was treated 'roughly four years ago' at an outside hospital, and the pharmacy feed carries an adjuvant capecitabine course beginning 2015-08-17 \u2014 which cannot establish a diagnosis but does bound the year. decision_rule[5]: the year is APPROXIMATED to 2015 and month and day are then unknown, so 20159999 with year_imputed true."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C187",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "EVIDENCE_INSUFFICIENT",
+      "why": "No pathology in the record; histology must NOT be inferred from imaging."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2009-06-06",
+        "end": "2020-11-25"
+      },
+      "expected_through_date": "2020-11-25",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "dx_date": "20159999",
+    "naive_answer": "EVIDENCE_INSUFFICIENT",
+    "requires": "approximating a year from a non-clinical source class"
+  }
+}

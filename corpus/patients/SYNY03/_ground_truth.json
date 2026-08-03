@@ -1,0 +1,54 @@
+{
+  "patient_id": "SYNY03",
+  "evidence_pattern": "three admissible sources give three different dates",
+  "designer_notes": "The arithmetic is not the test \u2014 SYN0001 already has a two-source version and runs get it right. conflict_rules[4] additionally demands that EVERY conflicting source be cited and the conflict resolved, which is the half of the proof obligation nothing has ever exercised. A run that answers 20200302 citing only the cytology has the right value and has not met the obligation, and those are two different results.",
+  "informed_module_design": false,
+  "designed_from": "contract_clause: conflict_rules[4] (cite every conflicting source)",
+  "n_documents": 305,
+  "date_range": [
+    "2010-04-04",
+    "2021-09-23"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": "20200302",
+      "status": "FOUND",
+      "why": "Three sources, three dates. Cytology 2020-03-02 reads 'suspicious for invasive ductal carcinoma' AND an oncology note of the same day records a clinical impression of malignancy, so conflict_rules[1] makes the cytology date diagnostic. Pathology 2020-04-01 confirms. A later oncology note asserts the diagnosis was made 2020-04-10. Earliest that satisfies the rules wins."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C504",
+      "histology": "8500",
+      "behavior": "3",
+      "status": "FOUND",
+      "why": "Tissue diagnosis present in the chart."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "00",
+      "date": null,
+      "status": "FOUND",
+      "observable_period": {
+        "start": "2010-04-04",
+        "end": "2021-09-23"
+      },
+      "expected_through_date": "2021-09-23",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "dx_date": "20200302",
+    "naive_answer": "20200401",
+    "requires": "citing all three conflicting sources, not only the winner"
+  }
+}

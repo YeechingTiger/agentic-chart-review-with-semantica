@@ -2,6 +2,8 @@
   "patient_id": "SYNX03",
   "evidence_pattern": "ambiguous cytology with NO clinical impression \u2014 the biopsy dates it",
   "designer_notes": "THE MIRROR OF SYN0001, and the branch the corpus has never tested. SYN0001 has the same ambiguous cytology WITH a same-day clinical impression, so its answer is the cytology date. Here the impression is absent and the answer is the biopsy date. A run that has generalised 'ambiguous cytology dates the case' answers 2022-02-14 and is exactly wrong \u2014 the two conflict_rules differ by one document, and only reading both charts distinguishes them.",
+  "informed_module_design": true,
+  "designed_from": "observed_failure: the cytology-vs-biopsy ordering was applied without checking the impression",
   "n_documents": 312,
   "date_range": [
     "2012-03-11",

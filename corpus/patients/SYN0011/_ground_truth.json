@@ -2,6 +2,8 @@
   "patient_id": "SYN0011",
   "evidence_pattern": "follow-up truncated; no recurrence before truncation",
   "designer_notes": "ACCEPTANCE TEST for the clipping fix. Surveillance is clean, then the patient simply stops coming. Everything after last contact is out of scope, NOT a gap. Must yield a valid negative with through_date = last contact. A one-size 'reject every empty window' implementation fails this.",
+  "informed_module_design": true,
+  "designed_from": "",
   "n_documents": 315,
   "date_range": [
     "2009-02-24",

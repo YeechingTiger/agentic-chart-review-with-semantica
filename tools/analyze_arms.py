@@ -10,6 +10,19 @@ IT REFUSES TO PRINT A COMPARISON ACROSS MIXED SPEC HASHES. The E3 attempt was co
 an edit to the spec made while the run was in flight — arm 1 ran against one version and the
 rest would have run against another, on the exact axis under measurement. Nothing caught it but
 a hunch. Now the arithmetic stops instead.
+
+AND IT REFUSES TO FOLD AN INFORMED CHART INTO A HEADLINE NUMBER. SYNX01-06 were designed by
+watching runs fail and the search cards were written from the same failures — SYNX06's own
+designer note says it tests "precisely the shorter-stem move the controller-reactive card
+advises". A card's score on those charts is a score on its own development set, and it was
+being printed in the same column as everything else. The two populations are now separated by
+`informed_module_design`, counted apart, and the held-out column is the one a claim may rest
+on. A REFUSAL AND NOT A FOOTNOTE: the footnote version of this warning has been written twice
+in this tree and lost both times.
+
+The held-out denominator is small — six charts — and printing it small is the point. A number
+over six charts that were not used to build the thing being measured is worth more than a
+number over twenty-four that were.
 """
 
 from __future__ import annotations
@@ -35,6 +48,10 @@ def gold() -> dict[str, dict]:
         gt = (row.get("ground_truth") or {}).get("STORE.390.date_of_initial_diagnosis") or {}
         out[row["patient_id"]] = {
             "value": gt.get("value") or gt.get("status"),
+            # DEFAULTS TO TRUE for a chart written before the flag existed, matching the
+            # generator's own default and for the same reason: the failure being guarded
+            # against is a contaminated chart silently counted as clean.
+            "informed": bool(row.get("informed_module_design", True)),
             # Declared only on the SYNX charts: the date an ordinary pass yields. They are the
             # only charts with a wrong-but-reachable answer, so they are the only ones where
             # "was it steered" is a question with an answer.
@@ -79,6 +96,7 @@ def arm(path: str) -> dict:
         return {}
     g, n = gold(), len(recs)
     correct = sprung = reached = synx = synx_ok = 0
+    held = held_ok = informed = informed_ok = 0
     reads = searches = invented = 0.0
     for r in recs:
         got = (r.answer or {}).get("value", {}).get("date_of_initial_diagnosis") \
@@ -86,6 +104,12 @@ def arm(path: str) -> dict:
         gv = g.get(r.patient_id, {})
         ok = bool(got and got == gv.get("value"))
         correct += ok
+        if gv.get("informed", True):
+            informed += 1
+            informed_ok += ok
+        else:
+            held += 1
+            held_ok += ok
         ids = read_ids(r)
         reads += len(ids)
         ts = terms_of(r)
@@ -104,6 +128,8 @@ def arm(path: str) -> dict:
     return {"n": n, "acc": correct, "reads": reads / n, "searches": searches / n,
             "invented": invented / n, "synx": synx, "synx_ok": synx_ok,
             "sprung": sprung, "reached": reached,
+            "held": held, "held_ok": held_ok,
+            "informed": informed, "informed_ok": informed_ok,
             "spec": {r.spec_hash[:12] for r in recs},
             "cost": sum(r.cost_usd or 0 for r in recs)}
 
@@ -127,14 +153,28 @@ def main() -> int:
 
     print(f"runs/{exp}/   spec {next(iter(hashes), '?')}   "
           f"${sum(a['cost'] for a in arms.values()):.2f}\n")
-    print(f"{'arm':<24}{'n':>3}{'读/人':>8}{'词/人':>8}{'自创':>7}"
-          f"{'全部准确':>10}{'SYNX 准确':>11}{'中饵':>7}{'读到关键':>10}")
+    print(f"{'arm':<22}{'n':>3}{'读/人':>8}{'词/人':>8}{'自创':>7}"
+          f"{'留出准确':>11}{'受污准确':>11}{'中饵':>7}{'读到关键':>10}")
     for k, a in arms.items():
-        print(f"{k:<24}{a['n']:>3}{a['reads']:>8.1f}{a['searches']:>8.1f}{a['invented']:>7.1f}"
-              f"{a['acc']:>7}/{a['n']:<2}{a['synx_ok']:>8}/{a['synx']:<2}"
+        held = f"{a['held_ok']}/{a['held']}" if a["held"] else "—"
+        info = f"{a['informed_ok']}/{a['informed']}" if a["informed"] else "—"
+        print(f"{k:<22}{a['n']:>3}{a['reads']:>8.1f}{a['searches']:>8.1f}{a['invented']:>7.1f}"
+              f"{held:>11}{info:>11}"
               f"{a['sprung']:>4}/{a['synx']:<2}{a['reached']:>7}/{a['synx']:<2}")
-    print("\n六张 SYNX 是唯一有『错但够得着的答案』可以被引偏的图，所以『中饵』"
-          "只在它们上面有意义。18 张图分不出 1-2 张的差别 —— 这条在跑之前就写死了。")
+
+    n_held = max(a["held"] for a in arms.values())
+    n_info = max(a["informed"] for a in arms.values())
+    print()
+    if not n_held:
+        print("!! 这批运行里没有一张留出病历。上面每一个准确率都是在被测对象自己的开发集上"
+              "算出来的，不能作为任何结论的依据。")
+    else:
+        print(f"『留出准确』{n_held} 张：设计时只用了契约条款，没有看过任何运行结果。"
+              f"结论只能建立在这一列上。")
+    print(f"『受污准确』{n_info} 张：SYNX/SYNK 是看着运行失败设计的，搜索卡又是从同一批"
+          f"失败写出来的；SYN0001-0012 没人追溯过。分开报，不合并。")
+    print("『中饵』只在声明了 naive_answer 的图上有意义 —— 有『错但够得着的答案』"
+          "可以被引偏的,只有那些。")
     return 0
 
 

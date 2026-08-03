@@ -1,0 +1,54 @@
+{
+  "patient_id": "SYNY05",
+  "evidence_pattern": "the record begins after the diagnosis and never says when",
+  "designer_notes": "THE FIRST CHART WHOSE CORRECT ANSWER IS AN ABSTENTION. CORPUS_INSUFFICIENT was declared in the contract and offered by the tool with no chart that could ever score it right, so the status could only ever be measured as a mistake. It is also the control for the opposite error: a smoke run on 2026-08-02 returned CORPUS_INSUFFICIENT on SYNX06, where the answer was present in dictation shorthand \u2014 a retrieval failure presenting as a fact about the corpus. Neither direction is measurable without a chart on each side. THAT OBSERVATION IS WHY THE GAP WAS NOTICED; the trap itself is derived from the contract's own abstention block, and no card's behaviour shaped it.",
+  "informed_module_design": false,
+  "designed_from": "contract_clause: abstention.CORPUS_INSUFFICIENT",
+  "n_documents": 39,
+  "date_range": [
+    "2021-03-08",
+    "2023-10-16"
+  ],
+  "ground_truth": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "value": null,
+      "status": "CORPUS_INSUFFICIENT",
+      "why": "CORPUS_INSUFFICIENT. Every note is surveillance and every one refers to the diagnosis only as history; the chart states no date, no season, no interval and no treatment start, and the outside records are named as absent. This is not 'the chart was searched and does not establish one' \u2014 it is that the documents which would carry it are not in this corpus."
+    },
+    "STORE.400_522_523.site_histology_behavior": {
+      "primary_site": "C209",
+      "histology": "8140",
+      "behavior": "3",
+      "status": "EVIDENCE_INSUFFICIENT",
+      "why": "No pathology in the record; histology must NOT be inferred from imaging."
+    },
+    "STORE.1860_1880.first_recurrence": {
+      "type": "99",
+      "date": null,
+      "status": "EVIDENCE_INSUFFICIENT",
+      "observable_period": {
+        "start": "2021-03-08",
+        "end": "2023-10-16"
+      },
+      "expected_through_date": "2023-10-16",
+      "followup_shape": "normal"
+    },
+    "STORE.610.class_of_case": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.580.date_of_first_contact": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    },
+    "STORE.1760_1750.vital_status": {
+      "status": "SPEC_INSUFFICIENT",
+      "why": "Not derivable from notes."
+    }
+  },
+  "expect": {
+    "dx_date": "CORPUS_INSUFFICIENT",
+    "naive_answer": "EVIDENCE_INSUFFICIENT",
+    "requires": "telling an absent record apart from a silent one"
+  }
+}

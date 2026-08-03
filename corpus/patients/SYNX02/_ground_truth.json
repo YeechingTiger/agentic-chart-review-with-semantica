@@ -2,6 +2,8 @@
   "patient_id": "SYNX02",
   "evidence_pattern": "first-course treatment precedes any documented diagnosis",
   "designer_notes": "The pathology of 2020-06-20 is the obvious answer and it is WRONG. The infusion record carries no narrative impression \u2014 it is an administration, under Procedure-Note \u2014 so a run that searches diagnostic vocabulary cannot reach it and must instead have swept the document inventory by type.",
+  "informed_module_design": true,
+  "designed_from": "observed_failure: runs abstained where treatment preceded any documented diagnosis",
   "n_documents": 330,
   "date_range": [
     "2010-06-23",

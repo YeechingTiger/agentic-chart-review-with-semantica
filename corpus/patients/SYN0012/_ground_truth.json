@@ -2,6 +2,8 @@
   "patient_id": "SYN0012",
   "evidence_pattern": "follow-up truncated; recurrence documented BEFORE truncation",
   "designer_notes": "NEGATIVE CONTROL for SYN0011. Same truncation, but a hepatic recurrence is plainly documented before it. Clipping must narrow the claim's SCOPE without touching the VERDICT inside that scope \u2014 so this must report the recurrence, not abstain and not say 00. Without this case, an implementation that waves through every truncated record would pass SYN0011.",
+  "informed_module_design": true,
+  "designed_from": "",
   "n_documents": 303,
   "date_range": [
     "2009-02-24",

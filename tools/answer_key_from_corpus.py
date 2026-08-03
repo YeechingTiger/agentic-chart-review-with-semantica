@@ -27,9 +27,11 @@ SUBGROUPS ARE WHERE THE INTERESTING FAILURE HIDES
 -------------------------------------------------
 `eval compare` fails a comparison when any SUBGROUP rate falls even if every headline rate rose,
 because the aggregate improvement is what gets shipped and the subgroup collapse is what reaches
-a patient. Two subgroups are emitted per patient: the primary site's ICD-O chapter, and whether
-the chart's own key says the value is establishable. An arm that improves overall by giving up
-on abstention cases shows up as a subgroup regression rather than as a win.
+a patient. Four subgroups are emitted per patient: the primary site's ICD-O chapter, whether the
+chart's own key says the value is establishable, the designer's own words for what the chart
+exercises, and — since 2026-08-03 — `held_out`. An arm that improves overall by giving up on
+abstention cases shows up as a subgroup regression rather than as a win, and an arm that gains
+only on the charts its own cards were written from shows up the same way.
 
 USAGE
 -----
@@ -55,6 +57,13 @@ def _subgroups(truth: dict, row: dict) -> list[str]:
     if site[:1] == "C" and site[1:3].isdigit():
         out.append(f"icdo_chapter:C{site[1:3]}")
     out.append("establishable:" + ("yes" if row.get("status") == "FOUND" else "no"))
+    # THE SUBGROUP A CLAIM RESTS ON. SYNX/SYNK were designed by watching runs fail and the
+    # search cards were written from the same failures, so a card's score on them is a score on
+    # its own development set. `eval compare` fails a comparison when any subgroup rate falls
+    # even while the headline rises — which is exactly the shape of an arm that gains on the
+    # charts it was built from and loses on the ones it was not. Defaults to `informed` for a
+    # chart written before the flag existed, matching the generator.
+    out.append("held_out:" + ("no" if truth.get("informed_module_design", True) else "yes"))
     pattern = str(truth.get("evidence_pattern") or "").strip()
     if pattern:
         # The corpus designer's own words for what each chart exercises. Kept verbatim rather

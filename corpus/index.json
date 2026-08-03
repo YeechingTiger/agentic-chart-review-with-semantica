@@ -3,6 +3,8 @@
     "patient_id": "SYN0001",
     "evidence_pattern": "tissue-confirmed; cytology precedes pathology",
     "designer_notes": "Exercises the [390] cytology-vs-pathology boundary case and a clean 00 (disease-free, no recurrence).",
+    "informed_module_design": true,
+    "designed_from": "",
     "n_documents": 321,
     "date_range": [
       "2013-04-14",
@@ -51,6 +53,8 @@
     "patient_id": "SYN0002",
     "evidence_pattern": "evidence gap \u2014 biopsy performed at outside hospital",
     "designer_notes": "Histology must come back EVIDENCE_INSUFFICIENT: the diagnosis is asserted in prose but the confirming pathology was done elsewhere and is not in the record. Recurrence status is genuinely unknown (99), not 00.",
+    "informed_module_design": true,
+    "designed_from": "",
     "n_documents": 293,
     "date_range": [
       "2012-09-08",
@@ -99,6 +103,8 @@
     "patient_id": "SYN0003",
     "evidence_pattern": "never disease-free \u2014 metastatic at presentation",
     "designer_notes": "Distant metastasis at diagnosis -> STORE [1880] code 70 (never disease-free). An agent that codes 00 here is wrong: there was never a disease-free interval.",
+    "informed_module_design": true,
+    "designed_from": "",
     "n_documents": 298,
     "date_range": [
       "2011-01-21",
@@ -147,6 +153,8 @@
     "patient_id": "SYN0004",
     "evidence_pattern": "documented recurrence after a disease-free interval",
     "designer_notes": "Requires the agent to establish BOTH (a) a disease-free interval and (b) the later pulmonary recurrence. Distant recurrence in lung only -> 52.",
+    "informed_module_design": true,
+    "designed_from": "",
     "n_documents": 322,
     "date_range": [
       "2009-03-07",
@@ -195,6 +203,8 @@
     "patient_id": "SYN0005",
     "evidence_pattern": "in situ disease \u2014 behavior 2",
     "designer_notes": "Behavior must be 2, not 3. Tests that the agent reads the behavior off the pathology wording rather than defaulting to invasive.",
+    "informed_module_design": true,
+    "designed_from": "",
     "n_documents": 322,
     "date_range": [
       "2014-02-22",
@@ -243,6 +253,8 @@
     "patient_id": "SYN0006",
     "evidence_pattern": "patient declined biopsy \u2014 radiographic diagnosis only",
     "designer_notes": "Second evidence-gap probe with a different mechanism (patient refusal, documented in prose).",
+    "informed_module_design": true,
+    "designed_from": "",
     "n_documents": 306,
     "date_range": [
       "2013-08-04",
@@ -291,6 +303,8 @@
     "patient_id": "SYN0007",
     "evidence_pattern": "focal invasion inside an in-situ lesion \u2014 behavior 3",
     "designer_notes": "STORE [523] boundary case: 'Code 3 if any malignant invasion is present, no matter how limited.' The prose says intraductal (which reads in situ) but reports focal invasion.",
+    "informed_module_design": true,
+    "designed_from": "",
     "n_documents": 319,
     "date_range": [
       "2010-09-20",
@@ -339,6 +353,8 @@
     "patient_id": "SYN0008",
     "evidence_pattern": "conflicting notes \u2014 consult contradicts the imaging impression",
     "designer_notes": "Oncology consult claims 'CT shows liver metastases' while the CT IMPRESSION explicitly says no hepatic lesions. Tests conflict handling and whether the agent cites the primary report over the downstream restatement.",
+    "informed_module_design": true,
+    "designed_from": "",
     "n_documents": 306,
     "date_range": [
       "2012-11-19",
@@ -387,6 +403,8 @@
     "patient_id": "SYN0009",
     "evidence_pattern": "interior follow-up gap; genuinely no recurrence",
     "designer_notes": "Two-year hole in the middle of surveillance. Nothing recurred, but the chart cannot show that. Must be Unknown (99).",
+    "informed_module_design": true,
+    "designed_from": "",
     "n_documents": 314,
     "date_range": [
       "2008-06-16",
@@ -440,6 +458,8 @@
     "patient_id": "SYN0010",
     "evidence_pattern": "interior follow-up gap; recurrence happened elsewhere during it",
     "designer_notes": "Same shape as SYN0009, but the patient recurred during the hole and was treated at another hospital. NOTHING about that appears here. Also Unknown (99) \u2014 and an implementation that distinguishes it from SYN0009 is cheating.",
+    "informed_module_design": true,
+    "designed_from": "",
     "n_documents": 317,
     "date_range": [
       "2008-07-13",
@@ -493,6 +513,8 @@
     "patient_id": "SYN0011",
     "evidence_pattern": "follow-up truncated; no recurrence before truncation",
     "designer_notes": "ACCEPTANCE TEST for the clipping fix. Surveillance is clean, then the patient simply stops coming. Everything after last contact is out of scope, NOT a gap. Must yield a valid negative with through_date = last contact. A one-size 'reject every empty window' implementation fails this.",
+    "informed_module_design": true,
+    "designed_from": "",
     "n_documents": 315,
     "date_range": [
       "2009-02-24",
@@ -547,6 +569,8 @@
     "patient_id": "SYN0012",
     "evidence_pattern": "follow-up truncated; recurrence documented BEFORE truncation",
     "designer_notes": "NEGATIVE CONTROL for SYN0011. Same truncation, but a hepatic recurrence is plainly documented before it. Clipping must narrow the claim's SCOPE without touching the VERDICT inside that scope \u2014 so this must report the recurrence, not abstain and not say 00. Without this case, an implementation that waves through every truncated record would pass SYN0011.",
+    "informed_module_design": true,
+    "designed_from": "",
     "n_documents": 303,
     "date_range": [
       "2009-02-24",
@@ -600,6 +624,8 @@
     "patient_id": "SYNX01",
     "evidence_pattern": "retrospective diagnosis \u2014 the answer predates the workup by two years",
     "designer_notes": "The biopsy date 2021-06-08 is where every ordinary path leads and it is WRONG. Reaching 2019-03-12 needs two hops: find the retrospective sentence in a post-diagnosis oncology note, then go back for the CT it names. A sweep that stops at the pathology never sees the sentence; a chase that never opens the follow-up notes never starts.",
+    "informed_module_design": true,
+    "designed_from": "observed_failure: naive passes took the workup date; the retrospective clause was the fix",
     "n_documents": 303,
     "date_range": [
       "2011-06-11",
@@ -652,6 +678,8 @@
     "patient_id": "SYNX02",
     "evidence_pattern": "first-course treatment precedes any documented diagnosis",
     "designer_notes": "The pathology of 2020-06-20 is the obvious answer and it is WRONG. The infusion record carries no narrative impression \u2014 it is an administration, under Procedure-Note \u2014 so a run that searches diagnostic vocabulary cannot reach it and must instead have swept the document inventory by type.",
+    "informed_module_design": true,
+    "designed_from": "observed_failure: runs abstained where treatment preceded any documented diagnosis",
     "n_documents": 330,
     "date_range": [
       "2010-06-23",
@@ -704,6 +732,8 @@
     "patient_id": "SYNX03",
     "evidence_pattern": "ambiguous cytology with NO clinical impression \u2014 the biopsy dates it",
     "designer_notes": "THE MIRROR OF SYN0001, and the branch the corpus has never tested. SYN0001 has the same ambiguous cytology WITH a same-day clinical impression, so its answer is the cytology date. Here the impression is absent and the answer is the biopsy date. A run that has generalised 'ambiguous cytology dates the case' answers 2022-02-14 and is exactly wrong \u2014 the two conflict_rules differ by one document, and only reading both charts distinguishes them.",
+    "informed_module_design": true,
+    "designed_from": "observed_failure: the cytology-vs-biopsy ordering was applied without checking the impression",
     "n_documents": 312,
     "date_range": [
       "2012-03-11",
@@ -756,6 +786,8 @@
     "patient_id": "SYNX04",
     "evidence_pattern": "pathology deferred to an addendum filed under another type",
     "designer_notes": "P05's 8046 error given somewhere further to go. The deferred report is the only Surgical-Pathology-Report in the chart, so an arm that sweeps the pathology type finds a document that answers nothing; the addendum is filed under Surgical-Pathology-Document three weeks later. Following the words 'SEE ADDENDUM' is the only cheap route, which is what thread-chasing is for.",
+    "informed_module_design": true,
+    "designed_from": "observed_failure: addenda filed under another type were never opened",
     "n_documents": 299,
     "date_range": [
       "2013-08-05",
@@ -808,6 +840,8 @@
     "patient_id": "SYNX05",
     "evidence_pattern": "the first diagnosis is a clinical impression buried in a diabetes note",
     "designer_notes": "The pathology of 2019-02-15 is three months later and is the obvious answer. The real one is one clause inside a routine diabetes visit \u2014 a specialty nobody searches for an oncology diagnosis, in a note type whose prior says it can establish nothing. Rewards sweeping the inventory by type over trusting a type prior.",
+    "informed_module_design": true,
+    "designed_from": "observed_failure: a type prior demoted the note that held the answer",
     "n_documents": 287,
     "date_range": [
       "2009-02-17",
@@ -859,7 +893,9 @@
   {
     "patient_id": "SYNX06",
     "evidence_pattern": "the diagnosis exists only in dictation shorthand",
-    "designer_notes": "No full word appears anywhere: not adenocarcinoma, not carcinoma, not malignant, not diagnosis. A run searching the contract's own vocabulary comes back empty and concludes the chart is silent. 'adeno' hits and 'adenocarcinoma' does not, which is precisely the shorter-stem move the search-native card advises \u2014 so this chart tests whether that advice is followed rather than merely rendered.",
+    "designer_notes": "No full word appears anywhere: not adenocarcinoma, not carcinoma, not malignant, not diagnosis. A run searching the contract's own vocabulary comes back empty and concludes the chart is silent. 'adeno' hits and 'adenocarcinoma' does not, which is precisely the shorter-stem move the controller-reactive card advises \u2014 so this chart tests whether that advice is followed rather than merely rendered.",
+    "informed_module_design": true,
+    "designed_from": "observed_failure: the contract's own vocabulary missed; informed the stem-widening advice in controller-reactive",
     "n_documents": 317,
     "date_range": [
       "2011-09-20",
@@ -912,6 +948,8 @@
     "patient_id": "SYNK01",
     "evidence_pattern": "the key rests on an outside report that is not in this chart",
     "designer_notes": "The key is CORRECT and unreachable. The only in-chart reference is a transfer note saying the biopsy was done elsewhere in March. An agent that answers EVIDENCE_INSUFFICIENT has read the chart correctly and will be scored as having missed \u2014 and an evaluation that calls that an agent error is teaching it to produce dates it cannot support.",
+    "informed_module_design": true,
+    "designed_from": "observed_failure: evaluation called an unverifiable key an agent error",
     "n_documents": 312,
     "date_range": [
       "2011-08-05",
@@ -971,6 +1009,8 @@
     "patient_id": "SYNK02",
     "evidence_pattern": "the key is a transcription error \u2014 no document carries that date",
     "designer_notes": "The agent is right and the key is wrong. This is the cheapest dispute to detect and the one most worth detecting automatically: the key names a date on which the chart holds NO DOCUMENT AT ALL, which is decidable without reading a word of clinical text. An evaluation that cannot catch this one will not catch any.",
+    "informed_module_design": true,
+    "designed_from": "observed_failure: evaluation could not report that the key itself was wrong",
     "n_documents": 322,
     "date_range": [
       "2010-06-26",
@@ -1030,6 +1070,8 @@
     "patient_id": "SYNK03",
     "evidence_pattern": "two defensible readings \u2014 the chart itself does not settle it",
     "designer_notes": "NEITHER SIDE IS WRONG, and that is what makes it a control. STORE.390 counts 'a pathology or cytology report whose interpretation establishes the diagnosis' and separately discounts 'cytology carrying only an ambiguous term'. POSITIVE FOR MALIGNANT CELLS is not ambiguous, so the first clause reaches it; but the conflict_rules are written around the ambiguous case and say nothing here. Without this chart an evaluation can score full marks by calling every disagreement a defect, which is the same failure as calling none of them one.",
+    "informed_module_design": true,
+    "designed_from": "observed_failure: evaluation named a winner where the contract supports both readings",
     "n_documents": 325,
     "date_range": [
       "2011-05-16",
@@ -1086,6 +1128,340 @@
       "why": "An unambiguous cytology and a confirmatory biopsy, and a spec whose conflict rules only cover the ambiguous-cytology case.",
       "correct_eval_verdict": "HUMAN_ADJUDICATION_REQUIRED",
       "harm_if_missed": "naming a winner here manufactures certainty, and a spec gap reported as an agent error never reaches whoever owns the spec"
+    }
+  },
+  {
+    "patient_id": "SYNY01",
+    "evidence_pattern": "death certificate only \u2014 nothing ante-mortem names a cancer",
+    "designer_notes": "No tissue was ever obtained and no oncology referral was completed, so there is nothing earlier to find. A run that reads the decline notes and stops returns EVIDENCE_INSUFFICIENT and is wrong by one document \u2014 one whose type appears nowhere else in the corpus, so no type prior can point at it.",
+    "informed_module_design": false,
+    "designed_from": "contract_clause: decision_rule[4] (autopsy / death certificate only)",
+    "n_documents": 291,
+    "date_range": [
+      "2012-04-21",
+      "2022-04-19"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": "20220419",
+        "status": "FOUND",
+        "why": "Nothing before the death names a malignancy: the three preceding visits record decline, weight loss and jaundice and no more. The Death-Summary of 2022-04-19 states metastatic adenocarcinoma of the pancreas as the cause of death, which is a physician's diagnostic statement, and decision_rule[4] puts the date of a death-certificate-only case at the date of death."
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C250",
+        "histology": "8140",
+        "behavior": "3",
+        "status": "EVIDENCE_INSUFFICIENT",
+        "why": "No pathology in the record; histology must NOT be inferred from imaging."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "99",
+        "date": null,
+        "status": "EVIDENCE_INSUFFICIENT",
+        "observable_period": {
+          "start": "2012-04-21",
+          "end": "2022-04-19"
+        },
+        "expected_through_date": "2022-04-19",
+        "followup_shape": "terminal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "dx_date": "20220419",
+      "naive_answer": "EVIDENCE_INSUFFICIENT",
+      "requires": "opening a document type that occurs once in the whole corpus"
+    }
+  },
+  {
+    "patient_id": "SYNY02",
+    "evidence_pattern": "the year cannot be read anywhere and must be approximated",
+    "designer_notes": "THE CHART THE `20999999` DEFECT NEEDED. Two E4 runs put 99 in the YEAR slot because decision_rule[5] orders an approximation and no field could record that one had been made; the value space now can, and nothing tested it. Note which flags are true: the year was approximated, the month and day are simply not recorded \u2014 a distinction one boolean could not make, and the reason there are three. The hard anchor is in a claims feed, which is a source class a run reading only clinical note types never opens.",
+    "informed_module_design": false,
+    "designed_from": "contract_clause: decision_rule[5] (the year must be approximated)",
+    "n_documents": 316,
+    "date_range": [
+      "2009-06-06",
+      "2020-11-25"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": "20159999",
+        "status": "FOUND",
+        "flags": {
+          "year_imputed": true,
+          "month_imputed": false,
+          "day_imputed": false
+        },
+        "why": "No document states a diagnosis date. The establishing-care note of 2019-06-04 says the cancer was treated 'roughly four years ago' at an outside hospital, and the pharmacy feed carries an adjuvant capecitabine course beginning 2015-08-17 \u2014 which cannot establish a diagnosis but does bound the year. decision_rule[5]: the year is APPROXIMATED to 2015 and month and day are then unknown, so 20159999 with year_imputed true."
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C187",
+        "histology": "8140",
+        "behavior": "3",
+        "status": "EVIDENCE_INSUFFICIENT",
+        "why": "No pathology in the record; histology must NOT be inferred from imaging."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "00",
+        "date": null,
+        "status": "FOUND",
+        "observable_period": {
+          "start": "2009-06-06",
+          "end": "2020-11-25"
+        },
+        "expected_through_date": "2020-11-25",
+        "followup_shape": "normal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "dx_date": "20159999",
+      "naive_answer": "EVIDENCE_INSUFFICIENT",
+      "requires": "approximating a year from a non-clinical source class"
+    }
+  },
+  {
+    "patient_id": "SYNY03",
+    "evidence_pattern": "three admissible sources give three different dates",
+    "designer_notes": "The arithmetic is not the test \u2014 SYN0001 already has a two-source version and runs get it right. conflict_rules[4] additionally demands that EVERY conflicting source be cited and the conflict resolved, which is the half of the proof obligation nothing has ever exercised. A run that answers 20200302 citing only the cytology has the right value and has not met the obligation, and those are two different results.",
+    "informed_module_design": false,
+    "designed_from": "contract_clause: conflict_rules[4] (cite every conflicting source)",
+    "n_documents": 305,
+    "date_range": [
+      "2010-04-04",
+      "2021-09-23"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": "20200302",
+        "status": "FOUND",
+        "why": "Three sources, three dates. Cytology 2020-03-02 reads 'suspicious for invasive ductal carcinoma' AND an oncology note of the same day records a clinical impression of malignancy, so conflict_rules[1] makes the cytology date diagnostic. Pathology 2020-04-01 confirms. A later oncology note asserts the diagnosis was made 2020-04-10. Earliest that satisfies the rules wins."
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C504",
+        "histology": "8500",
+        "behavior": "3",
+        "status": "FOUND",
+        "why": "Tissue diagnosis present in the chart."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "00",
+        "date": null,
+        "status": "FOUND",
+        "observable_period": {
+          "start": "2010-04-04",
+          "end": "2021-09-23"
+        },
+        "expected_through_date": "2021-09-23",
+        "followup_shape": "normal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "dx_date": "20200302",
+      "naive_answer": "20200401",
+      "requires": "citing all three conflicting sources, not only the winner"
+    }
+  },
+  {
+    "patient_id": "SYNY04",
+    "evidence_pattern": "a season and a year are all the record offers",
+    "designer_notes": "The contract's third boundary case is this exact shape ('diagnosed in the spring of 2010' -> 20100499) and no chart has ever produced one, so the season table has been rendered into every prompt for weeks and applied to nothing. The flags are the second half: a run that answers 20191099 and leaves all three false has given a date it invented two components of and said it read them.",
+    "informed_module_design": false,
+    "designed_from": "contract_clause: date_imputation (seasonal phrase -> month, flagged)",
+    "n_documents": 307,
+    "date_range": [
+      "2010-01-29",
+      "2021-07-20"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": "20191099",
+        "status": "FOUND",
+        "flags": {
+          "year_imputed": false,
+          "month_imputed": true,
+          "day_imputed": true
+        },
+        "why": "The transfer-of-care note of 2020-01-27 says the cancer was diagnosed 'in the fall of 2019' at another institution, the outside pathology never arrived, and nothing else in the chart names a date. date_imputation maps fall to month 10 and the day is unknown, giving 20191099 with month_imputed and day_imputed true and year_imputed FALSE \u2014 the year was stated outright."
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C182",
+        "histology": "8140",
+        "behavior": "3",
+        "status": "EVIDENCE_INSUFFICIENT",
+        "why": "No pathology in the record; histology must NOT be inferred from imaging."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "00",
+        "date": null,
+        "status": "FOUND",
+        "observable_period": {
+          "start": "2010-01-29",
+          "end": "2021-07-20"
+        },
+        "expected_through_date": "2021-07-20",
+        "followup_shape": "normal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "dx_date": "20191099",
+      "naive_answer": "20200127",
+      "requires": "applying the season table and flagging which components it made up"
+    }
+  },
+  {
+    "patient_id": "SYNY05",
+    "evidence_pattern": "the record begins after the diagnosis and never says when",
+    "designer_notes": "THE FIRST CHART WHOSE CORRECT ANSWER IS AN ABSTENTION. CORPUS_INSUFFICIENT was declared in the contract and offered by the tool with no chart that could ever score it right, so the status could only ever be measured as a mistake. It is also the control for the opposite error: a smoke run on 2026-08-02 returned CORPUS_INSUFFICIENT on SYNX06, where the answer was present in dictation shorthand \u2014 a retrieval failure presenting as a fact about the corpus. Neither direction is measurable without a chart on each side. THAT OBSERVATION IS WHY THE GAP WAS NOTICED; the trap itself is derived from the contract's own abstention block, and no card's behaviour shaped it.",
+    "informed_module_design": false,
+    "designed_from": "contract_clause: abstention.CORPUS_INSUFFICIENT",
+    "n_documents": 39,
+    "date_range": [
+      "2021-03-08",
+      "2023-10-16"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": null,
+        "status": "CORPUS_INSUFFICIENT",
+        "why": "CORPUS_INSUFFICIENT. Every note is surveillance and every one refers to the diagnosis only as history; the chart states no date, no season, no interval and no treatment start, and the outside records are named as absent. This is not 'the chart was searched and does not establish one' \u2014 it is that the documents which would carry it are not in this corpus."
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C209",
+        "histology": "8140",
+        "behavior": "3",
+        "status": "EVIDENCE_INSUFFICIENT",
+        "why": "No pathology in the record; histology must NOT be inferred from imaging."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "99",
+        "date": null,
+        "status": "EVIDENCE_INSUFFICIENT",
+        "observable_period": {
+          "start": "2021-03-08",
+          "end": "2023-10-16"
+        },
+        "expected_through_date": "2023-10-16",
+        "followup_shape": "normal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "dx_date": "CORPUS_INSUFFICIENT",
+      "naive_answer": "EVIDENCE_INSUFFICIENT",
+      "requires": "telling an absent record apart from a silent one"
+    }
+  },
+  {
+    "patient_id": "SYNY06",
+    "evidence_pattern": "suspicious imaging weeks before the biopsy \u2014 the later date wins",
+    "designer_notes": "THE INVERSE TRAP, and the only one in the corpus. SYNX01, SYNX02, SYNX05 and SYNY01 all reward reaching for the earliest date, so a card written from them learns 'earlier wins' and cannot be told apart from a card that learned the rule. Here the earliest candidate is inadmissible. A policy that only generalises in one direction fails exactly here and nowhere else.",
+    "informed_module_design": false,
+    "designed_from": "contract_clause: evidence_rules.does_not_count[2] (imaging is not a diagnosis)",
+    "n_documents": 325,
+    "date_range": [
+      "2012-12-12",
+      "2024-05-08"
+    ],
+    "ground_truth": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "value": "20221115",
+        "status": "FOUND",
+        "why": "The CT of 2022-10-08 reads 'HIGHLY SUSPICIOUS FOR MALIGNANCY' and recommends tissue sampling. evidence_rules.does_not_count[2] excludes a radiology report that merely describes a suspicious mass absent a physician's diagnostic statement, and no such statement exists before the biopsy. The pathology of 2022-11-15 is the first admissible witness."
+      },
+      "STORE.400_522_523.site_histology_behavior": {
+        "primary_site": "C251",
+        "histology": "8140",
+        "behavior": "3",
+        "status": "FOUND",
+        "why": "Tissue diagnosis present in the chart."
+      },
+      "STORE.1860_1880.first_recurrence": {
+        "type": "00",
+        "date": null,
+        "status": "FOUND",
+        "observable_period": {
+          "start": "2012-12-12",
+          "end": "2024-05-08"
+        },
+        "expected_through_date": "2024-05-08",
+        "followup_shape": "normal"
+      },
+      "STORE.610.class_of_case": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.580.date_of_first_contact": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      },
+      "STORE.1760_1750.vital_status": {
+        "status": "SPEC_INSUFFICIENT",
+        "why": "Not derivable from notes."
+      }
+    },
+    "expect": {
+      "dx_date": "20221115",
+      "naive_answer": "20221008",
+      "requires": "refusing an early candidate the evidence rules exclude"
     }
   }
 ]
