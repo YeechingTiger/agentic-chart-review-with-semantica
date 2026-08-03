@@ -45,7 +45,17 @@ import typer
 from rich.console import Console
 
 from ..core.cli_common import API_BASE, MODEL, con
-from ..core.local_artifacts import LOCAL_ROOT_ENV, LocalArtifactError, LocalArtifactStore
+
+#: A RUN RECORD is read with `require_run_artifact`, not through the store: `runs/` is inside
+#: the worktree by design and the store's `require_input` proves the opposite, so every one of
+#: these call sites was unreachable. Develop artifacts — gold, answer keys, case maps — keep
+#: going through the store, where the outside-the-worktree rule is the right rule.
+from ..core.local_artifacts import (
+    LOCAL_ROOT_ENV,
+    LocalArtifactError,
+    LocalArtifactStore,
+    require_run_artifact,
+)
 
 #: Progress goes here so that stdout stays exactly one JSON document. `cli_common.con` is the
 #: stdout console every other group shares and stays the one that prints the envelope.
@@ -405,7 +415,7 @@ def _packet_from_run(*, run: str, gold: str, dimension: str,
     from ..evaluation import judge as J
 
     store = _store(local_root)
-    manifest_path = store.require_input(run, what="manifest")
+    manifest_path = require_run_artifact(run, what="manifest")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     # The same derivation `cli_audit`, `cli_evaluation`, `evals` and `attribution` all use. A
     # fifth spelling of it would be a fifth thing to fix when run artifacts are renamed.

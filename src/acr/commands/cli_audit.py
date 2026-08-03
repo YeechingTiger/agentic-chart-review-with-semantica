@@ -15,7 +15,17 @@ from ..audit.audit_loop import (
 )
 from ..core.cli_common import con
 from ..core.kernel import ArtifactRef, TrajectoryAdapter, digest
-from ..core.local_artifacts import LOCAL_ROOT_ENV, LocalArtifactError, LocalArtifactStore
+
+#: A RUN RECORD is read with `require_run_artifact`, not through the store: `runs/` is inside
+#: the worktree by design and the store's `require_input` proves the opposite, so every one of
+#: these call sites was unreachable. Develop artifacts — gold, answer keys, case maps — keep
+#: going through the store, where the outside-the-worktree rule is the right rule.
+from ..core.local_artifacts import (
+    LOCAL_ROOT_ENV,
+    LocalArtifactError,
+    LocalArtifactStore,
+    require_run_artifact,
+)
 
 audit_app = typer.Typer(
     add_completion=False,
@@ -76,7 +86,7 @@ def audit_run_payload(*, manifest: str, subject_id: str = "",
     dispatcher reading it from the file it was handed is not.
     """
     store = _store(local_root)
-    manifest_path = store.require_input(manifest, what="audit manifest")
+    manifest_path = require_run_artifact(manifest, what="audit manifest")
     raw = json.loads(manifest_path.read_text(encoding="utf-8"))
     trace_path = manifest_path.with_name(
         manifest_path.name.replace(".manifest.json", ".jsonl")

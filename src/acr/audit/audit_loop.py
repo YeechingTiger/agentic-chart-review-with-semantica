@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import os
 import re
+import subprocess
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -43,8 +44,14 @@ _PHONE = re.compile(
 _MRN = re.compile(
     r"(?i)\b(?:mrn|medical record(?: number)?)\s*[:#-]?\s*[A-Z0-9-]{5,20}\b"
 )
+#: `DOB: 1/2/1956` AND `DOB: 1956-06-22`. The second form was missing, and what that cost is worth
+#: recording: the first real run of this plane found an MRN in a submitted evidence quote whose text
+#: was `MRN: SYN0009 / Patient: … / DOB: 1956-06-22` — a document header the agent had quoted whole.
+#: The MRN rule fired. The DOB rule did not, because it required `\d{1,2}[/-]\d{1,2}[/-]\d{2,4}` and
+#: the corpus writes ISO. One identifier reported out of the three that were sitting in one string.
 _DOB = re.compile(
-    r"(?i)\b(?:dob|date of birth)\s*[:#-]?\s*(?:\d{1,2}[/-]){2}\d{2,4}\b"
+    r"(?i)\b(?:dob|date of birth)\s*[:#-]?\s*"
+    r"(?:(?:\d{1,2}[/-]){2}\d{2,4}|\d{4}-\d{2}-\d{2})\b"
 )
 _URL = re.compile(r"https?://([^/\s:]+)")
 
@@ -498,6 +505,13 @@ def phi_provider_audit(
     for root, value, location, source_id in sources:
             for path, text in _walk(value, root):
                 for phi_type, pattern in PHI_PATTERNS.items():
+                    if pattern is None:
+                        # No identifier shape declared for this site, so this rule contributes
+                        # nothing. Skipped and NOT counted as clean — `inert_rules` on the report is
+                        # what says which rules could not look. The first time this plane was
+                        # reachable at all it crashed here on `NoneType.finditer`, because the
+                        # pattern was allowed to be None and the loop was not told.
+                        continue
                     for match_index, match in enumerate(pattern.finditer(text), 1):
                         locator = f"{path}#{phi_type}:{match_index}"
                         finding_id = _finding_id(
@@ -642,6 +656,30 @@ def undeclared_tool_audit(
     )
     return tuple(findings), incidents
 
+def _is_run_output(path: Path, git_root: Path | None) -> bool:
+    """A run's own trace or manifest, written where run output goes and not committed.
+
+    Two conditions, and both matter. It must be under `runs/` inside the worktree, which is the
+    documented location — an artifact somewhere else inside the worktree is not run output, it is a
+    file in the source tree. And Git must not TRACK it, because a committed run record is precisely
+    the disclosure this plane exists to report, whatever directory it sits in.
+    """
+    if git_root is None:
+        return False
+    try:
+        rel = path.relative_to(git_root)
+    except ValueError:
+        return False
+    if not rel.parts or rel.parts[0] != "runs":
+        return False
+    try:
+        r = subprocess.run(["git", "ls-files", "--error-unmatch", str(path)],
+                           cwd=git_root, capture_output=True, text=True, check=False)
+    except OSError:
+        return False
+    return r.returncode != 0          # untracked => run output; tracked => the escape, report it
+
+
 def local_artifact_audit(
     asset: ModuleAsset, context: AuditContext
 ) -> tuple[tuple[AuditFinding, ...], tuple[AuditIncident, ...]]:
@@ -652,6 +690,19 @@ def local_artifact_audit(
     findings = []
     for index, artifact in enumerate(context.trajectory.artifact_refs):
         path = Path(artifact.path).resolve(strict=False)
+
+        # RUN OUTPUT IS NOT AN ESCAPE. `runs/` is where a run writes its trace and its manifest —
+        # inside the worktree, ignored wholesale, never committed. The rule this file enforces is
+        # about DEVELOP artifacts, the curated patient-derived material the local store exists to
+        # keep away from Git. Applied to run output it fires on every run that has ever happened:
+        # the first time this plane was reachable at all it reported one IRB incident on a clean
+        # synthetic run, and it would have reported 508.
+        #
+        # The distinguishing property is the same one `local_artifacts.require_run_artifact` checks
+        # on the read side: run output is UNTRACKED. A tracked artifact inside the worktree IS the
+        # escape this rule is for, and that case still fires below.
+        if _is_run_output(path, git_root):
+            continue
         try:
             path.relative_to(local_root)
             within_local = True

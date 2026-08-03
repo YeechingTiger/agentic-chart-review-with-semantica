@@ -9,7 +9,17 @@ from rich.table import Table
 
 from ..core import cli_common, site
 from ..core.cli_common import API_BASE, CORPUS, MODEL, con
-from ..core.local_artifacts import LOCAL_ROOT_ENV, LocalArtifactError, LocalArtifactStore
+
+#: A RUN RECORD is read with `require_run_artifact`, not through the store: `runs/` is inside
+#: the worktree by design and the store's `require_input` proves the opposite, so every one of
+#: these call sites was unreachable. Develop artifacts — gold, answer keys, case maps — keep
+#: going through the store, where the outside-the-worktree rule is the right rule.
+from ..core.local_artifacts import (
+    LOCAL_ROOT_ENV,
+    LocalArtifactError,
+    LocalArtifactStore,
+    require_run_artifact,
+)
 from ..diagnosis import attribution as A
 from ..evaluation import evals
 
@@ -123,7 +133,7 @@ def _packet(*, store, manifest, case_id, spec_path, mode, gold_path,
             registry_path, detector_args):
     from ..contract.spec import load_spec
     try:
-        mpath = store.require_input(manifest, what="run manifest")
+        mpath = require_run_artifact(manifest, what="run manifest")
         sp = load_spec(spec_path)
         chart_gold, registry = _mode_inputs(
             store, mode, case_id, gold=gold_path,

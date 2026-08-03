@@ -50,6 +50,46 @@ def _within(path: Path, parent: Path) -> bool:
         return False
 
 
+def require_run_artifact(value: str | Path, *, what: str = "run artifact") -> Path:
+    """An existing RUN RECORD — a manifest or a trace — which lives inside the worktree by design.
+
+    WHY THIS EXISTS. Every command that reads a completed run used `LocalArtifactStore.require_input`,
+    which proves a path resolves UNDER the local root, and the local root is required to be outside
+    the Git worktree. But `runs/` is inside the worktree — deliberately, gitignored wholesale — so the
+    proof could never succeed and `acr audit run` could not be pointed at any of the 508 manifests on
+    disk. The plane looked unexercised; it was unreachable. An adversarial review named this as the
+    highest-value fix available, and running the chain end to end reproduced it independently.
+
+    THE PROPERTY WORTH KEEPING IS NOT THE ONE THAT WAS CHECKED. The danger was never "reading a file
+    inside the worktree". It was patient-derived material being COMMITTED. So this asserts the thing
+    that actually matters: the file exists, and Git does not TRACK it. A tracked manifest is either
+    synthetic (fine, and the caller may pass `allow_tracked=True` for a fixture) or a disclosure that
+    has already happened, and reading it is not the moment to discover that — `tests/
+    test_no_phi_in_tree.py::test_no_run_output_is_tracked` is what holds the property, and this is the
+    same rule stated where a reader of one run will meet it.
+    """
+    raw = Path(value).expanduser()
+    resolved = (raw if raw.is_absolute() else Path.cwd() / raw).resolve(strict=False)
+    if not resolved.is_file():
+        raise LocalArtifactError(f"{what} not found: {resolved}")
+    if _is_git_tracked(resolved):
+        raise LocalArtifactError(
+            f"{what} is TRACKED by Git: {resolved}. Run output is never committed — `runs/` is "
+            f"ignored wholesale — so a tracked run record is either a fixture (pass it directly) or "
+            f"material that should not be in the tree at all.")
+    return resolved
+
+
+def _is_git_tracked(path: Path) -> bool:
+    """True when Git tracks this exact path. False when Git is unavailable or the path is outside."""
+    try:
+        r = subprocess.run(["git", "ls-files", "--error-unmatch", str(path)],
+                           cwd=path.parent, capture_output=True, text=True, check=False)
+    except OSError:
+        return False
+    return r.returncode == 0
+
+
 class LocalArtifactStore:
     """A mode-0700 directory outside Git, with mode-0600 atomic files."""
 
@@ -96,6 +136,15 @@ class LocalArtifactStore:
         return resolved
 
     def require_input(self, value: str | Path, *, what: str) -> Path:
+        """An existing DEVELOP artifact, which must live under the local root.
+
+        Right for gold, answer keys, registry references, case maps, proposals and sealed sets:
+        every one is patient-derived material a human curated, and the point of the store is that
+        such a file never sits where Git can reach it.
+
+        WRONG FOR A RUN RECORD, and that mistake made a whole plane unreachable — see
+        `require_run_artifact`.
+        """
         return self.path(value, must_exist=True, what=what)
 
     def directory(self, value: str | Path) -> Path:

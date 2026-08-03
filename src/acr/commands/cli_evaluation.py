@@ -9,11 +9,17 @@ from rich.table import Table
 
 from ..core.cli_common import con
 from ..core.kernel import ArtifactRef, TrajectoryAdapter, digest
+
+#: A RUN RECORD is read with `require_run_artifact`, not through the store: `runs/` is inside
+#: the worktree by design and the store's `require_input` proves the opposite, so every one of
+#: these call sites was unreachable. Develop artifacts — gold, answer keys, case maps — keep
+#: going through the store, where the outside-the-worktree rule is the right rule.
 from ..core.local_artifacts import (
     LOCAL_ROOT_ENV,
     LocalArtifactError,
     LocalArtifactStore,
     content_hash,
+    require_run_artifact,
 )
 from ..core.modules import (
     CertificationRegistry,
@@ -63,7 +69,7 @@ def _trace_path(store: LocalArtifactStore, manifest_path: Path, raw: dict) -> Pa
     declared = str(raw.get("trace") or "").strip()
     if declared:
         try:
-            return store.require_input(declared, what="trajectory trace")
+            return require_run_artifact(declared, what="trajectory trace")
         except LocalArtifactError:
             # A moved local run directory may still have its trace beside the manifest.
             pass
@@ -80,7 +86,7 @@ def _context(
     subject_id: str,
     provider_boundary: str,
 ) -> EvaluationContext:
-    manifest_path = store.require_input(manifest, what="evaluation manifest")
+    manifest_path = require_run_artifact(manifest, what="evaluation manifest")
     raw = json.loads(manifest_path.read_text(encoding="utf-8"))
     trace_path = _trace_path(store, manifest_path, raw)
     trace = (
