@@ -40,6 +40,7 @@ from dataclasses import dataclass, field, replace
 from typing import Protocol
 
 from ..contract.answer_checks import check_answer
+from ..core.site import looks_like_a_person_id
 
 
 # ------------------------------------------------------------------------------- errors
@@ -222,8 +223,6 @@ def registry_invariants() -> None:
 
 
 # ------------------------------------------------------------------- 2. routing inputs
-#: The real corpus's person_id shape. A pattern, deliberately not an example.
-_PERSON_ID = re.compile(r"1168\d{12}")
 
 RETRIEVAL_FAILURE = "RETRIEVAL_FAILURE"
 ANSWER_KEY_WRONG = "ANSWER_KEY_WRONG"
@@ -271,7 +270,7 @@ class FailureCase:
     subgroup: str = "unassigned"
 
     def __post_init__(self) -> None:
-        if _PERSON_ID.search(self.case_id):
+        if looks_like_a_person_id(self.case_id):
             raise PhiInFailureCaseError(
                 "case_id looks like a real person_id. Pseudonymise before routing; the map "
                 "lives outside this tree.")

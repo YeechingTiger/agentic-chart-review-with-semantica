@@ -16,6 +16,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from ..core import site
 from ..core.kernel import (
     AssetRef,
     SignalEnvelope,
@@ -29,7 +30,12 @@ from ..core.modules import ModuleAsset, ModuleRegistry
 
 AUDIT_SEVERITIES = frozenset({"INFO", "WARN", "CRITICAL", "IRB"})
 
-_INSTITUTIONAL_PERSON = re.compile("1168" + r"\d{12}")
+#: The site's person-id shape, from `core/site.py`. It used to be a literal here, written as a
+#: string concatenation so that `tests/test_no_phi_in_tree.py`'s byte scan would not flag the file
+#: containing it — which is a sign the literal did not belong in the tree at all.
+#: May be `None` when this deployment has not declared an identifier shape; the rule
+#: then contributes nothing, which is the honest state rather than a silent pass.
+_INSTITUTIONAL_PERSON = site.PERSON_ID
 _EMAIL = re.compile(r"(?<![\w.-])[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}(?![\w.-])")
 _PHONE = re.compile(
     r"(?<!\d)(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]\d{3}[-.\s]\d{4}(?!\d)"

@@ -229,7 +229,7 @@ def test_there_is_no_default_table_any_more():
 # ==========================================================================================
 # 肺表 —— 抽取语料，以及它为之而建的那些失败
 # ==========================================================================================
-GT = Path("/N/project/computable_phenotype/acr_real/ground_truth.csv")
+GT = Path("$ACR_REAL_CORPUS/ground_truth.csv")
 
 
 def test_the_subsite_digits_a_run_got_wrong(lung):

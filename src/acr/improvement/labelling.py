@@ -136,14 +136,15 @@ from pathlib import Path
 from typing import Any
 
 from ..chartstore.corpus import Corpus, DocMeta
+from ..core import site
 from ..core.repo_paths import repo_root
 
 #: Azure credentials for the reading model. Read as a FILE, never sourced as a shell script:
 #: this module wires the deployment up and must not be able to execute what is in there.
-AZURE_ENV_PATH = "/N/project/computable_phenotype/llm/.azure_env"
+AZURE_ENV_PATH = site.MODEL_ENV_FILE or ""
 
 #: Where labellings live. Outside the tree, deliberately — see the PHI note above.
-DEFAULT_LABELS_ROOT = "/N/project/computable_phenotype/llm/devlabels"
+DEFAULT_LABELS_ROOT = str(site.LABELS_ROOT)
 LABELS_ROOT_ENV = "ACR_DEVLABELS_ROOT"
 
 #: The deployment this module was costed against: USD per 1M tokens, published rate.

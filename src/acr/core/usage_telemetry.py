@@ -10,12 +10,13 @@ comparable on spend as well as on answers.
 """
 from __future__ import annotations
 
-import os
 import sys
 
+from . import site
+
 #: Where `lc_callback` lives. Outside the tree because it is shared with the LiteLLM path's
-#: `sitecustomize` hook and predates this package; overridable for a different checkout.
-AUDIT_DIR = os.getenv("ACR_AUDIT_DIR", "/N/project/computable_phenotype/llm/audit")
+#: `sitecustomize` hook. The ADDRESS is deployment configuration — see `core/site.py`.
+AUDIT_DIR = str(site.AUDIT_DIR)
 
 
 def _callbacks(tracer=None):

@@ -24,6 +24,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..core.site import looks_like_a_person_id
+
 GOLD_SCHEMA = "acr.chart_observable_gold/1"
 BEHAVIOUR_SCHEMA = "acr.behavior_distribution/1"
 PACKET_SCHEMA = "acr.contrastive_failure_packet/1"
@@ -73,7 +75,6 @@ RETRIEVAL_PARAMETERS = {
     "document_type_policy", "keyword_retrieval_asset", "skill_instruction",
 }
 
-_PERSON_ID = re.compile(r"1168\d{12}")
 
 class SpecRepairError(ValueError):
     """A develop-plane artifact is incomplete, inconsistent, or unsafe to use."""
@@ -107,7 +108,7 @@ def _safe_case_id(value: Any) -> str:
     case_id = str(value or "").strip()
     if not case_id:
         raise SpecRepairError("case_id is required")
-    if _PERSON_ID.search(case_id):
+    if looks_like_a_person_id(case_id):
         raise SpecRepairError(
             "case_id looks like a real person_id; pseudonymise it before creating a "
             "develop-plane artifact")
@@ -126,7 +127,7 @@ def _portable_source(source: str) -> str:
     return f"manifest:{_hash(source)}" if source else ""
 
 def _portable_run_id(run_id: str) -> str:
-    return f"run:{_hash(run_id)}" if _PERSON_ID.search(run_id) else run_id
+    return f"run:{_hash(run_id)}" if looks_like_a_person_id(run_id) else run_id
 
 @dataclass(frozen=True)
 class GoldField:

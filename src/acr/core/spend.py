@@ -19,14 +19,13 @@ cache reads. A token cap therefore mostly measures how well the cache is working
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass, field
-from pathlib import Path
+
+from . import site
 
 #: Where the rates live. One table, shared with `cost_report.py`, because two price tables is
 #: two answers to "what did this cost".
-PRICES = Path(os.getenv("ACR_PRICES",
-                        "/N/project/computable_phenotype/llm/audit/prices.json"))
+PRICES = site.PRICES
 
 #: USD per 1M, used when the table has no row for the model. Absent rather than zero: a run
 #: whose model is unpriced must not be reported as free.

@@ -45,7 +45,7 @@ stamp `gate_validated: true` over a chart the ledger never saw read. Worse, unde
 `FilesystemBackend(root_dir=".")` the skills path uses, `read` and `grep` reach ABSOLUTE
 paths outside root_dir:
 
-    read("/N/project/computable_phenotype/acr_real/ground_truth.csv")
+    read("$ACR_REAL_CORPUS/ground_truth.csv")
         -> ReadResult(error=None, content="person_id,...,gt_primary_site,gt_histology,...")
 
 That is the answer key, reachable from the RUN plane. No recorded run exercised it — all

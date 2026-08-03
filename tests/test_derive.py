@@ -1,6 +1,6 @@
 """The first-order derivation, tested entirely offline against fixtures authored here.
 
-NOTHING IN THIS FILE TOUCHES A REAL CHART, THE CACHED BITMAPS ON /N/project, A MODEL OR THE
+NOTHING IN THIS FILE TOUCHES A REAL CHART, THE CACHED BITMAPS UNDER $ACR_TERMCACHE_ROOT, A MODEL OR THE
 NETWORK. The synthetic corpus below is thirty patients of pure Python, and it is shaped around
 the cases that have actually gone wrong in this repo:
 

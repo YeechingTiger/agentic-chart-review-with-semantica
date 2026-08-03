@@ -120,10 +120,11 @@ import yaml
 from ..chartstore.corpus import DocMeta
 from ..contract.spec import ProvenanceRecord, _content_hash, load_spec
 from ..contract.strata import assign_strata, strata_from_spec
+from ..core import site
 
 #: Where the cached document bitmaps live. Built once by `termcache/build_cache.py`; this
 #: module reads them and never rescans a chart.
-DEFAULT_CACHE_ROOT = "/N/project/computable_phenotype/llm/termcache"
+DEFAULT_CACHE_ROOT = str(site.TERMCACHE_ROOT)
 
 #: The four policies stage 4 can assign. Closed on purpose: a fifth would be a new promise
 #: to the run plane, and the run plane has to be taught it first.

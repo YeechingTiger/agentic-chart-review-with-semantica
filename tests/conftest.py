@@ -43,7 +43,32 @@ silently spending.
 """
 from __future__ import annotations
 
+import importlib
+import os
+
 import pytest
+
+# --------------------------------------------------------------- the site's identifier shape
+# `acr.core.site` ships NO default person-id pattern, on purpose: three defaults were tried and
+# each was measured wrong somewhere nobody had looked (see that module's docstring). The runtime
+# guards are therefore INERT until a deployment declares a shape — which would silently disarm
+# every test that asserts a real-looking identifier is REFUSED or MASKED.
+#
+# So the test session declares one. It is set here rather than per-test because the alternative is
+# sixteen tests each remembering to, and a test that forgets does not fail: it passes while
+# measuring nothing. Wide on purpose, matching the runtime setting's error cost — a false negative
+# here would mean a guard test that cannot see the thing it guards against.
+#
+# `ACR_PHI_SCAN_PATTERN` is deliberately NOT set. It is the other half of the split, and the byte
+# scan over the tree wants the opposite error cost: with a pattern this wide it flags 203 content
+# hashes under `assets/`. `tests/test_no_phi_in_tree.py` skips when it is unset, and a deployment
+# holding real data is refused unless it sets both — see `site.require_person_id_pattern`.
+os.environ.setdefault("ACR_PERSON_ID_PATTERN", r"(?<![\d.])\d{10,}")
+
+import acr.core.site as _site
+
+importlib.reload(_site)
+
 
 #: The provider constructors on `acr.core.cli_common`. Kept here rather than imported so that
 #: deleting one from the guard is a visible edit to the guard.

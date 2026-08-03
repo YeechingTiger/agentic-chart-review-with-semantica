@@ -386,9 +386,11 @@ def precedence_gate() -> PrecedenceGate:
 IRB, CRITICAL, WARN = "IRB", "CRITICAL", "WARN"
 _SEVERITY_ORDER = {IRB: 0, CRITICAL: 1, WARN: 2}
 
-#: The real corpus's person_id shape. Findings land in eval reports that live in the tree,
-#: so identifiers are masked on the way out — see tests/test_no_phi_in_tree.py.
-_PERSON_ID = re.compile(r"1168\d{12}")
+#: The site's person-id shape, configured in ONE place. Findings land in eval reports that live
+#: in the tree, so identifiers are masked on the way out — see tests/test_no_phi_in_tree.py.
+#: `evals` is otherwise stdlib-only by design (pinned by tests/test_evals.py), so the compiled
+#: pattern is imported rather than the module: one name, and no package edge worth checking.
+from ..core import site as _site
 
 READ_TOOLS = {"read_document", "read_documents_batch"}
 SEARCH_TOOLS = {"search_notes", "search_documents", "search"}
@@ -415,7 +417,7 @@ def mask_person_ids(obj: Any) -> Any:
     `_outcome_index` is a dict, so nine of them vanish and the tenth answers for the batch.
     That is how a real 10-patient before/after reported `0 regressions` while two instances
     had visibly left a good outcome — and why no test caught it, since a synthetic `SYN0001`
-    does not match `_PERSON_ID` and never collides.
+    matches no configured pattern and never collides.
 
     With a key set, each id becomes its own token, stable across processes so two baselines
     can be joined, and not invertible without the key. Without one the old behaviour stands,
@@ -423,15 +425,20 @@ def mask_person_ids(obj: Any) -> Any:
     a lookup table, not a protection. `compare` refuses rather than guess when it sees the
     collision, so the unkeyed path is slow, never wrong.
     """
+    pattern = _site.PERSON_ID
+    if pattern is None:
+        # No identifier shape configured for this site, so there is nothing to mask and nothing to
+        # claim. `core/site.require_person_id_pattern` refuses the case where that is unsafe.
+        return obj
     key = os.environ.get(PSEUDONYM_KEY_ENV)
     if not key:
-        return json.loads(_PERSON_ID.sub("<person_id:redacted>", json.dumps(obj, default=str)))
+        return json.loads(pattern.sub("<person_id:redacted>", json.dumps(obj, default=str)))
 
     def tok(m: re.Match[str]) -> str:
         digest = hmac.new(key.encode(), m.group(0).encode(), hashlib.sha256).hexdigest()[:12]
         return f"<person:{digest}>"
 
-    return json.loads(_PERSON_ID.sub(tok, json.dumps(obj, default=str)))
+    return json.loads(pattern.sub(tok, json.dumps(obj, default=str)))
 
 
 def _num(v: Any, cast):

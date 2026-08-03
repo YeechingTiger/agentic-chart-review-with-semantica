@@ -1,6 +1,6 @@
 """No real patient identifier may live in this tree.
 
-The corpus under `/N/project/computable_phenotype/acr_real/` is real PHI. The repo is not a
+The corpus under `$ACR_REAL_CORPUS/` is real PHI. The repo is not a
 safe place for any of it, and the leak this guards against already happened: real
 `person_id`s were pasted into `assets/skills/` write-ups and into `src/` docstrings as evidence for
 design decisions ("patient <id> was coded C349 when 'right upper lobe' was documented").
@@ -8,7 +8,7 @@ They were accurate, they were useful, and they were sixteen digits of protected 
 information sitting in source control.
 
 The fix was to swap them for the pseudonyms P01..P05 and keep the mapping OUTSIDE the tree,
-at `/N/project/computable_phenotype/llm/phi_pseudonym_map.json` (mode 600). The point of a
+at `$ACR_PSEUDONYM_MAP` (mode 600). The point of a
 pseudonym is that the write-up keeps its evidentiary value while the tree stops carrying the
 identifier, so nothing was lost by the swap.
 
@@ -40,12 +40,18 @@ from pathlib import Path
 
 import pytest
 
+from acr.core import site
+
 ROOT = Path(__file__).resolve().parents[1]
 
-#: The real corpus's person_id shape: a `1168` institutional prefix and twelve more digits.
+#: The site's person-id shape, taken from `acr.core.site` so that this scan and the runtime's
+#: masking cannot disagree. It used to be a literal here AND in three runtime modules; the four
+#: copies were the thing most likely to drift, and the direction they drift in is narrower, which
+#: is the direction that fails silently.
 #: A pattern, deliberately not an example -- writing one real id into the guard that exists
 #: to forbid real ids would be its own defect.
-PERSON_ID = re.compile(rb"1168[0-9]{12}")
+PERSON_ID = (re.compile(site.PHI_SCAN_PATTERN.encode())
+             if site.PHI_SCAN_PATTERN else None)
 
 #: Directories that belong to the repo and must be clean whether or not they are committed.
 SOURCE_DIRS = ("src", "assets", "tests", "tools")
@@ -92,13 +98,15 @@ def _tracked() -> list[Path]:
 
 def test_no_real_person_id_in_a_tracked_file():
     """A tracked file is a file that gets pushed. This is the disclosure boundary."""
+    if PERSON_ID is None:
+        pytest.skip("ACR_PHI_SCAN_PATTERN is not set: no shape to scan for. See acr/core/site.py — three defaults were tried and each was measured wrong.")
     found: list[str] = []
     for p in _tracked():
         if p.is_file() and p.suffix.lower() in TEXT_SUFFIXES:
             found.extend(_hits(p))
     assert not found, (
         f"{len(found)} real person_id(s) in tracked files — use the P01..P05 pseudonyms and "
-        "keep the mapping at /N/project/computable_phenotype/llm/phi_pseudonym_map.json:\n"
+        "keep the mapping at $ACR_PSEUDONYM_MAP:\n"
         + "\n".join(found[:40])
     )
 
@@ -108,6 +116,8 @@ def test_no_real_person_id_in_a_tracked_path():
     directory for a real patient could be published with the id in the PATH even if the file
     content is clean. `runs/` is ignored now, but `git add -f` overrides an ignore and this
     check does not depend on the ignore being right."""
+    if PERSON_ID is None:
+        pytest.skip("ACR_PHI_SCAN_PATTERN is not set: no shape to scan for. See acr/core/site.py — three defaults were tried and each was measured wrong.")
     bad = [str(p.relative_to(ROOT)) for p in _tracked() if PERSON_ID.search(bytes(p))]
     assert not bad, (
         f"{len(bad)} tracked path(s) contain a real person_id; rename them to a pseudonym:\n"
@@ -128,7 +138,7 @@ def test_no_run_output_is_tracked():
 
     So the rule is now categorical and checkable without knowing anything about ids: no path
     under `runs/` is tracked, whatever it is called and whatever is in it. Run output lives
-    outside the repo, under /N/project/computable_phenotype/llm/run/.
+    outside the repo, under $ACR_LOCAL_ROOT/run/.
     """
     tracked = sorted(str(p.relative_to(ROOT)) for p in _tracked()
                      if p.relative_to(ROOT).parts[:1] == ("runs",))
@@ -144,6 +154,8 @@ def test_no_run_output_is_tracked():
 def test_no_real_person_id_in_the_source_tree(directory: str):
     """Untracked source counts too: `assets/skills/` and much of `src/acr/` were untracked at the
     moment the ids were found sitting in them."""
+    if PERSON_ID is None:
+        pytest.skip("ACR_PHI_SCAN_PATTERN is not set: no shape to scan for. See acr/core/site.py — three defaults were tried and each was measured wrong.")
     base = ROOT / directory
     if not base.is_dir():
         pytest.skip(f"{directory}/ not present")
@@ -162,10 +174,59 @@ def test_no_real_person_id_in_the_source_tree(directory: str):
 def test_the_pseudonym_map_is_outside_the_tree_and_not_world_readable():
     """The mapping is the one artefact that must never be in the repo, and the only thing
     that makes the pseudonyms reversible for someone entitled to reverse them."""
-    m = Path("/N/project/computable_phenotype/llm/phi_pseudonym_map.json")
+    m = Path("$ACR_PSEUDONYM_MAP")
     assert ROOT not in m.parents, "the mapping must not live under the repo"
     if not m.exists():
         pytest.skip("mapping not present on this host")
     assert m.stat().st_mode & 0o077 == 0, (
         f"mapping is group/world accessible (mode {m.stat().st_mode & 0o777:o}); chmod 600 it"
     )
+
+
+def test_a_real_corpus_without_the_two_identifier_patterns_is_refused():
+    """The link that makes unset patterns safe rather than merely quiet.
+
+    Every person-id refusal, every mask and this file's own byte scan is a no-op without a
+    configured shape, and a no-op guard reads exactly like a satisfied one. So a deployment holding
+    real data must declare both shapes. This pins the REFUSAL and not a default: three defaults
+    were tried and each was measured wrong somewhere nobody had looked — see `acr/core/site.py`,
+    and note that the two settings exist because their consumers want OPPOSITE error costs.
+    """
+    import importlib
+    import os as _os
+
+    import acr.core.site as s
+
+    KEYS = ("ACR_REAL_CORPUS", "ACR_PERSON_ID_PATTERN", "ACR_PHI_SCAN_PATTERN")
+    saved = {k: _os.environ.get(k) for k in KEYS}
+
+    def reload(**env):
+        for k in KEYS:
+            v = env.get(k)
+            _os.environ.pop(k, None) if v is None else _os.environ.__setitem__(k, v)
+        return importlib.reload(s)
+
+    try:
+        m = reload(ACR_REAL_CORPUS="/somewhere/real")
+        with pytest.raises(RuntimeError, match="ACR_PERSON_ID_PATTERN and ACR_PHI_SCAN_PATTERN"):
+            m.require_person_id_pattern()
+
+        # Half-configured is still refused, and the message names the half that is missing.
+        m = reload(ACR_REAL_CORPUS="/somewhere/real", ACR_PERSON_ID_PATTERN=r"XX\d{6}")
+        with pytest.raises(RuntimeError, match="ACR_PHI_SCAN_PATTERN"):
+            m.require_person_id_pattern()
+
+        m = reload(ACR_REAL_CORPUS="/somewhere/real", ACR_PERSON_ID_PATTERN=r"XX\d{6}",
+                   ACR_PHI_SCAN_PATTERN=r"XX\d{6}")
+        m.require_person_id_pattern()
+        assert m.looks_like_a_person_id("XX123456")
+        assert not m.looks_like_a_person_id("SYN0001")
+
+        # No real corpus: nothing to protect, and inert guards are the correct state.
+        m = reload()
+        m.require_person_id_pattern()
+        assert not m.looks_like_a_person_id("XX123456")
+    finally:
+        for k, v in saved.items():
+            _os.environ.pop(k, None) if v is None else _os.environ.__setitem__(k, v)
+        importlib.reload(s)
