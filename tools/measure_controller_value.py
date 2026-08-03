@@ -87,7 +87,7 @@ def _exists_in_corpus(pid: str, value: str) -> bool:
 
 def main() -> int:
     root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "runs/a15eval")
-    gold = {r["patient_id"]: r for r in json.loads((ROOT / "corpus" / "index.json").read_text())}
+    gold = {r["patient_id"]: r for r in json.loads((site.corpus_root().parent / "index.json").read_text())}
 
     runs: dict[str, list[dict]] = defaultdict(list)
     for f in sorted(glob.glob(f"{root}/**/*.manifest.json", recursive=True)):

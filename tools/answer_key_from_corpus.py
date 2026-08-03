@@ -46,8 +46,10 @@ import argparse
 import json
 from pathlib import Path
 
+from acr.core import site
+
 REPO = Path(__file__).resolve().parents[1]
-DEFAULT_CORPUS = REPO / "corpus" / "patients"
+DEFAULT_CORPUS = site.corpus_root()
 
 
 def _subgroups(truth: dict, row: dict) -> list[str]:

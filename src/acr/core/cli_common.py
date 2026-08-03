@@ -25,7 +25,34 @@ if TYPE_CHECKING:
 
 con = Console()
 
-CORPUS = typer.Option(str(site.corpus_root()), "--corpus", help="root directory of patient directories")
+#: The corpus default is a CALLABLE, not a resolved path. `site.corpus_root()` raises when the
+#: corpus is not checked out beside this repository, and evaluating it here made `import
+#: acr.core.cli_common` require the data to be present — so every CLI module, and every test that
+#: imported one, failed at IMPORT in a checkout that had no corpus. A library that cannot be
+#: imported without its data is coupled to it. Typer calls a default factory when the command runs,
+#: which is the moment the corpus is actually needed and the moment the resolver's message ("set
+#: ACR_CORPUS, or clone acr-corpus beside this repository") is useful.
+def _corpus_default() -> str:
+    """The corpus, if it can be found at import time, and a nominal path if it cannot.
+
+    `site.corpus_root()` RAISES when the corpus is not checked out beside this repository, and
+    calling it here made `import acr.core.cli_common` require the data to be present: every CLI
+    module, and every test importing one, died at IMPORT in a checkout with no corpus. A library
+    that cannot be imported without its data is coupled to it.
+
+    Falling back to the nominal relative path rather than to `None` keeps this a `str`, so no
+    command signature changes and no caller has to re-resolve. The resolver's own message — set
+    `ACR_CORPUS`, or clone `acr-corpus` beside this repository — still reaches anything that calls
+    `corpus_root()` directly, which is every test that needs a chart.
+    """
+    try:
+        return str(site.corpus_root())
+    except FileNotFoundError:
+        return "corpus/patients"
+
+
+CORPUS = typer.Option(_corpus_default(), "--corpus",
+                      help="root directory of patient directories")
 MODEL = typer.Option(None, "--model", "-m", help="LiteLLM model string, e.g. ollama_chat/qwen3.6:35b")
 API_BASE = typer.Option(None, "--api-base", help="override provider base URL (vLLM, proxy, …)")
 

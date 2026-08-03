@@ -29,7 +29,12 @@ import pytest
 from acr.evaluation import evals as E
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
+#: Every directory the `acr` namespace package resolves to — one per installed distribution after
+#: the 2026-08-03 split. The registry names its verifiers as STRINGS (`acr.review.answer_gate.
+#: check_gate`), which is the whole point: `evals` imports nothing from `acr` and the linkage is a
+#: name, not a dependency. But checking that a name resolves has to look wherever the namespace
+#: actually lives, and `<this repo>/src` is only one portion of it.
+SRC_ROOTS = [Path(p) for p in __import__("acr").__path__]
 
 #: Shaped like a real person_id, assembled at import so the literal never appears in source.
 OTHER_PATIENT = "1168" + "0" * 11 + "7"
@@ -218,7 +223,9 @@ def test_every_deterministic_verifier_names_code_that_actually_exists(dim):
     """
     parts = E.REGISTRY[dim].verifier.split(".")
     for cut in range(len(parts), 1, -1):
-        path = SRC.joinpath(*parts[:cut]).with_suffix(".py")
+        # `parts[0]` is "acr" and each root IS the acr portion, so drop it before joining.
+        cand = [r.joinpath(*parts[1:cut]).with_suffix(".py") for r in SRC_ROOTS]
+        path = next((c for c in cand if c.is_file()), cand[0])
         if path.is_file():
             assert _defines(path, ".".join(parts[cut:])) or cut == len(parts), \
                 f"{E.REGISTRY[dim].verifier} does not exist"
@@ -242,7 +249,12 @@ FORBIDDEN_MODULES = {
 
 def test_no_model_is_reachable_from_this_module():
     """An eval plane that can call a model is an eval plane that will."""
-    tree = ast.parse((SRC / "acr" / "evaluation" / "evals.py").read_text(encoding="utf-8"))
+    # Whichever namespace portion actually ships it. `SRC_ROOTS[0]` is not it: the first portion
+    # is whatever the import system happened to list first, and after the split that is a sibling
+    # distribution that has no `evaluation/` at all.
+    _src = next(r / "evaluation" / "evals.py" for r in SRC_ROOTS
+                if (r / "evaluation" / "evals.py").is_file())
+    tree = ast.parse(_src.read_text(encoding="utf-8"))
     imported: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):

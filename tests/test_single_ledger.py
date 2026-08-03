@@ -18,6 +18,7 @@ import inspect
 import acr.core.state
 import acr.review.coverage
 import acr.review.tools.toolbox
+from acr.core import site
 
 
 def test_flat_ledger_is_gone_not_merely_unused():
@@ -47,7 +48,7 @@ def test_the_ledger_reports_which_mode_it_is_in():
 
     from acr.chartstore.corpus import Corpus
 
-    corpus = Path(__file__).resolve().parents[1] / "corpus" / "patients"
+    corpus = site.corpus_root()
     docs, _ = Corpus(corpus).chart("SYN0002").list_documents(limit=10_000)
 
     bare = acr.review.coverage.CoverageLedger(docs, [])

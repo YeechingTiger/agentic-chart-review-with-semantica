@@ -239,7 +239,18 @@ def test_every_yaml_key_the_skill_tells_an_author_to_write_is_read_by_something(
     # Two keys no shipped spec uses yet, each grounded in the code that reads it rather than
     # waved through: `provenance` drives the "what we made up" section of `spec review`, and
     # `witness` is the binding grammar of `for_positive`.
-    specview_tests = (ROOT / "tests" / "test_specview.py").read_text(encoding="utf-8")
+    # `test_specview.py` moved to `acr-spec-authoring` with the renderer it tests and this file
+    # followed the card it tests, so they may or may not sit side by side. The CLAIM here is "these
+    # two keys have a reader", and a reader in a sibling repository is still a reader — so look
+    # wherever it is, and say what could not be checked rather than raising a path error.
+    _sv = next((c for c in (ROOT / "tests" / "test_specview.py",
+                            *(r.parent.parent / "tests" / "test_specview.py"
+                              for r in site.skill_roots()))
+                if c.is_file()), None)
+    if _sv is None:
+        pytest.skip("test_specview.py is in a sibling repository that is not checked out; the "
+                    "claim it witnesses cannot be checked from here alone")
+    specview_tests = _sv.read_text(encoding="utf-8")
     assert "provenance" in specview_tests
     assert "witness" in inspect.getsource(ExtractionSpec.__module__ and __import__(
         "acr.contract.spec", fromlist=["spec"]))

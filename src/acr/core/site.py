@@ -160,8 +160,55 @@ def specs_root() -> Path:
 
 
 def skills_root() -> Path:
-    """The method cards. Ships in `acr-chart-review`; `$ACR_SKILLS` overrides."""
-    return _resolve("ACR_SKILLS", "assets/skills", "acr-chart-review", "the method cards")
+    """The FIRST method-card directory. Prefer `skill_roots()` — see why below."""
+    return skill_roots()[0]
+
+
+def skill_roots() -> tuple[Path, ...]:
+    """EVERY method-card directory, in search order.
+
+    A tuple and not a path, because after the 2026-08-03 split the cards are distributed by
+    CONSUMER rather than gathered in one place: the chart-review agent's task/policy/tactic/
+    experience/general cards ship with the agent, the five `slot: eval` cards ship with the
+    evaluation plane, `store-to-spec` with the contract authoring tools, and
+    `non-concordance-triage` with the guideline engine. A single root was the monorepo's shape and
+    resolving one made a card that had moved look like a card that never existed.
+
+    Order: `$ACR_SKILLS` if set, then `assets/skills` under the cwd and each parent, then the same
+    under every sibling directory of each of those parents. A card is looked up by NAME across all
+    of them, which is the whole linkage — no repository has to know which sibling owns a card, only
+    that the name means the same thing everywhere.
+    """
+    if os.getenv("ACR_SKILLS"):
+        return (_resolve("ACR_SKILLS", "assets/skills", "acr-chart-review", "the method cards"),)
+    roots: list[Path] = []
+    here = Path.cwd().resolve()
+    for base in (here, *here.parents):
+        if (base / "assets" / "skills").is_dir():
+            roots.append(base / "assets" / "skills")
+        # Sibling checkouts, but NOT at the filesystem root: `/` holds entries that raise
+        # `OSError: Invalid argument` on stat (`/.resolve` on macOS), and walking every top-level
+        # directory looking for `assets/skills` is not a search, it is a scan of the machine.
+        if base.parent != base and base.parent.parent != base.parent:
+            try:
+                siblings = sorted(base.parent.iterdir())
+            except OSError:
+                siblings = []
+            for sib in siblings:
+                d = sib / "assets" / "skills"
+                try:
+                    if d.is_dir() and d not in roots:
+                        roots.append(d)
+                except OSError:
+                    continue
+        if roots:
+            break
+    if not roots:
+        raise FileNotFoundError(
+            "cannot find the method cards. Looked for 'assets/skills' under "
+            f"{here}, its parents, and their sibling directories. Set ACR_SKILLS, or clone "
+            "acr-chart-review beside this repository.")
+    return tuple(roots)
 
 #: See the module docstring for the three defaults that were tried and what each one got wrong.
 #: `None` until a deployment says what an identifier looks like here.

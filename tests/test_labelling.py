@@ -803,8 +803,17 @@ def test_a_resumed_run_counts_prior_spend_against_the_ceiling(corpus, store):
 
 
 def test_labels_root_refuses_a_path_inside_the_repository():
+    """"Inside the repository" is whatever `repo_paths` says it is, not wherever this file sits.
+
+    Before the 2026-08-03 split those were the same directory. They are not any more: this test
+    lives in `acr-experience` and `labels_root` measures against the checkout it was imported
+    from, so a path built from `__file__` was outside the repository being checked and the refusal
+    correctly did not fire — which read as the guard being broken.
+    """
+    from acr.core.repo_paths import repo_root
+
     with pytest.raises(L.LabellingError):
-        L.labels_root(str(Path(__file__).resolve().parents[1] / "runs" / "labels"))
+        L.labels_root(str(repo_root() / "runs" / "labels"))
 
 
 def test_labels_are_not_group_or_world_readable(corpus, store):

@@ -151,6 +151,8 @@ TESTS_BY_SUBJECT = {
     #: Its subject is the CRC use-case bundle under `assets/usecase/`, which went with the
     #: guideline plane. An import graph put it in the shared layer because it imports nothing.
     "test_crc_full_normalization.py": "acr-concordance",
+    #: Loads `tools/run_ladder.py` by path and validates every arm. The driver is the harness's.
+    "test_run_ladder_arms.py": "acr-harness",
 }
 
 #: WHO OWNS WHICH METHOD CARD. `assets/skills/` held cards for FOUR different consumers in one

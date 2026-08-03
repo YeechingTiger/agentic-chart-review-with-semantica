@@ -11,16 +11,15 @@ point: "this patient has no pathology" would come back as a query error.
 """
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from acr.chartstore.corpus import Corpus
+from acr.core import site
 from acr.core.state import EvidenceLedger
 from acr.review.coverage import CoverageLedger
 from acr.review.tools import Toolbox
 
-CORPUS = Path(__file__).resolve().parents[1] / "corpus" / "patients"
+CORPUS = site.corpus_root()
 
 
 @pytest.fixture(scope="module")

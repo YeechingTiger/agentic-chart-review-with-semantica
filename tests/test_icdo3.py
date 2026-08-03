@@ -339,7 +339,7 @@ def test_the_table_validates_against_every_registry_answer_in_the_corpus(lung):
 def test_the_lung_spec_declares_its_code_table():
     """一个值属于哪个码系统是答案**含义**的一部分，所以由 spec 说。运行时不从语料或字段名猜。"""
     from acr.contract.spec import load_spec as _ls
-    spec = _ls("assets/specs/STORE.400_522_523.site_histology_behavior.yaml")
+    spec = _ls(site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml")
     assert spec.value_domain == "icdo3_lung"
 
 
@@ -374,7 +374,7 @@ def test_the_rendered_block_contains_the_subsite_facts_a_run_got_wrong():
     """端到端：模型真正会读到的那段文字里，C341 旁边写着 'Upper lobe'。"""
     from acr.contract.code_tables import code_domain_block
     from acr.contract.spec import load_spec as _ls
-    b = code_domain_block(_ls("assets/specs/STORE.400_522_523.site_histology_behavior.yaml"))
+    b = code_domain_block(_ls(site.specs_root() / "STORE.400_522_523.site_histology_behavior.yaml"))
     assert "C341  Upper lobe, lung" in b
     assert "C342  Middle lobe, lung" in b
     assert "C343  Lower lobe, lung" in b

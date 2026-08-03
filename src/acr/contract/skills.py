@@ -83,8 +83,10 @@ def load_skill_body(name: str, skills_dir: Path | str | None = None) -> str:
     the bug this module was written to fix — the runtime would report that guidance was supplied
     and the model would receive nothing.
     """
-    root = Path(skills_dir) if skills_dir else SKILLS_DIR
-    path = root / name / "SKILL.md"
+    roots = [Path(skills_dir)] if skills_dir else list(site.skill_roots())
+    path = next((r / name / "SKILL.md" for r in roots if (r / name / "SKILL.md").is_file()),
+                roots[0] / name / "SKILL.md")
+    root = path.parent.parent
     if not path.is_file():
         raise SkillError(
             f"no skill {name!r} at {path}. A profile that offers a skill the tree does not have "
@@ -105,8 +107,10 @@ def load_skill_body(name: str, skills_dir: Path | str | None = None) -> str:
 
 def _frontmatter(name: str, skills_dir: Path | str | None = None) -> dict:
     """One skill's frontmatter as a mapping. Raises for anything a loader would drop silently."""
-    root = Path(skills_dir) if skills_dir else SKILLS_DIR
-    path = root / name / "SKILL.md"
+    roots = [Path(skills_dir)] if skills_dir else list(site.skill_roots())
+    path = next((r / name / "SKILL.md" for r in roots if (r / name / "SKILL.md").is_file()),
+                roots[0] / name / "SKILL.md")
+    root = path.parent.parent
     if not path.is_file():
         raise SkillError(f"no skill {name!r} at {path}")
     m = _FRONTMATTER.match(path.read_text(encoding="utf-8"))

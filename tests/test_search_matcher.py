@@ -34,13 +34,13 @@ from __future__ import annotations
 
 import re
 from datetime import date
-from pathlib import Path
 
 import pytest
 
 from acr.chartstore.corpus import Corpus, _notation_tolerant
+from acr.core import site
 
-CORPUS = Path(__file__).resolve().parents[1] / "corpus" / "patients"
+CORPUS = site.corpus_root()
 
 
 def matches(query: str, text: str) -> bool:

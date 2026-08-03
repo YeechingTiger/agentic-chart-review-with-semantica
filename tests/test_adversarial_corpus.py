@@ -23,7 +23,9 @@ from pathlib import Path
 
 import pytest
 
-CORPUS = Path(__file__).resolve().parents[1] / "corpus" / "patients"
+from acr.core import site
+
+CORPUS = site.corpus_root()
 DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 
 
@@ -356,7 +358,7 @@ def test_no_unparseable_document_is_sitting_in_the_corpus():
 # ======================================================================================
 
 HELD_OUT = ["SYNY01", "SYNY02", "SYNY03", "SYNY04", "SYNY05", "SYNY06"]
-SPEC_390 = (Path(__file__).resolve().parents[1] / "assets" / "specs"
+SPEC_390 = (site.specs_root()
             / "STORE.390.date_of_initial_diagnosis.yaml")
 
 

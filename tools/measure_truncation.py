@@ -33,8 +33,9 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 from acr.chartstore.corpus import Corpus
+from acr.core import site
 
-CORPUS = REPO / "corpus" / "patients"
+CORPUS = site.corpus_root()
 SPEC_KEY = "STORE.390.date_of_initial_diagnosis"
 
 #: Terms a run against STORE.390 actually issues. Deliberately a mix: two that are meant to be

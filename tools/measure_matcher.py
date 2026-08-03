@@ -28,8 +28,9 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 from acr.chartstore.corpus import _notation_tolerant
+from acr.core import site
 
-CORPUS = REPO / "corpus" / "patients"
+CORPUS = site.corpus_root()
 
 #: (probe, what tolerance it exercises). Phrases are the ones a run actually issues against
 #: STORE.390 and STORE.400, plus one per tolerance the matcher claims.

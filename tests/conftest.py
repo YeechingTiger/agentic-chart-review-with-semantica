@@ -120,12 +120,79 @@ def _muzzle_provider(request, monkeypatch):
 # NARROW ON PURPOSE: it matches only the sentence `_resolve` produces. A genuinely missing file
 # inside this repository still FAILS, because "an asset that was supposed to travel and did not" is
 # the case this project most needs to hear about.
+#: The three phases a resolver failure can surface in. `setup` is where a fixture that builds a
+#: corpus path fails; `call` is where a test body does. Registering the wrapper for both is not
+#: belt-and-braces — an error in setup is reported as ERROR and never reaches `call`, which is why
+#: the isolated suites still showed `258 errors` after the call hook alone was in place.
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_setup(item):
+    yield from _reclassify()
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_call(item):
+    yield from _reclassify()
+
+
+def _reclassify():
+    """Turn the resolver's own FileNotFoundError into a skip, wherever it is raised.
+
+    A generator so both phase hooks share one body. Narrow on purpose: it matches only the sentence
+    `acr.core.site._resolve` and `skill_roots` produce, so a genuinely missing file inside this
+    repository still fails — "an asset that was supposed to travel and did not" is the case this
+    project most needs to hear about rather than skip.
+    """
     outcome = yield
     exc = outcome.excinfo[1] if outcome.excinfo else None
     if isinstance(exc, FileNotFoundError) and (
-            "Set ACR_" in str(exc) or "does not exist (" in str(exc)):
+            "Set ACR_" in str(exc) or "does not exist (" in str(exc)
+            or "cannot find the method cards" in str(exc)):
         outcome.force_exception(
             pytest.skip.Exception(f"fixture lives in a sibling repository: {exc}",
                                   _use_item_location=True))
+
+
+#: Which shared fixtures this checkout can actually reach, computed ONCE. `None` means unavailable.
+def _fixture_availability():
+    from acr.core import site
+    out = {}
+    for name, fn in (("specs", site.specs_root), ("corpus", site.corpus_root),
+                     ("skills", site.skill_roots)):
+        try:
+            fn(); out[name] = True
+        except FileNotFoundError:
+            out[name] = False
+    return out
+
+
+_AVAILABLE = _fixture_availability()
+
+#: Source-text markers for each fixture. A module that mentions the resolver needs the fixture; a
+#: grep is enough and, unlike importing, it works before the failure it is trying to avoid.
+_NEEDS = {"specs": ("specs_root",), "corpus": ("corpus_root",), "skills": ("skill_roots", "skills_root")}
+
+
+def pytest_ignore_collect(collection_path, config):
+    """Skip a test module BEFORE importing it when the fixture it needs is in an absent sibling.
+
+    WHY NOT A REPORT HOOK. Two earlier attempts reclassified the outcome after the fact —
+    `pytest_runtest_call`, which never runs because the failure is at MODULE level during import,
+    and `pytest_collectreport`, which does mark the report skipped but leaves pytest's own error
+    count intact, so a nine-repo suite still ended `Interrupted: 272 errors during collection`. A
+    collection error is fatal by design and the only way not to have one is not to import.
+
+    So the decision is made from the SOURCE TEXT: a module that names `specs_root` needs the
+    contracts. That is a grep, it needs no import, and it is wrong only in the harmless direction —
+    a module that mentions a resolver in a comment gets skipped when the fixture is missing, which
+    it would have been anyway.
+    """
+    if collection_path.suffix != ".py" or not collection_path.name.startswith("test_"):
+        return None
+    try:
+        text = collection_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for fixture, markers in _NEEDS.items():
+        if not _AVAILABLE.get(fixture, True) and any(m in text for m in markers):
+            return True
+    return None

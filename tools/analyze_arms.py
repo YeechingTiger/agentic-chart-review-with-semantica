@@ -36,6 +36,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from acr.core import site
 from acr.evaluation import evals as E
 
 #: The spec's five gate-required terms. Anything else the run chose for itself.
@@ -44,7 +45,7 @@ REQUIRED = {"biopsy", "carcinoma", "diagnosed", "diagnosis", "malignancy"}
 
 def gold() -> dict[str, dict]:
     out = {}
-    for row in json.loads((ROOT / "corpus" / "index.json").read_text()):
+    for row in json.loads((site.corpus_root().parent / "index.json").read_text()):
         gt = (row.get("ground_truth") or {}).get("STORE.390.date_of_initial_diagnosis") or {}
         out[row["patient_id"]] = {
             "value": gt.get("value") or gt.get("status"),

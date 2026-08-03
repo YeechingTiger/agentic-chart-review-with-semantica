@@ -104,7 +104,7 @@ def main() -> int:
     vocab = contract_vocabulary(spec)
     vset = set(vocab)
     corpus = Corpus(site.corpus_root())
-    gold = {r["patient_id"]: r for r in json.loads((ROOT / "corpus" / "index.json").read_text())}
+    gold = {r["patient_id"]: r for r in json.loads((site.corpus_root().parent / "index.json").read_text())}
 
     print(f"contract vocabulary: {len(vocab)} words")
     print(f"  {', '.join(vocab[:22])}{' ...' if len(vocab) > 22 else ''}\n")
