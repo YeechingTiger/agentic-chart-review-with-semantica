@@ -1067,7 +1067,16 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
                      config={"recursion_limit": recursion_limit_for(agent, max_model_calls)})
     except Exception as e:  # noqa: BLE001 -- a crashed run must still leave its trace
         crashed = True
-        tracer.emit("runtime_error", severity="error", error=f"{type(e).__name__}: {e}")
+        # THE TRACEBACK, not only the message. On 2026-08-03 thirty-five of forty-two runs in a
+        # frozen evaluation died with `TypeError: unhashable type: 'dict'` and that string was
+        # the entire record — no file, no line, no frame. Locating it cost an hour of reading
+        # code that was not the code at fault, and the evaluation's numbers had already been
+        # reported before anyone noticed the runs had crashed at all. A crash a trace cannot
+        # locate is a crash that gets attributed to whatever the reader was already suspicious
+        # of.
+        import traceback
+        tracer.emit("runtime_error", severity="error", error=f"{type(e).__name__}: {e}",
+                    traceback=traceback.format_exc()[-4000:])
     # Preserve the actual stopping mechanism.  The earlier binary assignment labelled every
     # non-crash—including a clean accepted answer and a rejection-loop fallback—as
     # BUDGET_EXHAUSTED, poisoning process attribution even when the answer itself was usable.

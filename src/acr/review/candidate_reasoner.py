@@ -335,15 +335,27 @@ def apply_updates(ledger: CandidateLedger, result: ReasonerResult, *, step: int,
                     if u.get("not_a_target_value"):
                         ledger.by_id(cid).not_a_target_value = True
                     if u.get("rejecting_rule"):
-                        # Recognised ids only. `parse_rule_citations` knows what the contract
-                        # declares and discards the rest without refusing anything — an
-                        # invented rule id recorded as a rule is worse than none, because a
-                        # reader checking the rejection would go looking for it.
-                        from ..contract.trace import parse_rule_citations
-                        known = parse_rule_citations(str(u["rejecting_rule"]), spec) \
-                            if spec is not None else [str(u["rejecting_rule"])]
-                        if known:
-                            ledger.by_id(cid).rejecting_rule = str(known[0])
+                        # Recognised ids only. An invented rule id recorded as a rule is worse
+                        # than none, because a reader checking the rejection would go looking
+                        # for it.
+                        #
+                        # `parse_rule_citations(source, known)` takes an ITERABLE OF RULE IDS as
+                        # its second argument and returns `(recognised, unknown)`. The first
+                        # version of this block passed the SPEC there and indexed the result,
+                        # so `set(known)` iterated a pydantic model and raised
+                        # `TypeError: unhashable type: 'dict'` — killing 35 of 42 runs in a
+                        # frozen evaluation whose numbers had already been reported. The tests
+                        # did not catch it because every one of them called `apply_updates`
+                        # with the default `spec=None`, which takes the other branch.
+                        from ..contract.trace import parse_rule_citations, rule_catalog
+                        if spec is not None:
+                            ids = [r.rule_id for r in rule_catalog(spec)]
+                            recognised, _unknown = parse_rule_citations(
+                                str(u["rejecting_rule"]), ids)
+                        else:
+                            recognised = [str(u["rejecting_rule"])]
+                        if recognised:
+                            ledger.by_id(cid).rejecting_rule = str(recognised[0])
                 elif action == "select_leading":
                     ledger.set_state(cid, "LEADING", step=step,
                                      reason=str(u.get("reason") or ""))

@@ -324,3 +324,35 @@ def test_rejecting_a_seeded_value_records_that_it_was_not_a_target_value():
     c = led.by_id("C1")
     assert c.status == "REJECTED" and c.not_a_target_value is True
     assert "service date" in c.rejection_reason
+
+
+# --------------------------------------------------------------- spec 那条分支必须被走到
+
+def test_a_rejecting_rule_is_checked_against_the_real_contract():
+    """这条测试存在的理由是一次事故,而且是测试自己造成的。
+
+    `rejecting_rule` 的第一版把 SPEC 传给了 `parse_rule_citations(source, known)` 的第二个
+    参数 —— 那里要的是**一串规则 id** —— 于是 `set(known)` 去迭代一个 pydantic 模型,抛出
+    `TypeError: unhashable type: 'dict'`,**杀掉了一次冻结评价里 42 次运行中的 35 次**,而
+    那批数字已经被当成结论报出去了。
+
+    2159 条测试一条都没抓到,因为它们全部用默认的 `spec=None` 调 `apply_updates`,走的是
+    另一个分支。一个只在参数缺省时被走到的代码路径,等于没有被测。
+    """
+    from pathlib import Path
+
+    from acr.contract.spec import load_spec
+    spec = load_spec(Path(__file__).resolve().parents[1] / "assets" / "specs"
+                     / "STORE.390.date_of_initial_diagnosis.yaml")
+    led = CandidateLedger()
+    led.declare({"d": "20200401"}, step=1)
+    led.declare({"d": "20200410"}, step=1)
+    r = CR.ReasonerResult([
+        {"action": "reject", "candidate_id": "C1", "reason": "later confirmation",
+         "rejecting_rule": "conflict_rule.3"},
+        {"action": "reject", "candidate_id": "C2", "reason": "x",
+         "rejecting_rule": "decision_rule.99"},      # 契约没有这一条
+    ])
+    assert CR.apply_updates(led, r, step=2, spec=spec) == []
+    assert led.by_id("C1").rejecting_rule == "conflict_rule.3"
+    assert led.by_id("C2").rejecting_rule == "", "编造的规则 id 被记成了规则"
