@@ -138,6 +138,20 @@ Every case carries `informed_module_design: true|false`. True means development 
 If N is too small for a clean split, use K-fold cross-fitting, with the rule that **a case's own
 data may never have contributed to the experience, rules or skills active when it is scored.**
 
+**Implemented 2026-08-03, and this paragraph was a wish for a week before it was.** The flag was
+named here and existed in no code, so every number this document reports was computed over
+charts that were designed by watching runs fail — SYNX01-06 — while the cards being scored were
+written from those same failures. `_ground_truth.json` now carries `informed_module_design` and
+`designed_from` for all 27 charts; `tools/analyze_arms.py` counts the two populations apart and
+refuses to present a headline number over an all-informed batch; `tools/answer_key_from_corpus.py`
+emits `held_out:` as a subgroup so `eval compare` fails an arm that gains only where its cards
+came from. Six held-out charts exist (SYNY01-06), each derived from a contract clause no other
+chart exercises and from no run result.
+
+**Every ladder number recorded above this line is on the informed population.** They are kept
+because they are what happened; they are not evidence about a card, and re-running the ladder
+against SYNY is the first thing that would produce any.
+
 ### Two generalisations, not one
 
 1. **Error-pattern generalisation** — in *new* cases of the same shape, is the error rarer? Not
