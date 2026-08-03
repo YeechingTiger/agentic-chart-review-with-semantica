@@ -64,10 +64,17 @@ def test_a_card_that_does_not_exist_still_fails_loudly(ladder):
         ladder.preflight([("bogus", "controller=controller-native")])
 
 
-def test_the_controller_arms_name_only_the_two_controllers_that_exist(ladder):
-    """B0 加两张卡。第三张出现时,这条测试会要求有人说明它是什么。"""
-    controllers = {s.controller for _, s in ladder.preflight(ladder.CONTROLLER_ARMS)}
-    assert controllers == {None, "controller-reactive", "controller-information-gain"}
+def test_the_controller_arms_are_every_controller_card_in_the_tree(ladder):
+    """一张树上有、梯子上没有的 controller 卡,是一个不会被测到的干预。
+
+    原来这条测试把名单钉成两张卡,理由是"第三张出现时要有人说明它是什么"。第三张出现了
+    (`controller-hypothesis-set`,2026-08-03,替代被删掉的候选账本机制),而钉死名单意味着
+    加一张卡就要改一次测试 —— 于是这条测试量的是我记不记得改它。改成对着树:少一张就是漏测。
+    """
+    on_disk = {p.name for p in (ROOT / "assets" / "skills").iterdir()
+               if p.name.startswith("controller-")}
+    named = {s.controller for _, s in ladder.preflight(ladder.CONTROLLER_ARMS)} - {None}
+    assert named == on_disk, "controller 卡和梯子不一致"
 
 
 def test_the_tactic_arms_cover_every_tactic_card_in_the_tree():

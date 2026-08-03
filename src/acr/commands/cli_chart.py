@@ -105,12 +105,6 @@ def run(
              "`general=chart-triage|thread-chasing` replaces a whole list (`|` because "
              "comma already separates clauses), `controller=` clears the slot. "
              "Validated before any model call."),
-    candidates: bool = typer.Option(
-        False, "--candidates",
-        help="OPTIONAL ARM: maintain a candidate answer ledger with an independent Candidate "
-             "Reasoner call after new evidence and before submission. An OBSERVER — its ledger "
-             "is not shown to the main loop and cannot refuse an answer; it costs one extra "
-             "model call per turn that recorded evidence. Off by default."),
     conflict_refine: bool = typer.Option(
         False, "--conflict-refine",
         help="OPTIONAL: run bounded conflict-informed candidates around the same deepagents "
@@ -142,7 +136,7 @@ def run(
         show(run_patient(spec=sp, corpus=c, patient_id=patient, out_dir=run_dir,
                          model=chat, max_model_calls=max_steps, seed=seed,
                          max_usd=max_usd, runtime_profile=runtime_profile,
-                         candidates=candidates, skill_stack=stack))
+                         skill_stack=stack))
         return
 
     from ..review.conflict_refinement import run_conflict_refinement
@@ -159,7 +153,7 @@ def run(
             "spec": sp, "corpus": c, "patient_id": patient, "out_dir": run_dir,
             "model": chat, "max_model_calls": max_steps, "seed": seed,
             "max_usd": max_usd, "runtime_profile": runtime_profile,
-            "candidates": candidates, "skill_stack": stack,
+            "skill_stack": stack,
         })
     summary = result.to_dict(include_manifests=False)
     path = run_dir / "conflict-refinement.json"
@@ -196,11 +190,6 @@ def batch(
              "`general=chart-triage|thread-chasing` replaces a whole list (`|` because "
              "comma already separates clauses), `controller=` clears the slot. "
              "Parsed once before the loop, so a typo cannot be charged per patient."),
-    candidates: bool = typer.Option(
-        False, "--candidates",
-        help="OPTIONAL ARM: maintain a candidate answer ledger with an independent Candidate "
-             "Reasoner call after new evidence and before submission. An OBSERVER — not shown "
-             "to the main loop, cannot refuse an answer. Off by default."),
     out: str = typer.Option("runs", "--out"),
 ):
     """Run one spec across many patients.
@@ -224,7 +213,7 @@ def batch(
                                        max_model_calls=max_steps, seed=seed, run_id=pid,
                                        max_usd=max_usd,
                                        runtime_profile=runtime_profile,
-                                       candidates=candidates, skill_stack=stack))
+                                       skill_stack=stack))
         except Exception as e:  # noqa: BLE001
             con.print(f"[red]{pid} failed: {e}[/]")
             results.append({"patient_id": pid, "error": str(e)})

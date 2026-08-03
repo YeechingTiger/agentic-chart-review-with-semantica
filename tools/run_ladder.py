@@ -77,6 +77,13 @@ CONTROLLER_ARMS: list[tuple[str, str]] = [
     ("B0-base", ""),
     ("ctrl-reactive", "controller=controller-reactive"),
     ("ctrl-infogain", "controller=controller-information-gain"),
+    # Added 2026-08-03 in place of the candidate ledger. It asks for the behaviour that machinery
+    # was built to enforce — enumerate the ways the contract says an answer can be established,
+    # then confirm or exclude each — as judgement rather than as a structure. Two enforced
+    # versions were measured and both failed on their own terms; see
+    # `docs/CANDIDATE_LEDGER_REMOVED.md`, and note that a card was ONE of the two, so this arm's
+    # first job is to find out whether the difference is the framing or the whole idea.
+    ("ctrl-hypothesis-set", "controller=controller-hypothesis-set"),
 ]
 
 #: THE TACTIC LADDER. A tactic is a move available when its precondition holds, so an arm
