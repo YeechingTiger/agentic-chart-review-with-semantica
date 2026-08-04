@@ -330,8 +330,27 @@ class RetrievalPlan:
                 keywords.append((st.name, tuple(k.strip().lower() for k in st.required_keywords)))
         fn = getattr(getattr(spec, "proof_obligation", None), "for_negative", {}) or {}
         claim = next((str(c["id"]) for c in (fn.get("claims") or []) if c.get("strata")), None)
-        return cls(field_name, tuple(assignment), tuple(sorted(keywords)), tuple(policies),
+        plan = cls(field_name, tuple(assignment), tuple(sorted(keywords)), tuple(policies),
                    fallback, claim)
+        # `proof_obligation.required_keywords` is scoped to NO stratum, and the runtime unions
+        # every declared term into one search list — so leaving them out made this plan a strict
+        # subset of what a run searches, and every candidate was priced against the short list
+        # while `adopt` deployed the long one. They belong on the stratum being developed, which is
+        # the one whose keywords `evolve` and `certify` move.
+        po_terms = [str(k).strip().lower()
+                    for k in (getattr(getattr(spec, "proof_obligation", None),
+                                      "required_keywords", []) or [])
+                    if str(k).strip()]
+        if not po_terms:
+            return plan
+        try:
+            target = plan.searched_stratum
+        except AssetDevelopmentError:
+            # No searched stratum means no keyword list to develop at all; `from_spec`'s callers
+            # already handle that refusal, and inventing a stratum here would be worse.
+            return plan
+        return plan.with_keywords(
+            target, list(plan.keywords_for(target)) + po_terms)
 
 
 @dataclass(frozen=True)
@@ -403,9 +422,17 @@ def _expand(terms: Sequence[str], vocabulary: frozenset[str]) -> frozenset[str]:
     `carcinoma` and `carcinomatosis`, which is what makes a stem move mean something. A needle
     that prefixes nothing raises: a silent zero would land in a recall denominator and read as
     "the corpus does not say it"."""
+    # CASE-INSENSITIVE, and returning the vocabulary's OWN spelling. Question 2 asks the reading
+    # model to copy each term "as this document spells them", so the vocabulary carries `Endoscopy`
+    # and `FILLED PRESCRIPTIONS` verbatim — while a keyword list is written lowercase. Comparing a
+    # lowercased needle against an unlowercased vocabulary made `evolve` refuse its own first move:
+    # `'endoscopy' prefixes nothing`, in a vocabulary that contained `Endoscopy`. Two spellings of one
+    # word are not two terms, and treating them as such is what made `evolve`, `certify` and `adopt`
+    # unreachable.
     out: set[str] = set()
+    lowered = {w.lower(): w for w in vocabulary}
     for t in (x.strip().lower() for x in terms if x.strip()):
-        hit = {w for w in vocabulary if w.startswith(t)}
+        hit = {orig for low, orig in lowered.items() if low.startswith(t)}
         if not hit:
             raise UnindexedTermError(f"{t!r} prefixes nothing in this labelling's {len(vocabulary)}"
                                      "-term vocabulary, so the labels cannot say what it would "
@@ -1118,8 +1145,92 @@ def cmd_adopt(spec: str = _SPEC,
               proposals_dir: str = typer.Option(None, "--proposals-dir"),
               run: str = typer.Option("", "--run")):
     """Adopt a certified keyword list, or emit a stratum PROPOSAL for a clinician."""
-    c = Certification.from_dict(json.loads(Path(cert).read_text(encoding="utf-8")))
+    path = Path(cert).expanduser()
+    if not path.is_file():
+        # `certify` writes NOTHING when it refuses, and refusing is the common case: the first real
+        # certification on this corpus returned a negative held-out gain against nineteen
+        # shuffled-label reruns. A missing certificate is that refusal, not a lost file, and a bare
+        # FileNotFoundError makes a working pipeline look broken at its last stage.
+        raise typer.BadParameter(
+            f"no certificate at {path}. `acr assets certify` writes one only when the held-out gain "
+            f"is positive AND beats every shuffled-label rerun by the required margin; when it "
+            f"refuses it writes nothing and prints why. There is nothing to adopt.")
+    c = Certification.from_dict(json.loads(path.read_text(encoding="utf-8")))
     a = adopt(c, spec, proposals_dir=proposals_dir, run=run)
     typer.echo(json.dumps(asdict(a), indent=1))
     if a.outcome == "proposal_emitted":
         typer.echo(f"The spec was NOT touched. {ADOPTION_RULE[STRATA]}")
+
+
+@assets_app.command("prior")
+def cmd_prior(labels: str = typer.Option(..., "--labels", help="labels.jsonl from a completed scan"),
+              fields: str = typer.Option(..., "--fields", help="comma list, the variables to fold"),
+              asset_id: str = typer.Option(..., "--asset-id",
+                                           help="a name a later run can be told it was shown"),
+              min_patients: int = typer.Option(..., "--min-patients", min=1,
+                                               help="refuse below this. No default: what counts "
+                                                    "as enough subjects to generalise from is a "
+                                                    "policy choice about this corpus."),
+              version: str = typer.Option("1", "--version"),
+              corpus: str = typer.Option("", "--corpus",
+                                         help="upgrade every term from `proposed_by_reader` (a "
+                                              "LOWER BOUND — a capped scan cannot propose a ninth "
+                                              "term) to `corpus_matched`, by asking the corpus's "
+                                              "own matcher. Slower and the only basis on which one "
+                                              "term may be said to beat another."),
+              out: str = typer.Option(..., "--out", help="where to write the prior JSON")):
+    """Fold a scan into a retrieval prior: which document types carry the answer, which terms find it.
+
+    THE MISSING AGGREGATOR. `acr label scan` produced the raw material and
+    `review.document_concepts.experience_block` had rendered the finished shape since the day it was
+    written — with no producer and no caller. This is the producer. `acr run --prior` is the caller.
+
+    WHY THIS AND NOT `assets adopt`. `adopt` writes a keyword list into the CONTRACT, which moves
+    `spec_hash`, after which `tools/analyze_arms.py` correctly refuses to compare the arm against its
+    own baseline — a changed contract is a changed question. A prior delivered as an ASSET leaves the
+    contract alone, so `run_ladder --group experience` measures the prior instead of refusing.
+    """
+    from ..chartstore.corpus import Corpus
+    from ..contract.retrieval_prior import RetrievalPriorError
+    from .prior import build_prior
+
+    flds = [f.strip() for f in fields.split(",") if f.strip()]
+    try:
+        prior = build_prior(labels, fields=flds, min_patients=min_patients, asset_id=asset_id,
+                            version=version,
+                            corpus=Corpus(Path(corpus)) if corpus else None)
+    except RetrievalPriorError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(2) from e
+
+    Path(out).expanduser().write_text(
+        json.dumps(prior.to_dict(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    m = prior.measured
+    typer.echo(f"{prior.asset_id} v{prior.version} [{prior.status}] "
+               f"content_hash={prior.content_hash}")
+    typer.echo(f"  measured on {m.n_patients} patient(s), {m.n_notes} note(s), "
+               f"model {m.model or '(unrecorded)'}")
+    for fp in prior.fields:
+        top = ", ".join(f"{d.doc_type} {d.rate:.0%} (n={d.n_scanned})" for d in fp.doc_types[:3])
+        typer.echo(f"  {fp.field_name}: {fp.n_answer_bearing} of {fp.n_notes} decided notes can "
+                   f"establish it; {len(fp.terms)} term(s)")
+        typer.echo(f"      top types: {top or '—'}")
+        best = sorted(fp.terms, key=lambda t: (-t.n_surfaced_answer_bearing, t.n_surfaced_other))[:5]
+        for t in best:
+            r = t.recall(fp.n_answer_bearing)
+            typer.echo(f"      {t.term:<24} surfaced {t.n_surfaced_answer_bearing} answer-bearing"
+                       f" + {t.n_surfaced_other} other"
+                       + (f"  (recall {r:.0%})" if r is not None else "  (recall not measured)"))
+        if fp.is_empty:
+            # REPORTED, not omitted: "the record is silent about this variable" and "nobody
+            # scanned it" are different findings and only one of them is about the corpus.
+            typer.echo(f"      !! no scanned note could establish {fp.field_name}. That is a "
+                       f"finding about this corpus or this requirement, not a missing measurement.")
+    basis = {t.basis for fp in prior.fields for t in fp.terms}
+    if basis == {"proposed_by_reader"}:
+        typer.echo("  NOTE: term counts are a LOWER BOUND — they count where the reading model "
+                   "PROPOSED a term, and a scan capped at N terms per note cannot propose the "
+                   "N+1th. Pass --corpus to count where terms actually occur.")
+    typer.echo(f"-> {out}")
+    typer.echo("Pass it to a run with `acr run --prior <file>`. It does not touch the contract, "
+               "so `spec_hash` does not move and the two arms stay comparable.")

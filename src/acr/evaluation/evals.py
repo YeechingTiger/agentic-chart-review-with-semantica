@@ -79,8 +79,6 @@ direction the missingness happens to lean.
 """
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 import os
 import re
@@ -91,6 +89,8 @@ from dataclasses import asdict, dataclass, field
 from itertools import groupby
 from pathlib import Path
 from typing import Any
+
+from ..core import site as _site
 
 # ============================================================ PART 1: precedence registry
 
@@ -390,7 +390,6 @@ _SEVERITY_ORDER = {IRB: 0, CRITICAL: 1, WARN: 2}
 #: in the tree, so identifiers are masked on the way out — see tests/test_no_phi_in_tree.py.
 #: `evals` is otherwise stdlib-only by design (pinned by tests/test_evals.py), so the compiled
 #: pattern is imported rather than the module: one name, and no package edge worth checking.
-from ..core import site as _site
 
 READ_TOOLS = {"read_document", "read_documents_batch"}
 SEARCH_TOOLS = {"search_notes", "search_documents", "search"}
@@ -399,9 +398,34 @@ UNIVERSAL_TERMS = {".", ".*", ".+", ".?", "*", "%", "^", "$", r"\w", r"\w*", r"\
 ABSTAIN_STATUSES = {"EVIDENCE_INSUFFICIENT", "NO_ANSWER", "SPEC_INSUFFICIENT", "ABSTAIN"}
 
 
+def _query_terms(query: object) -> list[str]:
+    """One search argument -> the terms it actually searched for.
+
+    A list is the batched form and each element is its own term; a scalar is one term; `None` is
+    no term. Stringifying a list here is the defect this function exists to prevent.
+    """
+    if query is None:
+        return []
+    if isinstance(query, (list, tuple, set)):
+        # EVERY ELEMENT, filtered by nothing. The first version dropped whitespace-only terms
+        # (`if str(t).strip() or t == ""`), which HID them from `detect_degenerate_search` — whose
+        # first branch is `"empty" if not s`, i.e. that term is exactly what it exists to report.
+        # It also made this disagree with `contract.behaviour._query_terms` on `["  "]`, in the same
+        # changeset that added a test to keep the two identical.
+        return [str(t) for t in query]
+    return [str(query)]
+
+
+
 #: Environment variable holding the pseudonymisation key. Kept out of the tree, beside the
 #: provider credentials.
-PSEUDONYM_KEY_ENV = "ACR_PSEUDONYM_KEY"
+#: `core.site` owns it: `audit` needs the identical answer and may not import this plane.
+PSEUDONYM_KEY_ENV = _site.PSEUDONYM_KEY_ENV
+
+
+def pseudonymise(value: str) -> str:
+    """One identifier's keyed pseudonym. The joinable form, shared with `acr audit run`."""
+    return _site.fingerprint(value)
 
 
 def pseudonym_basis() -> str:
@@ -435,8 +459,9 @@ def mask_person_ids(obj: Any) -> Any:
         return json.loads(pattern.sub("<person_id:redacted>", json.dumps(obj, default=str)))
 
     def tok(m: re.Match[str]) -> str:
-        digest = hmac.new(key.encode(), m.group(0).encode(), hashlib.sha256).hexdigest()[:12]
-        return f"<person:{digest}>"
+        # `site.fingerprint`, so a `<person:…>` token in an eval report and a fingerprint in an
+        # audit report are the same string for the same identifier.
+        return f"<person:{_site.fingerprint(m.group(0))}>"
 
     return json.loads(pattern.sub(tok, json.dumps(obj, default=str)))
 
@@ -444,6 +469,34 @@ def mask_person_ids(obj: Any) -> Any:
 def _num(v: Any, cast):
     # bool is an int in Python, and a True token count is a bug better surfaced as absent.
     return cast(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+#: `run-YYYYMMDD-HHMMSS-hex`, the id `agent.py` mints for a single run.
+_RUN_ID_DATE = re.compile(r"^run-(\d{4})(\d{2})(\d{2})-")
+#: `<arm>__YYYYMMDDTHHMMSSZ__<code_sha>`, the batch directory the launcher mints.
+_BATCH_DIR_DATE = re.compile(r"__(\d{4})(\d{2})(\d{2})T\d{6}Z__")
+
+
+def _run_date(run_id: str, source: str = "") -> str:
+    """`2026-07-27`, or "" when nothing recorded one.
+
+    TWO SOURCES, FIRST-WINS, never combined. `run_id` is not reliably a run id: over this tree's
+    509 manifests, 493 record the PATIENT id there (`SYN0007`) and only 16 carry the timestamped
+    form, so the batch directory name is where the date is for almost everything already recorded.
+    The runtime's own stamp outranks the path when both are present.
+
+    Adding the two would be the `searched_terms` defect again — that read the manifest AND the trace
+    and concatenated them, so every term counted twice and `detect_degenerate_search` reported 10
+    findings over a tree containing 5.
+
+    "" not today's date. Substituting the clock would stamp a two-week-old baseline with the day
+    somebody happened to read it, and every downstream reader would take that as measured.
+    """
+    if m := _RUN_ID_DATE.match(run_id or ""):
+        return "-".join(m.groups())
+    if m := _BATCH_DIR_DATE.search(source or ""):
+        return "-".join(m.groups())
+    return ""
 
 
 @dataclass
@@ -485,6 +538,23 @@ class RunRecord:
     patient_id = property(lambda s: str(s.manifest.get("patient_id") or ""))
     spec_id = property(lambda s: str(s.manifest.get("spec_id") or ""))
     spec_hash = property(lambda s: str(s.manifest.get("spec_hash") or ""))
+    #: The rest of the identity block the runtime writes, which this plane read none of until
+    #: 2026-08-04. `BaselineKey` was four strings an operator typed on the command line, so the
+    #: run's own statement of which arm it was had no reader at all — `experiment_config_hash`
+    #: was computed for every run and consumed by nothing.
+    code_sha = property(lambda s: str(s.manifest.get("code_sha") or ""))
+    model = property(lambda s: str(s.manifest.get("model") or ""))
+    #: WHICH ARM, as one value: a hash over spec_hash + runtime profile + prompt_assets + model +
+    #: temperature + seed + call ceiling + code_sha, assembled in `agent.py` where a reader can see
+    #: what counts. This is the only field that moves when two arms differ ONLY in their prompt —
+    #: the case where `commit`, `spec_hash`, `model` and `date` are all identical and the arms are
+    #: not. Empty for the 294 of this tree's 509 manifests written before it existed.
+    experiment_config_hash = property(
+        lambda s: str(s.manifest.get("experiment_config_hash") or ""))
+    run_id = property(lambda s: str(s.manifest.get("run_id") or ""))
+    #: The calendar day this run started, from the run id or the batch directory it sits in.
+    #: Derived rather than typed: `--date` was a free-text option no artifact could contradict.
+    run_date = property(lambda s: _run_date(s.run_id, s.source))
     answer = property(lambda s: s.manifest.get("answer") or {})
     status = property(lambda s: str(s.answer.get("status") or ""))
     #: The outcome KIND the contract gave this status, recorded at emission by the runtime.
@@ -521,11 +591,49 @@ class RunRecord:
     n_documents_read = property(lambda s: sum(
         len((e.get("args") or {}).get("note_ids") or []) or 1
         for e in s.tool_calls(READ_TOOLS)) if s.trace else
-        _num((s.manifest.get("coverage_attested") or {}).get("n_read"), int))
-    searched_terms = property(lambda s: [
-        str(t) for t in ((s.manifest.get("coverage_attested") or {}).get("searched_terms") or [])
-    ] + [str((e.get("args") or {}).get("query")) for e in s.tool_calls(SEARCH_TOOLS)
-         if (e.get("args") or {}).get("query") is not None])
+        _num(s._coverage().get("n_read"), int))
+    #: Every term this run searched, one per element. FLATTENED, because `search_notes` is BATCHED
+    #: — `toolbox.py` accepts a list and records one coverage entry per term — and 953 of the 3,988
+    #: search events in this tree carry a list-valued `query`. This used to be
+    #: `str(args["query"])`, so `str(["bx", "adenocarcinoma"])` was ONE opaque term:
+    #: `detect_degenerate_search` reported 1 finding over 509 manifests while
+    #: `coverage_state.searched_terms` showed five degenerate terms, and no test caught it because
+    #: every fixture in `tests/test_evals.py` writes a scalar.
+    searched_terms = property(lambda s: s._searched_terms())
+
+    def _searched_terms(self) -> list[str]:
+        """Every term this run searched, ONCE each occurrence, trace-first.
+
+        TRACE OR MANIFEST, NOT BOTH. This concatenated the two, which was harmless only while the
+        manifest half read `coverage_attested` — a key the runtime never writes — so in practice
+        only the trace contributed. Fixing the fallback to `coverage_state` (502 of 509 manifests
+        carry it) made both halves non-empty and every term counted TWICE: a real run yielded 12
+        terms where 6 were searched, and `detect_degenerate_search` reported 10 findings over this
+        tree where 5 occurrences exist. Two sources for one fact, added together.
+
+        The trace wins because it is per-CALL: it preserves that a term was searched three times,
+        which is what a rejection-loop or repeat-search reading needs. `coverage_state` is the
+        run's own summary and is the only source when no trace survives.
+        """
+        from_trace = [str(t) for e in self.tool_calls(SEARCH_TOOLS)
+                      for t in _query_terms((e.get("args") or {}).get("query"))]
+        if from_trace:
+            return from_trace
+        return [str(t) for t in (self._coverage().get("searched_terms") or [])]
+
+    def _coverage(self) -> dict:
+        """The manifest's coverage block, under whichever name wrote it.
+
+        `coverage_state` is what the runtime writes (502 of 509 manifests here);
+        `coverage_attested` is a legacy name carried by 13 older ones and by every fixture in
+        `tests/test_evals.py` — which is why the fallback read a key production never wrote and a
+        trace-less manifest reported zero terms searched. Both are read; neither is guessed at.
+        """
+        for name in ("coverage_state", "coverage_attested"):
+            block = self.manifest.get(name)
+            if isinstance(block, dict) and block:
+                return block
+        return {}
 
     def tool_calls(self, names: Iterable[str] | None = None) -> list[dict]:
         want = set(names or ())
@@ -847,9 +955,67 @@ class DetectorConfig:
                 raise ValueError(f"DetectorConfig.{n} is required and has no default")
 
 
+def detect_value_domain_violation(run: RunRecord, *, spec=None) -> list[Finding]:
+    """A submitted value that is not a code in the table the run was SHOWN. Advisory.
+
+    THE MODULE SAID THIS WAS COUNTED AND NOTHING COUNTED IT. `contract/code_tables.py`'s docstring
+    names three jobs, the second being "`check_values()` 返回带类型的问题给评测面**计数**" — and
+    `check_values` had zero non-test callers. The table was loaded (fail-closed on a typo), rendered
+    into the prompt, and recorded in the manifest: all INPUT-side. Nothing compared what came back.
+
+    The two failures that module records as its own motivation both passed uncounted: a run coding
+    morphology `7205` (not an ICD-O-3 code) and one writing "C341 is the right middle lobe" and
+    coding accordingly (C341 is the UPPER lobe). `score` reports MISMATCH for those with no
+    indication the value was not a code at all, and on an unkeyed variable reports nothing.
+
+    WARN, NEVER CRITICAL, and that is not timidity. This repo removed five deterministic content
+    checks after they destroyed 58 correct values against 21 helps, and demoted the coverage gate
+    after ~150 rejections of which 27 refused the registry's exact tuple. A count is a finding; a
+    refusal is a regression waiting to be measured.
+
+    `spec` IS PASSED IN, not read from the manifest: the manifest records the table's identity, not
+    the table, and re-deriving a spec from a manifest inside a detector is how an evaluator starts
+    disagreeing with the run it is evaluating.
+    """
+    domain = str(getattr(spec, "value_domain", "") or "").strip() if spec is not None else ""
+    if not domain or run.abstained or not run.value:
+        # No declared domain, or nothing coded. Reporting "conformant" here would be a claim about
+        # a table that does not exist.
+        return []
+    from ..contract.code_tables import CodeTableError, check_values, load_table
+    try:
+        table = load_table(domain)
+    except CodeTableError:
+        return []
+    fields = {ax.field for ax in table.axes.values()}
+    by_axis = {name: run.value.get(ax.field) for name, ax in table.axes.items()
+               if ax.field in run.value}
+    if not by_axis:
+        return []
+    # `by_axis` is built FROM `table.axes`, so `check_values`'s unknown-axis refusal cannot fire
+    # here. An earlier version caught `CodeTableError` and emitted a `value_domain_unusable`
+    # finding — a new finding kind that nothing could ever produce, which is the defect this whole
+    # changeset is about. The refusal is kept as an assertion instead: if it ever raises, the
+    # invariant above has broken and a silent `return []` would hide it.
+    problems = check_values(by_axis, table=table)
+    if not problems:
+        return []
+    return [Finding(
+        "value_domain_violation", WARN,
+        f"{len(problems)} submitted value(s) are not codes in {table.table_id}",
+        {"value_domain": domain, "table_id": table.table_id,
+         "problems": [pr.to_dict() for pr in problems],
+         "checked_fields": sorted(fields & set(run.value)),
+         "source": run.source})]
+
+
 def run_detectors(run: RunRecord, *, config: DetectorConfig,
-                  expected_patient: str | None = None) -> list[Finding]:
-    """All detectors, most severe first. `expected_patient` defaults to the manifest's own."""
+                  expected_patient: str | None = None, spec=None) -> list[Finding]:
+    """All detectors, most severe first. `expected_patient` defaults to the manifest's own.
+
+    `spec` is optional and only the value-domain detector uses it: a caller that has the contract
+    gets code conformance counted, and one that does not gets everything else rather than an error.
+    """
     exp = expected_patient or run.patient_id
     out = detect_zero_document_read(run)
     out += detect_degenerate_search(run, min_term_chars=config.min_term_chars)
@@ -858,6 +1024,7 @@ def run_detectors(run: RunRecord, *, config: DetectorConfig,
     out += detect_resource_band(run, token_band=config.token_band, turn_band=config.turn_band)
     out += detect_uncaused_reads(run)
     out += audit_evidence_set(run)
+    out += detect_value_domain_violation(run, spec=spec)
     return sorted(out, key=lambda f: _SEVERITY_ORDER.get(f.severity, 9))
 
 
@@ -904,19 +1071,145 @@ class InstanceResult:
         return mask_person_ids(asdict(self))
 
 
+#: More than one value across the scored runs. A baseline whose key carries this is a MIXTURE of
+#: arms, and `compare` refuses it as an endpoint — the shape that reported a two-spec-hash tree as
+#: a clean +5.6 points.
+MIXED = "MIXED"
+
+#: The identity a manifest records about its own arm, and the `BaselineKey` field each one answers.
+#: `date` is not here: it comes from the run id, not from a manifest field.
+IDENTITY_FIELDS: tuple[tuple[str, str], ...] = (
+    ("code_sha", "commit"),
+    ("spec_hash", "spec_hash"),
+    ("model", "model"),
+    ("experiment_config_hash", "experiment_config_hash"),
+)
+
+
 @dataclass(frozen=True)
 class BaselineKey:
-    """What a baseline is comparable ACROSS. Every part matters, so every part is stored."""
+    """What a baseline is comparable ACROSS. Every part matters, so every part is stored.
+
+    `experiment_config_hash` is the part that was missing, and its absence was not cosmetic. The
+    other four are all identical between two arms that differ only in their PROMPT — a skill card,
+    a retrieval prior, a runtime profile — so `compare` reported `key_differences: []` and
+    `verdict: OK` for two runs whose system prompts differed by a whole card. The runtime had
+    already computed the discriminating value for every run; nothing read it.
+
+    `basis` says where the key came from. `derived` means the manifests were asked; `declared`
+    means an operator typed it and the runs were not consulted, which is every baseline recorded
+    before 2026-08-04.
+    """
     commit: str
     spec_hash: str
     model: str
     date: str
+    #: Additive with a default so every baseline already on disk still loads and every existing
+    #: caller still constructs. An empty value means NOT RECORDED, which `compare` reports as a
+    #: file that cannot say rather than as an arm that changed.
+    experiment_config_hash: str = ""
+    basis: str = "declared"
 
     def as_str(self) -> str:
-        return f"{self.commit}|{self.spec_hash}|{self.model}|{self.date}"
+        # The arm hash is appended only when there is one. A trailing `|` on the 500-odd baselines
+        # that predate this field would assert a value they do not have, and this string is what a
+        # human pastes into a note.
+        base = f"{self.commit}|{self.spec_hash}|{self.model}|{self.date}"
+        return f"{base}|{self.experiment_config_hash}" if self.experiment_config_hash else base
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    @property
+    def is_mixture(self) -> bool:
+        """True when any part of this key describes more than one arm."""
+        return bool(self.mixed_fields)
+
+    @property
+    def mixed_fields(self) -> list[str]:
+        return sorted(k for k, v in self.to_dict().items() if v == MIXED)
+
+
+def manifest_identity(runs: Sequence[RunRecord]) -> dict:
+    """What the RUNS say about which arm they are. Data, never a refusal.
+
+    Per field: the unanimous value or `MIXED`, the distinct values seen, and how many runs recorded
+    nothing. Scoring a heterogeneous tree is legitimate — `eval score` over all of `runs/` is the
+    only way to sweep the detectors across everything recorded — so heterogeneity is reported here
+    and refused one step later, in `compare`, where a mixture cannot be one end of a delta.
+
+    `n_unrecorded` is load-bearing and not a diagnostic afterthought: 294 of this tree's 509
+    manifests carry no `experiment_config_hash`, and a reader who cannot see that count cannot tell
+    a baseline whose arm is established from one whose arm is an inference from three coarser
+    fields.
+    """
+    fields: dict[str, dict] = {}
+    for name, _ in IDENTITY_FIELDS:
+        seen = [getattr(r, name) for r in runs]
+        present = sorted({v for v in seen if v})
+        fields[name] = {
+            "value": present[0] if len(present) == 1 else (MIXED if present else ""),
+            "mixed": len(present) > 1,
+            "values": present,
+            "n_unrecorded": sum(1 for v in seen if not v),
+        }
+    dates = sorted({r.run_date for r in runs if r.run_date})
+    return {"n_runs": len(runs), "fields": fields, "dates": dates,
+            "n_undated": sum(1 for r in runs if not r.run_date)}
+
+
+def _identity_date(identity: Mapping[str, Any]) -> str:
+    """One day, a range, or "". A range is stated as a range: collapsing a nine-day batch to its
+    first day is the same class of claim as naming one arm for a mixture."""
+    dates = list(identity.get("dates") or [])
+    if not dates:
+        return ""
+    return dates[0] if len(dates) == 1 else f"{dates[0]}..{dates[-1]}"
+
+
+def derive_baseline_key(runs: Sequence[RunRecord]) -> BaselineKey:
+    """The key the runs themselves state. The default, so nobody has to type four strings.
+
+    Refuses an empty run set rather than returning a key of four empty strings: two such keys
+    compare equal to each other and to nothing real, so `compare` would call two unrelated empty
+    baselines the same configuration.
+    """
+    if not runs:
+        raise ValueError("no runs to derive a baseline key from — an empty key would be four "
+                         "empty strings, and two of those compare equal")
+    ident = manifest_identity(runs)
+    got = {slot: ident["fields"][name]["value"] for name, slot in IDENTITY_FIELDS}
+    return BaselineKey(date=_identity_date(ident), basis="derived", **got)
+
+
+def reconcile_baseline_key(key: BaselineKey, runs: Sequence[RunRecord]) -> list[str]:
+    """Every part of `key` that the manifests CONTRADICT. Empty means the claim holds.
+
+    A refusal that can only fire on a wrong claim, which is the property the five deterministic
+    content checks this repo deleted did not have — they destroyed 58 correct values against 21
+    helps. Two ways this one stays incapable of refusing something correct:
+
+      * A field NO manifest recorded contradicts nothing. Silence is not disagreement, and reading
+        it as disagreement would refuse every manifest written before `code_sha` reached the
+        identity block, plus every fabricated fixture in `tests/test_evals.py`.
+      * A field the runs report as MIXED is not a contradiction of the operator's string. It is
+        reported once, by `key_basis`, because the remedy differs: a wrong `--model` is a typo to
+        fix, a mixed tree is a batch to re-run.
+
+    What it does catch, measured: `--model TOTALLY-WRONG-MODEL` was accepted in silence and written
+    into the baseline, where every downstream reader took it as the model that produced the numbers.
+    """
+    ident = manifest_identity(runs)
+    out = []
+    for name, slot in IDENTITY_FIELDS:
+        claimed, f = getattr(key, slot), ident["fields"][name]
+        if claimed and not f["mixed"] and f["value"] and claimed != f["value"]:
+            out.append(f"{slot}: declared {claimed!r}, but the runs recorded "
+                       f"{f['value']!r} ({len(runs) - f['n_unrecorded']} run(s))")
+    date = _identity_date(ident)
+    if key.date and date and key.date != date:
+        out.append(f"date: declared {key.date!r}, but the run ids say {date!r}")
+    return out
 
 
 def _norm_value(v: Any) -> str | None:
@@ -927,6 +1220,40 @@ def _rate(num: int, den: int) -> float | None:
     # None, not 0.0: an empty denominator is "not measured", and 0.0 reads as "measured and
     # terrible". Those two lead to opposite actions.
     return round(num / den, 4) if den else None
+
+
+def _key_row(answer_key: Mapping[str, Any], iid: str, run: RunRecord) -> dict | None:
+    """This run's key row, or None when the key says nothing about THIS RUN.
+
+    THE BARE FALLBACK WAS UNCONDITIONAL, and that made `n_unkeyed` structurally incapable of
+    reporting a coverage miss. `tools/answer_key_from_corpus.py` writes bare patient ids, so the
+    composite `patient__spec` lookup never hit, the bare lookup always did, and `run.spec_id` was
+    compared to nothing: a run of a DIFFERENT CONTRACT scored against this key as a wrong answer.
+    Measured on this tree's `runs/`, scoring a spec-390 key over all 509 manifests: 8 cross-spec
+    runs scored as ABSTAINED_MISSED and dragged the published exact-match from the spec's actual
+    75.8% to 74.6%, with `n_unkeyed: 0` asserting complete coverage.
+
+    A row carrying no `spec_id` is accepted on the bare id — every answer key written before the
+    producer emitted one is still readable, and refusing them would make every recorded baseline
+    unscoreable. A row that DOES carry one must match.
+    """
+    row = answer_key.get(iid)
+    if row is not None:
+        return dict(row) if isinstance(row, Mapping) else None
+    row = answer_key.get(run.patient_id)
+    if not isinstance(row, Mapping):
+        return None
+    # `spec_ids` (plural) when a key covers more than one contract id for ONE variable, which is
+    # what an ABLATION arm is: `STORE.400_522_523.site_histology_behavior.UNSTRATIFIED` has the same
+    # correct answers and a different retrieval policy, and the corpus has no separate ground truth
+    # for it. The strict single-id check made all 3 real UNSTRATIFIED manifests unkeyed and dropped
+    # `exact_match_den` from 3 to 2 — the arm's own comparison silently became "nothing changed".
+    declared = {str(x) for x in (row.get("spec_ids") or []) if str(x)}
+    if row.get("spec_id"):
+        declared.add(str(row["spec_id"]))
+    if declared and run.spec_id and run.spec_id not in declared:
+        return None
+    return dict(row)
 
 
 def _outcome_for(coded: str | None, kv: str | None, keyed: bool) -> str:
@@ -965,9 +1292,17 @@ class ScoreReport:
     per_field: dict[str, dict]
     per_instance: list[InstanceResult]
     totals: dict
+    #: What the manifests said about their own arm, and every part of `key` they contradict. Both
+    #: are computed by `score` rather than by the command, because `analyze_arms.py`,
+    #: `measure_controller_value.py` and every future reader call `score` directly — a guard that
+    #: lived only in `cli_eval` would be absent on all of those paths. Same reasoning as
+    #: `prompt_asset_manifest` living in `run_manifest` rather than in `agent`.
+    key_basis: dict = field(default_factory=dict)
+    key_contradictions: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {"baseline_key": self.key.to_dict(), "baseline_key_str": self.key.as_str(),
+                "key_basis": self.key_basis, "key_contradictions": self.key_contradictions,
                 # Whether the instance ids in this file can identify an instance at all. On
                 # `constant` they cannot, and every per-instance consumer has to say so
                 # rather than read the collapsed index.
@@ -992,7 +1327,7 @@ class ScoreReport:
 
 def score(runs: Sequence[RunRecord], answer_key: Mapping[str, Mapping[str, Any]], *,
           fields: Sequence[str], key: BaselineKey,
-          detector_config: DetectorConfig | None = None) -> ScoreReport:
+          detector_config: DetectorConfig | None = None, spec=None) -> ScoreReport:
     """Score manifests against an answer key. Reads only; runs nothing.
 
     `answer_key` maps instance id (or bare patient id) -> {"fields": {name: value_or_None},
@@ -1006,7 +1341,7 @@ def score(runs: Sequence[RunRecord], answer_key: Mapping[str, Mapping[str, Any]]
     instances, n_unkeyed = [], 0
     for run in runs:
         iid = f"{run.patient_id}__{run.spec_id}"
-        row = answer_key.get(iid) or answer_key.get(run.patient_id)
+        row = _key_row(answer_key, iid, run)
         n_unkeyed += int(row is None)
         kf = (row or {}).get("fields") or {}
         abstained = run.abstained
@@ -1017,7 +1352,8 @@ def score(runs: Sequence[RunRecord], answer_key: Mapping[str, Mapping[str, Any]]
             o = _outcome_for(coded, kv, row is not None and f in kf)
             outcomes.append(FieldOutcome(f, coded, kv, o))
             by_field[f].append(o)
-        findings = run_detectors(run, config=detector_config) if detector_config else []
+        findings = (run_detectors(run, config=detector_config, spec=spec)
+                    if detector_config else [])
         instances.append(InstanceResult(
             str((row or {}).get("instance_id") or iid), run.patient_id, run.spec_id,
             run.spec_hash, run.status, run.gate_validated, outcomes, run.turns,
@@ -1025,12 +1361,19 @@ def score(runs: Sequence[RunRecord], answer_key: Mapping[str, Mapping[str, Any]]
             [str(g) for g in ((row or {}).get("subgroups") or [])],
             [fd.to_dict() for fd in findings]))
 
+    # `None` RATES READ AS "NO CHANGE" to a human and to `compare`, whose NOT_COMPARABLE guard only
+    # catches colliding instance ids. A key that covers none of these runs is a wrong pairing, and
+    # it must not present as a clean result with empty denominators.
+    all_unkeyed = bool(instances) and n_unkeyed == len(instances)
     n_gate = sum(1 for r in instances if r.gate_validated)
     costs, toks, turns = ([r.cost_usd for r in instances if r.cost_usd is not None],
                           [float(r.total_tokens) for r in instances if r.total_tokens is not None],
                           [float(r.turns) for r in instances if r.turns is not None])
     sev = dict(Counter(fd["severity"] for r in instances for fd in r.findings))
     totals = {"n_instances": len(instances), "n_unkeyed": n_unkeyed,
+              #: True when the key speaks about NONE of these runs. Every rate is then `None`, and
+              #: `None` is indistinguishable from "measured and unchanged" downstream.
+              "all_instances_unkeyed": all_unkeyed,
               "turns_mean": _mean(turns), "tokens_mean": _mean(toks),
               "cost_usd_total": round(sum(costs), 4) if costs else None,
               "n_tokens_unknown": len(instances) - len(toks),
@@ -1038,7 +1381,9 @@ def score(runs: Sequence[RunRecord], answer_key: Mapping[str, Mapping[str, Any]]
               "n_findings": sum(len(r.findings) for r in instances),
               "findings_by_severity": sev, "by_subgroup": _subgroup_rates(instances)}
     return ScoreReport(key, {f: _field_row(f, o, n_gate) for f, o in by_field.items()},
-                       instances, totals)
+                       instances, totals,
+                       key_basis=manifest_identity(runs),
+                       key_contradictions=reconcile_baseline_key(key, runs))
 
 
 def _subgroup_rates(instances: Sequence[InstanceResult]) -> dict:
@@ -1087,6 +1432,48 @@ def collided_instance_ids(report: Mapping[str, Any]) -> list[str]:
     return sorted(k for k, n in seen.items() if n > 1)
 
 
+#: The parts of a key that describe the ARM. `basis` is excluded: how a key was obtained is not a
+#: property of the configuration, and reporting "derived -> declared" as a difference would announce
+#: an arm change every time a baseline recorded before 2026-08-04 is compared against a new one.
+_ARM_PARTS = ("commit", "spec_hash", "model", "date", "experiment_config_hash")
+
+
+def _key_differences(bk: Mapping[str, Any], ak: Mapping[str, Any]) -> list[str]:
+    """Every part of the arm that moved, with "cannot say" kept distinct from "changed".
+
+    A baseline recorded before `experiment_config_hash` existed carries no value for it. "The arm
+    changed" and "one of these files cannot say" are different claims and only one of them is a
+    reason to re-run, so the two are never collapsed into a single `'' -> 'a1b2'` line that reads
+    like a configuration change.
+    """
+    out = []
+    for k in _ARM_PARTS:
+        b, a = bk.get(k) or "", ak.get(k) or ""
+        if b == a:
+            continue
+        if not b or not a:
+            side = "before" if not b else "after"
+            out.append(f"{k}: not recorded in the {side} baseline (the other says "
+                       f"{(a or b)!r}) — a file that cannot say, not an arm that changed")
+        else:
+            out.append(f"{k}: {b!r} -> {a!r}")
+    return out
+
+
+def _identity_problems(baseline: Mapping[str, Any]) -> tuple[list[str], list[str]]:
+    """`(mixed fields, contradictions)` for one baseline.
+
+    Reads `key_basis` when present and falls back to the key itself, so a baseline written by a
+    caller that assembled its own report — or one recorded before `key_basis` existed and later
+    hand-edited — is still checked on the evidence it does carry.
+    """
+    fields = (baseline.get("key_basis") or {}).get("fields") or {}
+    mixed = sorted(n for n, f in fields.items() if (f or {}).get("mixed"))
+    if not mixed:
+        mixed = sorted(k for k, v in (baseline.get("baseline_key") or {}).items() if v == MIXED)
+    return mixed, [str(c) for c in (baseline.get("key_contradictions") or [])]
+
+
 def compare(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict:
     """Two baselines into a delta: per field AND per instance AND per subgroup.
 
@@ -1100,12 +1487,44 @@ def compare(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict:
     because "accuracy fell" and "the question changed" look identical in the numbers.
     """
     bk, ak = dict(before.get("baseline_key") or {}), dict(after.get("baseline_key") or {})
-    diffs = [f"{k}: {bk.get(k)!r} -> {ak.get(k)!r}"
-             for k in ("commit", "spec_hash", "model", "date") if bk.get(k) != ak.get(k)]
+    diffs = _key_differences(bk, ak)
     bf, af = before.get("per_field") or {}, after.get("per_field") or {}
     per_field = {f: _pair((bf.get(f) or {}).get("exact_match_rate"),
                           (af.get(f) or {}).get("exact_match_rate"))
                  for f in sorted(set(bf) | set(af))}
+
+    # A MIXTURE IS NOT AN ENDPOINT. Measured: a run tree spanning two spec hashes scored as one
+    # clean baseline and this function reported +5.6 points. `tools/analyze_arms.py:191` refuses the
+    # identical shape in prose ("拒绝比较：这些臂跑在 N 个不同的 spec 版本上"); the evaluation plane
+    # averaged it, because nothing here had ever read what the manifests said about their own arm.
+    # Checked before the collision guard: a collision breaks only the per-instance arm, whereas a
+    # mixture means neither file describes one configuration and no column is interpretable.
+    b_mix, b_con = _identity_problems(before)
+    a_mix, a_con = _identity_problems(after)
+    if b_mix or a_mix or b_con or a_con:
+        return {"before_key": bk, "after_key": ak, "key_differences": diffs,
+                "per_field": per_field, "regressions": [], "improvements": [],
+                "subgroup_regressions": [], "verdict": "NOT_COMPARABLE",
+                "not_comparable": {
+                    "reason": ("a baseline does not describe one configuration"
+                               if (b_mix or a_mix) else
+                               "a baseline claims an identity its own runs contradict"),
+                    # Every `not_comparable` shape carries `reason`/`detail`/`why`/`remedy`, and
+                    # the shape-specific fields sit beside them. The CLI printer read the collision
+                    # shape's own keys, so adding this second shape raised `KeyError: n_colliding`
+                    # at the moment it first fired — the consumer-with-no-producer defect, inverted.
+                    "detail": (f"{', '.join(sorted(set(b_mix) | set(a_mix)))} differ within "
+                               f"{' and '.join(s for s, m in (('before', b_mix), ('after', a_mix)) if m)}"
+                               if (b_mix or a_mix) else "; ".join(b_con + a_con)),
+                    "mixed_fields": sorted(set(b_mix) | set(a_mix)),
+                    "mixed_in": ([s for s, m in (("before", b_mix), ("after", a_mix)) if m]),
+                    "contradictions": b_con + a_con,
+                    "why": ("every rate in a mixed baseline is an average over two or more arms, "
+                            "so a delta against it prices the difference between the arms and the "
+                            "difference between the mixtures as one number"),
+                    "remedy": ("score each arm separately — one `eval score --runs` per arm "
+                               "directory — and compare those. `key_basis.fields` names the "
+                               "field that moved and the values it took.")}}
 
     # THE PER-INSTANCE ARM IS EITHER SOUND OR ABSENT, never approximate. A collided id means
     # the index cannot tell two patients apart, so the arm that the docstring above calls the
@@ -1118,6 +1537,7 @@ def compare(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict:
                 "subgroup_regressions": [], "verdict": "NOT_COMPARABLE",
                 "not_comparable": {
                     "reason": "instance ids are not unique within a baseline",
+                    "detail": f"{len(collisions)} colliding id(s), basis={pseudonym_basis()}",
                     "colliding_ids": collisions[:10],
                     "n_colliding": len(collisions),
                     "why": ("person ids were masked to a single constant token, so every "

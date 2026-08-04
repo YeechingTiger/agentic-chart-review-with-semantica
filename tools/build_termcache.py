@@ -55,7 +55,6 @@ sys.path.insert(0, str(ROOT / "src"))
 from acr.chartstore.corpus import Corpus
 from acr.contract.spec import load_spec
 from acr.core import site
-from acr.review.coverage import strata_from_spec
 
 #: How many patients per pickle chunk. Small enough that a partial build leaves readable chunks,
 #: large enough that a corpus of a few hundred patients does not become a few hundred files.
@@ -83,10 +82,19 @@ def needles_from(labels_path: pathlib.Path, spec_path: str, min_chars: int) -> l
             term = (t if isinstance(t, str) else t.get("term", "")).strip().lower()
             if len(term) >= min_chars:
                 proposed.add(term)
-    current = {k.strip().lower()
-               for st in strata_from_spec(load_spec(spec_path))
-               for k in st.required_keywords}
-    return sorted(proposed | current)
+    return sorted(proposed | {k.strip().lower() for k in spec_incumbent(spec_path)})
+
+
+def spec_incumbent(spec_path: str) -> list[str]:
+    """The spec's own term list, as the RUNTIME computes it.
+
+    This used to read `strata_from_spec` only, which misses
+    `proof_obligation.required_keywords`. A needle the cache does not carry cannot be priced —
+    `derive` refuses rather than rescanning, correctly — so a short incumbent list here silently
+    removed terms from the comparison `certify` certifies against.
+    """
+    from acr.improvement.derive import incumbent_keywords
+    return incumbent_keywords(load_spec(spec_path))
 
 
 def answer_bearing(labels_path: pathlib.Path, fields: list[str]) -> set[tuple[str, str]]:
@@ -133,8 +141,8 @@ def main() -> int:
         return 2
     oracle = answer_bearing(labels, fields)
 
-    labelled = {json.loads(l)["patient_id"]
-                for l in labels.read_text(encoding="utf-8").splitlines() if l.strip()}
+    labelled = {json.loads(line)["patient_id"]
+                for line in labels.read_text(encoding="utf-8").splitlines() if line.strip()}
     pids = ([p.strip() for p in args.patients.split(",") if p.strip()]
             or sorted(labelled))
 

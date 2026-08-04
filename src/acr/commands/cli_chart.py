@@ -24,6 +24,75 @@ from ..core.cli_common import API_BASE, CORPUS, MODEL, con
 chart_app = typer.Typer(add_completion=False)
 
 
+#: The flag every run command takes, described once.
+SITE_MAPPING = typer.Option(
+    "", "--mapping",
+    help="Site Mapping JSON from `acr site-mapping build`. Required when the spec has any "
+         "`means:` stratum; ignored otherwise.")
+
+
+def _require_mapping_for(strata, mapping_path: str) -> str | None:
+    """The message to refuse with, or None when this spec needs no mapping.
+
+    REFUSED AT THE DOOR, not inside the ledger. `StratumSpec.matches` already refuses correctly,
+    but its message ends "pass it to assign_strata" — a function name, not something an operator
+    can supply. This says `--mapping`, and it fires before the corpus is opened or a model reached.
+    """
+    mapped = [st.name for st in strata if getattr(st, "is_mapped", False)]
+    if not mapped or mapping_path:
+        return None
+    return (f"this contract selects documents through a Site Mapping "
+            f"(stratum {', '.join(sorted(mapped))}) and no --mapping was given. With no mapping "
+            f"every document falls to the `rest` stratum, the gate counts an empty stratum as a "
+            f"satisfied one, and the run would report a coverage proof it never performed. Build "
+            f"one with `acr site-mapping build --out mapping.json` and pass `--mapping "
+            f"mapping.json`.")
+
+
+def _load_site_mapping(spec, mapping_path: str):
+    """Resolve `--mapping` against a spec, refusing rather than silently stratifying by `rest`."""
+    from ..contract.site_mapping import SiteMapping, SiteMappingError
+    from ..contract.strata import strata_from_spec
+
+    problem = _require_mapping_for(strata_from_spec(spec), mapping_path)
+    if problem:
+        raise typer.BadParameter(problem)
+    if not mapping_path:
+        return None
+    path = Path(mapping_path).expanduser()
+    if not path.is_file():
+        raise typer.BadParameter(f"no Site Mapping at {path}")
+    try:
+        return SiteMapping.from_dict(json.loads(path.read_text(encoding="utf-8")))
+    except (SiteMappingError, json.JSONDecodeError, KeyError) as e:
+        raise typer.BadParameter(f"{path}: {e}") from e
+
+
+#: The measured-prior flag, described once.
+PRIOR = typer.Option(
+    "", "--prior",
+    help="a retrieval prior from `acr assets prior`: which document types carried the answer on "
+         "OTHER patients and which terms surfaced them. Rendered into the prompt as REFERENCE, "
+         "never as a rule, and recorded in the manifest so two arms can be told apart. Leaving it "
+         "off is the baseline arm and produces a byte-identical prompt.")
+
+
+def _load_prior(path: str):
+    """A prior, or None. Refuses a path that does not load rather than running without one.
+
+    An unreadable prior must not degrade to the baseline silently: the manifest would then say
+    `retrieval_prior: null` for a run the operator believes was informed, and the arm would be
+    mislabelled in every later comparison.
+    """
+    if not path:
+        return None
+    from ..contract.retrieval_prior import RetrievalPrior, RetrievalPriorError
+    try:
+        return RetrievalPrior.load(path)
+    except RetrievalPriorError as e:
+        raise typer.BadParameter(str(e)) from e
+
+
 @chart_app.command("patients")
 def patients(corpus: str = CORPUS):
     """List patients in the corpus."""
@@ -83,6 +152,8 @@ def run(
     max_steps: int = cli_common.MAX_STEPS,
     max_usd: float = cli_common.MAX_USD,
     out: str = typer.Option("runs", "--out"),
+    site_mapping: str = SITE_MAPPING,
+    prior: str = PRIOR,
     temperature: float = typer.Option(1.0, "--temperature"),
     seed: int = typer.Option(1234, "--seed",
                              help="validation-sampling seed; fix it to make two runs comparable"),
@@ -123,6 +194,8 @@ def run(
     from ..review.agent import run_patient
 
     sp = load_spec(spec)
+    mapping = _load_site_mapping(sp, site_mapping)
+    prior_asset = _load_prior(prior)
     stack = _skill_stack(runtime_profile, skills)
     c = Corpus(Path(corpus))
     ch = c.chart(patient)
@@ -136,7 +209,8 @@ def run(
         show(run_patient(spec=sp, corpus=c, patient_id=patient, out_dir=run_dir,
                          model=chat, max_model_calls=max_steps, seed=seed,
                          max_usd=max_usd, runtime_profile=runtime_profile,
-                         skill_stack=stack))
+                         skill_stack=stack, site_mapping=mapping,
+                         retrieval_prior=prior_asset))
         return
 
     from ..review.conflict_refinement import run_conflict_refinement
@@ -153,7 +227,8 @@ def run(
             "spec": sp, "corpus": c, "patient_id": patient, "out_dir": run_dir,
             "model": chat, "max_model_calls": max_steps, "seed": seed,
             "max_usd": max_usd, "runtime_profile": runtime_profile,
-            "skill_stack": stack,
+            "skill_stack": stack, "site_mapping": mapping,
+            "retrieval_prior": prior_asset,
         })
     summary = result.to_dict(include_manifests=False)
     path = run_dir / "conflict-refinement.json"
@@ -191,6 +266,8 @@ def batch(
              "comma already separates clauses), `policy=` clears the slot. "
              "Parsed once before the loop, so a typo cannot be charged per patient."),
     out: str = typer.Option("runs", "--out"),
+    site_mapping: str = SITE_MAPPING,
+    prior: str = PRIOR,
 ):
     """Run one spec across many patients.
 
@@ -200,6 +277,8 @@ def batch(
     from ..review.agent import run_patient
 
     sp = load_spec(spec)
+    mapping = _load_site_mapping(sp, site_mapping)
+    prior_asset = _load_prior(prior)
     stack = _skill_stack(runtime_profile, skills)
     c = Corpus(Path(corpus))
     pids = [p.strip() for p in patients_arg.split(",") if p.strip()] or c.patient_ids()
@@ -213,7 +292,8 @@ def batch(
                                        max_model_calls=max_steps, seed=seed, run_id=pid,
                                        max_usd=max_usd,
                                        runtime_profile=runtime_profile,
-                                       skill_stack=stack))
+                                       skill_stack=stack, site_mapping=mapping,
+                                       retrieval_prior=prior_asset))
         except Exception as e:  # noqa: BLE001
             con.print(f"[red]{pid} failed: {e}[/]")
             results.append({"patient_id": pid, "error": str(e)})
@@ -251,6 +331,8 @@ def consistency(
         help="validation-sampling seed, SHARED by all N runs. Self-consistency is about the "
              "model, so the runtime's own sampling must not vary between them"),
     out: str = typer.Option("runs", "--out"),
+    site_mapping: str = SITE_MAPPING,
+    prior: str = PRIOR,
 ):
     """Run the same spec N times to measure SELF-consistency.
 
@@ -260,6 +342,8 @@ def consistency(
     from ..review.agent import run_patient
 
     sp = load_spec(spec)
+    mapping = _load_site_mapping(sp, site_mapping)
+    prior_asset = _load_prior(prior)
     c = Corpus(Path(corpus))
     stack = _skill_stack(runtime_profile, skills)
     run_dir = cli_common.unique_run_dir(out)
@@ -269,7 +353,8 @@ def consistency(
                         model=cli_common.chat_model(model, api_base, temperature),
                         max_model_calls=max_steps, seed=seed, run_id=f"{patient}__c{i}",
                         max_usd=max_usd, runtime_profile=runtime_profile,
-                        skill_stack=stack)
+                        skill_stack=stack, site_mapping=mapping,
+                        retrieval_prior=prior_asset)
         outs.append(r)
         con.print(f"  run {i+1}/{n}: {r['answer'].get('status')} "
                   f"{json.dumps(r['answer'].get('value', {}), ensure_ascii=False)}")
@@ -369,3 +454,53 @@ def show(res: dict) -> None:
         con.print(f"[bold]plan widened[/]: +{len(added)} term(s) "
                   f"{[r['term'] for r in added]}, {len(proms)} promotion(s) {moves}")
     con.print(f"[dim]trace: {res.get('trace')}[/]")
+
+
+@chart_app.command("check-corpus")
+def cmd_check_corpus(
+    corpus: str = CORPUS,
+    patients: str = typer.Option("", "--patients", help="comma list; default every patient"),
+    strict: bool = typer.Option(False, "--strict",
+                                help="exit non-zero when any filename is unreadable"),
+):
+    """Report every document the loader cannot see, BEFORE anything is spent reading the ones it can.
+
+    `corpus.FILENAME_RE` takes `<Doc-Type>_<YYYY-MM-DD>[__<n>].txt`: the type and the date come from
+    the NAME, and every date filter and every type sweep works off them. A stem it cannot parse is
+    skipped — correctly, because guessing a date is worse than missing one — but skipped SILENTLY,
+    and a silently missing document is the most expensive kind: the run still answers, still passes
+    its gate, and still reports coverage over the documents it did see.
+
+    On the synthetic corpus this finds nothing. On a real export it is the first command to run, and
+    `--strict` is what belongs in a pipeline: a corpus that half-loaded is not a corpus.
+    """
+    c = Corpus(Path(corpus))
+    ids = [p.strip() for p in patients.split(",") if p.strip()] or c.patient_ids()
+    bad: dict[str, list[str]] = {}
+    empty: list[str] = []
+    n_ok = 0
+    for pid in ids:
+        chart = c.chart(pid)
+        n_ok += len(chart)
+        if chart.unreadable_filenames:
+            bad[pid] = chart.unreadable_filenames
+        if len(chart) == 0:
+            # A zero-document patient is not "no findings" — it is a subject every run will answer
+            # CORPUS_INSUFFICIENT about while the report reads clean. Listed by name, because an
+            # aggregate hides exactly the patient someone is looking for.
+            empty.append(pid)
+    total_bad = sum(len(v) for v in bad.values())
+    con.print(f"{len(ids)} patient(s), [bold]{n_ok}[/] document(s) the loader can see, "
+              f"[bold]{total_bad}[/] it cannot, [bold]{len(empty)}[/] patient(s) with no "
+              f"readable document at all")
+    if bad:
+        t = Table("patient", "unreadable", "examples")
+        for pid, names in sorted(bad.items()):
+            t.add_row(pid, str(len(names)), ", ".join(names[:2]))
+        con.print(t)
+        con.print("[yellow]Expected `<Doc-Type>_<YYYY-MM-DD>[__<n>].txt`. Rename them, or accept "
+                  "that no run will ever read them.[/]")
+    if empty:
+        con.print(f"[yellow]No readable documents: {', '.join(sorted(empty))}[/]")
+    if strict and (total_bad or empty):
+        raise typer.Exit(code=1)

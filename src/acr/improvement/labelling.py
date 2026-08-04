@@ -785,7 +785,8 @@ def verify_quote(quote: str, text: str) -> bool:
     Whitespace- and case-insensitive, and nothing more. Line wrapping and casing are transport
     damage; a different word is a different quote, and this returns False for it.
     """
-    flat = lambda s: re.sub(r"\s+", " ", s).strip().lower()
+    def flat(s):
+        return re.sub(r"\s+", " ", s).strip().lower()
     return bool(quote.strip()) and flat(quote) in flat(text)
 
 

@@ -110,7 +110,6 @@ def _frontmatter(name: str, skills_dir: Path | str | None = None) -> dict:
     roots = [Path(skills_dir)] if skills_dir else list(site.skill_roots())
     path = next((r / name / "SKILL.md" for r in roots if (r / name / "SKILL.md").is_file()),
                 roots[0] / name / "SKILL.md")
-    root = path.parent.parent
     if not path.is_file():
         raise SkillError(f"no skill {name!r} at {path}")
     m = _FRONTMATTER.match(path.read_text(encoding="utf-8"))

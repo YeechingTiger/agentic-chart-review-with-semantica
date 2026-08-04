@@ -17,13 +17,22 @@ Seven phases. Two of them are decision points where the honest outcome may be *s
 
 **1. Point at the documents.** `export ACR_CORPUS=/path/to/patients`, one directory per subject.
 
-**2. Filenames are load-bearing.** `corpus.FILENAME_RE` is
-`<Doc-Type>_<YYYY-MM-DD>[__<n>].txt` — the type and the date come from the NAME, and every date
-filter and every type sweep works off them. A file whose stem the loader cannot parse is skipped
-**silently**: it is invisible to every run, the run still answers, still passes its gate, and still
-reports coverage over the documents it did see.
+**2. Filenames are load-bearing, so check them before spending anything.**
+
+```bash
+acr check-corpus --strict   # exits 1 on an unreadable filename OR a patient with no documents
+```
+
+`corpus.FILENAME_RE` is `<Doc-Type>_<YYYY-MM-DD>[__<n>].txt` — the type and the date come from the
+NAME, and every date filter and every type sweep works off them. A file whose stem the loader cannot
+parse is skipped, correctly, because guessing a date is worse than missing one — but it was skipped
+**silently**, which is the expensive kind: the document is invisible to every run, the run still
+answers, still passes its gate, and still reports coverage over the documents it did see.
+`PatientChart.unreadable_filenames` is what the command above reads.
 `tests/test_adversarial_corpus.py::test_no_unparseable_document_is_sitting_in_the_corpus` exists
-because that is not hypothetical.
+because that is not hypothetical. On the synthetic corpus this finds nothing (27 patients, 8,126
+documents, 0 unreadable); on a real export it is the first command to run, and `--strict` is what
+belongs in a pipeline, because a corpus that half-loaded is not a corpus.
 
 **3. If the data is real, say so, and the system will refuse until you finish.**
 
@@ -70,6 +79,13 @@ Two things that are not optional:
   different things. Collapsing them loses the only signal that separates "the record is silent" from
   "we never asked the right question".
 
+> **If the lint tells you to migrate to `means:` + a Site Mapping, you now can.** Until 2026-08-04
+> `acr site-mapping build` produced a file no run command could consume: `run_patient` never passed
+> `mapping=` and had no parameter for one, so every mapped contract died in `StratumSpec.matches`
+> before the first model call. `--mapping` now exists on `run`, `batch` and `extract`, `ACR_SITE_MAPPING`
+> covers `acr-mcp`, and the door refuses by naming the flag. Both call sites are wired — the ledger
+> AND `plan_from_spec`, because fixing only the first left the run dying one line later.
+
 **7. Lint it.** `acr spec lint <spec>` — eleven checks in four tiers that cost four different things
 to run and mean four different things when they pass. Tier 1 must be clean. **Do not read a clean
 lint as coverage**: five of the eleven produce zero findings over all six shipped contracts. They are
@@ -100,12 +116,45 @@ references, never as truth.
 **11. The floor.** `acr batch` over the cohort with NO method cards, then:
 
 ```bash
-acr eval score --runs <dir> --answer-key key.json --fields a,b,c \
-  --commit <sha> --spec-hash <hash> --model <m> --date <d>
+acr eval score --runs <dir> --answer-key key.json --fields a,b,c --baseline floor.json
 ```
 
+**The baseline key is no longer typed.** `--commit`, `--spec-hash`, `--model` and `--date` were
+required options reconciled against nothing, and this document instructed you to fill them in. Every
+manifest records `code_sha`, `spec_hash`, `model` and `experiment_config_hash`, so those are read;
+the date comes from the run id, or from the batch directory for the runs whose `run_id` is a patient
+id. The four flags remain as optional ASSERTIONS — pass one and a run that recorded something else
+stops the command by name. A part no manifest recorded contradicts nothing, so older runs still
+score.
+
+Two things this changes for you at step 22. `eval score` prints `MIXED` for any identity field that
+varies across the runs you pointed it at, and `eval compare` then REFUSES that baseline as an
+endpoint: a mixed baseline averages more than one arm, and a delta against it prices the difference
+between the arms and the difference between the mixtures as one number. Score one arm directory at a
+time. And two arms that differ only in their PROMPT — a skill card, a prior, a mapping, a
+conflict-refinement brief — are now distinguishable, because `experiment_config_hash` reaches the key.
+Before 2026-08-04 they compared as the same configuration and `key_differences` was empty.
+
 **12. DECISION POINT — is an agent the right tool here?**
-`python tools/measure_agency.py <runs>` takes the contract's OWN vocabulary, searches the corpus with
+
+```bash
+python tools/measure_agency.py <runs> --answer-key key.json   # --spec inferred from the runs
+```
+
+All three decision points (steps 12, 13, 22) were hardcoded to `STORE.390` and read gold from
+`corpus/index.json`, a file only `tools/generate_corpus.py` writes — so on any corpus but the
+shipped synthetic one they died with `FileNotFoundError`. They take `--answer-key` now: the same file
+`acr eval score` takes.
+
+**On a real corpus you must still author that file.** `tools/answer_key_from_corpus.py` reads
+`_ground_truth.json`, which exists only in the synthetic corpus, and **`acr gold` is not its
+real-data equivalent** — it stages registry values as LOCAL UNRESOLVED references and audits
+derivability; it emits nothing in `eval score`'s key format. That producer does not exist yet, and
+saying otherwise here was the same class of error as the rest of this document's corrections. `analyze_arms.py` additionally
+REFUSES to print its held-out column when the corpus carries no design metadata, because not knowing
+which charts are contaminated is not the same as none being contaminated.
+
+`measure_agency.py` takes the contract's OWN vocabulary, searches the corpus with
 it, and asks whether the document that carried the answer is among the hits.
 
 > If reachability is high and decisive evidence arrives on contract terms across most variables, then
@@ -219,7 +268,7 @@ empty "because nothing looked, not because nothing fired" — and the report say
 **25. Audit the trace you have already written to disk.**
 
 ```bash
-acr audit run --manifest <m> --subject-id <s> --local-root "$ACR_LOCAL_ROOT"
+acr audit run --manifest <m> --subject-id <s> --local-root "$ACR_LOCAL_ARTIFACT_ROOT"
 python -c "…" # or the script skill: audit-phi-in-trace
 ```
 
@@ -233,18 +282,86 @@ SUBMITTED ANSWER's evidence quote, because the agent had quoted a document HEADE
 (`MRN: … / Patient: … / DOB: …`) as its evidence. Synthetic there. On a real chart that is a real
 record number, a real name and a real date of birth, in the artifact a human pastes into a report.
 
-**26. Attribute the wrong answers.** `acr attribute` — a model-based cause for each, from an agent
-that has never been shown the key. Treat its output as a hypothesis: this plane's own accuracy has
-never been measured (`meta_evaluate_attributions` wants 30 adjudicated cases; there are 2 records).
+**26. Attribute the wrong answers.**
+
+> **The "there are only 2 records" explanation was wrong.** `meta_evaluate_attributions` reads the
+> human root cause from `row["primary_cause"]`; `AdjudicationEvent.to_dict()` — the only producer —
+> emitted `decision`, validated against `LIFECYCLE`, and `LIFECYCLE ∩ CAUSES` is empty. So the
+> calibration returned zero pairs for ANY number of adjudications and reported a case shortage.
+> Fixed 2026-08-04: `acr attribute adjudicate --primary-cause <one of CAUSES>`, and the report now
+> names the format problem when rows exist and none carries a cause. First real run:
+> `n_adjudicated_pairs: 2, macro_f1: 0.333`.
+
+```bash
+acr attribute case-map --runs <dir> --out case-map.json      # mint the pseudonyms FIRST
+acr attribute batch --runs <dir> --spec <spec> --case-map case-map.json \
+  --min-term-chars 4 --max-rejection-repeats 3 --token-band 2000,60000 --turn-band 3,40 \
+  --max-usd 1.20 --max-model-calls 24
+```
+
+`--case-map` is required by three commands and **nothing produced one until 2026-08-03**, which is
+why `attribute` had never emitted a proposal. The map is `{case_id: patient_id}`, minted as an HMAC
+under a 256-bit key kept in the local root — salted rather than a plain digest, because an unsalted
+hash of a medical record number is reversible by enumeration. Re-running is additive: reminting a
+case id would split that patient's history into two cases.
+
+**Give it enough CALLS, not just enough dollars.** The first real batch selected 1 of 27 runs, spent
+$0.009 of a $0.60 ceiling, and returned UNRESOLVED — *"model-call limit reached without a gate-valid
+attribution (7/8)"*. The protocol requires a final targeted confirmation round, and the call budget
+is what binds. At 24 calls the same case resolved: `EVIDENCE_GAP`, `POSSIBLE`, 15 calls, 3 chart
+reads, `repair_route: HUMAN_REVIEW_TEST_OBLIGATION`.
+
+Treat the cause as a hypothesis: this plane's own accuracy has never been measured
+(`meta_evaluate_attributions` wants 30 adjudicated cases; there are 2 records). And note that
+`semantic_patch_allowed` is `False` in BLIND mode by design — a patch needs gold AND adjudication.
 
 ---
 
 ## Phase 7 — change something, deliberately
 
-**27. Route failures at the text.** `acr refine` proposes an edit to the specific text parameter that
-could have caused a classified failure — a prompt, a card, a contract clause. It never applies one:
-paired validation is a separate decision, a semantic change needs gold AND human adjudication, and a
-`REGISTRY_REFERENCE` truth mode can only produce a question for an expert.
+**27. Route failures at the text.**
+
+```bash
+acr refine cases --runs <dir> --answer-key key.json --fields <f> --spec <spec> \
+  --case-map case-map.json --out cases.json          # free; the other missing producer
+acr refine route --cases cases.json --verdicts verdicts.json --spec-text <id>=<spec>
+```
+
+`refine route` proposes an edit to the specific text parameter that could have caused a classified
+failure — a prompt, a card, a contract clause. It never applies one: paired validation is a separate
+decision, a semantic change needs gold AND human adjudication, and a `REGISTRY_REFERENCE` truth mode
+can only produce a question for an expert.
+
+**`refine cases` separates three populations that the router's own boolean cannot.** Cut 1 sends
+`establishing_evidence_surfaced: false` to §6c retrieval without consulting any model, so what goes
+into that field decides the whole diagnosis:
+
+| population | what it means | is it retrieval? |
+|---|---|---|
+| a document carries the key value, the run never opened it | genuine retrieval failure | **yes** |
+| the key value appears in NO document | the key is CONSTRUCTED — imputed, or inferred across notes | no; no search could find it |
+| the key says abstaining was correct | no document establishes an abstention | no |
+
+On 27 runs of STORE.390 that is **7 disagreements: 2 genuine retrieval, 3 unseedable, 2
+read-and-misjudged.** `tools/measure_controller_value.py`, an independent implementation, reports the
+same 7.
+
+**An earlier version of this document said 8, and that was wrong** — three ways, all fixed
+2026-08-04. `_coded_value` returned the run's STATUS STRING when no value was present, so a run that
+correctly abstained on a chart where the key says abstention is correct compared `"CORPUS_INSUFFICIENT"`
+against `""` and was emitted as a failure; `eval score` called the same manifest `ABSTAINED_CORRECT`.
+`_notations` returned `[year]` for a `99`-partial date, and a bare year is in essentially every note
+of a chart from that year (SYNY02: 27 of them), so a CONSTRUCTED date read as present and cut 1
+routed it to §6c retrieval — the exact inversion this section warns about. And the trace was read
+from the manifest's recorded absolute path rather than the sibling `.jsonl`, so a moved run tree
+refused with a false statement (49 of 509 manifests here are in that state; `tools/archive_runs.sh`
+is what moves them). All three were duplicate implementations of facts `RunRecord` already owned.
+
+**Then it stops, and the stop is the point.** Every case lands `NOT_ADJUDICATED`, and cut 2 routes
+an un-adjudicated case to UNRESOLVED without asking the reflection model anything. Whether the
+answer key is right is a human's call, and the router refuses to launder it into a spec edit. So a
+first pass names its own next task: adjudication — the same thing
+`meta_evaluate_attributions` has been waiting on for thirty cases while two exist.
 
 **28. Then go back to Phase 5**, because an intervention nobody measured is a change and not an
 improvement.

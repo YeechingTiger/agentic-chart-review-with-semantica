@@ -376,8 +376,12 @@ degradation remain.
 .venv/bin/acr eval dimensions            # THE FENCE: what a judge may and may not decide
 .venv/bin/acr eval score   --runs runs/…/ --answer-key key.json \
                            --fields primary_site,histology,behavior \
-                           --commit $(git rev-parse --short HEAD) --spec-hash … \
-                           --model … --date … --baseline baseline.json
+                           --baseline baseline.json
+# The baseline key is READ FROM THE MANIFESTS — code_sha, spec_hash, model and
+# experiment_config_hash, plus the date from the run id or the batch directory. It used to be
+# four required strings reconciled against nothing, so `--model TOTALLY-WRONG-MODEL` was accepted
+# in silence. They survive as optional ASSERTIONS: pass one and a run that says otherwise stops
+# the command. Runs spanning two arms score, are marked MIXED, and are refused by `eval compare`.
 .venv/bin/acr eval detect  --runs runs/…/ --min-term-chars 3 --max-rejection-repeats 2 \
                            --token-band 20000,1500000 --turn-band 3,60
 .venv/bin/acr eval compare --before a.json --after b.json     # exits 1 on REGRESSION
@@ -671,8 +675,8 @@ The sixteen fixes and the reframed limits are verified **by tests only**. Re-run
 cohort on current code before quoting any figure:
 
 ```bash
-B="$ACR_LOCAL_ROOT/run/hooks_current" && mkdir -p "$B"
-cp "$ACR_LOCAL_ROOT/run/real_ten"/{cohort.txt,answer_key.json} "$B"/
+B="$ACR_LOCAL_ARTIFACT_ROOT/run/hooks_current" && mkdir -p "$B"
+cp "$ACR_LOCAL_ARTIFACT_ROOT/run/real_ten"/{cohort.txt,answer_key.json} "$B"/
 export ACR_AUDIT_LOG=$B/audit.jsonl
 .venv/bin/acr extract --cohort $B/cohort.txt --variables primary_site,histology,behavior \
   --corpus "$ACR_REAL_CORPUS/patients" \
@@ -789,7 +793,7 @@ added.
    `assets/skills/crc-guideline-registry-authoring/`, `tests/test_crc_*.py`. **Do not run
    `git stash -u`** — it stashes their untracked work. I did, and it looked like I had broken
    four of their tests.
-6. Write run outputs outside the repo (`$ACR_LOCAL_ROOT/run/`). Scratch storage
+6. Write run outputs outside the repo (`$ACR_LOCAL_ARTIFACT_ROOT/run/`). Scratch storage
    is near quota.
 
 **Three lessons that cost real time:**

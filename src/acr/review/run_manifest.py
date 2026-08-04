@@ -171,6 +171,24 @@ def chart_hash(patient_dir) -> str:
         return ""
     return h.hexdigest()[:16]
 
+def model_identity(model) -> str:
+    """WHICH MODEL, as a string two runs of one arm agree on.
+
+    `getattr(model, "model_name", "") or str(model)` was the fallback, and `str()` on a LangChain
+    chat model that does not set `model_name` renders the Python object's repr — including its
+    MEMORY ADDRESS. So `manifest["model"]` differed between two runs of the same arm, and once
+    `experiment_config_hash` started being read as the arm's identity that made it a per-run id:
+    `eval compare` would refuse every genuine pairing as a mixture of arms.
+
+    Caught by running the same patient twice through the real runtime and comparing the two
+    manifests, which is the only way this class of thing surfaces — every fixture that builds a
+    manifest by hand types a model name and the substitution never happens.
+
+    The class name is a real if coarse identity: stable across runs, and wrong in no way that a
+    reader could mistake for a provider model id.
+    """
+    return str(getattr(model, "model_name", "") or type(model).__name__)
+
 def experiment_config_hash(config: dict) -> str:
     """One value over everything that makes two runs the same arm.
 
@@ -188,7 +206,8 @@ def experiment_config_hash(config: dict) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
 def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None,
-                          tool_schemas=None) -> dict:
+                          tool_schemas=None, retrieval_prior=None,
+                          site_mapping=None, task_context: str = "") -> dict:
     """The identity of every prompt block whose content can change a run's answer.
 
     Lives here rather than in `agent` because a manifest field belongs with the manifest, and
@@ -222,6 +241,21 @@ def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None,
         skills = [{"error": f"{type(exc).__name__}: {exc}"}]
     return {
         "value_domain": table_manifest(spec),
+        # THE MEASURED PRIOR THIS RUN WAS SHOWN, or an explicit `None`. Recorded because a prior is
+        # prompt content: two arms differing only in which scan they were told about are otherwise
+        # indistinguishable afterwards, and "accuracy rose" and "the prompt changed" would be the
+        # same observation. `None` rather than an absent key — an absent entry and an entry saying
+        # "no prior" are different claims and only one survives a reader asking which arm this was.
+        "retrieval_prior": ({
+            "asset_id": retrieval_prior.asset_id,
+            "version": retrieval_prior.version,
+            "status": retrieval_prior.status,
+            "content_hash": retrieval_prior.content_hash,
+            "n_patients": retrieval_prior.measured.n_patients,
+            "n_notes": retrieval_prior.measured.n_notes,
+            "spec_id": retrieval_prior.measured.spec_id,
+            "labelling_model": retrieval_prior.measured.model,
+        } if retrieval_prior is not None else None),
         "document_concepts": concepts_manifest(),
         "skills": skills,
         # THE TOOL SURFACE IS PROMPT CONTENT. Every schema's `description` is rendered into
@@ -233,8 +267,39 @@ def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None,
         # `None`, not `{}`, when no surface was supplied: `mcp_server` builds its own answer
         # dict and an absent surface is a different fact from an unhashed one.
         "tool_surface": _tool_surface(tool_schemas),
+        # WHAT ELSE WENT INTO THE PROMPT, AND WHAT ELSE SHAPED THE PLAN. Both were switches on
+        # `run_patient` that no manifest field recorded, so `experiment_config_hash` — the read
+        # side's only discriminator since `evals.BaselineKey` started carrying it — could not tell
+        # those arms from the baseline.
+        #
+        # `additional_task_context` is appended verbatim to the system prompt (`agent.py:1688`) and
+        # its only caller is `conflict_refinement.py`, injecting the brief that DEFINES the
+        # refinement arm. The hash, never the text: this is unbounded operator prose written into a
+        # file that sits beside patient-derived output, and a manifest is not the place to copy it.
+        "additional_task_context": _text_identity(task_context),
+        # `site_mapping` reaches `CoverageLedger` and `plan_from_spec`, so it changes the
+        # stratification, the plan and therefore the gate. `mapping_hash` has existed since the
+        # mapping did and reached no manifest.
+        "site_mapping": ({"corpus_id": site_mapping.corpus_id,
+                          "mapping_hash": site_mapping.mapping_hash,
+                          "n_types": site_mapping.n_types,
+                          "provenance": site_mapping.provenance}
+                         if site_mapping is not None else None),
         "any_signed_off": False,
     }
+
+def _text_identity(text: str) -> dict | None:
+    """A content hash and a length for prompt text, or `None` when there was none.
+
+    `None` rather than `{"n_chars": 0}`: an absent block and an empty one are the same run, but a
+    manifest that predates this field and one that records "no brief" are different facts, and only
+    the explicit `None` lets a reader tell them apart.
+    """
+    if not (text or "").strip():
+        return None
+    import hashlib
+    return {"n_chars": len(text),
+            "content_hash": hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]}
 
 def _tool_surface(schemas) -> dict | None:
     if schemas is None:

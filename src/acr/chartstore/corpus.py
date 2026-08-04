@@ -175,7 +175,15 @@ def parse_filename(stem: str) -> tuple[str, date, int] | None:
     if not m:
         return None
     y, mo, d = (int(x) for x in m.group("date").split("-"))
-    return m.group("doc_type"), date(y, mo, d), int(m.group("seq") or 1)
+    try:
+        parsed = date(y, mo, d)
+    except ValueError:
+        # The regex matches digit SHAPE; the calendar decides validity. `0000-00-00` is the
+        # standard MySQL/EHR null-date sentinel and real exports contain it — unguarded, one such
+        # file raised through `PatientChart.__init__` and made the whole chart unconstructible,
+        # killing every command that touches the patient. Unreadable, like any other bad name.
+        return None
+    return m.group("doc_type"), parsed, int(m.group("seq") or 1)
 
 
 class PatientChart:
@@ -188,10 +196,27 @@ class PatientChart:
         self.patient_id = self.dir.name
         self._docs: dict[str, DocMeta] = {}
         self._paths: dict[str, Path] = {}
-        for p in sorted(self.dir.glob("*.txt")):
-            parsed = parse_filename(p.stem)
+        #: Files whose stem the loader could not read. KEPT rather than forgotten: skipping is right
+        #: — a name the loader cannot parse must not be guessed at — but a SILENT skip means the
+        #: document does not exist for any run, while the run still answers, still passes its gate,
+        #: and still reports coverage over the documents it did see. On a synthetic corpus these are
+        #: iCloud conflict copies and harmless; on a real export they are the documents whose naming
+        #: nobody checked. `unreadable_filenames` is what lets anything say so.
+        self.unreadable_filenames: list[str] = []
+        # `iterdir`, NOT `glob("*.txt")`. The glob was the universe, so a file that is not
+        # lowercase-.txt (`.TXT`, `.text`, an iCloud `.icloud` stub) was never ENUMERATED — it
+        # could not reach `unreadable_filenames`, and a chart made entirely of such files reported
+        # as clean with zero documents. Two exclusions, both conventions this corpus already has:
+        # hidden files (`.DS_Store` is every macOS directory) and the `_` sidecar prefix
+        # (`_ground_truth.json`). Flagging those would make every healthy corpus report unreadable
+        # files forever, which trains readers to ignore the report.
+        for p in sorted(self.dir.iterdir()):
+            if p.is_dir() or p.name.startswith((".", "_")):
+                continue
+            parsed = parse_filename(p.stem) if p.suffix == ".txt" else None
             if parsed is None:
-                continue  # unparseable filenames are skipped, not guessed at
+                self.unreadable_filenames.append(p.name)
+                continue
             doc_type, dt, seq = parsed
             self._docs[p.stem] = DocMeta(p.stem, doc_type, dt, seq, p.stat().st_size)
             self._paths[p.stem] = p

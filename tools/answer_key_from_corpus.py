@@ -104,7 +104,8 @@ def _value_of(row: dict, field: str, fields: list[str], pid: str) -> object:
         f"abstaining is the correct answer here.")
 
 
-def build(corpus: Path, spec_key: str, fields: list[str]) -> dict:
+def build(corpus: Path, spec_key: str, fields: list[str],
+          also_scores: list[str] | None = None) -> dict:
     key: dict[str, dict] = {}
     for gt_path in sorted(corpus.glob("*/_ground_truth.json")):
         truth = json.loads(gt_path.read_text(encoding="utf-8"))
@@ -121,6 +122,16 @@ def build(corpus: Path, spec_key: str, fields: list[str]) -> dict:
                 for f in fields
             },
             "subgroups": _subgroups(truth, row),
+            # THE READER CHECKS THIS. Without it, `evals.score`'s bare-patient-id fallback matched
+            # a run of any contract, so runs of a DIFFERENT spec were scored against this key and
+            # `n_unkeyed` reported 0 regardless — on this tree, 8 such runs moved a published
+            # exact-match rate by 1.2 points. The key already knows which spec it is about.
+            "spec_id": spec_key,
+            # Every contract id this key is the correct answer FOR. An ablation arm is a different
+            # `spec_id` over the same variable — same answers, different retrieval policy — and the
+            # corpus has no separate ground truth for it, so without this it scores as unkeyed and
+            # its comparison reads "nothing changed".
+            "spec_ids": [spec_key, *(also_scores or [])],
         }
     return key
 
@@ -132,11 +143,14 @@ def main() -> None:
                     help="the key inside `ground_truth`, e.g. STORE.390.date_of_initial_diagnosis")
     ap.add_argument("--fields", required=True,
                     help="comma list, and it must match `acr eval score --fields` exactly")
+    ap.add_argument("--also-scores", action="append", default=[],
+                    help="another spec_id this key is the correct answer for, e.g. an ablation "
+                         "arm `<base>.UNSTRATIFIED`. Repeatable.")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
 
     fields = [f.strip() for f in a.fields.split(",") if f.strip()]
-    key = build(Path(a.corpus), a.spec_key, fields)
+    key = build(Path(a.corpus), a.spec_key, fields, a.also_scores)
     if not key:
         raise SystemExit(f"no patient carries {a.spec_key!r}; check the spec key spelling")
 

@@ -36,6 +36,7 @@ import importlib
 
 import typer
 
+from ..core import site
 from ..core.cli_common import (  # noqa: F401 (re-export)
     CONCORD_SCHEMA,
     EXPLAIN_SCHEMA,
@@ -44,6 +45,24 @@ from ..core.cli_common import (  # noqa: F401 (re-export)
 from .cli_chart import chart_app
 
 app = typer.Typer(add_completion=False, help="Agentic EHR chart review.")
+
+
+@app.callback()
+def _gate() -> None:
+    """Refuse every command when a real corpus is declared and its identifier shape is not.
+
+    THE GATE HAD NO CALLER. `site.require_person_id_pattern` was written on 2026-08-03 with the
+    reasoning that "an inert guard is indistinguishable from a satisfied one", and then wired to
+    nothing: a deployment could point `ACR_REAL_CORPUS` at real data with no identifier pattern set,
+    and every mask and every person-id refusal in the system would silently do nothing. The gate that
+    exists to prevent a silent no-op WAS one.
+
+    A Typer root callback runs before any subcommand, which is the only placement that covers the
+    whole surface — putting it in the chart-run path would leave `acr eval`, `acr audit` and
+    `acr label` reading the same real corpus ungated.
+    """
+    site.require_person_id_pattern()
+
 
 app.add_typer(chart_app)
 

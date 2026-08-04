@@ -642,19 +642,40 @@ def meta_evaluate_attributions(
     """Calibrate causal attribution against accountable human root-cause labels."""
     if min_cases < 1 or not 0 <= min_macro_f1 <= 1:
         raise ValueError("min_cases must be >=1 and min_macro_f1 must be in [0,1]")
-    gold = {
-        str(row.get("case_id") or ""): str(
-            row.get("primary_cause")
-            or (row.get("adjudication") or {}).get("primary_cause")
-            or ""
-        )
-        for row in adjudications
-        if row.get("case_id")
-    }
+    # THE LEDGER IS APPEND-ONLY, so one case legitimately has several rows: `LIFECYCLE` includes
+    # `REOPENED`, and `ErrorCaseLibrary.add_adjudication` never rewrites an event. A dict
+    # comprehension over it made the LAST row win, so a follow-up `VALIDATED_FIXED` — which
+    # correctly carries no cause, being a decision about what to DO — silently erased the root-cause
+    # label recorded earlier, dropped the pair, AND counted the case as missing a cause. The fold
+    # keeps the LATEST row that actually names one: a registrar who changes their mind appends a new
+    # row with a cause, and that is the one that counts.
+    gold: dict[str, str] = {}
+    cases_seen: set[str] = set()
+    for row in adjudications:
+        case_id = str(row.get("case_id") or "")
+        if not case_id:
+            continue
+        cases_seen.add(case_id)
+        cause = str(row.get("primary_cause")
+                    or (row.get("adjudication") or {}).get("primary_cause") or "")
+        if cause:
+            gold[case_id] = cause
+    # ROWS THAT EXIST AND CARRY NO CAUSE are a FORMAT problem, and reporting them as
+    # `n_adjudicated_pairs: 0` beside "need at least N cases" reads as a data shortage — which is
+    # exactly how this defect survived: the repo shipped "there are 2 records" into its docs as the
+    # explanation. Counted per CASE, not per ROW: three causeless rows for one case are one case
+    # that pairs with nothing, and counting rows made a complete ledger look three times as broken.
+    n_rows = len(cases_seen)
+    n_without_cause = len(cases_seen - set(gold))
     pairs: list[tuple[str, str]] = []
     citation_invalid = 0
     clinical_auto_confirmed = 0
     scope_violations = 0
+    # `scope_violations` is read from a key NO PRODUCER WRITES: `AttributionReport.to_dict()` emits
+    # `gate_rejections` and never `scope_violations`, so the condition "patient-scope violations
+    # must be zero" could never appear in `reasons_not_certified` — a precondition that cannot fail
+    # printing as one that passed. Whether anything measured it is now part of the report.
+    scope_measured = any("scope_violations" in row for row in predictions)
     clinical = {
         "REFERENCE_OR_GOLD",
         "RETRIEVAL",
@@ -707,6 +728,7 @@ def meta_evaluate_attributions(
         and citation_invalid == 0
         and clinical_auto_confirmed == 0
         and scope_violations == 0
+        and n_without_cause == 0
     )
     return {
         "schema": "acr.attribution_meta_evaluation/1",
@@ -718,6 +740,9 @@ def meta_evaluate_attributions(
         "citation_invalid": citation_invalid,
         "clinical_auto_confirmed": clinical_auto_confirmed,
         "scope_violations": scope_violations,
+        #: False means NOBODY LOOKED, which is not the same as zero violations.
+        "scope_violations_measured": scope_measured,
+        "n_adjudications_without_cause": n_without_cause,
         "per_label": per_label,
         "reasons_not_certified": [
             reason
@@ -733,6 +758,11 @@ def meta_evaluate_attributions(
                     "agent may not auto-confirm clinical/semantic causes",
                 ),
                 (scope_violations > 0, "patient-scope violations must be zero"),
+                (n_without_cause > 0,
+                 f"{n_without_cause} of {n_rows} adjudicated case(s) carry no readable "
+                 f"`primary_cause`, so they pair with nothing. This is a FORMAT problem, not a "
+                 f"shortage of cases: record the human root cause with "
+                 f"`acr attribute adjudicate --primary-cause <one of CAUSES>`."),
             )
             if condition
         ],
@@ -945,11 +975,27 @@ class ErrorCaseEvent:
 
 @dataclass(frozen=True)
 class AdjudicationEvent:
+    """A human's accountable decision about one case.
+
+    `primary_cause` IS THE HUMAN ROOT-CAUSE LABEL, and it is the only reason
+    `meta_evaluate_attributions` can pair anything. It was absent: this class emitted `decision`
+    (a LIFECYCLE state — what to DO about the case) and nothing from `CAUSES` (what went wrong),
+    and the two sets are disjoint. So the calibration read zero pairs for every input, reported
+    "need at least 30 adjudicated cases", and the repo shipped that count into its docs as an
+    explanation — diagnosing a data shortage where the defect was a format mismatch.
+
+    OPTIONAL, because not every adjudication is a root-cause label: `WONT_FIX` and
+    `OUTSIDE_CHART` are decisions about what to do, and requiring a cause would make them
+    unrecordable. Validated against `CAUSES` when present, because a free-text cause pairs with
+    nothing — macro-F1 over labels only one side of the comparison uses is zero.
+    """
+
     case_id: str
     decision: str
     actor: str
     actor_role: str
     rationale: str
+    primary_cause: str = ""
     evidence: tuple[EvidenceRef, ...] = ()
     created_at: str = field(default_factory=_now)
 
@@ -961,11 +1007,17 @@ class AdjudicationEvent:
             raise AttributionError("actor_role must be registrar, clinician, or engineer")
         if not self.actor.strip() or not self.rationale.strip():
             raise AttributionError("adjudication needs actor and rationale")
+        if self.primary_cause and self.primary_cause not in CAUSES:
+            raise AttributionError(
+                f"primary_cause {self.primary_cause!r} is not one the attributor can emit; "
+                f"expected one of {CAUSES}. A label only the human side uses pairs with nothing, "
+                f"and macro-F1 over it is zero.")
 
     def to_dict(self) -> dict:
         return {
             "case_id": self.case_id, "decision": self.decision, "actor": self.actor,
             "actor_role": self.actor_role, "rationale": self.rationale,
+            "primary_cause": self.primary_cause,
             "evidence": [x.to_dict() for x in self.evidence], "created_at": self.created_at,
         }
 

@@ -54,6 +54,7 @@ from ..evaluation.explain import (
     scaffold_explanation,
     side_input_record,
 )
+from .cli_chart import PRIOR, SITE_MAPPING
 
 pipeline_app = typer.Typer(add_completion=False)
 
@@ -194,6 +195,8 @@ def extract(
              "same grammar as `acr chart run --skills`. Validated before any model call."),
     limit: int = typer.Option(0, "--limit", help="first N patients only; 0 = all"),
     out: str = typer.Option("runs", "--out"),
+    site_mapping: str = SITE_MAPPING,
+    prior: str = PRIOR,
     dry_run: bool = typer.Option(False, "--dry-run",
                                  help="resolve, plan and cost the work without calling a model"),
 ):
@@ -208,8 +211,19 @@ def extract(
     # BEFORE the cohort is read and long before a model is built, for the reason `cli_chart`'s
     # `_skill_stack` gives: a misspelt slot caught inside the per-patient `except` below would
     # be reported once per chart, as if the cohort had failed, when what failed is one string.
-    from .cli_chart import _skill_stack
+    from .cli_chart import _load_prior, _load_site_mapping, _skill_stack
     stack = _skill_stack(runtime_profile, skills)
+    # Per SPEC, because a cohort command runs several and any one of them may select documents
+    # through a Site Mapping. Resolved here, before the cohort is read and before `--dry-run`
+    # returns, so a mapped contract with no `--mapping` costs nothing to discover. One flag for
+    # all of them: a mapping is scoped to the CORPUS, not to a contract.
+    mapping = None
+    for sid in res.spec_ids:
+        mapping = _load_site_mapping(catalog.specs[sid], site_mapping)
+    # One prior for the cohort: a prior is measured against ONE requirement, and
+    # `build_prior` refuses a labelling spanning two. A cohort over several specs
+    # therefore takes at most one, and the manifest records which runs saw it.
+    prior_asset = _load_prior(prior)
     pids = read_cohort(cohort)
     if limit:
         pids = pids[:limit]
@@ -251,7 +265,8 @@ def extract(
                     model=cli_common.chat_model(model, api_base, temperature),
                     max_model_calls=max_steps, seed=seed or 1234,
                     run_id=f"{pid}__{sid}", max_usd=max_usd,
-                    runtime_profile=runtime_profile, skill_stack=stack)
+                    runtime_profile=runtime_profile, skill_stack=stack,
+                    site_mapping=mapping, retrieval_prior=prior_asset)
             except Exception as e:  # noqa: BLE001
                 # One patient failing must not silently shrink the cohort: the row survives,
                 # carries the error, and the command exits non-zero at the end.

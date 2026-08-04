@@ -65,7 +65,21 @@ import pytest
 # holding real data is refused unless it sets both — see `site.require_person_id_pattern`.
 os.environ.setdefault("ACR_PERSON_ID_PATTERN", r"(?<![\d.])\d{10,}")
 
-import acr.core.site as _site
+# THE SUITE MUST NOT DEPEND ON THE OPERATOR'S SHELL. `docs/NEW_TASK_NEW_DATA.md` tells a reader to
+# export `ACR_LOCAL_ARTIFACT_ROOT` — the whole develop plane needs it — and with it set,
+# `tests/test_attribution.py::test_local_store_refuses_missing_relative_repo_and_symlink_into_repo`
+# fails: it asserts `LocalArtifactStore(None)` raises "required", which is only true when no root is
+# configured. So the documented setup broke the suite, and it looked like an order-dependent flake
+# because it depended on which shell ran pytest.
+#
+# CLEARED, not defaulted: these name a deployment's own storage, and a test that wrote into a real
+# one would be a test that touches patient-derived material. Tests that need a root pass `tmp_path`.
+for _deployment_only in ("ACR_LOCAL_ARTIFACT_ROOT", "ACR_SITE_MAPPING", "ACR_REAL_CORPUS"):
+    os.environ.pop(_deployment_only, None)
+
+# E402 by design: `site` reads the environment at import, so it must be imported AFTER the block
+# above sets and clears it — and reloaded, in case another module imported it first.
+import acr.core.site as _site  # noqa: E402
 
 importlib.reload(_site)
 
@@ -159,7 +173,8 @@ def _fixture_availability():
     for name, fn in (("specs", site.specs_root), ("corpus", site.corpus_root),
                      ("skills", site.skill_roots)):
         try:
-            fn(); out[name] = True
+            fn()
+            out[name] = True
         except FileNotFoundError:
             out[name] = False
     return out

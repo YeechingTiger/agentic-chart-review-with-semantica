@@ -16,10 +16,12 @@ from ..core.kernel import ArtifactRef, TrajectoryAdapter, digest
 #: going through the store, where the outside-the-worktree rule is the right rule.
 from ..core.local_artifacts import (
     LOCAL_ROOT_ENV,
+    RUN_RECORD_GLOB,
     LocalArtifactError,
     LocalArtifactStore,
     content_hash,
     require_run_artifact,
+    require_run_tree,
 )
 from ..core.modules import (
     CertificationRegistry,
@@ -238,10 +240,11 @@ def batch(
     """Run one current CODE pipeline over every local extraction manifest."""
     store = _store(local_root)
     try:
-        root = store.path(runs, what="evaluation runs")
-        manifests = [root] if root.is_file() else sorted(root.rglob("*.manifest.json"))
-        if not manifests:
-            raise typer.BadParameter(f"no manifests under {root}")
+        # See `require_run_tree`: the store's outside-the-worktree proof is the wrong proof for a
+        # run record, and it made this command unreachable for `runs/`.
+        root = require_run_tree(runs, what="evaluation runs")
+        manifests = ([root] if root.is_file()
+                     else sorted(root.rglob(RUN_RECORD_GLOB)))
         contexts = tuple(
             _context(
                 store,

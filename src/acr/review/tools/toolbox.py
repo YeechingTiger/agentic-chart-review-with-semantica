@@ -449,7 +449,8 @@ class Toolbox:
         docs, unknown = [], []
         for nid in note_ids[:60]:
             if nid not in self.chart._docs:
-                unknown.append(nid); continue
+                unknown.append(nid)
+                continue
             r = self.chart.read(nid, 0, chars_each)
             self.coverage.note_read(nid, r["doc_type"])
             docs.append({"note_id": nid, "doc_type": r["doc_type"], "date": r["date"],

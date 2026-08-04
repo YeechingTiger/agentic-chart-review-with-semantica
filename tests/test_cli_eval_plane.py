@@ -324,16 +324,44 @@ def _score(tmp_path: Path, runs: Path, key: dict, baseline: Path, **kw) -> objec
     return runner.invoke(app, args)
 
 
-def test_eval_score_requires_every_part_of_the_baseline_key(tmp_path):
-    """A baseline is only comparable across all four: 'accuracy fell' and 'the question
-    changed' look identical in the numbers."""
+def _bare_score(tmp_path: Path, *extra: str):
     _manifest(tmp_path, "r1")
     (tmp_path / "key.json").write_text("{}", encoding="utf-8")
-    r = runner.invoke(app, ["eval", "score", "--runs", str(tmp_path),
-                            "--answer-key", str(tmp_path / "key.json"),
-                            "--fields", "primary_site", "--commit", "abc"])
+    return runner.invoke(app, ["eval", "score", "--runs", str(tmp_path),
+                               "--answer-key", str(tmp_path / "key.json"),
+                               "--fields", "primary_site", *extra])
+
+
+def test_eval_score_takes_its_baseline_key_from_the_manifests(tmp_path):
+    """The four key parts were REQUIRED options reconciled against nothing.
+
+    A baseline is only comparable across all of them — 'accuracy fell' and 'the question changed'
+    look identical in the numbers — but requiring an operator to type them did not establish them.
+    The runtime records `spec_hash`, `code_sha`, `model` and `experiment_config_hash` on every
+    manifest, so the key is read from there and nothing needs to be typed.
+    """
+    r = _bare_score(tmp_path)
+    assert r.exit_code == 0, r.output
+    assert "hash1" in r.output, "the spec hash the manifests recorded must reach the reader"
+    assert "derived" in r.output
+
+
+def test_eval_score_refuses_a_baseline_key_its_own_runs_contradict(tmp_path):
+    """`--model TOTALLY-WRONG-MODEL` was accepted in silence and written into the baseline as the
+    model that produced the numbers. A flag is now an ASSERTION, and a wrong one stops the command
+    rather than becoming the artifact's answer to "which arm was this"."""
+    r = _bare_score(tmp_path, "--spec-hash", "NOT-THE-HASH-THE-RUNS-RECORDED")
     assert r.exit_code == 2
-    assert "--spec-hash" in r.output
+    assert "spec_hash" in r.output and "hash1" in r.output
+
+
+def test_a_key_part_no_manifest_recorded_may_still_be_supplied(tmp_path):
+    """The fixture records no `code_sha`, so nothing contradicts `--commit`. Silence is not
+    disagreement — otherwise every manifest written before that field existed would be unscoreable,
+    which is 294 of this tree's 509."""
+    r = _bare_score(tmp_path, "--commit", "abc1234")
+    assert r.exit_code == 0, r.output
+    assert "abc1234" in r.output and "reconciled" in r.output
 
 
 def test_eval_score_scores_manifests_and_writes_a_baseline(tmp_path):
@@ -418,6 +446,33 @@ def test_a_baseline_whose_ids_collide_is_refused_not_averaged():
     assert d["regressions"] == [] and d["improvements"] == []
     assert d["not_comparable"]["n_colliding"] == 1
     assert "ACR_PSEUDONYM_KEY" in d["not_comparable"]["remedy"]
+
+
+def test_every_not_comparable_shape_prints(tmp_path):
+    """PRODUCER TO CONSUMER, both shapes. `compare` grew a second refusal — a baseline that mixes
+    arms — and the printer went on reading the collision shape's `n_colliding`, so the new refusal
+    raised `KeyError` at the moment it first fired on real runs. Every test above called
+    `evals.compare` directly and none of them reached the command that formats it.
+
+    The contract is the four keys every shape carries: `reason`, `detail`, `why`, `remedy`.
+    """
+    collide = _baseline(["<person_id:redacted>"] * 3, "EXACT")
+    mixture = {**_baseline(["a", "b"], "EXACT"),
+               "key_basis": {"n_runs": 2, "dates": [],
+                             "fields": {"spec_hash": {"value": "MIXED", "mixed": True,
+                                                      "values": ["h1", "h2"], "n_unrecorded": 0}}}}
+    contradicted = {**_baseline(["a", "b"], "EXACT"),
+                    "key_contradictions": ["model: declared 'x', but the runs recorded 'y'"]}
+    for name, after in (("collision", collide), ("mixture", mixture),
+                        ("contradiction", contradicted)):
+        b, a = tmp_path / f"{name}-b.json", tmp_path / f"{name}-a.json"
+        b.write_text(json.dumps(_baseline(["a", "b"], "EXACT")), encoding="utf-8")
+        a.write_text(json.dumps(after), encoding="utf-8")
+        r = runner.invoke(app, ["eval", "compare", "--before", str(b), "--after", str(a)])
+        assert r.exit_code == 2, f"{name}: {r.output}"
+        assert r.exception is None or isinstance(r.exception, SystemExit), \
+            f"{name} raised {r.exception!r}"
+        assert "NOT_COMPARABLE" in r.output, name
 
 
 def test_distinct_ids_still_compare_per_instance():

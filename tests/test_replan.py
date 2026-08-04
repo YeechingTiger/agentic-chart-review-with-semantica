@@ -1161,7 +1161,7 @@ from acr.review.run_manifest import replan_from_trace
 
 
 def _events(path) -> list[dict]:
-    return [json.loads(l) for l in Path(path).read_text(encoding="utf-8").splitlines() if l.strip()]
+    return [json.loads(line) for line in Path(path).read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
 #: The refusal prose `apply_revision` returns for a promotion already in force. Verbatim

@@ -61,7 +61,7 @@ def bitmaps(root: Path) -> D.DocBitmaps:
       everyone        a pile of noise carrying "nod" and "cough" and no answers
       "biops" matches every "biopsy" document plus 40 noise ones — a stem that costs extra
     """
-    recs, ix = [], {}
+    ix = {}
 
     def add(pid, terms, answer):
         r = ix.setdefault(pid, {"pid": pid, "doc_type": [], "date": [], "hits": [], "oracle": []})
@@ -106,8 +106,9 @@ def label(pid, doc_type, *, can=(), mentions=(), terms=(), error=""):
     Everything else is `neither`. There is deliberately no way to write a note-level verdict
     here — the fixture cannot express the shape the derivation refuses.
     """
-    verdict = lambda f: ("can_establish" if f in can else
-                         "merely_mentions" if f in mentions else "neither")
+    def verdict(f):
+        return ("can_establish" if f in can else
+                "merely_mentions" if f in mentions else "neither")
     return {"patient_id": pid, "note_id": f"{doc_type}_2021-01-01", "doc_type": doc_type,
             "error": error,
             "admissibility": {f: verdict(f) for f in THREE},
@@ -542,7 +543,8 @@ def test_the_cut_is_a_prefix_of_the_curve(bm):
 
 
 def test_a_tighter_threshold_buys_fewer_terms(bm):
-    priced = lambda: D.price_terms(["patho", "final diagnosis", "nod"], bm, ["carcinoma"])
+    def priced():
+        return D.price_terms(["patho", "final diagnosis", "nod"], bm, ["carcinoma"])
     loose = D.consolidate(priced(), bm, D.DerivationConfig(1000.0, 0.5, 1, 0.8), CFG.as_dict() and
                           ["carcinoma"])
     tight = D.consolidate(priced(), bm, D.DerivationConfig(0.5, 0.5, 1, 0.8), ["carcinoma"])

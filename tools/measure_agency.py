@@ -32,7 +32,6 @@ is an expensive way to run a keyword search, and the honest recommendation is a 
 
 from __future__ import annotations
 
-import glob
 import json
 import pathlib
 import re
@@ -43,14 +42,23 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from acr.chartstore.corpus import Corpus
-from acr.contract.spec import load_spec
-from acr.core import site
 
-SPEC = site.specs_root() / "STORE.390.date_of_initial_diagnosis.yaml"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from _decision_inputs import UNKEYED  # noqa: E402
+
+#: NO HARDCODED SPEC. This was `specs_root()/"STORE.390…"` with no flag, and `docs/
+#: NEW_TASK_NEW_DATA.md` step 12 calls this script a mandatory decision point BEFORE investing in a
+#: new task — which it could not run on. The contract comes from `--spec`, or is inferred from the
+#: runs, which already record it. See `tools/_decision_inputs.py`.
 
 #: Words too common to be a retrieval term in a clinical corpus. A vocabulary that includes
 #: "date" or "report" hits every document and would make reachability look total.
 _STOP = set(["the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "of", "for", "to", "that", "this", "and", "or", "not", "no", "if", "it", "its", "on", "in", "at", "as", "by", "with", "from", "any", "all", "more", "most", "must", "may", "can", "cannot", "should", "would", "when", "where", "which", "who", "whom", "whose", "what", "how", "why", "then", "than", "there", "here", "their", "them", "they", "you", "your", "we", "our", "use", "used", "using", "first", "second", "later", "earlier", "same", "other", "another", "such", "only", "also", "both", "each", "per", "than", "into", "over", "under", "about", "above", "below", "after", "before", "during", "while", "until", "unless", "whether", "either", "neither", "date", "dates", "day", "days", "month", "months", "year", "years", "time", "times", "record", "records", "document", "documents", "report", "reports", "note", "notes", "text", "case", "cases", "patient", "patients", "chart", "charts", "value", "values", "field", "fields", "statement", "statements", "source", "sources", "evidence", "rule", "rules", "answer", "answers"])
+
+
+def _show(want) -> str:
+    """`None` is the key asserting that abstention is correct — print it as such, not as empty."""
+    return "(abstain)" if want is None else str(want)
 
 
 def contract_vocabulary(spec) -> list[str]:
@@ -99,22 +107,28 @@ def how_reached(trace: list[dict], note_id: str, vocab: set[str]) -> str:
 
 
 def main() -> int:
-    root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "runs/a15eval")
-    spec = load_spec(SPEC)
+    import argparse
+
+    from _decision_inputs import Inputs, add_arguments, load_trace
+
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    add_arguments(ap)
+    args = ap.parse_args()
+    inp = Inputs(args)
+    inp.refuse_unless_resolved(needs_key=True)
+    spec = inp.spec
+    field = inp.fields[0]
     vocab = contract_vocabulary(spec)
     vset = set(vocab)
-    corpus = Corpus(site.corpus_root())
-    gold = {r["patient_id"]: r for r in json.loads((site.corpus_root().parent / "index.json").read_text())}
+    corpus = Corpus(inp.corpus_root)
 
     print(f"contract vocabulary: {len(vocab)} words")
     print(f"  {', '.join(vocab[:22])}{' ...' if len(vocab) > 22 else ''}\n")
 
     runs: dict[str, list[dict]] = defaultdict(list)
-    for m in sorted(glob.glob(f"{root}/**/*.manifest.json", recursive=True)):
+    for m in inp.manifests:
         d = json.loads(pathlib.Path(m).read_text())
-        tp = pathlib.Path(m.replace(".manifest.json", ".jsonl"))
-        d["_trace"] = ([json.loads(x) for x in tp.read_text().splitlines() if x.strip()]
-                       if tp.is_file() else [])
+        d["_trace"] = load_trace(m)
         if d.get("patient_id"):
             runs[d["patient_id"]].append(d)
 
@@ -122,21 +136,21 @@ def main() -> int:
           f"{'how the run got there'}")
     verdicts = []
     for pid in sorted(runs):
-        g = gold.get(pid) or {}
-        gt = (g.get("ground_truth") or {}).get("STORE.390.date_of_initial_diagnosis") or {}
-        want = gt.get("value") or gt.get("status")
+        want = inp.want(pid, field)
+        if want is UNKEYED:
+            continue                    # the key says nothing about this run; not a finding
         ms = runs[pid]
 
         # THE DECISIVE DOCUMENT, grounded in an outcome: what a run that got it RIGHT cited.
-        right = [m for m in ms
-                 if ((m["answer"].get("value") or {}).get("date_of_initial_diagnosis")
-                     or m["answer"].get("status")) == want]
+        # `inp.coded` for both halves, so a correct ABSTENTION (key `None`) matches a run that
+        # abstained instead of being compared against a status string that can never equal it.
+        right = [m for m in ms if inp.coded(m, field) == want]
         cited: dict[str, int] = defaultdict(int)
         for m in right:
             for e in m.get("evidence") or []:
                 cited[e["note_id"]] += 1
         if not cited:
-            print(f"{pid:<9}{want!s:<11}{f'0/{len(ms)}':<7}"
+            print(f"{pid:<9}{_show(want):<11}{f'0/{len(ms)}':<7}"
                   f"{'(no run got it right — nothing to ground on)':<40}")
             continue
         decisive = max(cited, key=lambda k: cited[k])
@@ -149,7 +163,7 @@ def main() -> int:
                 hit = True
                 break
         hows = {how_reached(m["_trace"], decisive, vset) for m in right}
-        print(f"{pid:<9}{want!s:<11}{f'{len(right)}/{len(ms)}':<7}{decisive[:38]:<40}"
+        print(f"{pid:<9}{_show(want):<11}{f'{len(right)}/{len(ms)}':<7}{decisive[:38]:<40}"
               f"{('YES' if hit else 'NO'):<12}{','.join(sorted(hows))}")
         verdicts.append((pid, hit, hows))
 

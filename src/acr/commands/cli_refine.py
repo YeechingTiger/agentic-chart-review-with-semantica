@@ -15,13 +15,28 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 import typer
 from rich.table import Table
 
-from ..core.cli_common import con, dump, read_json
+from ..chartstore.corpus import Corpus
+from ..contract.spec import load_spec
+from ..core.cli_common import CORPUS, con, dump, read_json
+from ..core.local_artifacts import (
+    LOCAL_ROOT_ENV,
+    RUN_RECORD_GLOB,
+    LocalArtifactError,
+    LocalArtifactStore,
+    require_run_tree,
+)
+from ..evaluation import evals as E
 from ..improvement import refine as R
+
+LOCAL_ROOT = typer.Option(
+    None, "--local-root", envvar=LOCAL_ROOT_ENV,
+    help="absolute patient-artifact root outside Git; where the case map lives")
 
 refine_app = typer.Typer(add_completion=False, help=(
     "§6b: route classified failures at the text parameter that caused them, size the "
@@ -274,3 +289,297 @@ def read_results(
     dump(doc, out)
     if not reading.accept:
         raise typer.Exit(1)
+
+
+# --------------------------------------------------------------- the missing `--cases` producer
+
+#: Returned when the key says NOTHING about this run and field. Distinct from `""`, which is the
+#: key ASSERTING that abstaining is correct — the distinction `evals.score` calls `n_unkeyed`.
+UNKEYED = object()
+
+
+def _key_value(answer_key: Mapping, patient: str, field: str, spec_id: str):
+    """The answer key's value for one field, or `UNKEYED`.
+
+    FOUR FACTS WERE COLLAPSED INTO `""`: a patient the key has no row for, a row that is not a
+    mapping, a field absent from the row, and a genuine `None` meaning "abstaining is correct". Only
+    the last of those is `""`. The other three made every run on an uncovered patient a failure
+    case, printed under "where abstaining was correct and the run answered anyway" — a claim the key
+    never made. Measured: a STORE.390 key against five real STORE.400 manifests produced six such
+    phantom cases.
+
+    This is the same defect as `n_unkeyed` being pinned at 0 in `evals.score`, reintroduced in a
+    producer with no `n_unkeyed` concept — including the `spec_id` half, which `evals._key_row`
+    checks and this ignored. `evals._key_row` is the one implementation; this delegates to it.
+    """
+    row = E._key_row(answer_key, f"{patient}__{spec_id}",
+                     _SpecScopedRun(patient_id=patient, spec_id=spec_id))
+    if row is None:
+        return UNKEYED
+    fields = row.get("fields")
+    if not isinstance(fields, Mapping) or field not in fields:
+        return UNKEYED
+    v = fields[field]
+    return "" if v is None else str(v)
+
+
+@dataclass(frozen=True)
+class _SpecScopedRun:
+    """The two attributes `evals._key_row` reads. Reusing the real lookup means the two scorers
+    cannot drift on "does the key speak about this run" — which they already had, in one changeset."""
+
+    patient_id: str
+    spec_id: str
+
+
+def _coded_value(record: "E.RunRecord", field: str) -> str:
+    """What this run coded for one field, in the KEY's own convention: `""` means it abstained.
+
+    THE STATUS STRING IS NOT A VALUE. The first version returned `answer["status"]` when no value
+    was present, so a run that abstained — `CORPUS_INSUFFICIENT` — compared unequal to the key's
+    empty string and a CORRECT abstention was emitted as a failure case. `eval score` called the
+    same manifest ABSTAINED_CORRECT: two scorers, one run, opposite verdicts, and this one put a
+    wrong count (8, actually 7) into the docs. Whether a run abstained is `RunRecord.abstained`'s
+    fact — `status_kind` first, the literal set for older manifests — and this module does not get
+    a second opinion.
+    """
+    if record.abstained:
+        return ""
+    v = record.value.get(field)
+    return "" if v in (None, "") else str(v)
+
+
+def _notations(value: str) -> list[str]:
+    """Every way this corpus might have written the key value.
+
+    MEASURED, not assumed. `chart.search('20230412')` returns zero notes on SYN0001 while
+    `chart.search('2023-04-12')` returns two: the corpus matcher is notation-tolerant about
+    separators inside a token but does not reformat a date. A producer that searched only the key's
+    own notation would find the carrying document in no chart, report `surfaced: False` for every
+    date failure, and cut 1 would classify the entire cohort as a retrieval failure — which is the
+    exact opposite of what this corpus measures (0 of 11 wrong answers were retrieval failures).
+    """
+    if not value:
+        return []
+    if value.isdigit() and len(value) < 8:
+        # A SHORT NUMERIC VALUE IS NOT A SEARCHABLE STRING. `STORE.400_522_523`'s `behavior` field
+        # has allowable values 0/1/2/3, and on SYN0001 (321 documents) `'0'` matches 321 notes,
+        # `'2'` matches 321 and `'3'` matches 172 — every digit appears in a grade, a date, a dose.
+        # Falling through to `[value]` made `key_value_in_corpus` a meaningless True, `surfaced`
+        # True for any run that opened any note, and cut 1 structurally unable to route a `behavior`
+        # failure to RETRIEVAL_FAILURE. The same inversion the 99-date guard prevents, one field
+        # over. Retrieval cannot be shown to have missed a bare digit, so nothing is searched for.
+        return []
+    if len(value) == 8 and value.isdigit():
+        y, mo, d = value[:4], value[4:6], value[6:]
+        if mo == "99" or d == "99":
+            # A constructed partial date is written in no document BY CONSTRUCTION, so there is
+            # nothing to search for. NOT `[y]`: a bare year appears in essentially every note of a
+            # chart from that year (SYNY02: 27 of them), so returning it flipped
+            # `key_value_in_corpus` to True and cut 1 routed the case to §6c retrieval — handing
+            # the search team a document that does not exist. `tools/measure_controller_value.py`
+            # returns False for the same fact, and the two implementations must agree.
+            return []
+        return [f"{y}-{mo}-{d}", f"{mo}/{d}/{y}", f"{int(mo)}/{int(d)}/{y}", value]
+    return [value]
+
+
+def _read_note_ids(record: "E.RunRecord") -> set[str]:
+    """Which notes were put in front of the agent, from the trace's read calls.
+
+    THE TRACE COMES FROM `RunRecord`, which reads the sibling `.jsonl` beside the manifest — the
+    move-safe lookup. The first version re-implemented this from the manifest's RECORDED absolute
+    path and hard-refused when it did not resolve; 49 of the 509 manifests in this tree are in
+    exactly that state (`tools/archive_runs.sh` moves run directories), every one with its sibling
+    present. Two implementations of "where is this run's trace" is how that shipped.
+
+    A MISSING TRACE REFUSES. Returning an empty set would mean "nothing was read", which is the
+    value that sends a case to `RETRIEVAL_FAILURE` with no model consulted — so an unreadable trace
+    would silently attribute a whole cohort to search. "We do not know" and "it read nothing" are
+    different facts and only one of them is a finding.
+    """
+    # `record.trace == []` is AMBIGUOUS: `RunRecord.from_manifest` returns an empty list both for
+    # a missing sibling file and for a trace that recorded zero events. Only the first refuses —
+    # the second is a run that genuinely read nothing, and "it read nothing" is a finding. The
+    # sibling convention is RunRecord's own (manifest name with `.jsonl`).
+    src = Path(record.source)
+    sibling = src.with_name(src.name.replace(".manifest.json", ".jsonl"))
+    # `sibling != src` is `RunRecord.from_manifest`'s own guard: for a path that does not end in
+    # `.manifest.json` the replace is a no-op and the MANIFEST would be treated as its own trace.
+    if not record.trace and not (sibling != src and sibling.is_file()):
+        raise R.RefineError(
+            f"no trace beside {record.source or 'this manifest'}: "
+            f"`establishing_evidence_surfaced` is computed from the read calls, and an absent "
+            f"trace would report False — which routes the case to a retrieval failure on no "
+            f"evidence at all.")
+    out: set[str] = set()
+    for step in record.tool_calls(E.READ_TOOLS):
+        args = step.get("args") or {}
+        if args.get("note_id"):
+            out.add(str(args["note_id"]))
+        for v in (args.get("note_ids") or []):
+            out.add(str(v))
+    return out
+
+
+def build_failure_cases(*, manifests, answer_key: Mapping, fields, spec_id: str, corpus,
+                        case_map: Mapping[str, str],
+                        adjudications: Mapping[str, str]) -> list[dict]:
+    """Assemble `refine route`'s `--cases` from run records, an answer key and a case map.
+
+    THE PRODUCER THAT DID NOT SHIP. `--cases` is required, `FailureCase` refuses to hold a real
+    person_id, and nothing wrote the file — so `refine` had never routed a real failure. This
+    carries FACTS only. `establishing_evidence_surfaced` comes from the trace crossed with the
+    corpus; `answer_key_adjudication` comes from a human or is `NOT_ADJUDICATED`. Both are
+    deliberately not model judgements: `FailureCase` says letting the reflector decide either
+    "would let it route its own gradient", and cut 1 acts on the first before any model is asked.
+
+    THE ABSTENTION CASE HAS A NON-OBVIOUS RIGHT ANSWER. When the key value is empty — abstaining
+    was correct and the run answered anyway — no document establishes it, and `False` would send a
+    misreading to `RETRIEVAL_FAILURE` where retrieval cannot be the cause. So it is `True`: nothing
+    was missing from what the agent saw.
+    """
+    patient_of_case = dict(case_map)
+    case_of_patient = {p: c for c, p in patient_of_case.items()}
+    out: list[dict] = []
+    n_unkeyed = [0]
+    for m in manifests:
+        record = E.RunRecord.from_manifest(m)
+        patient = record.patient_id
+        if record.spec_id != spec_id:
+            continue
+        case_id = case_of_patient.get(patient)
+        if not case_id:
+            raise R.RefineError(
+                f"{patient!r} is absent from the case map. A failure case may not carry a real "
+                f"person_id, and the map is the only thing that pseudonymises one — mint it with "
+                f"`acr attribute case-map`.")
+        read = None
+        for field in fields:
+            key_value = _key_value(answer_key, patient, field, spec_id)
+            if key_value is UNKEYED:
+                # The key says nothing about this run and field, so there is no disagreement to
+                # report. Counted, not silently dropped — see `n_unkeyed` in `cmd_cases`.
+                n_unkeyed[0] += 1
+                continue
+            coded = _coded_value(record, field)
+            if coded == key_value:
+                continue
+            if read is None:
+                # Only a DISAGREEMENT needs the trace, so a cohort whose agreeing runs lost their
+                # traces still builds — the refusal is reserved for the case it would corrupt.
+                read = _read_note_ids(record)
+            carrying: set[str] = set()
+            if key_value:
+                chart = corpus.chart(patient)
+                for form in _notations(key_value):
+                    carrying |= {h.note_id
+                                 for h in chart.search(form, False, None, None, None,
+                                                       max_hits=100000)}
+            # THREE POPULATIONS, and only the middle one is a retrieval failure.
+            #   key_value empty          — abstaining was correct; no document establishes it
+            #   no document carries it   — the key is CONSTRUCTED (imputed date, inferred across
+            #                              notes). `measure_controller_value.py` calls this
+            #                              UNSEEDABLE and keeps it out of NEVER_LOOKED for the same
+            #                              reason: retrieval cannot surface what does not exist.
+            #   carried but never read   — the genuine retrieval failure, and the only one §6c owns
+            # Collapsing the first two into `False` hands §6c cases no search could ever fix, and
+            # buries the real ones among them. Found on real runs: SYNK01 and SYNK02 are
+            # constructed, SYNX02 and SYNX06 are genuine, and the first version reported all four
+            # identically.
+            in_corpus = bool(carrying)
+            surfaced = True if not in_corpus else bool(carrying & read)
+            out.append({
+                "case_id": case_id,
+                "spec_id": spec_id,
+                "field": field,
+                "coded_value": coded,
+                "key_value": key_value,
+                "establishing_evidence_surfaced": surfaced,
+                "answer_key_adjudication": str(
+                    adjudications.get(case_id) or R.NOT_ADJUDICATED),
+                # Not a `FailureCase` field, and deliberately reported anyway: it is what separates
+                # "the agent saw everything" from "there was nothing to see", which the boolean
+                # above cannot express and a reader of the routing will otherwise assume.
+                "key_value_in_corpus": in_corpus,
+            })
+    build_failure_cases.n_unkeyed = n_unkeyed[0]   # read by `cmd_cases` for the printed summary
+    return out
+
+
+@refine_app.command("cases")
+def cmd_cases(
+    runs: str = typer.Option(..., "--runs", help="run record or directory"),
+    answer_key: str = typer.Option(..., "--answer-key"),
+    fields: str = typer.Option(..., "--fields", help="comma list, as `eval score --fields`"),
+    spec: str = typer.Option(..., "--spec", "-s"),
+    corpus: str = CORPUS,
+    case_map: str = typer.Option(..., "--case-map",
+                                 help="from `acr attribute case-map`; the pseudonymiser"),
+    adjudications: str = typer.Option("", "--adjudications",
+                                      help="JSON {case_id: ADJUDICATED_KEY_CORRECT|_WRONG}"),
+    out: str = typer.Option("", "--out"),
+    local_root: str | None = LOCAL_ROOT,
+):
+    """Assemble the `--cases` file `route` requires. Free: no model, and the chart is only searched.
+
+    WHAT COMES OUT AND WHAT IT COSTS YOU LATER. Every case lands with
+    `answer_key_adjudication: NOT_ADJUDICATED` unless `--adjudications` says otherwise, and cut 2
+    routes an un-adjudicated case to UNRESOLVED without ever consulting the reflector. That is the
+    designed behaviour, not a stub: whether the answer key is right is a human's call, and the
+    router refuses to launder it into a spec edit. So a first pass reports mostly UNRESOLVED, and
+    the work it names is adjudication — which is also what `meta_evaluate_attributions` has been
+    waiting on for thirty cases while two exist.
+    """
+    store = LocalArtifactStore(local_root) if local_root else None
+    try:
+        root = require_run_tree(runs, what="runs")
+    except LocalArtifactError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    manifests = [root] if root.is_file() else sorted(root.rglob(RUN_RECORD_GLOB))
+    key = read_json(answer_key, "answer key")
+    cmap = read_json(case_map, "case map") if not store else json.loads(
+        store.require_input(case_map, what="case map").read_text(encoding="utf-8"))
+    adj = read_json(adjudications, "adjudications") if adjudications else {}
+    spec_id = load_spec(spec).spec_id
+
+    try:
+        cases = build_failure_cases(
+            manifests=manifests, answer_key=key,
+            fields=[f.strip() for f in fields.split(",") if f.strip()],
+            spec_id=spec_id, corpus=Corpus(Path(corpus)), case_map=cmap, adjudications=adj)
+    except R.RefineError as e:
+        con.print(f"[red]{e}[/]")
+        raise typer.Exit(2) from e
+
+    # Printed as THREE numbers, because the boolean the router reads collapses two of them and a
+    # reader would otherwise take "surfaced" to mean the agent saw the answer.
+    n_retrieval = sum(1 for c in cases if not c["establishing_evidence_surfaced"])
+    n_unseeded = sum(1 for c in cases
+                     if c["key_value"] and not c["key_value_in_corpus"])
+    n_abstain = sum(1 for c in cases if not c["key_value"])
+    n_unkeyed = getattr(build_failure_cases, "n_unkeyed", 0)
+    con.print(f"{len(manifests)} run(s) -> [bold]{len(cases)}[/] disagreement(s) with the key")
+    if n_unkeyed:
+        # NAMED, not dropped. A run the key says nothing about used to be emitted as a failure with
+        # `key_value: ""`, which printed as "abstaining was correct" — a claim the key never made.
+        con.print(f"  [yellow]{n_unkeyed} run/field pair(s) the answer key says nothing about, "
+                  f"skipped. If that is most of the cohort, the key and the runs are about "
+                  f"different contracts.[/]")
+    con.print(f"  [bold]{n_retrieval}[/] retrieval failure(s): a document carries the key value "
+              f"and the run never opened it")
+    con.print(f"  [bold]{n_unseeded}[/] unseedable: the key value appears in NO document, so it is "
+              f"constructed and no search could have found it")
+    con.print(f"  [bold]{n_abstain}[/] where abstaining was correct and the run answered anyway")
+    con.print(f"  [bold]{len(cases) - n_retrieval - n_unseeded - n_abstain}[/] read the "
+              f"establishing document and got the reading wrong")
+    n_adj = sum(1 for c in cases if c["answer_key_adjudication"] != R.NOT_ADJUDICATED)
+    if cases and not n_adj:
+        con.print("[yellow]None is adjudicated, so `route` will return UNRESOLVED for every case "
+                  "that is not a retrieval failure. That is cut 2 refusing to guess whether the "
+                  "answer key is right — supply --adjudications to move past it.[/]")
+    if out:
+        dump(cases, out)
+        con.print(f"→ {out}")
+    else:
+        con.print_json(data=cases)

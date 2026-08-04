@@ -12,7 +12,12 @@ from rich.table import Table
 from ..contract import spec_repair as S
 from ..core import cli_common
 from ..core.cli_common import API_BASE, CORPUS, MODEL, con, read_json
-from ..core.local_artifacts import LOCAL_ROOT_ENV, LocalArtifactError, LocalArtifactStore
+from ..core.local_artifacts import (
+    LOCAL_ROOT_ENV,
+    LocalArtifactError,
+    LocalArtifactStore,
+    require_run_tree,
+)
 
 repair_app = typer.Typer(add_completion=False, help=(
     "DEVELOP only: sample deepagents behaviours, contrast them with chart-observable gold, "
@@ -57,9 +62,10 @@ def _load_distributions(runs: str, gold_path: str, store: LocalArtifactStore,
                                    dict[str, S.ChartObservableGold]]:
     try:
         gold_file = store.require_input(gold_path, what="chart-observable gold")
-        runs_path = store.path(runs, what="recorded runs")
-        if not runs_path.exists():
-            raise LocalArtifactError(f"recorded runs not found: {runs_path}")
+        # See `require_run_tree`. `gold` above stays on the store — a curated answer key IS a
+        # develop artifact and belongs outside Git. A run record is not, and sending it through the
+        # same proof made this whole plane unreachable.
+        runs_path = require_run_tree(runs, what="recorded runs")
         gold = S.load_gold(gold_file)
         signatures = S.load_signatures(
             [runs_path], case_map=_case_map(case_map, store))

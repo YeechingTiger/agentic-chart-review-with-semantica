@@ -70,6 +70,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..contract.strata import spec_declared_keywords as _spec_declared_keywords
 from ..core import site
 from ..core.repo_paths import asset_dir
 
@@ -1351,37 +1352,30 @@ class CoveragePlan:
 def spec_declared_keywords(spec) -> list[str]:
     """The spec's own term list: the falsification baseline, and nothing else.
 
-    Both places a spec can declare terms, because `strata_from_spec` descends into the
-    strata and `proof_obligation.required_keywords` does not -- a baseline that saw only one
-    of them would show the agent adding terms the spec had in fact declared.
+    Delegates to `contract.strata`, which is where it now lives: `improvement` needs the identical
+    answer and may not import `review`. Kept as a name here because this module's readers know it
+    by this name and a run's search list is seeded from it two lines below.
     """
-    po = getattr(spec, "proof_obligation", None)
-    kws: list[str] = list(getattr(po, "required_keywords", []) or []) if po else []
-    fn = (getattr(po, "for_negative", {}) or {}) if po else {}
-    for st in (fn.get("strata") or []):
-        kws.extend(st.get("required_keywords") or [])
-    for claim in (fn.get("claims") or []):
-        for st in (claim.get("strata") or []):
-            kws.extend(st.get("required_keywords") or [])
-    out: list[str] = []
-    for k in kws:
-        k = str(k).strip().lower()
-        if k and k not in out:
-            out.append(k)
-    return out
+    return _spec_declared_keywords(spec)
+
 
 def _blank_plan(spec) -> CoveragePlan:
     init = spec_declared_keywords(spec)
     return CoveragePlan(initial_keywords=list(init), keywords=list(init),
                         n_fields=max(1, len(getattr(spec, "fields", []) or [])))
 
-def plan_from_spec(spec, chart) -> CoveragePlan:
+def plan_from_spec(spec, chart, mapping=None) -> CoveragePlan:
     """The plan the runtime can always build: the spec's strata, projected onto this chart.
 
     Used when no model is available and as the floor under a degraded planner. It is not a
     fallback in the apologetic sense -- it is the spec's own declaration, and a run on it is
     a run whose retrieval scope is exactly what the specification says it should be. That is
     the arm the develop plane wants to falsify.
+
+    `mapping` IS THE SECOND CALL SITE. Wiring it into `CoverageLedger` alone was not enough: this
+    function stratifies the same documents again to decide which types get read, searched or
+    sampled, so a `means:` contract still died here — one line after the ledger accepted the
+    mapping. Reachability is not a property one call site can hold.
     """
     from .coverage import assign_strata, strata_from_spec
 
@@ -1397,7 +1391,7 @@ def plan_from_spec(spec, chart) -> CoveragePlan:
             p.rationale[t] = "spec declares no strata; every type is searched"
         p.source = "unstratified"
         return p
-    assigned = assign_strata(docs, strata)
+    assigned = assign_strata(docs, strata, mapping)
     for s in strata:
         bucket = POLICY_BUCKET.get(s.policy, "search")
         for t in sorted({d.doc_type for d in assigned.get(s.name, [])}):

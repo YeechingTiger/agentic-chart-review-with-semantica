@@ -121,6 +121,8 @@ from ..chartstore.corpus import DocMeta
 from ..contract.spec import ProvenanceRecord, _content_hash, load_spec
 from ..contract.strata import assign_strata, strata_from_spec
 from ..core import site
+from .assetdev import AdoptionAborted as _AssetdevAdoptionAborted
+from .assetdev import _set_keywords as _assetdev_set_keywords
 
 #: Where the cached document bitmaps live. Built once by `termcache/build_cache.py`; this
 #: module reads them and never rescans a chart.
@@ -895,7 +897,8 @@ def suggest_grouping(agg: Aggregate, cfg: DerivationConfig, *, spec_id: str = ""
                               "there is no default for it")
     rows = overlap_matrix(agg)
     j = {(o.field_a, o.field_b): o.jaccard for o in rows}
-    pair = lambda a, b: j.get((a, b), j.get((b, a), 0.0))
+    def pair(a, b):
+        return j.get((a, b), j.get((b, a), 0.0))
     groups = [[f] for f in agg.fields]
     while True:
         best = None
@@ -943,8 +946,27 @@ def assert_no_semantic_override(module: Any) -> None:
                 f"clinician. Admissibility is a clinical judgement; there is no flag for it.")
 
 
-_KW_ELEMENT_RE = re.compile(r"^proof_obligation\.for_negative(?:\.claims\[[^\]]+\])?"
-                            r"\.strata\[(?P<stratum>[^\]]+)\]\.required_keywords$")
+#: THE SECOND IMPLEMENTATION IS GONE. This module had its own element regex and its own write
+#: body: the regex made the `claims[...]` segment NON-CAPTURING and the body then descended
+#: unconditionally into `for_negative["strata"]`. So for a contract declaring its keywords under a
+#: CLAIM — `STORE.1860_1880.first_recurrence.yaml` has `strata: []` at the top level — the element
+#: matched and the write aborted with "no stratum 'can_establish'", which was false: the stratum
+#: existed one level down. One of five shipped contract shapes could not be adopted through this
+#: plane, and for a spec with the same stratum name in both places the write would have targeted
+#: the wrong element. `assetdev._set_keywords` handles both, so it is the only one now.
+def _set_keywords(doc: dict, element: str, value: list[str], where: Path) -> None:
+    """Delegate, re-raising as this module's own `AdoptionAborted`.
+
+    The write itself is `assetdev._set_keywords`'s — see the note above. The re-raise is not
+    ceremony: `derive.AdoptionAborted` is a `DerivationError` and `assetdev.AdoptionAborted` is an
+    `AssetDevelopmentError`, and this module's callers (and
+    `tests/test_derive.py::test_writing_into_a_stratum_that_does_not_exist_writes_nothing`) catch
+    the former. Letting the other one escape would turn a refusal that is reported into a traceback.
+    """
+    try:
+        _assetdev_set_keywords(doc, element, value, where)
+    except _AssetdevAdoptionAborted as e:
+        raise AdoptionAborted(str(e)) from e
 
 
 def write_keywords(spec_path: str | Path, element: str, con: Consolidation, *, run: str,
@@ -956,18 +978,12 @@ def write_keywords(spec_path: str | Path, element: str, con: Consolidation, *, r
     result is reloaded and hash-checked first, because a spec carrying a new list under the
     old list's provenance record loads perfectly and reads as measured.
     """
-    m = _KW_ELEMENT_RE.match(element)
-    if not m:
-        raise AdoptionAborted(f"{element!r} is not a required_keywords element")
     p = Path(spec_path)
     doc = yaml.safe_load(p.read_text(encoding="utf-8"))
     value = list(con.keywords)
-    holder = (doc.get("proof_obligation") or {}).get("for_negative") or {}
-    hit = [s for s in (holder.get("strata") or []) if str(s.get("name")) == m.group("stratum")]
-    if not hit:
-        raise AdoptionAborted(f"{p}: no stratum {m.group('stratum')!r}; adopting into one that "
-                              f"does not exist creates a list nothing reads")
-    hit[0]["required_keywords"] = value
+    # One writer for the whole tree — it resolves a claim-scoped element, which this module's own
+    # version silently could not. See `_set_keywords` above.
+    _set_keywords(doc, element, value, p)
     rescued = con.curve[-1].cum_answers_rescued if con.curve else 0
     # A derivation that rescued nothing is `underpowered`, not support. `spec._validate_record`
     # keeps such an element at draft on purpose: a measurement is a reason to distrust an
@@ -1108,12 +1124,30 @@ def _load_labels(path: str | Path) -> list[dict]:
     return out
 
 
+def incumbent_keywords(spec) -> list[str]:
+    """The list a RUN searches, which is what a candidate's marginal value is measured against.
+
+    NOT `strata_from_spec` — that reads only the two stratum locations and misses
+    `proof_obligation.required_keywords`, which `coverage_planner._blank_plan` seeds a run's search
+    list from. Pricing against the shorter list credits a candidate with answers the incumbent
+    already reaches: `STORE.700_880` declares six terms there, one of them (`tnm`) in no stratum,
+    so `derive` scored every candidate against 10 terms while the runtime searched 11. `certify`
+    then certifies improvement over a configuration nobody deploys.
+
+    `contract.strata.spec_declared_keywords` is the one implementation. It lives in `contract`
+    rather than beside the runtime's copy because `tests/test_layering.py` forbids
+    `improvement -> review`: work planes share only `core`/`contract` types.
+    """
+    from ..contract.strata import spec_declared_keywords
+    return list(spec_declared_keywords(spec))
+
+
 def _stage123(labels: str, spec: str, cache: str, fields: str, cfg: DerivationConfig):
     s = load_spec(spec)
     flds = [f.strip() for f in fields.split(",") if f.strip()]
     agg = aggregate(_load_labels(labels), flds)
     bm = load_bitmaps(cache)
-    current = [k for st in strata_from_spec(s) for k in st.required_keywords]
+    current = incumbent_keywords(s)
     priced = price_terms([t.term for t in agg.ranked_terms(cfg)], bm, current)
     return s, agg, bm, consolidate(priced, bm, cfg, current)
 

@@ -45,8 +45,14 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 #: them, and leaving them in the shared layer is what made `tests/test_layering.py`'s claim that the
 #: working planes "meet only through the shared layers" partly fictional. 2,256 code lines that
 #: layer 2 never imports. The split is where that gets fixed rather than restated.
-CONTRACT_SHARED = ("spec", "skill_invoke", "behaviour", "outcomes", "answer_contract", "answer_checks", "trace", "code_tables",
-                   "site_mapping", "strata", "case_requirements", "skills")
+#: Modules in `contract/` that ship with the AGENT and are read by more than one plane. This is the
+#: only sanctioned way two work planes share anything: `tests/test_layering.py` forbids
+#: `improvement -> review`, so a type both need lives here, at rank 1, and they meet through it and
+#: through an artifact on disk. `retrieval_prior` is the newest instance — `improvement/prior.py`
+#: writes one and `review/document_concepts` renders it, and neither imports the other.
+CONTRACT_SHARED = ("spec", "skill_invoke", "behaviour", "outcomes", "answer_contract",
+                   "answer_checks", "trace", "code_tables", "site_mapping", "strata",
+                   "case_requirements", "skills", "retrieval_prior")
 
 #: name -> (one-line purpose, source paths, test files, runtime deps on siblings)
 #: A source path ending in `/` takes the whole directory; otherwise it is one file.
@@ -133,12 +139,30 @@ CARD_OWNERS = {
 #: Tests that import no `acr` module, or whose subject is an asset rather than a plane. An import
 #: graph cannot route these, and each one is a judgement worth writing down.
 TESTS_BY_SUBJECT = {
+    # A producer→consumer test whose two halves ship in DIFFERENT distributions can only run where
+    # both are present. `tools/` ships only in `acr-chart-review`, so these cases routed by subject
+    # to `acr-improvement`/`acr-eval` and failed there with `ModuleNotFoundError: No module named
+    # 'build_termcache'` — seven failures in a changeset whose whole subject is seams between planes.
+    "test_producers_across_distributions.py": "(composer)",
+    # The prior spans both planes on purpose: `improvement` builds it, `review` renders it. The
+    # builder's own arithmetic is `improvement`'s; the wiring into the prompt and the manifest is
+    # the agent's.
+    "test_retrieval_prior_from_scan.py": "acr-improvement",
+    "test_prior_reaches_the_prompt.py": "acr-chart-review",
     "test_adversarial_corpus.py": "acr-chart-review",   # subject is the corpus
     "test_run_ladder_arms.py": "acr-chart-review",       # subject is tools/run_ladder.py
     "test_store_to_spec_skill.py": "acr-rules",          # a card's test follows its card
     "test_guideline_to_rules_skill.py": "acr-rules",
     "test_crc_full_normalization.py": "acr-rules",       # subject is assets/usecase/crc
     "test_eval_skill_fence.py": "acr-eval",
+    #: Subject is `tools/scaffold_repos.py`, which is the thing that STAGES these repositories.
+    "test_split_declares_real_dependencies.py": "(composer)",
+    #: The read side takes its identity from what the runtime wrote, so this spans `review` (the
+    #: producer of `experiment_config_hash`) and `evaluation` (the only consumer). Routed by import
+    #: it would land in `acr-eval`, where `acr.review.agent` is a sibling dependency and present —
+    #: but the subject is the SEAM, and a seam test belongs where both halves are first-class.
+    "test_every_arm_switch_reaches_the_arm_hash.py": "acr-chart-review",
+    "test_baseline_key_is_derived_from_the_runs.py": "acr-eval",
     #: Validates EVERY card against the slot contract, and the cards live in three repositories, so
     #: it can only mean anything where all three are present.
     "test_skills_load.py": "(composer)",

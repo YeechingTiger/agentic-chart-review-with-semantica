@@ -31,8 +31,10 @@ from rich.table import Table
 
 from ..chartstore.corpus import Corpus
 from ..contract.spec import load_spec
+from ..core import site
 from ..core.cli_common import CORPUS, con, dump
 from ..improvement import labelling as lab
+from ..review.coverage import strata_from_spec
 
 label_app = typer.Typer(add_completion=False, help=(
     "THE FULL SCAN — read every note of a dev set once, against one spec's requirement. "
@@ -300,6 +302,32 @@ def cmd_export(
         con.print("[red]no completed labels in this store — run `acr label scan` first[/]")
         raise typer.Exit(code=2)
 
+    # THE INCUMBENT LIST, CONFIRMED AGAINST THE CORPUS. `assetdev` scores a keyword by expanding it
+    # over the labelling's vocabulary and refuses one that prefixes nothing — "the labels cannot say
+    # what it would surface", which is right, because a silent zero would land in a recall
+    # denominator and read as "the corpus does not say it".
+    #
+    # But whether a spec's EXISTING keyword appears in a note is a fact about the corpus, and the
+    # corpus can answer it without a model. So each note's term set is the union of what the reading
+    # model PROPOSED and the incumbent terms this note actually contains, decided by the corpus's own
+    # matcher. Without this, `acr assets measure` refuses on the first shipped keyword nobody
+    # happened to propose, and `evolve` / `certify` / `adopt` are unreachable — which is where the
+    # chain stopped the first time it was run end to end.
+    #
+    # The two sources are recorded apart in `term_sources`, because "the model thought this term
+    # would find the document" and "the document contains this term" are different claims and only
+    # the first is evidence about the model.
+    incumbent = sorted({k.strip() for st in strata_from_spec(load_spec(spec))
+                        for k in st.required_keywords if k.strip()})
+    corpus = Corpus(site.corpus_root())
+    present: dict[str, set[str]] = {}
+    if incumbent:
+        for pid in sorted({ll.patient_id for ll in labels}):
+            chart = corpus.chart(pid)
+            for term in incumbent:
+                for hit in chart.search(term, False, None, None, None, max_hits=100000):
+                    present.setdefault(f"{pid}/{hit.note_id}", set()).add(term)
+
     notes = []
     for ll in labels:
         verdicts = ll.admissibility.verdicts or {}
@@ -307,7 +335,8 @@ def cmd_export(
             "patient_id": ll.patient_id, "note_id": ll.note_id, "doc_type": ll.doc_type,
             "establishes": sorted(f for f, v in verdicts.items() if v == "can_establish"),
             "mentions": sorted(f for f, v in verdicts.items() if v == "merely_mentions"),
-            "terms": sorted({t.term for t in ll.retrieval_terms}),
+            "terms": sorted({t.term for t in ll.retrieval_terms}
+                            | present.get(f"{ll.patient_id}/{ll.note_id}", set())),
         })
     doc = {
         "schema": "acr.labelling/1",
@@ -319,6 +348,10 @@ def cmd_export(
         # needle outside this set as an error rather than as a zero, because a term the scan never
         # looked for scoring zero is a lie about the term rather than a fact about it.
         "indexed_vocabulary": sorted({t for n in notes for t in n["terms"]}),
+        "term_sources": {
+            "proposed_by_model": sorted({t.term for ll in labels for t in ll.retrieval_terms}),
+            "incumbent_confirmed_in_corpus": incumbent,
+        },
     }
     dump(doc, out)
     con.print(f"{len(notes)} note(s), {len(doc['indexed_vocabulary'])} indexed term(s) -> {out}")

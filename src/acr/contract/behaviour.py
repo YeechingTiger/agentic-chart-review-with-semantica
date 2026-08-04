@@ -120,6 +120,21 @@ def artifact_hash(*parts: Any) -> str:
     """Return the stable short digest used to bind repair artifacts."""
     return _hash(*parts)
 
+def _query_terms(query: object) -> list[str]:
+    """One search argument -> the terms it searched for. `evals._query_terms`'s rule, restated.
+
+    NOT imported: `contract/` may not depend on `evaluation/` (`tests/test_layering.py` pins the
+    direction). So the rule is duplicated deliberately, and
+    `tests/test_search_terms_agree_everywhere.py` is what keeps the two honest — a duplicate with a
+    test that compares them is a different thing from a duplicate nobody checks.
+    """
+    if query is None:
+        return []
+    if isinstance(query, (list, tuple, set)):
+        return [str(t) for t in query]
+    return [str(query)]
+
+
 def _portable_source(source: str) -> str:
     """Name a controlled input without copying a path that may contain a person id."""
     return f"manifest:{_hash(source)}" if source else ""
@@ -439,9 +454,12 @@ class BehaviorSignature:
                         ev = json.loads(line)
                         if ev.get("kind") == "tool" and str(ev.get("tool") or "").endswith(
                                 ("search", "search_notes")):
-                            q = (ev.get("args") or {}).get("query")
-                            if q is not None:
-                                trace_searches.append(str(q))
+                            # FLATTENED — `search_notes` is batched, so a list-valued query is
+                            # several terms and `str(q)` made them one opaque token. This was the
+                            # THIRD independent implementation of "which terms did this run
+                            # search"; `evals._query_terms` is the one that decides.
+                            trace_searches.extend(
+                                _query_terms((ev.get("args") or {}).get("query")))
                 except (OSError, json.JSONDecodeError):
                     trace_searches = []
         searches = tuple(sorted({

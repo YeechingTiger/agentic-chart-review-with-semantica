@@ -72,18 +72,23 @@ class ToolScript(BaseChatModel):
 
 
 def run_scripted(spec, corpus, patient_id, tmp_path, *, script, submit=None, max_model_calls=12,
-                 run_id="scripted", seed=7):
+                 run_id="scripted", seed=7, **kw):
     """Drive the real runtime with a scripted provider. Returns (manifest, trace events).
 
     Everything but the completions is real: the graph, the middleware, the toolbox, the
     coverage ledger, the thread ledger and the gate.
+
+    `**kw` reaches `run_patient` unchanged, so a test can vary one ARM SWITCH — a site mapping, a
+    retrieval prior, a task context — and compare the two manifests the runtime actually wrote.
+    That is the only way to check that a switch reaches `experiment_config_hash`: reading the
+    assembly by eye is what let three switches sit outside it for a fortnight.
     """
     model = ToolScript(script=list(script), submit=dict(submit or {}))
     model.seen = []
     m = run_patient(spec=spec, corpus=corpus, patient_id=patient_id, out_dir=Path(tmp_path),
-                    model=model, max_model_calls=max_model_calls, seed=seed, run_id=run_id)
+                    model=model, max_model_calls=max_model_calls, seed=seed, run_id=run_id, **kw)
     trace = Path(tmp_path) / f"{run_id}.jsonl"
-    events = [json.loads(l) for l in trace.read_text(encoding="utf-8").splitlines() if l.strip()]
+    events = [json.loads(line) for line in trace.read_text(encoding="utf-8").splitlines() if line.strip()]
     return m, events
 
 
@@ -153,18 +158,22 @@ class LitellmScriptAdapter(BaseChatModel):
 
 
 def run_with_script(spec, corpus, patient_id, tmp_path, llm, *, run_id="scripted",
-                    max_model_calls=12, seed=7, ctx_out=None, expansion_budget=None):
+                    max_model_calls=12, seed=7, ctx_out=None, expansion_budget=None, **kw):
     """Drive the real runtime with a litellm-shaped scripted client. (manifest, events).
 
     `ctx_out` is a list the runtime appends its live `RunContext` to, so a test can assert on
     the plan and the ledgers the run actually used rather than on a second assembly of them.
+
+    `**kw` reaches `run_patient` unchanged, so a test can vary ONE ARM SWITCH and compare the two
+    manifests the runtime actually wrote. That is the only honest check that a switch reaches
+    `experiment_config_hash`: reading the assembly by eye is what let three of them sit outside it.
     """
     m = run_patient(spec=spec, corpus=corpus, patient_id=patient_id, out_dir=Path(tmp_path),
                     model=LitellmScriptAdapter(inner=llm), max_model_calls=max_model_calls,
                     seed=seed, run_id=run_id, ctx_out=ctx_out,
-                    expansion_budget=expansion_budget)
+                    expansion_budget=expansion_budget, **kw)
     trace = Path(tmp_path) / f"{run_id}.jsonl"
-    events = [json.loads(l) for l in trace.read_text(encoding="utf-8").splitlines() if l.strip()]
+    events = [json.loads(line) for line in trace.read_text(encoding="utf-8").splitlines() if line.strip()]
     return m, events
 
 

@@ -226,10 +226,18 @@ def score(
     fields: str = typer.Option(..., "--fields",
                                help="comma list. Required: scoring whatever keys the model "
                                     "happened to emit makes the denominator depend on the model"),
-    commit: str = typer.Option(..., "--commit", help="part of the baseline key"),
-    spec_hash: str = typer.Option(..., "--spec-hash", help="part of the baseline key"),
-    model: str = typer.Option(..., "--model", help="part of the baseline key"),
-    date: str = typer.Option(..., "--date", help="part of the baseline key"),
+    commit: str = typer.Option("", "--commit",
+                               help="OPTIONAL assertion. The baseline key is read from the "
+                                    "manifests; passing a part here refuses the command if the "
+                                    "runs recorded something else."),
+    spec_hash: str = typer.Option("", "--spec-hash", help="optional assertion; see --commit"),
+    spec: str = typer.Option(
+        "", "--spec",
+        help="the contract YAML. Optional, and only the value-domain check uses it: with it, a "
+             "submitted value that is not a code in the table the run was SHOWN is counted "
+             "(advisory). Without it that check reports nothing rather than guessing."),
+    model: str = typer.Option("", "--model", help="optional assertion; see --commit"),
+    date: str = typer.Option("", "--date", help="optional assertion; see --commit"),
     baseline: str = typer.Option("", "--baseline", help="write the full report here"),
     min_term_chars: int = typer.Option(0, "--min-term-chars",
                                        help="with the other three bands, also runs the "
@@ -240,11 +248,17 @@ def score(
 ):
     """Score recorded runs against an answer key. Reads only; runs nothing.
 
-    Every part of the baseline key is required because a baseline is only comparable across
-    all four: "accuracy fell" and "the question changed" look identical in the numbers, and
-    the key is what lets `eval compare` tell the reader which one happened.
+    THE BASELINE KEY COMES FROM THE MANIFESTS. It used to be four strings typed here and reconciled
+    against nothing, so `--model TOTALLY-WRONG-MODEL` was accepted in silence and written into the
+    baseline as the model that produced the numbers. Every manifest records `code_sha`, `spec_hash`,
+    `model` and `experiment_config_hash`; those are read, and the four flags are now optional
+    ASSERTIONS that refuse the command when the runs disagree.
+
+    A part the runs did not record is not a disagreement, so a manifest written before that field
+    existed still scores. And a tree spanning two arms is not refused here — sweeping the detectors
+    over everything in `runs/` is a real use — it is recorded as `MIXED` and refused by
+    `eval compare`, where a mixture cannot be one endpoint of a delta.
     """
-    key = evals.BaselineKey(commit=commit, spec_hash=spec_hash, model=model, date=date)
     names = [f.strip() for f in fields.split(",") if f.strip()]
     if not names:
         raise typer.BadParameter("--fields resolved to nothing")
@@ -264,8 +278,51 @@ def score(
         cfg = _detector_config(min_term_chars, max_rejection_repeats, token_band, turn_band)
 
     records = [evals.RunRecord.from_manifest(p) for p in _manifests(runs)]
-    report = evals.score(records, akey, fields=names, key=key, detector_config=cfg)
+    if not records:
+        raise typer.BadParameter(f"{runs}: no run records found")
+    key = evals.derive_baseline_key(records)
+    # An operator-supplied part OVERRIDES what was derived only after being reconciled against it,
+    # so the recorded key is never a string the runs contradict. Both halves matter: the assertion
+    # is honoured (a `--commit` for a field no manifest recorded is the one way to supply it), and a
+    # wrong assertion stops the command instead of being written into the artifact.
+    declared = evals.BaselineKey(commit=commit or key.commit, spec_hash=spec_hash or key.spec_hash,
+                                 model=model or key.model, date=date or key.date,
+                                 experiment_config_hash=key.experiment_config_hash,
+                                 basis="reconciled" if any((commit, spec_hash, model, date))
+                                 else "derived")
+    if problems := evals.reconcile_baseline_key(declared, records):
+        raise typer.BadParameter(
+            "the baseline key you declared is contradicted by the runs you are scoring:\n  "
+            + "\n  ".join(problems)
+            + "\n\nDrop the flag and the key is read from the manifests.")
+    key = declared
+
+    # `--spec` reaches only the value-domain detector. `check_values` was documented as counted by
+    # this plane and had no caller for weeks; this is the caller.
+    loaded = None
+    if spec:
+        from ..contract.spec import load_spec
+        loaded = load_spec(spec)
+    report = evals.score(records, akey, fields=names, key=key, detector_config=cfg, spec=loaded)
     typer.echo(report.table())
+    con.print(f"[dim]baseline key ({key.basis}): {key.as_str()}[/]")
+    n = report.key_basis.get("n_runs", 0)
+    for name, f in (report.key_basis.get("fields") or {}).items():
+        if f["mixed"]:
+            con.print(f"[yellow]{name} is MIXED across these runs: {f['values']} — this baseline "
+                      f"averages more than one arm and `eval compare` will refuse it[/]")
+        # NOT `elif`. A field can be mixed across the runs that recorded it AND absent from most of
+        # them, which is exactly `experiment_config_hash` on this tree: 12 distinct values and 294
+        # of 509 runs carrying none. Reporting only the first hides how much of the mixture is
+        # unknown rather than merely varied.
+        if f["n_unrecorded"]:
+            con.print(f"[dim]{name}: {f['n_unrecorded']} of {n} run(s) recorded none[/]")
+    if undated := report.key_basis.get("n_undated"):
+        con.print(f"[dim]date: {undated} of {n} run(s) carry no timestamp in their run id or "
+                  f"batch directory[/]")
+    if cfg is not None and not spec:
+        con.print("[dim]value-domain conformance NOT COUNTED: pass --spec to check submitted "
+                  "values against the code table the runs were shown.[/]")
     if cfg is None:
         con.print("[dim]detectors NOT RUN: no thresholds were declared, so `findings` is "
                   "empty because nothing looked, not because nothing fired[/]")
@@ -296,8 +353,10 @@ def compare(
         # Printed BEFORE the field table would be tidier, but the field rates are still real
         # and worth seeing. What must not happen is a per-instance count appearing beneath
         # them, because a reader takes `0 regression(s)` as a result rather than as silence.
-        con.print(f"[bold red]NOT_COMPARABLE[/] — {nc['reason']} "
-                  f"({nc['n_colliding']} colliding id(s), basis={nc['pseudonym_basis']})")
+        # THE FOUR KEYS EVERY SHAPE CARRIES. This read the collision shape's own `n_colliding`
+        # and `pseudonym_basis`, so the second refusal — a baseline that mixes arms — raised
+        # `KeyError: n_colliding` the first time it fired on real runs.
+        con.print(f"[bold red]NOT_COMPARABLE[/] — {nc['reason']} ({nc['detail']})")
         con.print(f"[dim]{nc['why']}[/]")
         con.print(f"[yellow]remedy: {nc['remedy']}[/]")
         dump(d, out)

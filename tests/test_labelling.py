@@ -918,7 +918,7 @@ def test_a_patient_absent_from_the_key_and_a_failed_label_are_unscorable(corpus,
 def test_a_falsy_key_entry_is_an_answer_and_not_a_missing_one():
     """`0`, `""` and an empty record all mean "adjudicated, nothing there", which is scorable."""
     lab = L.NoteLabel("P1", "n1", admissibility=L.Admissibility({"f": "neither"}))
-    audit = L.audit_relevance([lab], {"P1": ()}, carries=lambda a, l: False)
+    audit = L.audit_relevance([lab], {"P1": ()}, carries=lambda a, _label: False)
     assert audit.n_scorable == 1 and audit.n_unscorable == 0
 
 

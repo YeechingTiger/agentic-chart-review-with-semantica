@@ -9,11 +9,10 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
 import re
 import subprocess
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -78,13 +77,13 @@ OUTBOUND_TOOLS = frozenset({
 class AuditContractError(ValueError):
     """An audit rule attempted to cross its truth or output boundary."""
 
+#: Re-exported so a reader of this module sees which key it uses without chasing an import.
+PSEUDONYM_KEY_ENV = site.PSEUDONYM_KEY_ENV
+
+
 def _fingerprint(value: str) -> str:
-    key = os.environ.get("ACR_PHI_FINGERPRINT_KEY", "")
-    if not key:
-        return "<redacted:no-local-key>"
-    return hmac.new(
-        key.encode("utf-8"), value.encode("utf-8"), hashlib.sha256
-    ).hexdigest()[:16]
+    """`site.fingerprint`. See it for why this is not implemented here."""
+    return site.fingerprint(value)
 
 def _walk(value: Any, path: str = "root"):
     if isinstance(value, Mapping):
@@ -275,6 +274,12 @@ class AuditReport:
     findings: tuple[AuditFinding, ...]
     incidents: tuple[AuditIncident, ...]
     input_hash: str
+    #: Per-rule: what that rule was able to examine. A rule that produced no findings may have
+    #: found nothing OR looked at nothing, and `status: PASS` cannot tell them apart — which is how
+    #: an IRB-severity rule reading four argument names no tool declares sat in every report's
+    #: `rule_refs` for weeks reading as a satisfied check. A rule with no entry here made no claim
+    #: about its own coverage; a rule with one did.
+    basis: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
 
     @property
     def status(self) -> str:
@@ -293,6 +298,7 @@ class AuditReport:
             "findings": [row.to_dict() for row in self.findings],
             "incidents": [row.to_dict() for row in self.incidents],
             "input_hash": self.input_hash,
+            "basis": {k: dict(v) for k, v in self.basis.items()},
         }
 
 AuditImplementation = Callable[
@@ -341,17 +347,25 @@ class AuditRunner:
         )
         findings: list[AuditFinding] = []
         incidents: list[AuditIncident] = []
+        basis: dict[str, Mapping[str, Any]] = {}
         for asset in assets:
             implementation = self.registry.modules.implementation(asset)
             module_findings, module_incidents = implementation(asset, context)
             findings.extend(module_findings)
             incidents.extend(module_incidents)
+            # A rule may declare what it examined by exposing `basis(context)`. Optional on
+            # purpose: a rule that makes no claim about its own coverage says nothing here, which
+            # is more honest than a default that would read as a claim.
+            reporter = BASIS_REPORTERS.get(asset.implementation_id)
+            if reporter is not None:
+                basis[asset.ref] = reporter(context)
         report = AuditReport(
             trajectory_id=context.trajectory.trajectory_id,
             rule_refs=tuple(asset.ref for asset in assets),
             findings=tuple(findings),
             incidents=tuple(incidents),
             input_hash=context.input_hash,
+            basis=basis,
         )
         if self.store is not None:
             self.store.add(report, assets)
@@ -412,6 +426,40 @@ def _target(
         target_id=target_id or context.trajectory.trajectory_id,
     )
 
+#: The argument names this rule looks for. NO TOOL IN `TOOL_SCHEMAS` DECLARES ANY OF THEM, and a
+#: scan of this tree's whole run history found 8,866 arg-bearing trace events with ZERO
+#: intersection. Kept rather than deleted, because the reason is structural and worth asserting:
+#: `Toolbox` binds exactly ONE `PatientChart`, so no tool can be asked about another subject and
+#: the emptiness is TRUE. What was wrong was that a zero read as "no crossover occurred" when it
+#: meant "nothing looked" — see `_boundary_basis`. If a tool ever takes a subject argument, this
+#: fires without anyone remembering to re-enable it.
+#:
+#: The repo's precedent for the other case is a few hundred lines below: on 2026-08-03
+#: `runtime_control_conformance_audit` was DELETED for reading four trace keys nothing writes.
+#: The difference is that its emptiness was not structurally guaranteed by anything.
+_SUBJECT_ARG_NAMES = ("patient", "patient_id", "person_id", "subject_id")
+
+
+def _boundary_basis(context: AuditContext) -> dict[str, object]:
+    """What this rule was able to examine, so a zero can be read.
+
+    `AuditFinding` has no `examined` field and this rule may legitimately produce no findings, so
+    the count rides on the INCIDENT this function feeds. An audit that cannot say "I had nothing to
+    look at" reproduces, one level up, the defect that deleted the rule below.
+    """
+    args_seen = sum(1 for e in context.application_events
+                    if isinstance(e.get("args"), Mapping) and e.get("args"))
+    subject_args = sum(1 for e in context.application_events
+                       if isinstance(e.get("args"), Mapping)
+                       and set(e["args"]) & set(_SUBJECT_ARG_NAMES))
+    return {"examined": subject_args,
+            "arg_bearing_events": args_seen,
+            "person_id_pattern_configured": site.PERSON_ID is not None,
+            "why_zero": ("no tool in the declared surface accepts a subject argument, and "
+                         "`Toolbox` binds exactly one chart, so an empty result is structural "
+                         "rather than unexamined" if subject_args == 0 else "")}
+
+
 def patient_boundary_audit(
     asset: ModuleAsset, context: AuditContext
 ) -> tuple[tuple[AuditFinding, ...], tuple[AuditIncident, ...]]:
@@ -419,7 +467,7 @@ def patient_boundary_audit(
     expected = {context.patient_scope, context.trajectory.case_ref}
     for index, event in enumerate(context.application_events):
         args = event.get("args") if isinstance(event.get("args"), Mapping) else {}
-        for key in ("patient", "patient_id", "person_id", "subject_id"):
+        for key in _SUBJECT_ARG_NAMES:
             if key not in args:
                 continue
             observed = str(args[key])
@@ -825,6 +873,57 @@ def _audit_asset(
         owner="platform-governance",
         tags=("audit", "application-events"),
     )
+
+def _artifact_basis(context: AuditContext) -> dict[str, object]:
+    """How many artifacts a rule that walks `artifact_refs` actually had to walk.
+
+    Both `local_artifact_audit` and `trajectory_integrity_audit` iterate
+    `context.trajectory.artifact_refs` and produce nothing when it is empty — which is the correct
+    outcome for a clean run AND for a caller that passed no artifacts at all. Those are different
+    facts. `tools/verify_mechanisms.py`'s M5 found this by building a context with `artifact_refs=()`
+    and watching both rules report zero: exactly the reading a report gave with no way to tell.
+    """
+    refs = tuple(getattr(context.trajectory, "artifact_refs", ()) or ())
+    on_disk = sum(1 for a in refs if Path(a.path).is_file())
+    return {"examined": on_disk,
+            "artifacts_declared": len(refs),
+            "local_root_configured": bool(context.local_root),
+            "why_zero": ("no artifact was declared for this trajectory, so this rule examined "
+                         "nothing — that is a caller omission, not a clean result"
+                         if not refs else
+                         "every declared artifact is missing from disk" if on_disk == 0 else "")}
+
+
+def _declared_tool_basis(context: AuditContext) -> dict[str, object]:
+    """How many tool calls this rule compared against the declared surface.
+
+    It returns early when `declared_tools` is empty, so a caller that forgot to pass the surface
+    got zero findings and a clean-looking report. `tools/verify_mechanisms.py` M5 hit exactly that:
+    it read the tool name from `t["name"]` where `TOOL_SCHEMAS` is OpenAI-style
+    (`t["function"]["name"]`), passed `("",)`, and 1,688 spurious findings read as the rule working.
+    Fixing the fixture made it produce nothing — correctly, since no run calls an undeclared tool —
+    and that zero needs to be legible.
+    """
+    calls = [e for e in context.application_events
+             if str(e.get("kind") or "").lower() == "tool"]
+    return {"examined": len(calls) if context.declared_tools else 0,
+            "declared_surface_size": len(context.declared_tools),
+            "why_zero": ("no declared tool surface was supplied, so nothing could be compared"
+                         if not context.declared_tools else
+                         "the trace records no tool call" if not calls else "")}
+
+
+#: `implementation_id` -> a callable saying what that rule EXAMINED, for the report's `basis`.
+#: A registry rather than a protocol on the rule itself, because a rule is a plain function and
+#: adding a required second return value would touch every one of them. Only rules whose emptiness
+#: is ambiguous need an entry — the ones where "no findings" and "nothing looked" print the same.
+BASIS_REPORTERS: dict[str, Callable[["AuditContext"], Mapping[str, Any]]] = {
+    "audit.patient_boundary.v1": _boundary_basis,
+    "audit.local_artifact.v1": _artifact_basis,
+    "audit.trajectory_integrity.v1": _artifact_basis,
+    "audit.undeclared_tool.v1": _declared_tool_basis,
+}
+
 
 def builtin_audit_registry() -> AuditRuleRegistry:
     registry = AuditRuleRegistry()

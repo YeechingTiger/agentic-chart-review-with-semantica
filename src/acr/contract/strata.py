@@ -153,6 +153,40 @@ def assign_strata(docs: Sequence[DocMeta], specs: Sequence[StratumSpec],
     return out
 
 
+def spec_declared_keywords(spec) -> list[str]:
+    """Every retrieval term a spec declares, in declaration order, deduplicated and lowercased.
+
+    THE ONE IMPLEMENTATION, and it lives HERE rather than beside its first caller because two work
+    planes need it: `review` seeds a run's search list from it, and `improvement` prices every
+    candidate term against it. `tests/test_layering.py` forbids `improvement -> review` — work
+    planes may share only `core`/`contract` types — and the alternative to moving it down was four
+    copies. Three of the four disagreed: `strata_from_spec` reads the two STRATUM locations and
+    misses `proof_obligation.required_keywords`, so `assetdev`, `derive` and `build_termcache` each
+    priced candidates against a shorter list than the runtime searched. `STORE.700_880` declares
+    `tnm` there and in no stratum: runtime 11 terms, develop plane 10, and `certify` certified
+    improvement over a configuration nobody deploys.
+
+    Three locations, because a spec may declare terms at any of them:
+      `proof_obligation.required_keywords`                     — scoped to no stratum
+      `for_negative.strata[].required_keywords`
+      `for_negative.claims[].strata[].required_keywords`
+    """
+    po = getattr(spec, "proof_obligation", None)
+    kws: list[str] = list(getattr(po, "required_keywords", []) or []) if po else []
+    fn = (getattr(po, "for_negative", {}) or {}) if po else {}
+    for st in (fn.get("strata") or []):
+        kws.extend(st.get("required_keywords") or [])
+    for claim in (fn.get("claims") or []):
+        for st in (claim.get("strata") or []):
+            kws.extend(st.get("required_keywords") or [])
+    out: list[str] = []
+    for k in kws:
+        k = str(k).strip().lower()
+        if k and k not in out:
+            out.append(k)
+    return out
+
+
 def strata_from_spec(spec) -> list[StratumSpec]:
     """Pull the stratum declarations out of a spec's proof_obligation.
 

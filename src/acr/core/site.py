@@ -67,23 +67,51 @@ test caught it because a synthetic `SYN0001` matches nothing and never collides.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import re
 from pathlib import Path
 
-#: Root for anything derived from patient data that must not enter the worktree. A deployment
-#: points this at storage it controls; the default is per-user and outside any checkout.
-#: `core/local_artifacts.LocalArtifactStore` refuses a root that is relative or inside the worktree
-#: regardless of what is set here — this variable chooses WHERE, not WHETHER.
-LOCAL_ROOT = Path(os.getenv("ACR_LOCAL_ROOT", str(Path.home() / ".acr" / "local"))).expanduser()
+# `LOCAL_ROOT` / `ACR_LOCAL_ROOT` was here and is DELETED. It had zero readers anywhere in the
+# tree, while its own docstring named `LocalArtifactStore` as its consumer — and the store reads
+# `ACR_LOCAL_ARTIFACT_ROOT` (`core/local_artifacts.LOCAL_ROOT_ENV`). Two env var names for one
+# address, one of them dead, and `docs/NEW_TASK_NEW_DATA.md` pasted the dead one into a documented
+# command: `--local-root "$ACR_LOCAL_ROOT"` expands to empty and hits the store's refusal.
+# `tests/test_site_addresses_resolve_anywhere.py` keeps it gone.
 
 #: Where the usage/cost callback writes. Outside the tree because it is shared with the LiteLLM
 #: path's `sitecustomize` hook.
 AUDIT_DIR = Path(os.getenv("ACR_AUDIT_DIR", str(Path.home() / ".acr" / "audit"))).expanduser()
 
+def _prices_path() -> Path:
+    """The model price table, resolved from a REPO ROOT rather than the working directory.
+
+    This was `Path(os.getenv("ACR_PRICES", "assets/pricing/prices.json"))` — the one cwd-relative
+    default in this module. `acr` is an installed console script, so from any directory but the
+    checkout the table did not exist, `Spend.usd` was `None` for every model, and
+    `agent.py`'s `if spend.exceeded()` never tripped: `--max-usd` enforced nothing. Nothing
+    published was wrong — `spend.report()` records the ceiling as unenforced — but a ceiling that
+    depends on the operator's shell is not a ceiling.
+
+    Falls back to the literal relative path when there is no repo root (a packaged install with no
+    checkout), because that is the state where there is genuinely no shipped table and the caller
+    must set `ACR_PRICES`. `spend.report()` already says so in every manifest.
+    """
+    override = os.getenv("ACR_PRICES")
+    if override:
+        return Path(override).expanduser()
+    rel = "assets/pricing/prices.json"
+    try:
+        from .repo_paths import repo_root
+        return repo_root() / rel
+    except Exception:                          # noqa: BLE001 — no checkout is a legitimate state
+        return Path(rel)
+
+
 #: The model price table. ONE table, because two price tables is two answers to "what did this
-#: cost". Ships in-repo; a site with negotiated rates overrides.
-PRICES = Path(os.getenv("ACR_PRICES", "assets/pricing/prices.json")).expanduser()
+#: cost". Ships in-repo; a site with negotiated rates overrides via `ACR_PRICES`.
+PRICES = _prices_path()
 
 #: Where full-scan labellings live. Outside the tree: a labelling names documents.
 LABELS_ROOT = Path(
@@ -147,6 +175,59 @@ def _resolve(env_var: str, relative: str, sibling_repo: str, what: str) -> Path:
         f"cannot find {what}. Looked for {relative!r} under {here} and its parents, and for a "
         f"sibling checkout of {sibling_repo!r}. Set {env_var} to the directory, or clone "
         f"{sibling_repo} beside this repository.")
+
+
+#: Env var naming the Site Mapping JSON for this deployment's corpus. Read by surfaces that take
+#: no command line — `acr-mcp` — because a mapping belongs to a CORPUS and not to a request.
+SITE_MAPPING_ENV = "ACR_SITE_MAPPING"
+
+
+def site_mapping_path() -> Path | None:
+    """The configured Site Mapping file, or None. An ADDRESS, deliberately not the object.
+
+    Loading it would mean `core` importing `contract.site_mapping`, and
+    `tests/test_layering.py::test_no_layer_imports_a_higher_one` forbids that — including a lazy
+    import inside a function body. This module's job is where things are; constructing a contract
+    object is the caller's, and every caller of this is already allowed to.
+    """
+    raw = os.getenv(SITE_MAPPING_ENV, "").strip()
+    if not raw:
+        return None
+    path = Path(raw).expanduser()
+    if not path.is_file():
+        raise FileNotFoundError(f"{SITE_MAPPING_ENV}={raw} is not a file")
+    return path
+
+
+#: Env var holding the pseudonymisation secret. ONE NAME. `audit_loop._fingerprint` read
+#: `ACR_PHI_FINGERPRINT_KEY` — which appeared in the whole tree exactly once, on that line — while
+#: `evals`, the `audit-phi-in-trace` skill and the README used `ACR_PSEUDONYM_KEY`. A site that set
+#: the documented name got `<redacted:no-local-key>` for every `acr audit run` finding, so a report
+#: could not tell ONE identifier leaking forty times from FORTY leaking once, and the skill's
+#: fingerprints over the same trace joined to nothing.
+PSEUDONYM_KEY_ENV = "ACR_PSEUDONYM_KEY"
+
+#: 12 hex characters, because two of the three call sites already used 12 and the `<person:…>`
+#: tokens in recorded eval output are that length. Truncation length is part of the identifier: a
+#: 16-character fingerprint and a 12-character one are not comparable by equality.
+PSEUDONYM_DIGEST_CHARS = 12
+
+
+def fingerprint(value: str) -> str:
+    """A stable, keyed pseudonym for one identifier — the same one in every plane.
+
+    Lives in `core` because `audit` and `evaluation` are sibling work planes and
+    `tests/test_layering.py` forbids one importing the other. Two implementations of "what key
+    fingerprints PHI" is how they came to disagree.
+
+    UNKEYED IS REDACTED, NOT HASHED. An unkeyed digest of a small, structured identifier space —
+    which a medical record number is — is a lookup table, not a protection.
+    """
+    key = os.environ.get(PSEUDONYM_KEY_ENV, "")
+    if not key:
+        return "<redacted:no-local-key>"
+    return hmac.new(key.encode("utf-8"), str(value).encode("utf-8"),
+                    hashlib.sha256).hexdigest()[:PSEUDONYM_DIGEST_CHARS]
 
 
 def corpus_root() -> Path:

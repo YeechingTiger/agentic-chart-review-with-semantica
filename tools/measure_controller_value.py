@@ -40,7 +40,6 @@ If most are CITED_BUT_MISJUDGED, no Controller helps and the work belongs in the
 
 from __future__ import annotations
 
-import glob
 import json
 import pathlib
 import subprocess
@@ -49,12 +48,15 @@ from collections import defaultdict
 
 from acr.core import site
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from _decision_inputs import UNKEYED  # noqa: E402
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
-def _answer(m: dict) -> str:
-    a = m.get("answer") or {}
-    return str((a.get("value") or {}).get("date_of_initial_diagnosis") or a.get("status") or "")
+#: `_answer` is gone: it plucked a literal `date_of_initial_diagnosis` key, which made this script
+#: about one contract, and it collapsed an abstention into a status string, which is how a correct
+#: abstention becomes a failure. `Inputs.coded` is the one implementation.
 
 
 def _read_ids(trace: list[dict]) -> set[str]:
@@ -70,7 +72,7 @@ def _read_ids(trace: list[dict]) -> set[str]:
     return out
 
 
-def _exists_in_corpus(pid: str, value: str) -> bool:
+def _exists_in_corpus(pid: str, value: str, corpus_root=None) -> bool:
     """Is the gold value written anywhere in this chart, in any notation we can look for?"""
     if len(value) != 8 or not value.isdigit():
         return True                       # a status, not a date
@@ -78,7 +80,8 @@ def _exists_in_corpus(pid: str, value: str) -> bool:
         return False                      # a constructed partial date is in no document
     y, mo, d = value[:4], value[4:6], value[6:]
     for form in (f"{y}-{mo}-{d}", f"{mo}/{d}/{y}", f"{int(mo)}/{int(d)}/{y}"):
-        r = subprocess.run(["grep", "-rlF", form, str(site.corpus_root() / pid)],
+        r = subprocess.run(["grep", "-rlF", form,
+                            str((corpus_root or site.corpus_root()) / pid)],
                            capture_output=True, text=True, check=False)
         if r.stdout.strip():
             return True
@@ -86,39 +89,47 @@ def _exists_in_corpus(pid: str, value: str) -> bool:
 
 
 def main() -> int:
-    root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "runs/a15eval")
-    gold = {r["patient_id"]: r for r in json.loads((site.corpus_root().parent / "index.json").read_text())}
+    import argparse
+
+    from _decision_inputs import Inputs, add_arguments, load_trace
+
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    add_arguments(ap)
+    args = ap.parse_args()
+    inp = Inputs(args)
+    inp.refuse_unless_resolved(needs_key=True)
+    field = inp.fields[0]
 
     runs: dict[str, list[dict]] = defaultdict(list)
-    for f in sorted(glob.glob(f"{root}/**/*.manifest.json", recursive=True)):
+    for f in inp.manifests:
         m = json.loads(pathlib.Path(f).read_text())
-        tp = pathlib.Path(f.replace(".manifest.json", ".jsonl"))
-        m["_trace"] = ([json.loads(x) for x in tp.read_text().splitlines() if x.strip()]
-                       if tp.is_file() else [])
+        m["_trace"] = load_trace(f)
         if m.get("patient_id"):
             runs[m["patient_id"]].append(m)
 
     verdicts: dict[str, list[str]] = defaultdict(list)
     print(f"{'chart':<9}{'picked':<14}{'gold':<14}{'attribution':<22}{'why'}")
     for pid in sorted(runs):
-        g = gold.get(pid) or {}
-        if not g.get("candidate_stratum"):
+        want = inp.want(pid, field)
+        if want is UNKEYED:
             continue
-        gt = g["ground_truth"]["STORE.390.date_of_initial_diagnosis"]
-        want = gt.get("value") or gt.get("status")
         ms = runs[pid]
-        right = [m for m in ms if _answer(m) == want]
+        right = [m for m in ms if inp.coded(m, field) == want]
         # Grounded in an outcome: what a run that got it right cited.
         decisive = {e["note_id"] for m in right for e in (m.get("evidence") or [])}
 
         for m in ms:
-            got = _answer(m)
+            got = inp.coded(m, field)
             if got == want:
                 continue
             led = m.get("candidates") or {}
-            cands = {(c["value"].get("date_of_initial_diagnosis") or c["abstention"] or ""): c
+            cands = {(c["value"].get(field) or c["abstention"] or ""): c
                      for c in (led.get("candidates") or [])}
-            if not _exists_in_corpus(pid, want):
+            if want is None:
+                # The key says abstaining was correct and this run answered anyway. Retrieval is
+                # not the cause and there is no decisive document to have missed.
+                v, why = "ANSWERED_OVER_ABSTAIN", "the key says abstention was correct"
+            elif not _exists_in_corpus(pid, want, inp.corpus_root):
                 v, why = "UNSEEDABLE", "the gold value is written in no document"
             elif want in cands and cands[want]["status"] == "REJECTED":
                 v, why = "GOLD_REJECTED", (cands[want].get("rejection_reason") or "")[:52]
@@ -131,7 +142,7 @@ def main() -> int:
             else:
                 v, why = "NEVER_LOOKED", f"never opened {sorted(decisive)[:1]}"
             verdicts[v].append(pid)
-            print(f"{pid:<9}{got[:12]:<14}{str(want)[:12]:<14}{v:<22}{why}")
+            print(f"{pid:<9}{str(got)[:12]:<14}{str(want)[:12]:<14}{v:<22}{why}")
 
     total = sum(len(v) for v in verdicts.values())
     print(f"\n{total} wrong answers across {sum(len(v) for v in runs.values())} runs\n")

@@ -332,7 +332,7 @@ def selftest() -> int:
                 bool(["Surgical-Pathology-Report"] or []))
     must_reject("M2 ledger: reviewed > actually read is caught", 9 > 3)
     must_reject("M2 ledger: complete=true with reviewed<N is caught",
-                True != (3 == 23))
+                (3 == 23) is False)
 
     fake = [{"case_id": "X", "mode": "BLIND", "semantic_patch_allowed": True,
              "primary_cause": {"cause": "RETRIEVAL", "causal_strength": "PLAUSIBLE"}},
@@ -365,6 +365,117 @@ def selftest() -> int:
     return bad
 
 
+def m5_audit_rules_can_fire(root: pathlib.Path) -> None:
+    """M5 — every audit rule either FIRES on real runs, or declares why it cannot.
+
+    WHY. On 2026-08-03 `runtime_control_conformance_audit` was deleted from `audit/audit_loop.py`
+    because it read four trace keys (`refused_fields`, `inadmissible_fields`, `rejected_fields`,
+    `disallowed_fields`) that nothing in `src/` writes and that appear zero times in any recorded
+    run. It could never have fired since the day it was written, and it was invisible on the
+    dependency graph because a rule reads EVENT KEYS rather than importing a type. The comment left
+    in its place says the only way to judge such a rule dead is to ask who writes what it reads.
+
+    Then `patient_boundary_audit` turned out to be the same shape: it keys on
+    `patient`/`patient_id`/`person_id`/`subject_id`, no tool in `TOOL_SCHEMAS` declares any of them,
+    and 8,866 arg-bearing trace events in this tree intersect none. That one is structurally empty
+    ON PURPOSE — `Toolbox` binds ONE chart — so it survives, with a `BASIS_REPORTERS` entry that
+    puts the emptiness and its reason into every report.
+
+    THIS CHECK EXECUTES THE RULES, and the first version did not. It compared string literals in
+    each rule's body against the tool surface, and reported four rules as unable to fire when they
+    demonstrably do — `phi_provider_audit` produced this tree's four IRB findings. A checker with
+    four false positives is worse than none: it trains a reader to skip the section. The same lesson
+    `tools/verify_structure.py` learned when its first finding was a card name in a docstring.
+    """
+    print("\nM5  every audit rule fires on real runs, or declares why it cannot")
+    from acr.audit.audit_loop import (
+        BASIS_REPORTERS,
+        AuditContext,
+        builtin_audit_registry,
+    )
+    from acr.core.kernel import TrajectoryAdapter
+
+    registry = builtin_audit_registry()
+    assets = registry.all()
+    fired: dict[str, int] = {a.module_id: 0 for a in assets}
+    n_runs = 0
+    last_context = None
+    for _arm, rec in runs_of(root):
+        raw = rec.manifest
+        patient = str(raw.get("patient_id") or "unknown")
+        # REAL ARTIFACT REFS, as `acr audit run` passes them. The first version of this check
+        # passed `()`, and two rules that walk `artifact_refs` reported zero — which this check
+        # then blamed on the rules. A verifier that constructs an input the system never produces
+        # measures its own fixture.
+        from acr.core.kernel import ArtifactRef
+        mpath = pathlib.Path(rec.source)
+        refs = [ArtifactRef.from_path(mpath)] if mpath.is_file() else []
+        tpath = mpath.with_name(mpath.name.replace(".manifest.json", ".jsonl"))
+        if tpath.is_file():
+            refs.append(ArtifactRef.from_path(tpath))
+        trajectory = TrajectoryAdapter.from_run_artifacts(
+            manifest=raw, trace=list(rec.trace), case_ref=patient,
+            spec_id=str(raw.get("spec_id") or "unspecified-spec"),
+            spec_hash=str(raw.get("spec_hash") or ""),
+            runtime_profile_id=str(raw.get("runtime_profile_id") or ""),
+            runtime_profile_hash=str(raw.get("runtime_profile_hash") or ""),
+            artifact_refs=tuple(refs),
+        )
+        context = AuditContext(
+            trajectory=trajectory, application_events=list(rec.trace),
+            patient_scope=patient, provider_boundary="UNKNOWN",
+            # `t["function"]["name"]`, NOT `t["name"]`. `TOOL_SCHEMAS` is OpenAI-style —
+            # `{"type": "function", "function": {"name": ..., "parameters": ...}}` — so the top
+            # level has no `name` and `t.get("name", "")` returned `""` for every entry. That made
+            # `declared_tools = ("",)`, so `undeclared_tool_audit` reported EVERY tool call as
+            # undeclared: 1,688 findings, and this check read that as the rule "firing". A verifier
+            # that measures its own fixture error is the failure this whole check exists to catch,
+            # and it is the second time in one sitting — the first was `artifact_refs=()`.
+            declared_tools=tuple(sorted(
+                {(t.get("function") or {}).get("name", "") for t in TOOL_SCHEMAS} - {""})),
+            local_root="", git_root="",
+        )
+        n_runs += 1
+        last_context = context
+        for asset in assets:
+            impl = registry.modules.implementation(asset)
+            try:
+                findings, incidents = impl(asset, context)
+            except Exception:                     # noqa: BLE001 — a raising rule is not a firing one
+                continue
+            fired[asset.module_id] += len(findings) + len(incidents)
+
+    if n_runs == 0:
+        check("M5 examined at least one run", False,
+              f"no runs under {root}, so this check looked at nothing")
+        return
+    by_module = {a.module_id: a for a in assets}
+    for module_id in sorted(fired):
+        n = fired[module_id]
+        asset = by_module[module_id]
+        reporter = BASIS_REPORTERS.get(asset.implementation_id)
+        # A BASIS ENTRY IS NOT ENOUGH BY ITSELF, or a genuinely dead rule would pass by registering
+        # an empty dict. The basis has to say either "I examined N things" with N > 0, or
+        # "I examined nothing, and here is why" — the pair is what makes a zero readable.
+        basis = reporter(last_context) if (reporter and last_context) else None
+        examined = int((basis or {}).get("examined") or 0)
+        why_zero = str((basis or {}).get("why_zero") or "")
+        ok = n > 0 or examined > 0 or bool(why_zero)
+        if n > 0:
+            why = f"{n} finding(s)/incident(s) over {n_runs} run(s)"
+        elif examined > 0:
+            why = f"examined {examined} item(s) and found nothing — a clean result, not silence"
+        elif why_zero:
+            why = f"examined 0, and says why: {why_zero}"
+        else:
+            why = (f"produced nothing across {n_runs} recorded run(s) and its basis reports "
+                   f"neither a positive `examined` count nor a `why_zero`, so a zero in its report "
+                   f"cannot be distinguished from 'nothing looked'. Repoint it at what the runtime "
+                   f"writes, give it a real basis, or delete it as "
+                   f"`runtime_control_conformance_audit` was.")
+        check(f"{module_id}: fired, examined something, or says why it examined nothing", ok, why)
+
+
 def main() -> int:
     if "--selftest" in sys.argv:
         return selftest()
@@ -374,6 +485,7 @@ def main() -> int:
     m2_prior(root)
     m3_eval()
     m4_outcomes(root)
+    m5_audit_rules_can_fire(root)
     print(f"\n{len(FAILURES)} failure(s)" + (": " + "; ".join(FAILURES) if FAILURES else ""))
     return len(FAILURES)
 

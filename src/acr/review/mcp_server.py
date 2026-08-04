@@ -97,6 +97,7 @@ from ..contract.answer_contract import (
     strip_value_from_spec_insufficient,
 )
 from ..contract.outcomes import KIND_ABSTAIN_EVIDENCE, status_kind
+from ..contract.site_mapping import SiteMapping
 from ..contract.spec import ExtractionSpec, load_specs
 from ..core import site
 from ..core.state import EvidenceLedger
@@ -182,6 +183,20 @@ def _normalise_spelling(raw: str) -> str:
     slipping past it as an exotic-but-harmless character.
     """
     return unicodedata.normalize("NFKC", raw)
+
+
+def _configured_site_mapping():
+    """This server's Site Mapping, from `ACR_SITE_MAPPING`, or None.
+
+    `site.py` hands back the PATH only — `core` may not import `contract` — so the load lives here,
+    where it is allowed. A server has no command line, and a mapping belongs to the CORPUS this
+    server serves: letting a caller pass one per request would let two callers stratify the same
+    documents differently and both be told they were covered.
+    """
+    path = site.site_mapping_path()
+    if path is None:
+        return None
+    return SiteMapping.from_dict(json.loads(path.read_text(encoding="utf-8")))
 
 
 @dataclass
@@ -610,11 +625,18 @@ class ChartReviewService:
         docs, _ = chart.list_documents(limit=100_000)
         strata = strata_from_spec(spec)
         seed = self._seed_for(patient, spec_id)
-        coverage = CoverageLedger(docs, strata, ForcedSampler(seed))
+        # `ACR_SITE_MAPPING`, not a tool argument: this server serves ONE corpus, and a mapping is
+        # scoped to a corpus rather than to a request — letting a caller supply one per call would
+        # let two callers stratify the same documents differently and both be told they were
+        # covered. `site.site_mapping()` refuses a mapped contract when the variable is unset, the
+        # same refusal `acr run` makes at its door. Without this, every `means:` contract died in
+        # `StratumSpec.matches` on this surface after being fixed on the CLI one.
+        mapping = _configured_site_mapping()
+        coverage = CoverageLedger(docs, strata, ForcedSampler(seed), mapping=mapping)
         evidence = EvidenceLedger()
         toolbox = Toolbox(chart, evidence, coverage, self._vocab(), spec=spec)
 
-        assigned = assign_strata(docs, strata) if strata else {}
+        assigned = assign_strata(docs, strata, mapping) if strata else {}
         plan: dict[str, Any] = {"read_all": [], "search": [], "sample": []}
         keywords: list[str] = list(getattr(spec.proof_obligation, "required_keywords", []) or [])
         for s in strata:

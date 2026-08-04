@@ -786,7 +786,7 @@ def test_the_no_op_refusal_reaches_the_model_in_the_loop_it_understands(spec, ch
     ask = dict(open_threads=[{"note_id": nid, "marker": TRUNCATED,
                               "why": "the read stopped short"}])
 
-    first = _revise(tool, **ask)
+    _revise(tool, **ask)          # the first open is the side effect under test
     second = _revise(tool, **ask)
 
     assert len(ctx.threads.threads) == 1, "the second open created a second thread"

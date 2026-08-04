@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import os
 import pathlib
 import subprocess
 import sys
@@ -56,8 +57,14 @@ PINS = {
 #:   mcp, anyio — only reachable from `mcp_server.main`, which is the `acr-mcp` console script.
 #:                Declared as an OPTIONAL extra so `pip install acr-chart-review` does not pull an
 #:                MCP stack for a user who only wants the CLI.
-#:   conftest, hooks_harness — test-local modules that travel with the tests that import them.
-NOT_REQUIRED = {"scipy", "lc_callback", "openpyxl", "conftest", "hooks_harness"}
+#:
+#: `conftest` and `hooks_harness` USED TO BE HERE and are not packages at all — they are files in
+#: `tests/`, reached through `sys.path`. Two different facts were living in one set: "not a package"
+#: and "a package we deliberately do not require". `third_party` now resolves the first case against
+#: the staged tree itself, which also fixed a false positive nobody had chased: `_decision_inputs`,
+#: a real file at `tools/_decision_inputs.py`, was reported as an unpinned requirement on every
+#: staging run.
+NOT_REQUIRED = {"scipy", "lc_callback", "openpyxl"}
 OPTIONAL_EXTRAS = {"acr-chart-review": {"mcp": ["mcp>=1.0", "anyio>=4.0"]}}
 
 #: THE MARKER. Every commit this script makes carries it, and each generated repository's CI fails
@@ -234,6 +241,13 @@ regression guards in a passing state, not dead code — but do not read a clean 
 def third_party(repo_dir: pathlib.Path) -> list[str]:
     """Every non-stdlib, non-`acr` import in the staged tree, pinned to the source repo's range."""
     found: set[str] = set()
+    # A MODULE THAT SHIPS HERE IS NOT A DEPENDENCY. Anything reached through a `sys.path` insert —
+    # `tools/_decision_inputs.py`, a test importing a fixture from another test — is spelled exactly
+    # like a PyPI top-level name, so it was reported as an unpinned requirement. Resolved against
+    # the staged tree rather than hand-listed: the hand-list is what put `conftest` beside `scipy`,
+    # which are two different facts, and it is not a rule the next such import obeys by itself.
+    local = {p.stem for p in repo_dir.rglob("*.py")} | {
+        p.name for p in repo_dir.rglob("*") if p.is_dir() and (p / "__init__.py").is_file()}
     for f in repo_dir.rglob("*.py"):
         try:
             tree = ast.parse(f.read_text(encoding="utf-8"))
@@ -250,7 +264,7 @@ def third_party(repo_dir: pathlib.Path) -> list[str]:
     extra_tops = {n.split(">")[0].split("=")[0].replace("-", "_") for n in extras}
     out, unknown = [], []
     for t in sorted(found):
-        if t in NOT_REQUIRED or t in extra_tops or t == "tools":
+        if t in NOT_REQUIRED or t in extra_tops or t == "tools" or t in local:
             continue
         if t in PINS:
             out.append(PINS[t])
@@ -521,6 +535,37 @@ License: MIT.
 ''', encoding="utf-8")
 
 
+def _identity(cwd: pathlib.Path) -> dict[str, str]:
+    """Environment supplying a committer, but only when git cannot already resolve one.
+
+    WHY THIS EXISTS. `git commit` exited 128 in the `distributions` CI job and nowhere else:
+
+        fatal: empty ident name (for <runner@runnervm….internal.cloudapp.net>) not allowed
+
+    Git had derived an EMAIL from the OS user and found no NAME, because a CI runner's account has
+    no GECOS full name. A developer's machine has one, so the script worked by hand for everyone who
+    ran it and for nobody else, and the failure read as a bug in the split rather than as two
+    missing lines of configuration.
+
+    ENV, NOT `-c user.name=…`. The first fix passed config flags and still failed, because
+    `GIT_COMMITTER_NAME` in the environment OVERRIDES config — so an inherited empty value wins
+    against `-c`. Env is the only layer that beats env.
+
+    IT DEFERS. When `git var GIT_COMMITTER_IDENT` resolves, a real author is committing and keeps
+    the attribution. Nothing global is written, and nothing is left in the generated repository.
+
+    The address is under `.invalid`, which RFC 2606 reserves so it can never resolve. A
+    plausible-looking address here would attribute a generated commit to somebody.
+    """
+    probe = subprocess.run(["git", "var", "GIT_COMMITTER_IDENT"], cwd=cwd,
+                           capture_output=True, text=True, check=False)
+    if probe.returncode == 0 and probe.stdout.strip():
+        return dict(os.environ)
+    who = {"NAME": "acr scaffold_repos.py", "EMAIL": "scaffold@acr.invalid"}
+    return {**os.environ,
+            **{f"GIT_{role}_{k}": v for role in ("AUTHOR", "COMMITTER") for k, v in who.items()}}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", required=True)
@@ -552,7 +597,7 @@ def main() -> int:
              f"`acr` is a PEP 420 namespace package across all four; no import statement changed.\n"
              f"Edits belong in the source tree. A commit made HERE is lost at the next generation, "
              f"and this repository's CI fails on any HEAD that does not carry the marker above."],
-            cwd=d, check=True)
+            cwd=d, check=True, env=_identity(d))
         n = len(list(d.rglob("*")))
         print(f"  {name:<22}{n:>6} files  deps={len(REPOS[name]['deps'])} sibling(s)")
 

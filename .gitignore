@@ -49,11 +49,11 @@ _chartreview_ref/
 # Document-type vocabulary cache, rebuilt on demand (39min -> 10s)
 corpus/patients/.doc_type_vocab.json
 
-# Second venv for the deepagents runtime
-.venv-deep/
-
-# Document-type vocabulary cache, rebuilt on demand
-corpus/patients/.doc_type_vocab.json
+# Document-type COUNT cache (`corpus.COUNT_CACHE`), written by the corpus itself on first
+# `doc_type_counts()`. Ignored by pattern rather than by path: on a real corpus this same file is a
+# per-document-type census of patient records, and one committed by accident from a corpus_real
+# checkout would be a disclosure. Regenerable either way.
+.doc_type_counts.json
 
 # (The real-patient globs that used to live here are gone: `runs/` is ignored wholesale
 # above, so there is nothing left for a name-based exception to get wrong.)

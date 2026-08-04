@@ -71,7 +71,8 @@ def test_substring_expression_that_was_replaced():
     counts in `acr.contract.site_mapping` say how many documents each one carries.
     """
     pats = ["pathology", "cytology"]
-    hit = lambda t: any(p in t.lower() for p in pats)
+    def hit(t):
+        return any(p in t.lower() for p in pats)
 
     for missed in ("Non-Gyn-Cyto-FNA", "FN-Aspirate-Report", "SURG-PATH-RESULT",
                    "Fine-Needle-Aspiration", "Microscopic-Observation-ID-Cyto-Stain"):

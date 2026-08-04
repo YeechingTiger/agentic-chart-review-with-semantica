@@ -42,5 +42,26 @@ packages = ["src/acr"]
 line-length = 100
 target-version = "py312"
 
+# THE RULESET IS DECLARED, and that is the point of this block. With no `select`, ruff lints against
+# whatever its own default set happens to be in the version CI installed — and `ruff>=0.8` installs
+# the newest. Between 0.8 and 0.16 that default grew, so `ruff check src/ tests/ tools/` went from
+# clean to 131 findings with no commit touching any of them, and the CI step has been red ever since
+# without carrying any information. A check whose meaning changes when nobody edits it is the same
+# defect this tree names elsewhere as an inert guard: it cannot be read either way.
+#
+# So: the rules are named here, and adding one is a decision with a diff. E4/E7/E9/F are the import,
+# statement and undefined-name errors that catch real bugs; I keeps import blocks stable so a
+# generated repository's diff is about code.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# Every script in tools/ inserts `src` on `sys.path` before importing `acr`, because they run
+# against a checkout rather than an install. The import genuinely cannot come first.
+"tools/*" = ["E402"]
+# Same reason, stated in the file: the imports sit below a header explaining what may not be
+# imported there.
+"tests/test_replan.py" = ["E402"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -604,8 +604,18 @@ def test_a_clean_improvement_is_not_reported_as_a_regression():
 
 
 def test_comparing_across_a_changed_spec_is_allowed_but_always_announced():
+    """The main reason to compare at all, and the announcement is the safety property.
+
+    Both endpoints have to be internally consistent: the AFTER runs are the ones carrying the new
+    spec hash and commit. Stamping a different hash onto a key while its own manifests say otherwise
+    is refused as NOT_COMPARABLE since 2026-08-04 — the key is the only thing telling the reader
+    which of "accuracy fell" and "the question changed" happened, so a key its runs contradict makes
+    the answer to that question wrong rather than missing.
+    """
+    after = [E.RunRecord({**r.manifest, "spec_hash": "zzz999", "code_sha": "deadbee"},
+                         source="synthetic") for r in CORRECT]
     other = E.BaselineKey("deadbee", "zzz999", "syn-model", "2026-07-28")
-    d = E.compare(score(CORRECT).to_dict(), score(CORRECT, key=other).to_dict())
+    d = E.compare(score(CORRECT).to_dict(), score(after, key=other).to_dict())
     assert d["verdict"] == "OK"
     assert any("spec_hash" in s for s in d["key_differences"])
     assert any("commit" in s for s in d["key_differences"])

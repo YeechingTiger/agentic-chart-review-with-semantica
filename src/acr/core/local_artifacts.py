@@ -80,6 +80,48 @@ def require_run_artifact(value: str | Path, *, what: str = "run artifact") -> Pa
     return resolved
 
 
+#: What a directory of run records is allowed to contain. A batch is named by its directory and
+#: found by glob, so the glob IS the definition of the batch — widening it later silently changes
+#: what every past comparison was over.
+RUN_RECORD_GLOB = "*.manifest.json"
+
+
+def require_run_tree(value: str | Path, *, what: str = "runs") -> Path:
+    """A run record OR a directory of them, resolved for reading. The plural of the above.
+
+    WHY A SECOND FUNCTION. `require_run_artifact` takes one file, and three planes take a batch:
+    `attribute batch`, `eval score` and `repair` all accept "a manifest file or a directory". All
+    three resolved that through `LocalArtifactStore.path`, which proves the path sits under a local
+    root that is required to be OUTSIDE the worktree — while `runs/` is inside it by design. So all
+    three were unreachable for every run this project has ever produced, and it did not look like a
+    defect: `attribute` had simply never produced a proposal.
+
+    The single-file fix shipped for `acr audit run` and was wired nowhere else. Reachability is not
+    a property one call site can hold.
+
+    THE CHECK THAT SURVIVES is the one that was always the point: Git must not TRACK the record. It
+    is applied to EVERY member of a directory, not to the directory itself — a batch is scored as a
+    whole, so one tracked member is a disclosure inside the thing being read.
+
+    An EMPTY directory refuses. Returning it would let a mistyped path score zero runs and report a
+    clean batch, which is the failure mode this codebase already names as inert-versus-satisfied.
+    """
+    raw = Path(value).expanduser()
+    resolved = (raw if raw.is_absolute() else Path.cwd() / raw).resolve(strict=False)
+    if resolved.is_file():
+        return require_run_artifact(resolved, what=what)
+    if not resolved.is_dir():
+        raise LocalArtifactError(f"{what} not found: {resolved}")
+    members = sorted(resolved.rglob(RUN_RECORD_GLOB))
+    if not members:
+        raise LocalArtifactError(
+            f"no run record under {resolved}: nothing matches {RUN_RECORD_GLOB}. An empty batch "
+            f"scores zero runs and reads like a clean one, so it refuses instead.")
+    for m in members:
+        require_run_artifact(m, what=f"{what} member")
+    return resolved
+
+
 def _is_git_tracked(path: Path) -> bool:
     """True when Git tracks this exact path. False when Git is unavailable or the path is outside."""
     try:

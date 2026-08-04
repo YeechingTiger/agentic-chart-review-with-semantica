@@ -75,18 +75,65 @@ from ..contract.outcomes import (
     default_evidence_abstention,
     status_kind,
 )
+from ..contract.retrieval_prior import to_experience_asset
 from ..contract.skills import skills_block
 from ..core.case_context import CaseContext
 from ..core.cli_common import code_sha
 from ..core.tool_surface import LIBRARY_TOOLS, ToolSurfaceError, assert_tool_surface  # noqa: F401
 from .coverage_planner import OPEN_REQUEST_OPENED, triggers_from_tool_result
-from .document_concepts import anchor_block, baseline_block
-from .run_manifest import chart_hash, experiment_config_hash, prompt_asset_manifest
+from .document_concepts import anchor_block, baseline_block, experience_block
+from .run_manifest import (
+    chart_hash,
+    experiment_config_hash,
+    model_identity,
+    prompt_asset_manifest,
+)
 
 #: Tools whose results the coverage ledger must see. Named here rather than inferred from the
 #: toolbox, because this list answers "what counts as having looked" — a claim about the audit
 #: rule, not about which functions happen to exist.
 READ_TOOLS = ("read_document", "read_documents_batch")
+
+#: Every `run_patient` parameter that DEFINES THE ARM, and the manifest key it reaches
+#: `experiment_config_hash` through. `tests/test_every_arm_switch_reaches_the_arm_hash.py` fails when
+#: a parameter is in neither this dict nor `WITHIN_ARM_PARAMETERS`.
+#:
+#: Why a registry rather than the fixed list that was here: `experiment_config_hash`'s docstring says
+#: there is no allowlist inside it and that the caller assembles the dict "at the point where it
+#: knows what varied". The caller then wrote nine keys, and three switches added afterwards never
+#: joined them — `additional_task_context` (the whole of what makes a `--conflict-refine` arm
+#: different), `site_mapping` and `max_usd`. Measured consequence in `runs/phaseA`: two arms sharing
+#: `experiment_config_hash 801fb23df6124fa5` while one declared candidates and the other did not.
+#: An omission cannot be caught by reading the list; it can be caught by requiring a decision.
+ARM_PARAMETERS: dict[str, str] = {
+    "spec": "spec_hash",
+    "model": "model",                                 # and model_temperature
+    "max_model_calls": "max_model_calls",
+    "seed": "sample_seed",
+    "max_usd": "max_usd",
+    "runtime_profile": "runtime_profile_ref",          # and runtime_profile_hash
+    "skill_stack": "prompt_assets.skills",
+    "retrieval_prior": "prompt_assets.retrieval_prior",
+    "site_mapping": "prompt_assets.site_mapping",
+    "additional_task_context": "prompt_assets.additional_task_context",
+}
+
+#: Parameters that vary WITHIN one arm, each with the reason it must not be hashed. The reason is
+#: required by test: an exclusion with no reason is an omission wearing a registry entry.
+WITHIN_ARM_PARAMETERS: dict[str, str] = {
+    "patient_id": "the axis a paired comparison varies; hashing it makes every patient its own arm",
+    "corpus": "the cohort, recorded per run as chart_hash; the same arm runs over many charts",
+    "out_dir": "where the artifact lands, which is not a property of the experiment",
+    "run_id": ("a per-run id by construction; it names this run, and the arm hash exists precisely "
+               "so that two runs of one arm can be recognised as such"),
+    "ctx_out": "an out-parameter for the caller's own inspection; reaches no prompt and no plan",
+    "case": ("carries patient_id and latest_document_date, so hashing it makes the arm hash a "
+             "per-run id and every paired comparison finds each patient in a separate arm"),
+    "expansion_budget": ("priced against the patient's own plan when the caller supplies none, so "
+                         "it varies per patient inside one arm; hashing it makes the arm hash a "
+                         "per-run id. The caps a caller DOES supply are visible in the manifest's "
+                         "own expansion_budget block."),
+}
 
 #: The standing instruction. Beside the runtime it drives, now that the runner it used to live
 #: in is gone. The gate's contract — a rejection is the instruction for what to do next — is
@@ -719,7 +766,7 @@ def build_agent(*, model, tools: list[StructuredTool], system_prompt: str, ctx: 
     ctx.declared = {t.name for t in tools}
     if ctx.spend is None:
         from ..core.spend import Spend
-        ctx.spend = Spend(max_usd=max_usd, model=getattr(model, "model_name", "") or str(model))
+        ctx.spend = Spend(max_usd=max_usd, model=model_identity(model))
     middleware = [
         # Planning. Todos live in STATE and `write_todos` REPLACES the list, so a revised plan
         # leaves no stale copy in the transcript.
@@ -895,7 +942,15 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
                      # The stack that was actually rendered into `system_prompt`, so the manifest
                      # records what the model received rather than re-deriving it from the profile
                      # and silently disagreeing with the prompt whenever `--skills` overrode it.
-                     skill_stack=None) -> dict:
+                     skill_stack=None,
+                     # Same reason, one asset along: the prior is rendered into `system_prompt` by
+                     # the caller, and the manifest must name the one the model actually read.
+                     retrieval_prior=None,
+                     # The last two arm switches that reached no manifest field at all, so
+                     # `experiment_config_hash` could not tell their arms from the baseline. See
+                     # `ARM_PARAMETERS`. `task_context` is the text already appended to
+                     # `system_prompt` by the caller; only its hash is recorded.
+                     site_mapping=None, task_context: str = "") -> dict:
     """One patient, one spec, through the library's graph. Returns the manifest."""
     from ..contract.answer_contract import (
         NO_COVERAGE_CLAIM,
@@ -1077,7 +1132,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # fewer keys than the one it replaced — including the one below that decides whether a
         # gate pass may be reported as a validated answer at all.
         "run_id": tracer.run_id,
-        "model": getattr(model, "model_name", "") or str(model),
+        "model": model_identity(model),
         "model_temperature": getattr(model, "temperature", None),
         "spec_version": spec.spec_version,
         "trace": str(tracer.path),
@@ -1132,7 +1187,10 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # table gained eleven morphologies from one validation pass; manifests written either
         # side of that must not compare as equal.
         "prompt_assets": prompt_asset_manifest(spec, runtime_profile_asset, skill_stack,
-                                               tool_schemas=toolbox.schemas()),
+                                               tool_schemas=toolbox.schemas(),
+                                               retrieval_prior=retrieval_prior,
+                                               site_mapping=site_mapping,
+                                               task_context=task_context),
         "answer": answer, "spec_gap": spec_gap, "gate_validated": ctx.gate_validated,
         "coverage_gate_validated": ctx.coverage_claim_earned,
         "coverage_activation": dict(ctx.coverage_state),
@@ -1265,15 +1323,27 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
     # Everything a paired comparison assumes is held constant goes in. What does NOT go in:
     # patient_id (the axis a paired comparison varies), run_id, timestamps, and anything about
     # what the run FOUND. A config hash that moved with the answer would be a per-run id.
+    #
+    # THE KEYS BELOW ARE `ARM_PARAMETERS`, NOT A LIST SOMEBODY MAINTAINS BY HAND. That is the whole
+    # correction: this was nine keys and three switches were added to `run_patient` afterwards
+    # without joining them, so `--conflict-refine`, `--mapping` and `--max-usd` arms all hashed
+    # identically to their baselines. `prompt_assets` now carries the first two, and
+    # `tests/test_every_arm_switch_reaches_the_arm_hash.py` fails if a new parameter is classified
+    # as neither arm-defining nor within-arm.
     manifest["experiment_config_hash"] = experiment_config_hash({
         "spec_hash": manifest["spec_hash"],
         "runtime_profile_ref": manifest.get("runtime_profile_ref"),
         "runtime_profile_hash": manifest.get("runtime_profile_hash"),
+        # Covers skills, the retrieval prior, the tool surface, the value domain, the site mapping
+        # and the additional task context — every block rendered into the prompt or the plan.
         "prompt_assets": manifest["prompt_assets"],
         "model": manifest["model"],
         "model_temperature": manifest.get("model_temperature"),
         "sample_seed": manifest.get("sample_seed"),
         "max_model_calls": manifest.get("max_model_calls"),
+        # The priced ceiling. A run stopped for spend and a run that finished are not the same arm,
+        # and `spend_stopped` — the OUTCOME — cannot go in without making this a per-run id.
+        "max_usd": max_usd,
         "code_sha": manifest["code_sha"],
     })
     manifest_path = out_dir / f"{tracer.run_id}.manifest.json"
@@ -1455,7 +1525,7 @@ def _case_refused_manifest(spec, chart, case, refusal: dict, out_dir, run_id, mo
     refusal = {**refusal, "status_kind": status_kind(spec, refusal["status"]) or "undeclared"}
     return {
         "run_id": tracer.run_id,
-        "model": getattr(model, "model_name", "") or str(model),
+        "model": model_identity(model),
         "trace": str(tracer.path),
         "runtime": "deepagents-hooks",
         "patient_id": chart.patient_id,
@@ -1483,7 +1553,9 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
                 additional_task_context: str = "",
                 runtime_profile: str = "current-stratified-coverage",
                 case: CaseContext | None = None,
-                skill_stack=None) -> dict:
+                skill_stack=None,
+                site_mapping=None,
+                retrieval_prior=None) -> dict:
     """Assemble the ledgers, tools and gate for one patient and run it.
 
     The assembly lived in a scratch harness while this runtime was being proven. It belongs
@@ -1551,13 +1623,19 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
     tracer.bind_spec(spec)
 
     evidence = EvidenceLedger()
-    coverage = CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(seed))
+    # `mapping=` was omitted, and `run_patient` had no parameter for one — so a contract whose
+    # strata select documents by `means:` (which `spec lint` F10 tells every author to migrate to)
+    # died in `StratumSpec.matches` before the first model call, and the refusal's own remedy
+    # ("pass it to assign_strata") was unfollowable from any CLI. `acr site-mapping build` produced
+    # a file no run command could consume.
+    coverage = CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(seed),
+                              mapping=site_mapping)
     # `spec=` is what binds `submit_answer`'s status enum to THIS contract's outcome space.
     # Omitting it does not fail loudly -- the toolbox falls back to the default three -- so it
     # is the kind of omission that shows up as "the model never used the new status".
     toolbox = Toolbox(chart, evidence, coverage,
                       known_doc_types=corpus.doc_type_vocabulary(), spec=spec)
-    coverage_plan = plan_from_spec(spec, chart)
+    coverage_plan = plan_from_spec(spec, chart, site_mapping)
     plan = (
         coverage_plan
         if starts_with_coverage_assets(runtime_profile_asset.ref)
@@ -1643,9 +1721,19 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
                        # no measurement. It replaces `doc_type_matches`, which was the same
                        # knowledge written as a substring list that gated reads and fed the
                        # coverage gate. The model reads this beside `document_type_summary` and
-                       # decides for itself. A measured prior would render under its own heading
-                       # via `experience_block`, and there is none certified yet.
+                       # decides for itself.
                        + "\n\n" + baseline_block()
+                       # THE MEASURED PRIOR, when one was supplied: which document types carried
+                       # the answer on OTHER patients and at what rate, and which terms surfaced an
+                       # answer-bearing document. `""` when there is none, so the baseline arm's
+                       # prompt is byte-identical to a run predating this channel. The comment that
+                       # used to sit above said "a measured prior would render under its own
+                       # heading via `experience_block`, and there is none certified yet" — the
+                       # renderer had no producer and no caller; `improvement/prior.py` is the
+                       # producer and this is the caller.
+                       + (f"\n\n{xp}" if (xp := experience_block(
+                           to_experience_asset(retrieval_prior) if retrieval_prior else None
+                       )) else "")
                        # THE VALUE DOMAIN, when the Task Contract declares one. A run asserted
                        # "C341 is right middle lobe" and coded C341 over evidence reading "right
                        # middle lobe" (C341 is the upper lobe), and another coded histology 7205,
@@ -1668,6 +1756,12 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
         elapsed_fn=lambda: round(time.time() - t0, 1), ctx_out=ctx_out,
         max_usd=max_usd,
         skill_stack=effective_stack,
+        retrieval_prior=retrieval_prior,
+        # The two arm switches whose identity reached no manifest field. `task_context` is the same
+        # string appended to `system_prompt` just above; passing it here records its hash, and the
+        # hash is the only form of it that belongs in an artifact written beside patient output.
+        site_mapping=site_mapping,
+        task_context=additional_task_context,
         seed_record={"effective": seed, "provenance": "caller_supplied",
                      "caller_supplied": True},
         runtime_profile_asset=runtime_profile_asset,
