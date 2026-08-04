@@ -337,6 +337,83 @@ def batch(
     con.print(f"→ {summ}")
 
 
+@chart_app.command("query")
+def query(
+    patients: str = typer.Option(..., "--patients", help="comma list, or one id"),
+    spec: str = typer.Option(..., "--spec", "-s"),
+    corpus: str = CORPUS,
+    model: str = MODEL,
+    api_base: str = API_BASE,
+    max_usd: float = cli_common.MAX_USD,
+    out: str = typer.Option("runs", "--out"),
+    temperature: float = typer.Option(1.0, "--temperature"),
+    prior: str = PRIOR,
+    field: str = typer.Option("", "--field",
+                              help="which variable's terms to take from --prior; required with it"),
+    terms: str = typer.Option("", "--terms",
+                              help="comma list, overriding both --prior and the contract. Empty is "
+                                   "an arm: an extractor with no terms retrieves nothing."),
+):
+    """THE CONTROL ARM: one query, every hit, one model call. No loop, no tools, no gate.
+
+    The question this exists to answer is whether the agent loop earns its cost, and until now there
+    was no arm to compare against. Same contract, same `submit_answer` schema, same notation-tolerant
+    matcher; what differs is the loop, the retrieval tools, the plan, the coverage ledger and the
+    gate. Its manifests are read by `acr eval score` with no special case, which is the only thing
+    that makes the comparison mean anything.
+
+    Term list, in precedence order: `--terms`, then `--prior` + `--field`, then the contract's own
+    declared keywords. Whichever it was is recorded in the manifest's `query` block.
+    """
+    from ..contract.strata import spec_declared_keywords
+    from ..review.query_only import run_query_only
+
+    sp = load_spec(spec)
+    prior_asset = _load_prior(prior)
+    if terms.strip():
+        picked = [t.strip() for t in terms.split(",") if t.strip()]
+        source = "--terms"
+    elif prior_asset is not None:
+        if not field.strip():
+            raise typer.BadParameter(
+                "--prior needs --field: a prior holds one term list per variable, and folding them "
+                "together would retrieve for a question nobody asked")
+        fp = prior_asset.field_prior(field.strip())
+        if fp is None:
+            raise typer.BadParameter(
+                f"{prior_asset.asset_id} says nothing about {field!r}; it covers "
+                f"{[f.field_name for f in prior_asset.fields]}")
+        picked = [t.term for t in fp.terms]
+        source = f"prior:{prior_asset.asset_id}@{prior_asset.version}"
+    else:
+        picked = list(spec_declared_keywords(sp))
+        source = "contract"
+    ids = [p.strip() for p in patients.split(",") if p.strip()]
+    c = Corpus(Path(corpus))
+    run_dir = cli_common.unique_run_dir(out)
+    con.print(f"[bold]{sp.spec_id}[/] query-only · {len(picked)} term(s) from {source} · "
+              f"{len(ids)} patient(s)")
+    if not picked:
+        # STATED. An empty term list retrieves nothing and every answer will be an abstention; that
+        # is a legitimate floor arm and a silent one would be read as a broken run.
+        con.print("[yellow]no terms: this arm retrieves nothing and can only abstain[/]")
+    chat = cli_common.chat_model(model, api_base, temperature)
+    rows = []
+    for pid in ids:
+        m = run_query_only(spec=sp, corpus=c, patient_id=pid, out_dir=run_dir, model=chat,
+                           terms=picked, max_usd=max_usd, run_id=pid,
+                           prior_asset=({"asset_id": prior_asset.asset_id,
+                                         "version": prior_asset.version,
+                                         "content_hash": prior_asset.content_hash}
+                                        if prior_asset is not None else None))
+        q = m["query"]
+        con.print(f"  {pid:12} {m['answer']['status']:22} hits {q['n_hits']:>3}/"
+                  f"{q['n_documents_in_chart']:<4} {q['n_chars_read']:>7} chars")
+        rows.append(m)
+    con.print(f"→ {run_dir}  ({len(rows)} manifest(s), {sum(1 for r in rows if not r['query']['n_hits'])} "
+              f"with no hit)")
+
+
 @chart_app.command("consistency")
 def consistency(
     patient: str = typer.Argument(...),

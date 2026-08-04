@@ -216,6 +216,33 @@ def detect(
         raise typer.Exit(1)
 
 
+def _answer_key(path: str) -> dict:
+    """The answer key, refused if it declares patient data and sits where Git can reach it.
+
+    `eval score` read its key with a bare `read_json` and enforced nothing, so a real registry key —
+    the same values `acr gold` stores as `contains_phi: true, LOCAL_ONLY, shareable: false` — could
+    sit inside the worktree and be committed. `runs/` is gitignored wholesale; an answer key is not.
+
+    THE REFUSAL CAN ONLY FIRE ON THE REAL DANGER. It requires the file to DECLARE `_contains_phi`,
+    which only `acr gold to-answer-key` writes, so `tools/answer_key_from_corpus.py`'s synthetic keys
+    and every fixture in `tests/` are untouched — the property the five deterministic content checks
+    this repo deleted did not have.
+    """
+    akey = read_json(path, "answer key")
+    if not isinstance(akey, dict):
+        raise typer.BadParameter(f"{path}: expected an object keyed by instance id")
+    if akey.get("_contains_phi"):
+        from ..core.local_artifacts import _git_root, _within
+        resolved, git = Path(path).expanduser().resolve(strict=False), _git_root()
+        if resolved == git or _within(resolved, git):
+            raise typer.BadParameter(
+                f"{resolved} declares _contains_phi and resolves inside the Git worktree ({git}). "
+                f"A key holding registry values is patient-derived material and `runs/` being "
+                f"gitignored does not cover it. Move it under $ACR_LOCAL_ARTIFACT_ROOT — "
+                f"`acr gold to-answer-key` writes there and nowhere else.")
+    return akey
+
+
 @eval_app.command("score")
 def score(
     runs: str = typer.Option(..., "--runs", help="a *.manifest.json, or a tree of them"),
@@ -262,9 +289,7 @@ def score(
     names = [f.strip() for f in fields.split(",") if f.strip()]
     if not names:
         raise typer.BadParameter("--fields resolved to nothing")
-    akey = read_json(answer_key, "answer key")
-    if not isinstance(akey, dict):
-        raise typer.BadParameter(f"{answer_key}: expected an object keyed by instance id")
+    akey = _answer_key(answer_key)
     # All four bands or none: a partial set would silently disable the detectors while the
     # report still carried a `findings` block reading zero, which is the shape of a channel
     # that is broken rather than clean.

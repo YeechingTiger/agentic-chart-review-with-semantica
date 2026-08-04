@@ -87,9 +87,16 @@ def test_a_missing_chart_hashes_to_nothing_rather_than_raising(tmp_path):
 # --------------------------------------------------------------- the tool surface
 
 def test_the_tool_surface_is_hashed(spec):
+    """`names` is SORTED, not in schema order, since 2026-08-04.
+
+    It became the union of the schema names and the names bound to the compiled graph — nine, not
+    seven: `revise_plan` and `write_todos` reach the model and were unrecorded. A set union has no
+    order, so sorting is what makes the hash stable; schema order carried no meaning anyway.
+    """
     block = prompt_asset_manifest(spec, tool_schemas=build_tool_schemas(spec))
     ts = block["tool_surface"]
-    assert ts["names"] == [s["function"]["name"] for s in build_tool_schemas(spec)]
+    assert ts["names"] == sorted(s["function"]["name"] for s in build_tool_schemas(spec))
+    assert ts["not_schema_hashed"] == [], "nothing was bound beyond the schemas here"
     assert len(ts["content_hash"]) == 16
 
 

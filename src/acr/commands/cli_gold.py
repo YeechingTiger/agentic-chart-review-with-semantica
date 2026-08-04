@@ -57,6 +57,58 @@ def audit(
         raise typer.Exit(1)
 
 
+@gold_app.command("to-answer-key")
+def to_answer_key(
+    gold: str = typer.Option(..., "--gold", help=f"{S.GOLD_SCHEMA} JSON, root-relative"),
+    fields: str = typer.Option(..., "--fields", help="comma list; must match `eval score --fields`"),
+    out: str = typer.Option(..., "--out", help="root-relative LOCAL answer key for `eval score`"),
+    worklist: str = typer.Option(
+        "", "--worklist",
+        help="root-relative LOCAL JSON listing every cell nobody has adjudicated. Write it: it is "
+             "the human queue AND the honest denominator of any study built on this key."),
+    also_scores: list[str] = typer.Option(
+        [], "--also-scores",
+        help="another spec_id this key is the correct answer for, e.g. an ablation arm. Repeatable."),
+    local_root: str | None = LOCAL_ROOT,
+):
+    """Chart-observable gold -> the answer key `acr eval score` reads. No model, no chart.
+
+    THE CELL THIS EXISTS FOR is the empty one. In `evals.score` a key value of `None` ASSERTS that
+    abstaining is correct, so mapping an unadjudicated empty registry cell to `None` scores the run
+    that finds the right value as a failure and the run that gives up as a success. Those two land in
+    an aggregate looking ordinary, which is why this is a converter and not a `json.dumps`.
+
+    Three populations, and only the first two are scored: a value, a human-adjudicated abstention,
+    and a cell nobody has looked at. The third is omitted from the key and listed in the worklist.
+    """
+    store = _store(local_root)
+    names = [f.strip() for f in fields.split(",") if f.strip()]
+    if not names:
+        raise typer.BadParameter("--fields resolved to nothing")
+    try:
+        gold_path = store.require_input(gold, what="chart-observable gold")
+        key, work = S.answer_key_from_gold(read_json(gold_path, "chart-observable gold"),
+                                          fields=names, also_scores=also_scores)
+        key_path = store.write_json(out, key)
+        work_path = store.write_json(worklist, work) if worklist else None
+    except (S.SpecRepairError, LocalArtifactError) as e:
+        raise typer.BadParameter(str(e)) from e
+    n = key["_summary"]
+    t = Table("population", "n", "scored as")
+    t.add_row("registry value", str(n["n_with_value"]), "exact match")
+    t.add_row("adjudicated abstention", str(n["n_correct_abstention"]), "correct abstention")
+    t.add_row("[yellow]nobody has looked[/]", str(n["n_unadjudicated"]), "[yellow]NOT SCORED[/]")
+    t.add_row("[red]key found wrong[/]", str(n["n_key_wrong"]), "[red]case dropped[/]")
+    con.print(t)
+    con.print(f"→ {key_path}")
+    if work_path:
+        con.print(f"→ {work_path}  [yellow]{len(work)} cell(s) awaiting a human[/]")
+    elif work:
+        # STATED, because a worklist nobody wrote is a denominator nobody can defend.
+        con.print(f"[yellow]{len(work)} cell(s) are unadjudicated and no --worklist was given, so "
+                  f"the list of what this key cannot score exists nowhere[/]")
+
+
 @gold_app.command("stage-registry-reference")
 def stage_registry_reference(
     answer_key: str = typer.Option(

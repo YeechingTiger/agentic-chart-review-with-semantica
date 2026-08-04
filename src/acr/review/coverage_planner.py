@@ -1308,18 +1308,36 @@ class CoveragePlan:
         n = dict(n_docs_by_type or {})
         def _row(t: str) -> str:
             return f"{t}" + (f" (n={n[t]})" if t in n else "")
-        L = ["RETRIEVAL PLAN — this is the plan, and it governs what you may open.",
+        # GUIDANCE, AND IT SAYS SO. This block claimed three enforcements, and all three were
+        # removed after measurement: "it governs what you may open" and "you may NOT open these
+        # directly" were `AuditMiddleware._out_of_plan`, deleted 2026-07-30 after 138 firings on a
+        # substring matcher that matched `Speech-Language-Pathology-Note` and missed
+        # `Non-Gyn-Cyto-FNA` (1,285 documents); "every one of these must actually be run before a
+        # negative is allowed" was the required-search refusal, which left `check_gate` when
+        # `evaluate_gate` went advisory (`enforce=False`, no production caller passes True).
+        #
+        # A false rule in the prompt is an uncontrolled intervention, not untidiness: it reaches the
+        # model on every call, in the arm meant to be the baseline. Same stance the neighbouring
+        # blocks already take — `document_concepts` says "REFERENCE, NOT INSTRUCTIONS",
+        # `experience_block` says "not a rule" — because a model cannot weigh guidance it has been
+        # told is a constraint.
+        L = ["RETRIEVAL PLAN — where the contract's strata say the answer is likely to be. "
+             "Guidance, not a restriction: you may open any document in the chart.",
              "",
              "READ IN FULL (these can establish the answer on their own):",
              "  " + (", ".join(_row(t) for t in sorted(self.read_all)) or "(none)"),
              "SEARCH (may restate or localise; open the hits):",
              "  " + (", ".join(_row(t) for t in sorted(self.search)) or "(none)"),
-             "SAMPLED BY THE RUNTIME — you may NOT open these directly. The sampler draws "
-             "them and hands you the note_ids:",
+             # The one enforced consequence, kept and stated AS a consequence. `_coverage_verdict`
+             # refuses an abstention while drawn samples are un-inspected, so a model that meets
+             # that refusal with no warning meets it as a surprise.
+             "SAMPLED BY THE RUNTIME — the sampler draws from these and hands you the note_ids. "
+             "An answer that claims the chart establishes nothing is refused until you have "
+             "inspected the draws:",
              "  " + (", ".join(_row(t) for t in sorted(self.sample)) or "(none)"),
              "",
-             "SEARCH TERMS (every one of these must actually be run before a negative is "
-             "allowed):",
+             "SEARCH TERMS the contract declares. Whether each was run is recorded and reported; "
+             "it is not enforced:",
              "  " + (", ".join(sorted(self.keywords)) or "(none)")]
         if self.term_provenance:
             L += ["", "TERMS ADDED DURING THIS RUN:"]

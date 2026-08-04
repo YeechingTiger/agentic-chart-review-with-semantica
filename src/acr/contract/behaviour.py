@@ -41,7 +41,7 @@ import hashlib
 import json
 import re
 from collections import Counter
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -310,6 +310,99 @@ def load_gold(path: str | Path) -> dict[str, ChartObservableGold]:
             raise SpecRepairError(f"{p}: duplicate case_id {gold.case_id!r}")
         out[gold.case_id] = gold
     return out
+
+#: The eval answer key's own schema tag, and the reserved keys it carries beside the cases.
+#: `evals.score` reads the key as `{case_id: row}` and looks rows up by id, so metadata has to sit
+#: somewhere no lookup can reach. `_`-prefixed keys are that place, and `answer_key_from_gold`
+#: refuses a case id starting with `_` rather than letting one shadow them.
+ANSWER_KEY_SCHEMA = "acr.eval_answer_key/1"
+ANSWER_KEY_RESERVED = ("_schema", "_contains_phi", "_summary", "_spec_id")
+
+
+def answer_key_from_gold(document: Mapping[str, Any], *, fields: Sequence[str],
+                         also_scores: Sequence[str] = ()) -> tuple[dict, list[dict]]:
+    """Chart-observable gold -> `(eval answer key, worklist)`. Reads nothing, calls nothing.
+
+    THE ONE THING IT MUST NOT DO is map an unadjudicated empty cell to `None`. In `evals.score`,
+    `None` ASSERTS that abstaining is the correct answer, so on a real registry export — where a
+    missing value is an empty cell and nothing more — that mapping scores the run that finds the
+    right value as `ANSWERED_OVER_ABSTAIN`, a failure for being right, and the run that gives up as
+    `ABSTAINED_CORRECT`, a success for giving up. Both land in the aggregate looking ordinary.
+
+    So a field nobody has adjudicated is OMITTED. `_outcome_for` then returns `NO_KEY` and the case
+    is counted in `n_unkeyed` and in no rate. Every omission becomes a worklist row, because a
+    denominator that shrank silently is the same defect one layer along.
+
+    It invents no vocabulary. `GoldField.status` already distinguishes `FOUND` from a correct
+    abstention, `ChartObservableGold` already enforces that `outside_chart` requires `NOT_DERIVABLE`
+    — a human read the chart and the value is not in it, which is the only thing that licenses
+    `None` — and `adjudication` already has a value for "the registry key is itself wrong".
+
+    `key_wrong` drops the whole case. Scoring against a key a human found wrong measures agreement
+    with a known error, and marks the run that gets it right as wrong.
+    """
+    cases = document.get("cases")
+    if not isinstance(cases, list):
+        raise SpecRepairError("cases must be a list")
+    if document.get("schema") not in (GOLD_SCHEMA, None):
+        raise SpecRepairError(
+            f"expected schema {GOLD_SCHEMA!r}; an unresolved registry reference is not "
+            f"chart-observable gold until derivability and adjudication are recorded")
+    key: dict[str, Any] = {}
+    work: list[dict] = []
+    n_value = n_abstain = n_unadj = n_wrong = 0
+    spec_ids: set[str] = set()
+    for raw in cases:
+        gold = ChartObservableGold.from_dict(raw)
+        if gold.case_id.startswith("_"):
+            raise SpecRepairError(
+                f"case id {gold.case_id!r} starts with '_', which is reserved for this key's own "
+                f"metadata ({', '.join(ANSWER_KEY_RESERVED)}) and would shadow it")
+        spec_ids.add(gold.spec_id)
+        if gold.adjudication == KEY_WRONG:
+            n_wrong += 1
+            work.append({"case_id": gold.case_id, "field": "*",
+                         "adjudication": gold.adjudication,
+                         "why": ("a human found the registry value wrong; scoring against it would "
+                                 "measure agreement with a known error. Supply the corrected value "
+                                 "or drop the case.")})
+            continue
+        row_fields: dict[str, Any] = {}
+        for f in fields:
+            got = gold.chart_answer.get(f)
+            if got is None:
+                n_unadj += 1
+                work.append({"case_id": gold.case_id, "field": f,
+                             "adjudication": gold.adjudication,
+                             "chart_derivability": gold.chart_derivability,
+                             "registry_value": gold.registry_value.get(f),
+                             "why": ("no chart_answer for this field, so nobody has decided whether "
+                                     "the chart can establish it. Omitted: mapping it to null would "
+                                     "assert that abstaining is correct.")})
+            elif got.status == FOUND:
+                n_value += 1
+                row_fields[f] = got.value
+            else:
+                # A DECIDED abstention. `GoldField` refuses a non-FOUND status carrying a value, so
+                # this branch cannot silently drop one.
+                n_abstain += 1
+                row_fields[f] = None
+        row: dict[str, Any] = {"fields": row_fields, "spec_id": gold.spec_id}
+        if also_scores:
+            row["spec_ids"] = sorted({gold.spec_id, *(str(x) for x in also_scores if str(x))})
+        if gold.subgroups:
+            row["subgroups"] = list(gold.subgroups)
+        key[gold.case_id] = row
+    key["_schema"] = ANSWER_KEY_SCHEMA
+    # DECLARED, so `eval score` can refuse this file where Git can reach it. The gold it came from is
+    # `contains_phi` and `LOCAL_ONLY`; a derived key holding the same values is no less so.
+    key["_contains_phi"] = True
+    key["_spec_id"] = sorted(x for x in spec_ids if x)
+    key["_summary"] = {"n_cases": len(cases), "n_with_value": n_value,
+                       "n_correct_abstention": n_abstain, "n_unadjudicated": n_unadj,
+                       "n_key_wrong": n_wrong, "n_worklist": len(work)}
+    return key, work
+
 
 def gold_document(cases: Iterable[ChartObservableGold]) -> dict:
     rows = list(cases)

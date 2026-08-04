@@ -79,7 +79,12 @@ from ..contract.retrieval_prior import to_experience_asset
 from ..contract.skills import skills_block
 from ..core.case_context import CaseContext
 from ..core.cli_common import code_sha
-from ..core.tool_surface import LIBRARY_TOOLS, ToolSurfaceError, assert_tool_surface  # noqa: F401
+from ..core.tool_surface import (  # noqa: F401
+    LIBRARY_TOOLS,
+    ToolSurfaceError,
+    assert_tool_surface,
+    bound_tool_names,
+)
 from .coverage_planner import OPEN_REQUEST_OPENED, triggers_from_tool_result
 from .document_concepts import anchor_block, baseline_block, experience_block
 from .run_manifest import (
@@ -179,6 +184,13 @@ WITHIN_ARM_PARAMETERS: dict[str, str] = {
 #: The standing instruction. Beside the runtime it drives, now that the runner it used to live
 #: in is gone. The gate's contract — a rejection is the instruction for what to do next — is
 #: the whole reason this prompt is shaped the way it is.
+#: The human turn that starts the graph. LangGraph needs at least one, and it used to be the entire
+#: system prompt — see the note at the `agent.invoke` call. It names the patient because that is the
+#: one fact the turn has to carry: `TASK` in the instructions is formatted with the same id, and an
+#: opening turn naming a different patient would be a defect nothing else could see.
+OPENING_TURN = ("Begin. Determine the answer for patient {patient} under the specification and the "
+                "method guidance in your instructions.")
+
 TASK = """Determine the answer for patient {patient} using ONLY this chart.
 
 Work by calling tools: list the documents, search them, read what matters, and record every
@@ -1030,7 +1042,22 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
 
     crashed = False
     try:
-        agent.invoke({"messages": [{"role": "user", "content": system_prompt}]},
+        # THE OPENING TURN, not a second copy of the instructions. This passed the whole
+        # `system_prompt` — the same ~25 KB already given to `create_agent(system_prompt=…)` — as the
+        # first human message, where it then rode in `messages` for the rest of the run while
+        # `wrap_model_call` rebuilt the system message from scratch every call. So the contract, the
+        # rule identifiers, the document concepts, the tumour anchor and both skill cards were paid
+        # for twice per model call: once as instructions, once as a user asking a question in the
+        # voice of a specification.
+        #
+        # Fixed before the 100/100 study rather than after, because cost is a reported outcome there
+        # and the headline is a ratio: a query-only arm is one call over a few hundred tokens of
+        # search hits against an agent arm's ~150k, and a doubled prompt inflates only the
+        # denominator. It is also a prompt change in its own right — the model's QUESTION was a
+        # verbatim copy of its own instructions — so leaving it in place and calling the result a
+        # baseline was not available.
+        agent.invoke({"messages": [{"role": "user",
+                                    "content": OPENING_TURN.format(patient=chart.patient_id)}]},
                      config={"recursion_limit": recursion_limit_for(agent, max_model_calls)})
     except Exception as e:  # noqa: BLE001 -- a crashed run must still leave its trace
         crashed = True
@@ -1249,7 +1276,15 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
                                                tool_schemas=toolbox.schemas(),
                                                retrieval_prior=retrieval_prior,
                                                site_mapping=site_mapping,
-                                               task_context=task_context),
+                                               task_context=task_context,
+                                               # EVERYTHING BOUND, read off the compiled graph.
+                                               # This recorded `toolbox.schemas()` — seven — while
+                                               # nine reach the model: `revise_plan` is added a few
+                                               # lines above and `write_todos` by
+                                               # `TodoListMiddleware`. A manifest that understates
+                                               # the reachable surface is what
+                                               # `undeclared-tool-audit` reads.
+                                               bound_tool_names=bound_tool_names(agent)),
         "answer": answer, "spec_gap": spec_gap, "gate_validated": ctx.gate_validated,
         "coverage_gate_validated": ctx.coverage_claim_earned,
         "coverage_activation": dict(ctx.coverage_state),

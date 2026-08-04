@@ -207,7 +207,8 @@ def experiment_config_hash(config: dict) -> str:
 
 def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None,
                           tool_schemas=None, retrieval_prior=None,
-                          site_mapping=None, task_context: str = "") -> dict:
+                          site_mapping=None, task_context: str = "",
+                          bound_tool_names: set[str] | None = None) -> dict:
     """The identity of every prompt block whose content can change a run's answer.
 
     Lives here rather than in `agent` because a manifest field belongs with the manifest, and
@@ -266,7 +267,7 @@ def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None,
         #
         # `None`, not `{}`, when no surface was supplied: `mcp_server` builds its own answer
         # dict and an absent surface is a different fact from an unhashed one.
-        "tool_surface": _tool_surface(tool_schemas),
+        "tool_surface": _tool_surface(tool_schemas, bound_tool_names),
         # WHAT ELSE WENT INTO THE PROMPT, AND WHAT ELSE SHAPED THE PLAN. Both were switches on
         # `run_patient` that no manifest field recorded, so `experiment_config_hash` — the read
         # side's only discriminator since `evals.BaselineKey` started carrying it — could not tell
@@ -301,11 +302,28 @@ def _text_identity(text: str) -> dict | None:
     return {"n_chars": len(text),
             "content_hash": hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]}
 
-def _tool_surface(schemas) -> dict | None:
+def _tool_surface(schemas, bound: set[str] | None = None) -> dict | None:
+    """Everything the model can reach, and an honest account of how much of it is hashed.
+
+    THIS RECORDED SEVEN AND NINE WERE BOUND. `revise_plan` is added by `run_chart_review` and
+    `write_todos` by `TodoListMiddleware`; both reach the model, and a manifest that understates the
+    reachable surface is read by `undeclared-tool-audit` and by anyone asking what a run could do.
+
+    `not_schema_hashed` is an ADMITTED limit rather than a silent one. Only `build_tool_schemas`
+    produces schemas here; `revise_plan`'s description is a module constant and `write_todos` belongs
+    to the library, whose version `code_sha` already covers. A reader has to be able to tell a hashed
+    name from a merely listed one, or the hash looks like it covers all nine.
+    """
     if schemas is None:
         return None
     import hashlib
-    names = [s["function"]["name"] for s in schemas]
-    blob = json.dumps(schemas, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    hashed = [s["function"]["name"] for s in schemas]
+    names = sorted(set(hashed) | set(bound or ()))
+    # The names go INTO the hash alongside the schemas: a tool that appears with no schema still
+    # changes the surface, and two arms differing only by such a tool must not hash alike.
+    blob = json.dumps({"schemas": schemas, "names": names},
+                      sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return {"names": names, "n_tools": len(names),
+            "n_schema_hashed": len(hashed),
+            "not_schema_hashed": sorted(set(names) - set(hashed)),
             "content_hash": hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]}
