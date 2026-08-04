@@ -208,7 +208,8 @@ def experiment_config_hash(config: dict) -> str:
 def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None,
                           tool_schemas=None, retrieval_prior=None,
                           site_mapping=None, task_context: str = "",
-                          bound_tool_names: set[str] | None = None) -> dict:
+                          bound_tool_names: set[str] | None = None,
+                          prompt_blocks: Mapping[str, int] | None = None) -> dict:
     """The identity of every prompt block whose content can change a run's answer.
 
     Lives here rather than in `agent` because a manifest field belongs with the manifest, and
@@ -242,6 +243,35 @@ def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None,
         skills = [{"error": f"{type(exc).__name__}: {exc}"}]
     return {
         "value_domain": table_manifest(spec),
+        # WHICH STATIC PROMPT BLOCKS THE MODEL WAS SHOWN, and how much each one contributed. The
+        # prompt was a ten-term `+` chain until 2026-08-04, so no run could drop a block and no
+        # manifest had anything to say about the ten; `--prompt-blocks` makes each one ablatable and
+        # this is the record that turns an ablation into an arm. It rides in `prompt_assets`, which
+        # `experiment_config_hash` already takes, so dropping `skills` (9,117 characters of a 20,531
+        # character prompt) moves the arm hash without that function learning a new field.
+        #
+        # The SIZES, not a content hash: the blocks' own identities are already covered here —
+        # `value_domain`, `document_concepts`, `skills`, `retrieval_prior`, `additional_task_context`
+        # — and what was missing is which of them rendered at all and how large it was. A selected
+        # block that rendered nothing records `0`, which is a different fact from not being selected:
+        # STORE.390 declares no value domain, so a run over it renders that block empty while the
+        # arm still includes it.
+        #
+        # `None` when the caller did not supply one, on the `retrieval_prior` precedent: `query_only`
+        # builds its own prompt and never assembles this registry, and "no selection recorded" must
+        # not read as "every block".
+        # THE SELECTION ONLY. The per-block character counts used to ride here and this dict is
+        # hashed WHOLESALE by `experiment_config_hash`, which made the arm hash a per-run id:
+        # `_task` renders `TASK.format(patient=...)`, the shipped corpus has both 7- and
+        # 6-character ids, and two patients of one arm therefore hashed differently (SYN0001 616
+        # chars / c829dca0, SYNK01 615 / a32d5c96). Measured downstream: `derive_baseline_key`
+        # returned MIXED and `eval compare` returned NOT_COMPARABLE over the DEFAULT cohort, so
+        # every batch would have been unscoreable. Same defect `model_identity` was written to fix.
+        #
+        # The distinction is the one `ARM_PARAMETERS` / `WITHIN_ARM_PARAMETERS` already draws: the
+        # selection DEFINES the arm, the sizes are a per-run observation. They live apart, and the
+        # sizes are in the manifest's own `prompt_block_chars` where nothing hashes them.
+        "blocks": ({"selected": list(prompt_blocks)} if prompt_blocks is not None else None),
         # THE MEASURED PRIOR THIS RUN WAS SHOWN, or an explicit `None`. Recorded because a prior is
         # prompt content: two arms differing only in which scan they were told about are otherwise
         # indistinguishable afterwards, and "accuracy rose" and "the prompt changed" would be the

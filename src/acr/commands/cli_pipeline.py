@@ -54,7 +54,7 @@ from ..evaluation.explain import (
     scaffold_explanation,
     side_input_record,
 )
-from .cli_chart import PLANNER, PRIOR, SITE_MAPPING, _planner
+from .cli_chart import PLANNER, PRIOR, PROMPT_BLOCKS, SITE_MAPPING, _planner
 
 pipeline_app = typer.Typer(add_completion=False)
 
@@ -198,6 +198,7 @@ def extract(
     site_mapping: str = SITE_MAPPING,
     prior: str = PRIOR,
     planner: str = PLANNER,
+    prompt_blocks: str = PROMPT_BLOCKS,
     dry_run: bool = typer.Option(False, "--dry-run",
                                  help="resolve, plan and cost the work without calling a model"),
 ):
@@ -212,8 +213,11 @@ def extract(
     # BEFORE the cohort is read and long before a model is built, for the reason `cli_chart`'s
     # `_skill_stack` gives: a misspelt slot caught inside the per-patient `except` below would
     # be reported once per chart, as if the cohort had failed, when what failed is one string.
-    from .cli_chart import _load_prior, _load_site_mapping, _skill_stack
+    from .cli_chart import _load_prior, _load_site_mapping, _prompt_blocks, _skill_stack
     stack = _skill_stack(runtime_profile, skills)
+    # Same place and the same reason for the block selection: `--prompt-blocks anchour` costs one
+    # error message here and one run directory per patient anywhere later.
+    blocks = _prompt_blocks(prompt_blocks)
     # Per SPEC, because a cohort command runs several and any one of them may select documents
     # through a Site Mapping. Resolved here, before the cohort is read and before `--dry-run`
     # returns, so a mapped contract with no `--mapping` costs nothing to discover. One flag for
@@ -268,7 +272,7 @@ def extract(
                     run_id=f"{pid}__{sid}", max_usd=max_usd,
                     runtime_profile=runtime_profile, skill_stack=stack,
                     site_mapping=mapping, retrieval_prior=prior_asset,
-                    planner=_planner(planner))
+                    planner=_planner(planner), prompt_blocks=blocks)
             except Exception as e:  # noqa: BLE001
                 # One patient failing must not silently shrink the cohort: the row survives,
                 # carries the error, and the command exits non-zero at the end.

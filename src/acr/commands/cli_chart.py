@@ -100,6 +100,34 @@ def _planner(value: str) -> str:
     return value
 
 
+PROMPT_BLOCKS = typer.Option(
+    "", "--prompt-blocks",
+    help="which static prompt blocks the model is shown, comma-separated and in any order: "
+         "spec, rule_ids, task, runtime_policy, document_concepts, experience, value_domain, "
+         "anchor, skills, task_context. Empty means every block, which is what every run recorded "
+         "before 2026-08-04 used and is byte-identical to it. `spec` and `task` cannot be dropped. "
+         "This is the ablation the prompt could not express: `skills` alone is 9,117 characters of "
+         "a 20,531 character prompt and had never been removed without editing the runtime.")
+
+
+def _prompt_blocks(value: str) -> list[str] | None:
+    """The block names, or None for every block. Validated before any model call.
+
+    Same reason as `_planner`, with more to gain: an unknown name reaching `run_patient` would raise
+    on the first patient of a cohort, after the run directory and the trace exist. The names are
+    checked against `prompt_blocks.BLOCKS` here and refused there too, because the runtime must not
+    trust a caller to have validated — but the operator should never have to pay a model call to
+    learn they typed `anchour`.
+    """
+    from ..review.prompt_blocks import PromptBlockError, parse_block_names, selected_blocks
+    names = parse_block_names(value)
+    try:
+        selected_blocks(names)
+    except PromptBlockError as e:
+        raise typer.BadParameter(str(e)) from e
+    return names
+
+
 def _load_prior(path: str):
     """A prior, or None. Refuses a path that does not load rather than running without one.
 
@@ -178,6 +206,7 @@ def run(
     site_mapping: str = SITE_MAPPING,
     prior: str = PRIOR,
     planner: str = PLANNER,
+    prompt_blocks: str = PROMPT_BLOCKS,
     temperature: float = typer.Option(1.0, "--temperature"),
     seed: int = typer.Option(1234, "--seed",
                              help="validation-sampling seed; fix it to make two runs comparable"),
@@ -221,6 +250,7 @@ def run(
     mapping = _load_site_mapping(sp, site_mapping)
     prior_asset = _load_prior(prior)
     pl = _planner(planner)
+    pb = _prompt_blocks(prompt_blocks)
     stack = _skill_stack(runtime_profile, skills)
     c = Corpus(Path(corpus))
     ch = c.chart(patient)
@@ -235,7 +265,8 @@ def run(
                          model=chat, max_model_calls=max_steps, seed=seed,
                          max_usd=max_usd, runtime_profile=runtime_profile,
                          skill_stack=stack, site_mapping=mapping,
-                         retrieval_prior=prior_asset, planner=pl))
+                         retrieval_prior=prior_asset, planner=pl,
+                         prompt_blocks=pb))
         return
 
     from ..review.conflict_refinement import run_conflict_refinement
@@ -254,6 +285,11 @@ def run(
             "max_usd": max_usd, "runtime_profile": runtime_profile,
             "skill_stack": stack, "site_mapping": mapping,
             "retrieval_prior": prior_asset,
+            # THE FOURTH CALL SITE. `--planner` was already being dropped here before
+            # `--prompt-blocks` existed: a switch accepted on the command line and missing
+            # from this dict is silently discarded, and every refinement round would run the
+            # profile's default while the other three paths honoured what was asked.
+            "planner": pl, "prompt_blocks": pb,
         })
     summary = result.to_dict(include_manifests=False)
     path = run_dir / "conflict-refinement.json"
@@ -294,6 +330,7 @@ def batch(
     site_mapping: str = SITE_MAPPING,
     prior: str = PRIOR,
     planner: str = PLANNER,
+    prompt_blocks: str = PROMPT_BLOCKS,
 ):
     """Run one spec across many patients.
 
@@ -306,6 +343,7 @@ def batch(
     mapping = _load_site_mapping(sp, site_mapping)
     prior_asset = _load_prior(prior)
     pl = _planner(planner)
+    pb = _prompt_blocks(prompt_blocks)
     stack = _skill_stack(runtime_profile, skills)
     c = Corpus(Path(corpus))
     pids = [p.strip() for p in patients_arg.split(",") if p.strip()] or c.patient_ids()
@@ -320,7 +358,8 @@ def batch(
                                        max_usd=max_usd,
                                        runtime_profile=runtime_profile,
                                        skill_stack=stack, site_mapping=mapping,
-                                       retrieval_prior=prior_asset, planner=pl))
+                                       retrieval_prior=prior_asset, planner=pl,
+                                       prompt_blocks=pb))
         except Exception as e:  # noqa: BLE001
             con.print(f"[red]{pid} failed: {e}[/]")
             results.append({"patient_id": pid, "error": str(e)})
@@ -438,6 +477,7 @@ def consistency(
     site_mapping: str = SITE_MAPPING,
     prior: str = PRIOR,
     planner: str = PLANNER,
+    prompt_blocks: str = PROMPT_BLOCKS,
 ):
     """Run the same spec N times to measure SELF-consistency.
 
@@ -450,6 +490,7 @@ def consistency(
     mapping = _load_site_mapping(sp, site_mapping)
     prior_asset = _load_prior(prior)
     pl = _planner(planner)
+    pb = _prompt_blocks(prompt_blocks)
     c = Corpus(Path(corpus))
     stack = _skill_stack(runtime_profile, skills)
     run_dir = cli_common.unique_run_dir(out)
@@ -460,7 +501,8 @@ def consistency(
                         max_model_calls=max_steps, seed=seed, run_id=f"{patient}__c{i}",
                         max_usd=max_usd, runtime_profile=runtime_profile,
                         skill_stack=stack, site_mapping=mapping,
-                        retrieval_prior=prior_asset, planner=pl)
+                        retrieval_prior=prior_asset, planner=pl,
+                        prompt_blocks=pb)
         outs.append(r)
         con.print(f"  run {i+1}/{n}: {r['answer'].get('status')} "
                   f"{json.dumps(r['answer'].get('value', {}), ensure_ascii=False)}")

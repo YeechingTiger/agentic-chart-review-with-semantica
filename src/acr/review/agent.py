@@ -56,7 +56,7 @@ from __future__ import annotations
 
 import collections
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -67,7 +67,6 @@ from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_core.tools import StructuredTool
 
 from ..contract.case_requirements import is_time_anchorable, refuse_before_reading
-from ..contract.code_tables import code_domain_block
 from ..contract.outcomes import (
     KIND_ABSTAIN_EVIDENCE,
     KIND_ABSTAIN_SPEC,
@@ -75,8 +74,6 @@ from ..contract.outcomes import (
     default_evidence_abstention,
     status_kind,
 )
-from ..contract.retrieval_prior import to_experience_asset
-from ..contract.skills import skills_block
 from ..core.case_context import CaseContext
 from ..core.cli_common import code_sha
 from ..core.tool_surface import (  # noqa: F401
@@ -86,7 +83,12 @@ from ..core.tool_surface import (  # noqa: F401
     bound_tool_names,
 )
 from .coverage_planner import OPEN_REQUEST_OPENED, triggers_from_tool_result
-from .document_concepts import anchor_block, baseline_block, experience_block
+from .prompt_blocks import (
+    PromptContext,
+    assemble_prompt,
+    parse_block_names,
+    selected_blocks,
+)
 from .run_manifest import (
     chart_hash,
     experiment_config_hash,
@@ -158,6 +160,12 @@ ARM_PARAMETERS: dict[str, str] = {
     # nothing else; coverage activation, the runtime policy's positive terms and the spec view stay
     # on the profile. Folding any of those back in would rebuild the confound under a new name.
     "planner": "planner",
+    # WHICH PROMPT BLOCKS THE MODEL WAS SHOWN, added 2026-08-04 with the registry that made a
+    # selection expressible. Ten blocks were a `+` chain, so the only ablation available was an edit
+    # to this file — and an edited runtime is not an arm, because the manifest would still describe
+    # the baseline. The selection rides in `prompt_assets`, which is already an input to
+    # `experiment_config_hash`, so dropping `skills` (9,117 of 20,531 characters) moves the arm hash.
+    "prompt_blocks": "prompt_assets.blocks",
     "skill_stack": "prompt_assets.skills",
     "retrieval_prior": "prompt_assets.retrieval_prior",
     "site_mapping": "prompt_assets.site_mapping",
@@ -1008,7 +1016,15 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
                      # the caller is where the profile is known. Recorded, not re-derived: a manifest
                      # that reconstructed this from the profile would be back to reporting one flag
                      # for two decisions.
-                     planner_record: tuple[str, str] | None = None) -> dict:
+                     planner_record: tuple[str, str] | None = None,
+                     # `{block name: characters rendered}` for the selection that BUILT
+                     # `system_prompt`, from `assemble_prompt`. Same reason as `skill_stack` and
+                     # `planner_record`: the caller assembled the prompt, so only the caller knows
+                     # what went into it, and a manifest that re-derived the selection here would
+                     # describe the default whatever the run was actually given. `None` when the
+                     # caller built its prompt some other way — `query_only` does — which is a
+                     # different fact from "every block".
+                     prompt_blocks: dict[str, int] | None = None) -> dict:
     """One patient, one spec, through the library's graph. Returns the manifest."""
     from ..contract.answer_contract import (
         NO_COVERAGE_CLAIM,
@@ -1272,11 +1288,23 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # `table_version` would otherwise masquerade as the one an earlier run used. The lung
         # table gained eleven morphologies from one validation pass; manifests written either
         # side of that must not compare as equal.
+        # PER-RUN, AND DELIBERATELY OUTSIDE `prompt_assets`. Nothing hashes this key, because
+        # `_task` embeds the patient id and its length varies across the cohort — inside the
+        # hashed block it made two patients of one arm two arms. See `prompt_asset_manifest`.
+        "prompt_block_chars": ({"n_chars": dict(prompt_blocks),
+                                "total_chars": sum(prompt_blocks.values())}
+                               if prompt_blocks is not None else None),
         "prompt_assets": prompt_asset_manifest(spec, runtime_profile_asset, skill_stack,
                                                tool_schemas=toolbox.schemas(),
                                                retrieval_prior=retrieval_prior,
                                                site_mapping=site_mapping,
                                                task_context=task_context,
+                                               # REGISTER ORDER, which `selected_blocks`
+                                               # already canonicalises, so `skills,spec` and
+                                               # `spec,skills` are one arm.
+                                               prompt_blocks=(list(prompt_blocks)
+                                                              if prompt_blocks is not None
+                                                              else None),
                                                # EVERYTHING BOUND, read off the compiled graph.
                                                # This recorded `toolbox.schemas()` — seven — while
                                                # nine reach the model: `revise_plan` is added a few
@@ -1653,6 +1681,13 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
                 #: `""` = whatever `runtime_profile` chooses, which is what every recorded run took.
                 #: See `PLANNERS` for why this is no longer part of that flag.
                 planner: str = "",
+                #: WHICH STATIC PROMPT BLOCKS the model is shown. `""` = every block, which is what
+                #: the `+` chain this replaced could produce and what every recorded run took. A
+                #: comma string is what `--prompt-blocks` carries and what a test writes; the parsed
+                #: list is what `cli_chart._prompt_blocks` returns after validating it before any
+                #: model call. Both go through `parse_block_names`, so there is one grammar. See
+                #: `prompt_blocks.BLOCKS`.
+                prompt_blocks: str | Sequence[str] | None = "",
                 case: CaseContext | None = None,
                 skill_stack=None,
                 site_mapping=None,
@@ -1671,7 +1706,7 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
 
     from deepagents.backends import StateBackend
 
-    from ..contract.trace import Tracer, rule_citation_block
+    from ..contract.trace import Tracer
     from ..core.state import EvidenceLedger
     from .answer_gate import gate_answer
     from .coverage import CoverageLedger, ForcedSampler, strata_from_spec
@@ -1685,10 +1720,8 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
     from .runtime_profiles import (
         RuntimePolicyContext,
         resolve_runtime_policy,
-        runtime_policy_instruction,
         runtime_policy_skills,
         starts_with_coverage_assets,
-        uses_clinical_contract_view,
     )
     from .tools.toolbox import Toolbox
 
@@ -1745,6 +1778,11 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
     planner_name, planner_provenance = resolve_planner(planner, runtime_profile)
     plan = (coverage_plan if planner_name == "spec-strata"
             else plan_from_patient_inventory(spec, chart))
+    # WHICH PROMPT BLOCKS THE MODEL IS SHOWN, resolved here for the same reason as the planner: once,
+    # before anything reads it, so the prompt and the manifest cannot describe different runs. An
+    # unknown or a required-and-missing name raises HERE — before the first model call and before the
+    # `--prompt-blocks` typo has been charged for a chart.
+    prompt_selection = selected_blocks(parse_block_names(prompt_blocks))
     coverage_state = {
         "active": bool(starts_with_coverage_assets(runtime_profile_asset.ref)),
         "reason": (
@@ -1798,72 +1836,36 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
     effective_stack = (skill_stack if skill_stack is not None
                        else runtime_policy_skills(runtime_profile_asset.module_id))
 
+    # THE STATIC PROMPT, ASSEMBLED FROM THE REGISTRY. This was a ten-term `+` chain here, which made
+    # every block unablatable: dropping one meant editing this file, and an edited runtime is not an
+    # arm because the manifest would still describe the baseline. `prompt_blocks.BLOCKS` owns the
+    # order and the text; the default selection is byte-identical to the chain, which is what keeps
+    # every manifest under `runs/` reproducible. `n_chars` per block is returned so the manifest
+    # records what the model was shown rather than what the profile would have chosen — the same
+    # reason `effective_stack` is resolved once, one asset along.
+    system_prompt, prompt_block_chars = assemble_prompt(
+        PromptContext(spec=spec, patient_id=patient_id,
+                      runtime_profile_asset=runtime_profile_asset,
+                      skill_stack=effective_stack, retrieval_prior=retrieval_prior,
+                      task_context=additional_task_context),
+        prompt_selection)
+
     t0 = time.time()
     return run_chart_review(
         spec=spec, chart=chart, toolbox=toolbox, coverage=coverage, evidence=evidence,
         plan=plan, threads=threads, catalogue=markers, tracer=tracer, gate=gate, case=case,
         model=model, tools=tools,
-        # THE RULE IDENTIFIERS GO IN THE PROMPT, not only into the finalize question. The
-        # self-report channel asks at submit time which decision rule was applied, and
-        # `submit_answer` is reachable from any turn — an agent asked at the last moment to cite
-        # identifiers it has never seen invents them, and `rule_attribution.self_reported` then
-        # records invented ids as if they were a measurement of the agent's reasoning.
-        system_prompt=(spec.as_prompt_block(
-                           view=(
-                               "clinical_contract"
-                               if uses_clinical_contract_view(runtime_profile_asset.ref)
-                               else "full"
-                           )
-                       )
-                       + (f"\n\n{cite}" if (cite := rule_citation_block(spec)) else "")
-                       + "\n\n" + TASK.format(patient=patient_id)
-                       + "\n\n" + runtime_policy_instruction(
-                           runtime_profile_asset.module_id
-                       )
-                       # PORTABLE DOCUMENT CONCEPTS, as reference. Standard names and prose
-                       # saying what each kind of document is; no local type string, no ordering,
-                       # no measurement. It replaces `doc_type_matches`, which was the same
-                       # knowledge written as a substring list that gated reads and fed the
-                       # coverage gate. The model reads this beside `document_type_summary` and
-                       # decides for itself.
-                       + "\n\n" + baseline_block()
-                       # THE MEASURED PRIOR, when one was supplied: which document types carried
-                       # the answer on OTHER patients and at what rate, and which terms surfaced an
-                       # answer-bearing document. `""` when there is none, so the baseline arm's
-                       # prompt is byte-identical to a run predating this channel. The comment that
-                       # used to sit above said "a measured prior would render under its own
-                       # heading via `experience_block`, and there is none certified yet" — the
-                       # renderer had no producer and no caller; `improvement/prior.py` is the
-                       # producer and this is the caller.
-                       + (f"\n\n{xp}" if (xp := experience_block(
-                           to_experience_asset(retrieval_prior) if retrieval_prior else None
-                       )) else "")
-                       # THE VALUE DOMAIN, when the Task Contract declares one. A run asserted
-                       # "C341 is right middle lobe" and coded C341 over evidence reading "right
-                       # middle lobe" (C341 is the upper lobe), and another coded histology 7205,
-                       # which is not a morphology. Both are facts about a published
-                       # classification, so the model is shown the table instead of being trusted
-                       # to recall it — and instead of being refused by a regex afterwards.
-                       + (f"\n\n{cb}" if (cb := code_domain_block(spec)) else "")
-                       # WHICH tumour, as opposed to which documents. Three runs answered about
-                       # the wrong neoplasm and the traces could not say why; this asks the model
-                       # to enumerate its candidates and name the one it answered for.
-                       + "\n\n" + anchor_block()
-                       # METHOD GUIDANCE. Until now nothing in this tree read a SKILL.md body
-                       # into a prompt, so moving the coverage obligation into
-                       # `assets/skills/coverage-judgement/` deleted it rather than relocating it. The
-                       # profile chooses which skills load; see `acr.contract.skills`.
-                       + (f"\n\n{sk}" if (sk := skills_block(effective_stack)) else "")
-                       + (f"\n\n{additional_task_context.strip()}"
-                          if additional_task_context.strip() else "")),
+        system_prompt=system_prompt,
+        prompt_blocks=prompt_block_chars,
         backend=StateBackend(), max_model_calls=max_model_calls, out_dir=out_dir,
         elapsed_fn=lambda: round(time.time() - t0, 1), ctx_out=ctx_out,
         max_usd=max_usd,
         skill_stack=effective_stack,
         retrieval_prior=retrieval_prior,
         # The two arm switches whose identity reached no manifest field. `task_context` is the same
-        # string appended to `system_prompt` just above; passing it here records its hash, and the
-        # hash is the only form of it that belongs in an artifact written beside patient output.
+        # string the `task_context` block rendered into `system_prompt` just above; passing it here
+        # records its hash, and the hash is the only form of it that belongs in an artifact written
+        # beside patient output.
         site_mapping=site_mapping,
         task_context=additional_task_context,
         planner_record=(planner_name, planner_provenance),

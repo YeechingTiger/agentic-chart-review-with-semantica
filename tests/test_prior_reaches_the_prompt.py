@@ -134,9 +134,26 @@ def test_two_priors_are_distinguishable_in_the_manifest(tmp_path, prior_file):
 
 # ---------------------------------------------------------------- (4) it reaches the prompt
 
-def test_the_prior_is_rendered_into_the_system_prompt(prior_file):
+def test_the_prior_is_rendered_into_the_system_prompt(prior_file, tmp_path):
     """Signature-level wiring is not enough — the Site Mapping reached the ledger and a second call
-    site rebuilt the plan without it. This asserts the text the model would read."""
+    site rebuilt the plan without it. This asserts the text the model would read.
+
+    THE SYSTEM MESSAGE, not a grep. This used to assert `"experience_block" in
+    inspect.getsource(run_patient)`, which stopped saying anything on 2026-08-04: the ten static
+    blocks became `prompt_blocks.BLOCKS`, so the producer is called from the `experience` entry and
+    `run_patient` names neither it nor the header. The property the grep stood in for is that a
+    `--prior` reaches the message the provider is handed, and the offline harness can just check it.
+    """
+    pytest.importorskip("deepagents")
+    import pathlib
+    import sys
+    sys.path.insert(0, str(pathlib.Path(__file__).parent))
+    from hooks_harness import ToolScript
+
+    from acr.chartstore.corpus import Corpus
+    from acr.contract.spec import load_spec
+    from acr.core import site
+    from acr.review.agent import run_patient
     from acr.review.document_concepts import experience_block
     prior = RetrievalPrior.load(prior_file)
     block = experience_block(to_experience_asset(prior))
@@ -144,10 +161,27 @@ def test_the_prior_is_rendered_into_the_system_prompt(prior_file):
     assert "carcinoma" in block
     assert "Path" in block
 
-    import acr.review.agent as agent_mod
-    src = inspect.getsource(agent_mod.run_patient)
-    assert "experience_block" in src, (
-        "run_patient does not call experience_block, so a --prior would be accepted and discarded")
+    model = ToolScript(script=[], submit={"status": "EVIDENCE_INSUFFICIENT", "value": {},
+                                          "reasoning": "the script submits at once"})
+    model.seen = []
+    m = run_patient(spec=load_spec(site.specs_root() / f"{SPEC}.yaml"),
+                    corpus=Corpus(site.corpus_root()), patient_id="SYN0001", out_dir=tmp_path,
+                    model=model, max_model_calls=1, seed=7, run_id="prior",
+                    retrieval_prior=prior)
+    # Probed by heading and by a measured term rather than by the whole block: the provider is handed
+    # the system message as a list of content parts, so its newlines survive `str()` only escaped —
+    # the same reason `test_the_prompt_is_sent_once` probes headings.
+    instructions = "\n".join(str(x.content) for x in model.seen[0]
+                             if getattr(x, "type", None) == "system")
+    assert "RETRIEVAL EXPERIENCE" in instructions and "carcinoma" in instructions, (
+        "a --prior would be accepted and discarded: it reached no system message")
+    # `prompt_block_chars`, not `prompt_assets.blocks`: the per-block sizes moved out of the hashed
+    # block after they were found to make the arm hash a per-run id — `_task` embeds the patient id
+    # and its length varies across the cohort. The selection stays in the arm; the sizes are an
+    # observation. See `tests/test_the_prompt_is_a_registry.py`.
+    assert m["prompt_block_chars"]["n_chars"]["experience"] == len(block), (
+        "and the manifest must say how much of the prompt it was")
+    assert "experience" in m["prompt_assets"]["blocks"]["selected"]
 
 
 def test_the_prompt_says_the_prior_is_not_a_rule(prior_file):
