@@ -163,8 +163,9 @@ def test_the_prompt_says_the_prior_is_not_a_rule(prior_file):
 
 def test_supplying_a_prior_does_not_move_the_spec_hash(prior_file):
     """THE REASON THIS FEATURE EXISTS. `assets adopt` writes keywords into the contract, which moves
-    `spec_hash`; `analyze_arms.py:192` then refuses the comparison ("这些臂跑在 N 个不同的 spec
-    版本上"). A prior delivered as an asset leaves the question unchanged, so the two arms compare."""
+    `spec_hash`; `analyze_arms.py:192` then refuses the comparison ("refusing to compare: these arms
+    ran against N different spec versions"). A prior delivered as an asset leaves the question
+    unchanged, so the two arms compare."""
     from acr.contract.spec import load_spec
     from acr.core import site
     path = site.specs_root() / "STORE.390.date_of_initial_diagnosis.yaml"

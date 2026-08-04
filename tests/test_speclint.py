@@ -158,10 +158,11 @@ def test_an_empty_required_keyword_list_under_an_enforcing_gate_is_flagged():
 
 
 def test_a_contract_declaring_no_retrieval_at_all_owes_no_reachability_map():
-    """契约不声明任何检索时，`keyword_field_coverage` 缺席只是 NOTE。
+    """When a contract declares no retrieval, a missing `keyword_field_coverage` is only a NOTE.
 
-    2026-08-02 检索资产移出 spec 之后，"哪些词够得到哪个字段"变成开发集上的测量，由经验层
-    做。对一个不声明检索的契约还要求这张映射表，等于把检索要回契约里。
+    Since the retrieval assets moved out of the specs on 2026-08-02, "which terms reach which field"
+    is a measurement over a development set, made by the experience layer. Demanding that mapping
+    from a contract which declares no retrieval is demanding retrieval back into the contract.
     """
     s = mkspec(fields=[{"name": "a", "allowable_values": ["1"]}],
                proof_obligation={"for_negative": {}})
@@ -171,15 +172,17 @@ def test_a_contract_declaring_no_retrieval_at_all_owes_no_reachability_map():
 
 
 def test_a_contract_that_DOES_declare_searches_still_owes_the_map():
-    """区分分支的那一条。没有它，上面那条用"把 F4 全降成 NOTE"也能通过，而那会让
-    声明了必需检索却说不出它们为什么存在的 spec 一起蒙混过去。"""
+    """The one that separates the branches. Without it, the test above would also pass by "demoting
+    all of F4 to a NOTE", and that would let a spec which declares required searches but cannot say
+    what they are for slip through along with it."""
     s = mkspec(fields=[{"name": "a", "allowable_values": ["1"]}],
                proof_obligation={"for_negative": {"required_keywords": ["biopsy"]}})
     assert checks(speclint.lint_spec(s), speclint.F4)
 
 
 def test_the_shipped_diagnosis_spec_has_no_failures_left():
-    """检索资产、覆盖门和本地类型名全部移出之后，这个契约应当干净。"""
+    """With the retrieval assets, the coverage gate and the local type names all moved out of it,
+    this contract should be clean."""
     fs = speclint.lint_spec(load_spec(DIAG))
     assert [f.where for f in fs if f.severity == speclint.FAIL] == []
 
@@ -196,16 +199,17 @@ def test_a_field_no_stratum_establishes_is_flagged():
 
 
 def test_a_gate_demanding_can_establish_while_no_stratum_establishes_anything_is_a_failure():
-    """两处检查看的不是同一个东西，而它们之间没有人把话说圆。
+    """The two checks do not read the same thing, and nobody ever closed the gap between them.
 
-    `coverage.py` 那道门是按**名字**过的 —— `ok = "can_establish" in by`。可采纳性判定看的
-    是 `establishes`。所以一个 spec 可以堂堂正正通过 `require_can_establish_nonempty`，
-    同时它的每一条引文都解析成 UNDECLARED：门写着"必须存在一个能确立答案的文档类型"，
-    而没有任何一处说那个类型确立的是什么。
+    The gate in `coverage.py` passes on the NAME — `ok = "can_establish" in by`. The admissibility
+    ruling reads `establishes`. So a spec can pass `require_can_establish_nonempty` squarely while
+    every one of its citations resolves to UNDECLARED: the gate says "a document type that can
+    establish the answer must exist", and nothing anywhere says what that type establishes.
 
-    这正是 F4 已经以 FAIL 拒绝的那个形状 —— "the switch reads as enforcement and enforces
-    nothing" —— 只不过 F5 对它一直只给 NOTE。是 STORE.390 上一次 BLIND 归因跑出来的，
-    在 `seq:17`：agent 想引用一份文档，问"这份可采纳吗"，规格答不上来。
+    This is exactly the shape F4 already refuses with a FAIL — "the switch reads as enforcement
+    and enforces nothing" — except that F5 had only ever given it a NOTE. It came out of a BLIND
+    attribution run on STORE.390, at `seq:17`: the agent went to cite a document, asked "is this one
+    admissible", and the spec had no answer.
     """
     s = mkspec(fields=[{"name": "a", "allowable_values": ["1"]}],
                evidence_rules={"counts_as_evidence": ["a path report"]},
@@ -213,14 +217,16 @@ def test_a_gate_demanding_can_establish_while_no_stratum_establishes_anything_is
                    "strata": [{"name": "can_establish", "match": {"rest": True}}],
                    "gate": {"require_can_establish_nonempty": True}}})
     found = checks(speclint.lint_spec(s), speclint.F5)
-    assert found, "门要求 can_establish 非空，却没有任何 stratum 说自己确立什么 —— 必须 FAIL"
+    assert found, ("the gate demands a non-empty can_establish while no stratum says what it "
+                   "establishes — that must FAIL")
 
 
 def test_that_failure_does_not_fire_when_the_gate_makes_no_such_demand():
-    """没有那道门的时候，`establishes` 缺席仍然只是 NOTE。
+    """With no such gate, a missing `establishes` is still only a NOTE.
 
-    没有这一条，上面那条测试用"把 F5 的 NOTE 全升成 FAIL"也能通过 —— 那会让每一个
-    不用 `establishes` 的 spec 立刻变成失败，而它们只是把耦合写在散文里，不是坏的。
+    Without this test, the one above would also pass by "promoting every F5 NOTE to a FAIL" — and
+    that would turn every spec which does not use `establishes` into a failure on the spot, when all
+    those specs do is write the coupling in prose, which is not broken.
     """
     s = mkspec(fields=[{"name": "a", "allowable_values": ["1"]}],
                evidence_rules={"counts_as_evidence": ["a path report"]},

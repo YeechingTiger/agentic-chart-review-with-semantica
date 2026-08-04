@@ -1,14 +1,17 @@
-"""仓库根和它下面的资产目录，不靠 `__file__` 的层数算出来。
+"""The repo root and the asset directories under it, worked out without counting `__file__` levels.
 
-为什么存在
---------
-五个模块各自写着 `Path(__file__).resolve().parents[2]`，那个 2 编码的是"我在 src/acr/ 下面
-第一层"。把模块搬进平面目录之后它指向 `src/`，而后果不是报错：`labelling.py` 的
-"标注不许写进仓库内部"这条拒绝**静默失效**了，因为它比较的根变成了 `src/`。
-`test_labels_root_refuses_a_path_inside_the_repository` 抓到了它 —— DID NOT RAISE。
+Why this exists
+---------------
+Five modules each wrote `Path(__file__).resolve().parents[2]`, and that 2 encoded "I sit one level
+below src/acr/". Once the modules moved into plane directories it pointed at `src/`, and the
+consequence was not an error: `labelling.py`'s refusal that "labels may not be written inside the
+repository" **silently stopped firing**, because the root it compared against had become `src/`.
+`test_labels_root_refuses_a_path_inside_the_repository` caught it — DID NOT RAISE.
 
-层数是随目录结构变的量，而"仓库根"不是。所以往上走到带 `pyproject.toml` 的那一层，
-搬到多深都对。找不到就抛，不回退到某个猜测：一个猜错了根的路径检查正是上面那种静默失效。
+A level count is a quantity that moves with the directory structure, and "the repo root" is not. So
+walk up to the directory that holds `pyproject.toml`, and it stays correct however deep a module is
+moved. Raise when there is none rather than falling back to a guess: a path check that guessed its
+root wrong is exactly the silent failure above.
 """
 
 from __future__ import annotations
@@ -16,13 +19,14 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-#: 标记文件。`pyproject.toml` 而不是 `.git`：从打好的 wheel 里跑时没有 `.git`，而那时
-#: 这些资产目录也不在，调用方应该拿到一个明确的错误而不是一个存在但为空的路径。
+#: The marker file. `pyproject.toml` rather than `.git`: a run out of a built wheel has no `.git`,
+#: and at that point these asset directories are not there either, so a caller should get an
+#: explicit error instead of a path that exists and is empty.
 MARKER = "pyproject.toml"
 
 
 class RepoRootNotFound(RuntimeError):
-    """向上找不到带标记文件的目录。"""
+    """No directory at or above this file holds the marker file."""
 
 
 @lru_cache(maxsize=1)
@@ -37,5 +41,6 @@ def repo_root() -> Path:
 
 
 def asset_dir(name: str) -> Path:
-    """仓库根下的一个资产目录，例如 `skills` / `codes`。不检查存在性 —— 调用方各有各的报错。"""
+    """An asset directory under the repo root, e.g. `skills` / `codes`. Existence is not
+    checked — each caller has its own error to raise."""
     return repo_root() / name

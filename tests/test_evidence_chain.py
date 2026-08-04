@@ -1,21 +1,25 @@
-"""因果链必须是**链**，而不是一组注解。
+"""A causal chain has to be a **chain**, not a set of annotations.
 
-现在 `because` 是散文，schema 里写着 "Recorded, never checked"。于是
-`detect_uncaused_reads` 只能数有没有，不能验对不对 —— 一句编造的理由和一句真的理由，
-在记录里长得一模一样。
+Today `because` is prose, and the schema says "Recorded, never checked". So
+`detect_uncaused_reads` can only count whether there is one, never check whether it is true — a
+fabricated reason and a true one look exactly alike in the record.
 
-一条链的构成要件只有一个：**每个标签是按 ID 指向另一个产物的可解析指针**。trace 事件本来
-就有 `seq`，所以锚点是现成的；缺的是让 `because` 带上它，以及一个把指针走通的解析器。
+A chain needs exactly one thing: **every label is a resolvable pointer at another artefact, by ID**.
+Trace events already have `seq`, so the anchor already exists; what is missing is letting `because`
+carry it, and a resolver that walks the pointer.
 
-走通之后能算三样现在算不出来的东西：
+Once it walks, three things become countable that cannot be counted today:
 
-  * 解析失败率 —— 确定性的，不需要任何模型判断；
-  * **前向引用** —— 一次读取声称由排在它后面的事件引起，这是可证明不可能的，而这正是
-    模型事后为一个已做过的动作补理由时会产生的形状；
-  * grounding ratio 与链深 —— 评测可以挂在上面。
+  * the resolution-failure rate — deterministic, needing no model judgement at all;
+  * **forward references** — a read claiming it was caused by an event that comes after it, which is
+    provably impossible, and which is exactly the shape a model produces when it writes a reason
+    after the fact for an action it has already taken;
+  * grounding ratio and chain depth — numbers an evaluation can hang on.
 
-向后兼容是硬要求：已记录的每一次运行里 `because` 都是字符串，它们必须继续可读、并且**不被
-记成失败** —— 散文式的理由不是造假，它只是无法核对，而这两件事的区别就是这个文件的全部。
+Backwards compatibility is a hard requirement: `because` is a string in every run recorded so far,
+and those runs must stay readable and **must not be recorded as failures** — a prose reason is not a
+fabrication, it is merely uncheckable, and the difference between those two is what this whole file
+is about.
 """
 from __future__ import annotations
 
@@ -62,11 +66,13 @@ def test_a_pointer_at_an_event_that_does_not_exist_is_unresolved():
 
 
 def test_a_pointer_at_a_LATER_event_is_impossible_and_named_as_such():
-    """一次调用不可能由还没发生的事引起。
+    """A call cannot have been caused by something that had not happened yet.
 
-    这是这套改动带来的唯一一个**纯确定性**的新检测器，而且它抓的正是事后补理由的形状：
-    动作已经做了，理由是回头写的，于是指向了当时还不存在的东西。分开成自己的状态而不是并进
-    UNRESOLVED_REF，因为"指错了"和"指了个未来"是两种不同的失败，后者不可能是笔误。
+    This is the one **purely deterministic** new detector this change buys, and what it catches is
+    precisely the shape of a reason written after the fact: the action was already taken, the reason
+    was written looking back, and so it points at something that did not exist at the time. Given
+    its own state rather than folded into UNRESOLVED_REF, because "pointed at the wrong step" and
+    "pointed at the future" are two different failures, and the second one cannot be a typo.
     """
     rep = chain_report(_run(
         {"args": {"doc": "path-1"}, "because": {"why": "x", "from": {"event": 2}}},
@@ -76,19 +82,21 @@ def test_a_pointer_at_a_LATER_event_is_impossible_and_named_as_such():
 
 
 def test_a_pointer_at_itself_is_also_forward():
-    """自引用是环，不是链。按同一条规则处理：`seq` 不小于自己就不合法。"""
+    """A self-reference is a cycle, not a chain. The same rule handles it: a target `seq` that is
+    not smaller than the caller's own is not legal."""
     rep = chain_report(_run(
         {"args": {"doc": "d"}, "because": {"why": "x", "from": {"event": 1}}},
     ))
     assert _status(rep) == [FORWARD_REF]
 
 
-# ------------------------------------------------------------------ 向后兼容
+# -------------------------------------------------------------- backwards compatibility
 def test_a_plain_string_because_is_prose_not_a_failure():
-    """已记录的每一次运行都是这个形状。散文无法核对，但它不是造假。
+    """Every recorded run has this shape. Prose cannot be checked, but it is not a fabrication.
 
-    分成 PROSE_ONLY 而不是并进 GROUNDED 或 UNSOURCED：并进前者会把无法核对的说成已核对，
-    并进后者会把历史上所有认真写了理由的运行记成没写。两种都会让这个数字失去意义。
+    Split out as PROSE_ONLY rather than folded into GROUNDED or UNSOURCED: folding it into the first
+    calls something checked that cannot be checked, and folding it into the second records every run
+    that ever wrote a careful reason as having written none. Either one makes the number useless.
     """
     rep = chain_report(_run(
         {"args": {"doc": "d"}, "because": "the search that surfaced this document"},
@@ -105,7 +113,8 @@ def test_a_because_object_with_no_pointer_is_prose_too():
 
 
 def test_a_malformed_pointer_does_not_crash_and_is_unresolved():
-    """一个坏标签必须变成一条记录，不能变成一次异常 —— 评测跑的是别人已经产生的运行。"""
+    """A broken label has to become a record, not an exception — the evaluation runs over runs
+    somebody else already produced."""
     for bad in ({"why": "x", "from": {"event": "not-a-number"}},
                 {"why": "x", "from": "not-a-mapping"},
                 {"why": "x", "from": {}}):
@@ -113,12 +122,14 @@ def test_a_malformed_pointer_does_not_crash_and_is_unresolved():
         assert _status(rep) == [UNRESOLVED_REF], bad
 
 
-# ------------------------------------------------------------------ 挂评测的那三个数
+# ------------------------------------------------- the three numbers an evaluation hangs on
 def test_the_grounding_ratio_counts_only_resolvable_links():
-    """分母是**能带 because 的调用总数**，分子只有真的解析通的。
+    """The denominator is **every call that could carry a because**; the numerator is only the ones
+    that actually resolved.
 
-    散文不进分子。这条比率的用处正是把"写了理由"和"理由可核对"分开 —— 把散文算进去，
-    这个数字就退回成 `detect_uncaused_reads` 已经在数的东西。
+    Prose stays out of the numerator. The whole use of this ratio is to separate "a reason was
+    written" from "the reason can be checked" — count prose in, and the number collapses back into
+    what `detect_uncaused_reads` already counts.
     """
     rep = chain_report(_run(
         {"tool": "search_notes", "args": {"q": "a"}},
@@ -129,11 +140,12 @@ def test_the_grounding_ratio_counts_only_resolvable_links():
     assert rep["n_links"] == 4
     assert rep["n_grounded"] == 1
     assert rep["grounding_ratio"] == 0.25
-    assert rep["n_prose_only"] == 1 and rep["n_unsourced"] == 2   # search 与 d3
+    assert rep["n_prose_only"] == 1 and rep["n_unsourced"] == 2   # the search and d3
 
 
 def test_the_chain_is_walkable_and_its_depth_is_reported():
-    """链之所以是链：走得下去。深度 1 说明每一步都只挂在根上，这和一条真正的推理线不同。"""
+    """What makes a chain a chain: it can be walked. A depth of 1 says every step hangs off the root
+    and nothing else, which is not the same thing as a real line of reasoning."""
     rep = chain_report(_run(
         {"tool": "list_documents", "args": {}},
         {"tool": "search_notes", "args": {"q": "a"},
@@ -141,32 +153,36 @@ def test_the_chain_is_walkable_and_its_depth_is_reported():
         {"args": {"doc": "d"}, "because": {"why": "the search surfaced it",
                                            "from": {"event": 2}}},
     ))
-    assert rep["max_depth"] == 2                       # 3 <- 2 <- 1，两跳
+    assert rep["max_depth"] == 2                       # 3 <- 2 <- 1, two hops
     assert rep["links"][2]["chain"] == [3, 2, 1]
 
 
 def test_a_cycle_cannot_hang_the_walk():
-    """两个事件互指是不可能的（后向规则已经排除），但解析器不能依赖那条规则才不死循环。"""
+    """Two events pointing at each other is impossible (the backwards-only rule already rules it
+    out), but the resolver must not depend on that rule to avoid looping forever."""
     rec = _run({"args": {"doc": "a"}}, {"args": {"doc": "b"}})
     rec.trace[0]["because"] = {"why": "x", "from": {"event": 2}}
     rec.trace[1]["because"] = {"why": "y", "from": {"event": 1}}
-    rep = chain_report(rec)                            # 不挂起即通过
+    rep = chain_report(rec)                            # not hanging is the pass condition
     assert _status(rep) == [FORWARD_REF, GROUNDED]
 
 
 def test_an_empty_run_reports_no_ratio_rather_than_zero():
-    """0/0 报成 0.0，读起来是"完全没有接地"，而事实是"没有可判断的调用"。"""
+    """0/0 reported as 0.0 reads as "grounded in nothing" when the fact is that there was no call to
+    judge."""
     rep = chain_report(_run())
     assert rep["n_links"] == 0 and rep["grounding_ratio"] is None
 
 
-# ============================================================ 主张层：散文里的每一句
-# 工具调用的链回答"为什么做这一步"。归因报告和 L5 explain 是**散文**产物，它们的每一条因果
-# 主张目前没有任何标签 —— 那是这个仓库唯一产出散文却不检查接地的地方。
+# ================================================== the claim layer: every sentence in the prose
+# The chain over tool calls answers "why this step was taken". The attribution report and L5 explain
+# are **prose** artefacts, and every causal claim in them currently carries no label at all — that
+# is the one place in this repo that produces prose and never checks its grounding.
 #
-# `claim_report` 复用同一套指针格式和同一组状态，但**不认识归因报告的 schema**：它收一个
-# 通用的 claim 列表，由调用方适配。evidence_chain 在 evaluation 平面，让它 import
-# diagnosis 的结构就是把两个平面焊在一起。
+# `claim_report` reuses the same pointer format and the same set of states, but **does not know the
+# attribution report's schema**: it takes a generic list of claims, and the caller adapts. Because
+# evidence_chain sits on the evaluation plane, making it import diagnosis's structures would weld
+# the two planes together.
 def test_a_claim_pointing_at_a_real_trace_event_is_grounded():
     from acr.evaluation.evidence_chain import claim_report
     run = _run({"tool": "search_notes", "args": {"q": "a"}},
@@ -181,7 +197,8 @@ def test_a_claim_pointing_at_a_real_trace_event_is_grounded():
 
 
 def test_a_claim_may_cite_an_evidence_entry_instead_of_an_event():
-    """归因常常要指向**答案引用的那条证据**，而不是某一步动作。两种锚点都得能指。"""
+    """Attribution often has to point at **the evidence the answer cited**, not at a step that was
+    taken. Both anchors have to be pointable."""
     from acr.evaluation.evidence_chain import claim_report
     run = _run({"args": {"doc": "d"}})
     run.manifest["evidence"] = [{"note_id": "path-1", "start": 10, "end": 20}]
@@ -195,7 +212,8 @@ def test_a_claim_may_cite_an_evidence_entry_instead_of_an_event():
 
 
 def test_a_claim_with_prose_only_is_not_counted_as_grounded():
-    """和调用层同一条规则：无法核对不等于造假，但也不等于已核对。"""
+    """Same rule as the call layer: uncheckable does not mean fabricated, and it does not mean
+    checked either."""
     from acr.evaluation.evidence_chain import claim_report
     rep = claim_report([{"text": "t", "because": "it seemed likely"}], _run())
     assert [c["status"] for c in rep["claims"]] == [PROSE_ONLY]

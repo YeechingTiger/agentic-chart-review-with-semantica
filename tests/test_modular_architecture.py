@@ -802,11 +802,13 @@ def test_capability_broker_enforces_effective_patient_scope():
 
 
 def test_audit_catches_a_tool_call_that_leaves_the_patient_under_review():
-    """一次运行只应触及一个病人。这条测试钉住审计确实会发现越界,并且把发现变成一个可路由的信号。
+    """One run must touch one patient only. This test pins down that the audit really does catch the
+    crossing, and that the finding becomes a routable signal.
 
-    2026-08-03 之前它还断言 `RepairSignalRouter` 把这个信号路由成 `SECURITY_CONTROL` 且不改
-    语义。那个路由器在生产代码里零引用,已删除;审计这一半是活的,所以断言退到信号本身 ——
-    越界被发现了,而且带着产出它的资产引用。
+    Before 2026-08-03 it also asserted that `RepairSignalRouter` routed this signal to
+    `SECURITY_CONTROL` without altering semantics. That router had zero references in production
+    code and has been deleted; the audit half is live, so the assertion falls back to the signal
+    itself -- the crossing was caught, and it carries the reference to the asset that produced it.
     """
     events = ({
         "seq": 1,

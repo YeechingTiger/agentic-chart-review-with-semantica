@@ -43,7 +43,7 @@ from acr.evaluation import evals as E
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from _decision_inputs import UNKEYED  # noqa: E402
 
-#: WAS A HARDCODED SET of STORE.390's five gate-required terms, which made "自创" (terms the run
+#: WAS A HARDCODED SET of STORE.390's five gate-required terms, which made `invented` (terms the run
 #: invented) a number about one contract. It comes from the spec now — `spec_declared_keywords`, the
 #: same list the runtime seeds a search from, so "invented" means exactly "not declared".
 
@@ -183,43 +183,51 @@ def main() -> int:
 
     dirs = {re.sub(r"__.*", "", p.name): str(p) for p in sorted(root.glob("*__*")) if p.is_dir()}
     if not dirs:
-        print(f"{root} 下没有 arm 目录")
+        print(f"no arm directories under {root}")
         return 1
     arms = {k: a for k, v in dirs.items() if (a := arm(v, inp, design, required))}
 
     hashes = set().union(*(a["spec"] for a in arms.values())) if arms else set()
     if len(hashes) > 1:
-        print(f"拒绝比较：这些臂跑在 {len(hashes)} 个不同的 spec 版本上 —— {sorted(hashes)}")
+        print(f"Refusing to compare: these arms ran on {len(hashes)} different spec versions "
+              f"— {sorted(hashes)}")
         for k, a in arms.items():
             print(f"  {k:<24} {sorted(a['spec'])}")
-        print("\n跑到一半改了 spec，差值里混着两个变量。重跑，不要读这张表。")
+        print("\nThe spec was edited half way through the run, so the difference carries two "
+              "variables. Re-run it; do not read this table.")
         return 2
 
     if not required:
-        # STATED, because otherwise `自创` silently equals `词/人` and reads like a finding about
+        # STATED, since otherwise `invented` silently equals `term/pt` and reads like a finding about
         # the runs. It is a fact about the CONTRACT: STORE.390 retired its `required_keywords` on
         # 2026-08-02 ("a switch that reads as enforcement and enforces nothing"), and this file's
-        # hardcoded five-term set was never updated — so `自创` undercounted by five phantom terms
+        # hardcoded five-term set was never updated — so `invented` undercounted by five phantom terms
         # against a spec that declares none.
-        print(f"『自创』= 全部：{inp.spec.spec_id} 一个 required_keywords 都没声明，"
-              f"所以每个词都是运行自己选的。这是契约的事实，不是臂之间的差异。\n")
+        print(f"'invented' = all of them: {inp.spec.spec_id} declares no required_keywords at all, "
+              f"so every term is one the run chose itself. That is a fact about the contract, "
+              f"not a difference between arms.\n")
     if not design:
         # THE REFUSAL, not a footnote. The held-out column is the only thing separating a method
         # scored on its own training set from a method scored on data it has not seen, and this
         # corpus carries no record of which charts informed which method.
-        print(f"拒绝分列：{inp.corpus_root.parent/'index.json'} 不存在，所以没有任何记录说明"
-              f"哪些图是照着运行失败设计的。\n"
-              f"『留出准确』与『受污准确』都不会打印 —— 不知道哪些被污染，"
-              f"不等于没有被污染。\n")
+        print(f"Refusing to split the columns: {inp.corpus_root.parent/'index.json'} does not "
+              f"exist, so nothing on record says which charts were designed by watching runs "
+              f"fail.\n"
+              f"Neither 'held-out' nor 'informed' will be printed — not knowing which charts are "
+              f"contaminated is not the same as none of them being contaminated.\n")
     print(f"{root}   spec {next(iter(hashes), '?')}   "
           f"${sum(a['cost'] for a in arms.values()):.2f}\n")
-    print(f"{'arm':<22}{'n':>3}{'读/人':>8}{'词/人':>8}{'自创':>7}"
-          f"{'留出准确':>11}{'受污准确':>11}{'中饵':>7}{'读到关键':>10}")
+    # `invented`, not `invented`: the cell below is `a['invented']`, this file's own comment calls
+    # them "terms the run invented", and `docs/MODULE_LADDER_EXPERIMENT.md` names the column
+    # `invented/patient`. A header that disagrees with its own data key and with the document
+    # reporting it is how a column gets read as the wrong quantity.
+    print(f"{'arm':<22}{'n':>3}{'read/pt':>8}{'term/pt':>8}{'invented':>9}"
+          f"{'held-out':>11}{'informed':>11}{'sprung':>7}{'reached':>10}")
     for k, a in arms.items():
         held = f"{a['held_ok']}/{a['held']}" if a["held"] else ("—" if a["design_known"] else "?")
         info = f"{a['informed_ok']}/{a['informed']}" if a["informed"] else (
             "—" if a["design_known"] else "?")
-        print(f"{k:<22}{a['n']:>3}{a['reads']:>8.1f}{a['searches']:>8.1f}{a['invented']:>7.1f}"
+        print(f"{k:<22}{a['n']:>3}{a['reads']:>8.1f}{a['searches']:>8.1f}{a['invented']:>9.1f}"
               f"{held:>11}{info:>11}"
               f"{a['sprung']:>4}/{a['synx']:<2}{a['reached']:>7}/{a['synx']:<2}")
 
@@ -227,22 +235,25 @@ def main() -> int:
     n_info = max(a["informed"] for a in arms.values())
     print()
     if not design:
-        # THE REFUSAL ABOVE ALREADY SAID WE DO NOT KNOW. Falling through to "没有一张留出病历"
+        # THE REFUSAL ABOVE ALREADY SAID WE DO NOT KNOW. Falling through to "not one is held out"
         # would assert the opposite of it — that there are none — which is a different and equally
         # unfounded claim. A checker that refuses and then answers anyway has refused nothing.
-        print("!! 上面已经拒绝分列：没有设计元数据，所以『有几张留出』本身无法回答。"
-              "这批准确率既不能当作留出结果，也不能当作受污结果。")
+        print("!! The columns were already refused above: with no design metadata, 'how many are "
+              "held out' cannot be answered at all. These accuracies can be read neither as "
+              "held-out results nor as informed ones.")
     elif not n_held:
-        print("!! 这批运行里没有一张留出病历。上面每一个准确率都是在被测对象自己的开发集上"
-              "算出来的，不能作为任何结论的依据。")
+        print("!! Not one chart in these runs is held out. Every accuracy above was computed on "
+              "the development set of the very thing being measured, and cannot support any "
+              "conclusion.")
     else:
-        print(f"『留出准确』{n_held} 张：设计时只用了契约条款，没有看过任何运行结果。"
-              f"结论只能建立在这一列上。")
+        print(f"'held-out', {n_held} chart(s): designed from the contract's clauses alone, with no "
+              f"run result ever looked at. A conclusion may rest on this column and no other.")
     if design:
-        print(f"『受污准确』{n_info} 张：SYNX/SYNK 是看着运行失败设计的，搜索卡又是从同一批"
-              f"失败写出来的；SYN0001-0012 没人追溯过。分开报，不合并。")
-    print("『中饵』只在声明了 naive_answer 的图上有意义 —— 有『错但够得着的答案』"
-          "可以被引偏的,只有那些。")
+        print(f"'informed', {n_info} chart(s): SYNX/SYNK were designed by watching runs fail and "
+              f"the search cards were written from that same batch of failures; nobody has traced "
+              f"SYN0001-0012. Reported apart, not folded together.")
+    print("'sprung' means something only on charts that declare a naive_answer — those are the "
+          "only ones with a wrong-but-reachable answer to be steered into.")
     return 0
 
 

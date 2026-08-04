@@ -1,32 +1,38 @@
-"""因果链：把 `because` 从一句读给人看的话，变成一条走得通的指针。
+"""The causal chain: turning `because` from a sentence a human reads into a pointer that resolves.
 
-问题
-----
-`because` 的 schema 说得很清楚：*"Recorded, never checked; it is how a later reader tells your
-reasoning from theirs."* 所以 `detect_uncaused_reads` 只能数**有没有**。一句编造的理由和一句
-真的理由在记录里长得一模一样，而"这一步为什么发生"是归因报告全部结论所依赖的东西。
+THE PROBLEM
+-----------
+`because`'s schema says it plainly: *"Recorded, never checked; it is how a later reader tells your
+reasoning from theirs."* So `detect_uncaused_reads` can only count **whether there is one**. A
+fabricated reason and a true one look exactly alike in the record, and "why this step happened" is
+what every conclusion in an attribution report rests on.
 
-一组注解和一条链，差别只在一件事：**标签是不是按 ID 指向另一个产物的可解析指针**。trace 事件
-本来就带 `seq`，锚点是现成的，所以这里不发明新的标识体系 —— 只是把 `because` 允许写成
+A set of annotations and a chain differ in exactly one thing: **whether the label is a resolvable
+pointer at another artefact, by ID**. Trace events already carry `seq`, so the anchor already
+exists and no new identifier scheme is invented here — `because` is merely allowed to be written as
 
-    {"why": "<散文，保留>", "from": {"event": 14}}
+    {"why": "<prose, kept>", "from": {"event": 14}}
 
-散文留着，因为它才是告诉后来者推理过程的东西；指针是新加的，因为只有它能被核对。
+The prose stays, because it is what tells a later reader the reasoning; the pointer is what is new,
+because it is the only part that can be checked.
 
-它不是门
---------
-解析失败**不拒绝任何东西**。这个仓库测量过把判断变成机械门的代价：五条临床检查，254 次
-拒绝里 60 次（24%）拒掉的元组恰好是登记面自己的答案。所以这里的产物是一份报告和几个数字，
-和 `detect_uncaused_reads` 的立场一致 —— 数出来，交给读的人。
+IT IS NOT A GATE
+----------------
+A pointer that fails to resolve **refuses nothing**. This repo has measured what it costs to turn a
+judgement into a mechanical gate: five clinical checks, and 60 of 254 recorded rejections (24%)
+refused a tuple that was exactly the registry's own answer. So what comes out of here is a report
+and a few numbers, the same stance as `detect_uncaused_reads` — count it, hand it to the reader.
 
-五种状态，为什么不是三种
-------------------------
-`PROSE_ONLY` 必须和 `GROUNDED`、`UNSOURCED` 都分开：并进前者会把无法核对的说成已核对，
-并进后者会把历史上所有认真写了理由的运行记成没写。已记录的每一次运行都是散文形状。
+FIVE STATES, AND WHY NOT THREE
+------------------------------
+`PROSE_ONLY` has to be kept apart from both `GROUNDED` and `UNSOURCED`: folding it into the first
+calls something checked that cannot be checked, and folding it into the second records every run
+that ever wrote a careful reason as having written none. Every run recorded so far is prose-shaped.
 
-`FORWARD_REF` 必须和 `UNRESOLVED_REF` 分开：指错了可能是笔误，**指向一个当时还不存在的事件
-不可能是笔误** —— 那是动作先做、理由后补才会出现的形状，而且它是这套改动带来的唯一一个纯
-确定性的新检测器。
+`FORWARD_REF` has to be kept apart from `UNRESOLVED_REF`: pointing at the wrong step can be a typo,
+but **pointing at an event that did not exist at the time cannot be a typo** — that is the shape
+that only appears when the action came first and the reason was written afterwards, and it is the
+one purely deterministic new detector this change buys.
 """
 
 from __future__ import annotations
@@ -34,35 +40,39 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-#: 指针解析通了：指向一个真实存在、且排在自己**前面**的事件。
+#: The pointer resolved: it names an event that really exists and that sits **before** this one.
 GROUNDED = "GROUNDED"
-#: 写了理由但没给指针 —— 包括历史上所有字符串形态的 `because`。不是失败。
+#: A reason was written but no pointer given — including every string-shaped `because` on record.
+#: Not a failure.
 PROSE_ONLY = "PROSE_ONLY"
-#: 没有 because。
+#: No `because` at all.
 UNSOURCED = "UNSOURCED"
-#: 给了指针但解析不到：seq 不存在，或标签本身坏了。
+#: A pointer was given but does not resolve: the seq does not exist, or the label itself is broken.
 UNRESOLVED_REF = "UNRESOLVED_REF"
-#: 指向自己或更晚的事件。不可能，因为那时它还没发生。
+#: Points at itself or at a later event. Impossible, because that event had not happened yet.
 FORWARD_REF = "FORWARD_REF"
 
-#: 允许携带 `because` 的调用种类。`kind == "tool"` 就够了：哪些工具值得解释是策略问题，
-#: 而这里只报告事实 —— 把范围收窄到读取会让"检索为什么发的"这件事无法被计入。
+#: The kind of call allowed to carry a `because`. `kind == "tool"` is enough: which tools deserve an
+#: explanation is a policy question, and this module only reports facts — narrowing the scope to
+#: reads would make "why this search was issued" impossible to count.
 _TOOL_KIND = "tool"
 
-#: 走链时的上限。后向规则本已排除环，但解析器不能依赖另一条规则才不死循环 —— 一个坏记录
-#: 不该让评测挂起。
+#: The ceiling on a chain walk. The backwards-only rule already rules cycles out, but the resolver
+#: must not depend on another rule to avoid looping forever — one bad record should not hang the
+#: evaluation.
 _MAX_WALK = 1000
 
 
 def _pointer(because: Any) -> int | None | str:
-    """从 `because` 里取出被指向的 seq。
+    """Pull the pointed-at seq out of a `because`.
 
-    返回 int（有指针）、None（没有指针，是散文）、或 `UNRESOLVED_REF`（有指针但坏了）。
-    坏标签必须变成一条记录而不是一次异常：评测跑的是别人已经产生的运行，而那些运行不会
-    因为格式错误就重跑一遍。
+    Returns an int (there is a pointer), None (no pointer, it is prose), or `UNRESOLVED_REF` (there
+    is a pointer but it is broken). A broken label has to become a record rather than an exception:
+    the evaluation runs over runs somebody else already produced, and those runs are not going to be
+    run again because of a formatting error.
     """
     if not isinstance(because, Mapping):
-        return None                                    # 字符串 / 其它 —— 散文
+        return None                                    # a string, or anything else — prose
     ref = because.get("from")
     if ref is None:
         return None
@@ -78,7 +88,8 @@ def _pointer(because: Any) -> int | None | str:
 
 
 def _as_seq(raw: Any) -> int | str:
-    """扁平 `after_event` 的取值。坏值走和坏标签同一条路：变成记录，不变成异常。"""
+    """The value of the flat `after_event`. A bad value takes the same route as a bad label: it
+    becomes a record, not an exception."""
     try:
         return int(raw)
     except (TypeError, ValueError):
@@ -92,9 +103,9 @@ def _why(because: Any) -> str:
 
 
 def chain_report(run) -> dict:
-    """每一次工具调用的因果链状态，加上挂评测用的三个数。
+    """The causal-chain status of every tool call, plus the three numbers an evaluation can hang on.
 
-    `run` 是一个 `RunRecord`；只读它的 trace。
+    `run` is a `RunRecord`; only its trace is read.
     """
     events = [ev for ev in (run.trace or []) if ev.get("kind") == _TOOL_KIND]
     by_seq: dict[int, dict] = {}
@@ -111,8 +122,10 @@ def chain_report(run) -> dict:
         except (TypeError, ValueError):
             seq = None
         because = ev.get("because")
-        # 扁平字段优先。嵌套形态保留只为读懂用第一版 schema 跑出来的记录 —— 那一版实测
-        # 执行率 0/18，所以它不会有多少数据，但读不懂旧记录是另一种损失。
+        # The flat field wins. The nested shape is kept only so records produced by the first
+        # version of the schema stay readable — that version measured 0 of 18 calls emitting one,
+        # so there will not be much data in it, but being unable to read an old record is its own
+        # kind of loss.
         flat = ev.get("after_event")
         target = _pointer(because) if flat is None else _as_seq(flat)
 
@@ -123,7 +136,8 @@ def chain_report(run) -> dict:
         elif target == UNRESOLVED_REF:
             status, ref = UNRESOLVED_REF, None
         elif target not in by_seq:
-            # 存在性先判：一个指向不存在 seq 的指针，说它"在后面"是在假装它存在。
+            # Existence is judged first: calling a pointer at a seq that does not exist "later" is
+            # pretending that seq exists.
             status, ref = UNRESOLVED_REF, target
         elif seq is not None and target >= seq:
             status, ref = FORWARD_REF, target
@@ -146,17 +160,19 @@ def chain_report(run) -> dict:
         "n_unsourced": counts[UNSOURCED],
         "n_unresolved": counts[UNRESOLVED_REF],
         "n_forward": counts[FORWARD_REF],
-        # None, 不是 0.0 —— 一次没有工具调用的运行不是"完全没有接地"，是没有可判断的调用，
-        # 而把两者渲染成同一个数字正是这份报告要消除的那种混淆。
+        # None, not 0.0 — a run with no tool calls is not "grounded in nothing", it is a run with
+        # no call to judge, and rendering the two as the same number is exactly the confusion this
+        # report exists to remove.
         "grounding_ratio": (counts[GROUNDED] / n) if n else None,
         "max_depth": max((len(x["chain"]) - 1 for x in links), default=0),
     }
 
 
 def _walk(seq: int | None, by_seq: dict[int, dict]) -> list[int]:
-    """从 `seq` 沿指针回溯到根，返回经过的 seq 列表。
+    """Walk back from `seq` along the pointers to the root, returning the seqs it passed through.
 
-    带 `seen` 与硬上限：后向规则本已让环不可能出现，但一份坏记录不该让评测挂起。
+    Carries both a `seen` set and a hard ceiling: the backwards-only rule already makes a cycle
+    impossible, but a bad record should not hang the evaluation.
     """
     out: list[int] = []
     seen: set[int] = set()
@@ -176,11 +192,12 @@ def _walk(seq: int | None, by_seq: dict[int, dict]) -> list[int]:
 
 
 def _claim_pointer(because: Any) -> tuple[str, int] | None | str:
-    """从一条主张的 `because` 里取出锚点：`("event", n)` 或 `("evidence", i)`。
+    """Pull the anchor out of a claim's `because`: `("event", n)` or `("evidence", i)`.
 
-    两种锚点都要支持，因为归因主张有两种自然的依据：一步动作（"它从没搜过这个缩写"）和
-    一条已引用的证据（"被引的那一段没提到 behaviour"）。只支持前者会逼调用方把证据主张
-    硬塞进事件编号里。
+    Both anchors have to be supported, because an attribution claim has two natural grounds: a step
+    that was taken ("it never searched for the abbreviation") and a piece of evidence already cited
+    ("the cited span does not mention behaviour"). Supporting only the first would force callers to
+    cram an evidence claim into an event number.
     """
     if not isinstance(because, Mapping):
         return None
@@ -199,14 +216,16 @@ def _claim_pointer(because: Any) -> tuple[str, int] | None | str:
 
 
 def claim_report(claims: list[Mapping], run) -> dict:
-    """散文产物里每条主张的接地状态。
+    """The grounding status of every claim in a prose artefact.
 
-    收一个**通用**的 claim 列表 —— 每项至少有 `text`，可选 `because` —— 而不是归因报告的
-    类型。这个模块在 evaluation 平面；让它 import diagnosis 的 schema 就是把两个平面焊死，
-    而 `tests/test_layering.py` 恰好禁止这件事。调用方负责适配。
+    Takes a **generic** list of claims — each with at least `text`, optionally `because` — rather
+    than the attribution report's own types. This module sits on the evaluation plane; making it
+    import diagnosis's schema would weld the two planes together, and `tests/test_layering.py`
+    forbids exactly that. Adapting is the caller's job.
 
-    状态与调用层完全相同，理由也相同：`PROSE_ONLY` 既不算已核对也不算没写，而
-    `grounding_ratio` 只把真的解析通的算进分子。
+    The states are identical to the call layer's, for identical reasons: `PROSE_ONLY` counts neither
+    as checked nor as unwritten, and `grounding_ratio` puts only the pointers that actually resolved
+    into the numerator.
     """
     by_seq = {}
     for ev in (run.trace or []):

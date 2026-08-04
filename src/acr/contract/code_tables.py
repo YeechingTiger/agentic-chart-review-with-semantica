@@ -1,31 +1,39 @@
-"""值域码表：一个码系统的事实表，轴由资产声明而不是由本模块写死。
+"""Value-domain code tables: the fact table for one code system, its axes declared by the asset
+rather than hard-coded in this module.
 
-这个模块替换了 `icdo3.py`。原因不是风格
---------------------------------------
-`icdo3.load_table` 要求每张表都有 `topography` / `morphology` / `behavior` 三个键，
-`prompt_block` 把这三个词当章节标题写死，`_TOPO = C\\d{3}` 和 `_MORPH = \\d{4}` 是模块常量，
-`check_codes(site, histology, behavior)` 把三个癌症字段名写进了参数表。于是：
+THIS MODULE REPLACES `icdo3.py`, AND NOT FOR STYLE
+--------------------------------------------------
+`icdo3.load_table` required every table to carry the three keys `topography` / `morphology` /
+`behavior`, `prompt_block` hard-coded those three words as its section headings, `_TOPO = C\\d{3}`
+and `_MORPH = \\d{4}` were module constants, and `check_codes(site, histology, behavior)` wrote
+three cancer field names into the parameter list. So:
 
-  * 一张 LOINC 血脂面板或 RxNorm 药物类**无法表达** —— `load_table` 抛错，而
-    `spec.load_spec` 是 fail-closed 的，整个 spec 加载失败；
-  * `spec`、`agent`、`run_manifest` 三处框架代码 import 了一个 use case 专属模块，
-    这是 `tests/test_layering.py` 登记的三条倒挂依赖中的全部。
+  * a LOINC lipid panel or an RxNorm drug class **could not be expressed** — `load_table` raised,
+    and `spec.load_spec` is fail-closed, so the whole spec load failed;
+  * three pieces of framework code — `spec`, `agent`, `run_manifest` — imported a module belonging
+    to one use case, and those were all three of the inverted dependencies registered in
+    `tests/test_layering.py`.
 
-肿瘤登记是这套框架的**一个** use case。所以轴的名字、章节标题、码形正则和记法折叠规则
-全部下沉到 `assets/codes/*.yaml`，本模块只知道"表有若干个有序的轴，每个轴有码和名字"。
+Cancer registry abstraction is **one** use case of this framework. So the axis names, the section
+headings, the code-shape regexes and the notation-folding rules all move down into
+`assets/codes/*.yaml`, and this module only knows that "a table has some ordered axes, and each
+axis has codes and names".
 
-保留下来的三件事，一件都不是 gate
---------------------------------
-  1. `prompt_block()` 把值域渲进系统提示词，让模型往一张看得见的表里编码，而不是往一张
-     半记住的表里编码。两次真实失败促成了它：一次把 `7205` 当形态码（ICD-O-3 里没有
-     7205），一次写下"C341 是右中叶"并据此编码（C341 是**上**叶）。
-  2. `check_values()` 返回带类型的问题给评测面**计数**，永不用于拒绝。
-  3. `normalize()` 折叠记法差异。这是 4 of 6 有用的旧 `field_format` firing —— 它当年
-     大半时间在制造自己再解决的往返。
+THE THREE THINGS THAT SURVIVED, AND NOT ONE OF THEM IS A GATE
+-------------------------------------------------------------
+  1. `prompt_block()` renders the value domain into the system prompt, so the model codes into a
+     table it can see rather than into one it half remembers. Two real failures prompted it: one
+     run used `7205` as a morphology code (there is no 7205 in ICD-O-3), and one wrote "C341 is the
+     right middle lobe" and coded on that basis (C341 is the **upper** lobe).
+  2. `check_values()` returns typed problems for the evaluation plane to **count**, never to reject
+     with.
+  3. `normalize()` folds notation differences. This is 4 of the 6 useful firings of the old
+     `field_format` check — most of what that check did was manufacture a round trip it then
+     solved itself.
 
-REPORTABILITY / ADMISSIBILITY 是领域策略，不是本模块的权限。轴里的 `admissible: false`
-和表级 `exclusions` 携带的是编码手册的裁定，所以每个问题都是 advisory，而且每张表的
-`source_authority` 都要求由人核对。
+REPORTABILITY / ADMISSIBILITY is domain policy, not this module's authority. The `admissible: false`
+in an axis and the table-level `exclusions` carry a casefinding manual's rulings, so every problem
+is advisory and every table's `source_authority` asks for a human to check it.
 """
 
 from __future__ import annotations
@@ -41,8 +49,9 @@ from ..core.repo_paths import asset_dir
 
 CODES_DIR = asset_dir("assets/codes")
 
-#: 问题类型。是名字而不是布尔，因为"这不是一个码"、"这个码属于别的范围"和"这个码不可采纳"
-#: 是三种不同的发现，分不清的调用方会报错那一种。
+#: Problem kinds. Names rather than a boolean, because "this is not a code", "this code belongs to
+#: a different scope" and "this code is not admissible" are three different findings, and a caller
+#: that cannot tell them apart will report the wrong one.
 MALFORMED = "MALFORMED"
 NOT_IN_TABLE = "NOT_IN_TABLE"
 OUT_OF_TABLE_SCOPE = "OUT_OF_TABLE_SCOPE"
@@ -51,7 +60,7 @@ EXCLUDED_BY_SPEC = "EXCLUDED_BY_SPEC"
 
 
 class CodeTableError(ValueError):
-    """码表缺失，或者不是本模块能读的形状。"""
+    """A code table is missing, or is not a shape this module can read."""
 
 
 @dataclass(frozen=True)
@@ -68,10 +77,11 @@ class CodeProblem:
 
 @dataclass(frozen=True)
 class CodeAxis:
-    """一个轴：一组码，加上渲染和检查它所需要的、由资产声明的元数据。
+    """One axis: a set of codes, plus the asset-declared metadata needed to render and check it.
 
-    `name` 是轴名（调用方按它传值），`field` 是这个轴编码的 spec 字段名（问题报在它上面）。
-    两者分开，是因为一个轴可以在不同 spec 里落到不同字段名上。
+    `name` is the axis name (callers pass values keyed by it) and `field` is the name of the spec
+    field this axis codes (problems are reported against it). The two are kept apart because one
+    axis can land on a different field name in a different spec.
     """
 
     name: str
@@ -88,8 +98,9 @@ class CodeAxis:
         return e.get("name") if e else None
 
     def is_admissible(self, code: str) -> bool:
-        """轴不声明 `admissible` 时默认可采纳。缺省为 True，因为绝大多数轴的码都是可用值，
-        而把默认设成 False 会让一张没写这个键的表整体变成不可采纳且没人看得出为什么。"""
+        """A code is admissible when the axis does not declare `admissible`. The default is True
+        because the codes on almost every axis are usable values, and defaulting to False would make
+        a table that never writes the key inadmissible as a whole, with nobody able to see why."""
         e = self.codes.get(code)
         return True if e is None else bool(e.get("admissible", True))
 
@@ -108,10 +119,11 @@ class CodeTable:
     _norm: dict = field(default_factory=dict)
 
     def normalize(self, raw: str) -> str:
-        """按**这张表**声明的记法规则折叠一个码。
+        """Fold one code by the notation rules **this table** declares.
 
-        规则跟着表走而不是写在模块里：ICD-O-3 写 `C18.7` 和 `8140/3`，而 LOINC 码里的连字符
-        是码的一部分。一个写死了 `[.\\s]` 加 `split_on='/'` 的函数会把别的系统的码改坏。
+        The rules travel with the table instead of living in the module: ICD-O-3 writes `C18.7` and
+        `8140/3`, whereas the hyphen inside a LOINC code is part of the code. A function with
+        `[.\\s]` and `split_on='/'` hard-coded into it corrupts another system's codes.
         """
         s = str(raw or "")
         pattern = self._norm.get("strip_pattern")
@@ -125,10 +137,11 @@ class CodeTable:
         return s
 
     def trailing_part(self, raw: str) -> str | None:
-        """`split_on` 之后被丢掉的那一段的首字符，例如 `8140/3` 的 `3`。
+        """The first character of what `split_on` dropped, for example the `3` of `8140/3`.
 
-        存在的理由：行为位在 STORE 里是**单独一个字段**，所以不能被静默并进形态码，但调用方
-        需要拿得到它。表没声明 `split_on` 就永远返回 None。
+        Why it exists: the behaviour digit is a **field of its own** in STORE, so it must not be
+        silently merged into the morphology code, but a caller still needs to be able to get at it.
+        A table that declares no `split_on` always returns None.
         """
         split_on = self._norm.get("split_on")
         if not split_on:
@@ -143,7 +156,7 @@ class CodeTable:
         return tail[:1] or None
 
     def exclusion_term(self, axis_values: dict[str, str]) -> str | None:
-        """`exclusions` 里与这组轴值全部吻合的那一条的术语名。"""
+        """The term of the `exclusions` row whose every axis value matches these axis values."""
         for row in self.exclusions:
             match = row.get("axis_values") or {}
             if not match:
@@ -179,10 +192,11 @@ def _axis(name: str, d: dict, norm: dict) -> CodeAxis:
 
 @lru_cache(maxsize=8)
 def load_table(name: str, codes_dir: str | None = None) -> CodeTable:
-    """一张码表，按名字。
+    """One code table, by name.
 
-    没有默认表名。旧的 `load_table(name="icdo3_lung")` 让"忘了声明值域"和"声明了肺"看起来
-    一样，而装错表会让每个病例都像答错。名字必须由 spec 说出来。
+    There is no default table name. The old `load_table(name="icdo3_lung")` made "forgot to declare
+    a value domain" and "declared lung" look the same, and loading the wrong table makes every case
+    look like a wrong answer. The name has to be said out loud by the spec.
     """
     root = Path(codes_dir) if codes_dir else CODES_DIR
     path = root / f"{name}.yaml"
@@ -216,12 +230,15 @@ def load_table(name: str, codes_dir: str | None = None) -> CodeTable:
 
 
 def check_values(values: dict[str, str | None], *, table: CodeTable) -> list[CodeProblem]:
-    """一组按轴名给出的值的事实性问题。ADVISORY —— 用于计数，永不用于拒绝。
+    """The factual problems in a set of values given by axis name. ADVISORY — for counting, never
+    for rejecting.
 
-    空值跳过：一个空值是弃答的事，本模块对"该不该弃答"没有意见。
+    Empty values are skipped: an empty value is a matter of abstention, and this module has no
+    opinion on whether abstaining was right.
 
-    轴名拼错会抛错而不是被忽略。静默忽略等于报告"检查通过"而一个字都没查 —— 那是这个仓库
-    反复点名的那种不会失败的检查。
+    A misspelled axis name raises rather than being ignored. Ignoring it silently amounts to
+    reporting "the check passed" without having checked a single thing — the kind of check that
+    cannot fail that this repository keeps naming.
     """
     out: list[CodeProblem] = []
     unknown = [a for a in values if a not in table.axes]
@@ -229,7 +246,7 @@ def check_values(values: dict[str, str | None], *, table: CodeTable) -> list[Cod
         raise CodeTableError(
             f"{table.table_id} has no axis {unknown!r}; declared axes are "
             f"{sorted(table.axes)}")
-    for axis_name, axis in table.axes.items():          # 按表的顺序，不按传入顺序
+    for axis_name, axis in table.axes.items():          # the table's order, not the caller's
         if axis_name not in values:
             continue
         raw = values[axis_name]
@@ -270,15 +287,15 @@ def check_values(values: dict[str, str | None], *, table: CodeTable) -> list[Cod
 
 
 def prompt_block(table: CodeTable, *, max_terms: int = 0) -> str:
-    """值域，给系统提示词。默认渲染整张表。
+    """The value domain, for the system prompt. Renders the whole table by default.
 
-    渲染而不是摘要：一个只被展示 12 of 40 个码的模型会往那 12 个里编码。`max_terms` 是给
-    量提示词大小的调用方用的,不是默认值。
+    Rendered rather than summarised: a model shown only 12 of 40 codes will code into those 12.
+    `max_terms` is for a caller that is measuring prompt size, not a default.
 
-    每一行文字都来自资产 —— 标题来自轴的 `label`，提醒来自表的 `warnings`。旧版本把
-    "MORPHOLOGY (four digits; behaviour is a separate field)" 和 "if a diagnosis has no
-    ICD-O-3 morphology then the finding is not a reportable neoplasm" 写在 Python 里，那两句
-    话对一张血脂表就是胡说。
+    Every line of text comes from the asset — the headings from each axis's `label`, the warnings
+    from the table's `warnings`. The old version wrote "MORPHOLOGY (four digits; behaviour is a
+    separate field)" and "if a diagnosis has no ICD-O-3 morphology then the finding is not a
+    reportable neoplasm" into Python, and both of those sentences are nonsense over a lipid panel.
     """
     L = [f"VALUE DOMAIN — {table.table_id} v{table.version}"
          + (f" ({table.scope})" if table.scope else "")]
@@ -310,14 +327,16 @@ def prompt_block(table: CodeTable, *, max_terms: int = 0) -> str:
 
 
 def code_domain_block(spec) -> str:
-    """声明了值域的 spec 的值域块；没声明的 spec 得到 ""。
+    """The value-domain block for a spec that declares one; a spec that declares none gets "".
 
-    Task Contract 与提示词之间的接缝。spec 说它的值编码进**哪张**表
-    (`value_domain: icdo3_lung`)，因为那是答案含义的一部分；这里把它渲染出来。没声明的
-    spec 什么也不给 —— 日期和 class-of-case 变量没有码表值域，塞一墙形态码只会被忽略。
+    The seam between the Task Contract and the prompt. The spec says **which** table its values are
+    coded into (`value_domain: icdo3_lung`), because that is part of what the answer means; this
+    renders it. A spec that declares none gets nothing — date and class-of-case variables have no
+    code-table value domain, and a wall of morphology codes stuffed at them is only ignored.
 
-    `load_spec` 已经拒绝过不存在的表，所以到这里的名字一定能解析。`try` 是为测试或 ablation
-    在内存里构造的 spec 留的：那里没有这个保证，而一张缺失的表不该拖垮一次本来不需要它的运行。
+    `load_spec` has already refused a table that does not exist, so a name that reaches here always
+    resolves. The `try` is there for specs a test or an ablation builds in memory: there is no such
+    guarantee, and a missing table should not bring down a run that never needed it.
     """
     name = str(getattr(spec, "value_domain", "") or "").strip()
     if not name:
@@ -329,12 +348,13 @@ def code_domain_block(spec) -> str:
 
 
 def table_manifest(spec) -> dict | None:
-    """一次运行被展示过的值域的身份，或者 None（它没声明）。
+    """The identity of the value domain a run was shown, or None (it declared none).
 
-    内容哈希，理由和 `skills_manifest` 一样：这些表是给人编辑的 YAML —— 每张表里的
-    `what_a_human_must_check` 正是在邀请这件事 —— 所以单靠 `table_version` 会让一张改过的
-    表冒充上一次运行用过的那张。那次给肺表加了十一个形态码的 1,788 行验证就是这种编辑，
-    它之前和之后写的 manifest 绝不能被当成可比的。
+    Content-hashed, for the same reason as `skills_manifest`: these tables are YAML meant to be
+    edited by hand — the `what_a_human_must_check` in every table is an invitation to exactly that —
+    so `table_version` on its own lets an edited table pass for the one the previous run used. The
+    1,788-row validation that added eleven morphology codes to the lung table was an edit of that
+    kind, and the manifests written before it and after it must never be taken as comparable.
     """
     import hashlib
     name = str(getattr(spec, "value_domain", "") or "").strip()

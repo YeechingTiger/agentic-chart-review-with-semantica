@@ -1,7 +1,8 @@
-"""`acr signal` 是问信号的唯一入口，程序算的和 AI 看的都从这里进。
+"""`acr signal` is the one door signals come through: what code computes and what a model reads.
 
-它必须是薄的：转发给已经测过的 `evals` 和 `attribution`，自己不含判分逻辑。特别是
-`--kind rule` 这条路必须一个模型都不碰——否则"无模型评测面"就只是文档里的一句话。
+It has to be thin — it forwards to the already-tested `evals` and `attribution` and holds no
+scoring logic of its own. The `--kind rule` path in particular must not touch a single model:
+otherwise "a model-free evaluation plane" is only a sentence in the documentation.
 """
 from __future__ import annotations
 
@@ -47,14 +48,15 @@ def test_unknown_kind_is_refused():
 
 
 def test_module_imports_no_provider_at_module_scope():
-    """薄壳的代价必须是零：模型侧的 import 只在 --kind agent 的分支里发生。
+    """The thin shell must cost nothing: provider imports happen only in the --kind agent branch.
 
-    `acr eval` 组承诺不调模型。如果这个新组在模块层面就 import 了 litellm，任何人 import
-    cli 都会把 provider 拖进来，那条承诺在实践中就没了。
+    The `acr eval` group promises it calls no model. If this new group imports litellm at module
+    scope, anybody who imports `cli` drags the provider in with them, and that promise is gone in
+    practice.
     """
     tree = ast.parse((SRC / "acr" / "commands" / "cli_signal.py").read_text(encoding="utf-8"))
     top: set[str] = set()
-    for node in tree.body:                      # 只看模块层，函数体内的延迟 import 不算
+    for node in tree.body:                      # module scope only; deferred imports do not count
         if isinstance(node, ast.Import):
             top.update(a.name.split(".")[0] for a in node.names)
         elif isinstance(node, ast.ImportFrom):
@@ -148,14 +150,16 @@ def test_out_writes_the_signal_instead_of_printing_it(tmp_path, monkeypatch):
 
 
 def test_the_posture_vocabulary_is_attributions_own_and_not_a_third_spelling():
-    """立场就是 truth mode，而 truth mode 已经存在于两处。
+    """The posture IS the truth mode, and the truth mode already exists in two places.
 
-    第一版在这里发明了 `run-fault` / `key-suspect`，那是同一个概念的**第三种**拼法，而且是
-    唯一一种绕过资产层的：`attribution.ATTRIBUTION_MODES` 是 (GOLD, REGISTRY_REFERENCE,
-    BLIND)，`EvaluationTask.truth_mode` 校验的是同一个集合，`assets/module_catalog/**/*.yaml` 里
-    每个模块声明 `truth_modes:`。方法论文档 §4.1 的标题就是"Truth mode 决定结论上限"。
+    The first version invented `run-fault` / `key-suspect` here. That was a THIRD spelling of one
+    concept, and the only one that bypassed the asset layer: `attribution.ATTRIBUTION_MODES` is
+    (GOLD, REGISTRY_REFERENCE, BLIND), `EvaluationTask.truth_mode` validates the same set, and
+    every module under `assets/module_catalog/**/*.yaml` declares `truth_modes:`. The methodology
+    doc's §4.1 is titled "Truth mode caps what can be concluded".
 
-    这条断言读 attribution 自己的常量而不是抄一份 —— 抄一份的那天起两份就可以各自漂移。
+    This assertion reads attribution's own constant rather than keeping a copy — from the day
+    there are two copies, the two are free to drift apart.
     """
     from acr.commands.cli_signal import EVAL_MODES
     from acr.diagnosis.attribution import ATTRIBUTION_MODES
@@ -163,12 +167,13 @@ def test_the_posture_vocabulary_is_attributions_own_and_not_a_third_spelling():
 
 
 def test_no_truth_mode_puts_both_postures_in_one_prompt():
-    """原来的缺陷，用正确的词表重述一遍。
+    """The original defect, restated in the right vocabulary.
 
-    `eval-key-challenge` 开篇是"the key is also a suspect"，`eval-missed-evidence` 开篇是
-    "confirm the value is genuinely documented before you start"。两句话进同一个系统提示词
-    不是"更多方法"，是一个没有立场的提示词 —— 每个难解的失败都能从"key 可能有问题"退出，
-    每个不可达的 key 都能记成 agent 的错，而它在两者之间的选择不被记录在任何地方。
+    `eval-key-challenge` opens with "the key is also a suspect"; `eval-missed-evidence` opens with
+    "confirm the value is genuinely documented before you start". Both sentences in one system
+    prompt is not "more method", it is a prompt with no posture — every hard failure can exit
+    through "the key may be wrong", every unreachable key can be booked as an agent error, and the
+    agent's choice between the two is recorded nowhere.
     """
     from acr.commands.cli_signal import EVAL_MODES, KEY_IS_RIGHT_SKILLS, KEY_IS_SUSPECT_SKILLS
     for mode, cards in EVAL_MODES.items():
@@ -180,12 +185,13 @@ def test_no_truth_mode_puts_both_postures_in_one_prompt():
 
 
 def test_each_truth_mode_gets_the_posture_its_boundary_licenses():
-    """卡组跟着 truth mode 的结论上限走，而不是反过来。
+    """The card set follows the truth mode's ceiling on conclusions, not the other way round.
 
-    GOLD 的边界说 packet 里的 gold 是**人工裁定过**的，所以怀疑 key 不在选项里，因在 run。
-    REGISTRY_REFERENCE 的边界说登记值是"an UNRESOLVED reference, not truth"，分歧只能是
-    NEEDS_ADJUDICATION —— 那正是 eval-key-challenge 要问的。
-    BLIND 根本没有 truth，所以两种立场都不适用：只给与 key 无关的卡。
+    GOLD's boundary says the packet's gold was HUMAN ADJUDICATED, so doubting the key is not on
+    the table and the cause is in the run.
+    REGISTRY_REFERENCE's boundary says a registry value is "an UNRESOLVED reference, not truth",
+    so a disagreement may only be NEEDS_ADJUDICATION — exactly what eval-key-challenge asks.
+    BLIND has no truth at all, so neither posture applies: key-agnostic cards only.
     """
     from acr.commands.cli_signal import (
         EVAL_MODES,
@@ -200,9 +206,10 @@ def test_each_truth_mode_gets_the_posture_its_boundary_licenses():
 
 
 def test_every_eval_card_in_the_tree_belongs_to_exactly_one_posture():
-    """分不到立场的卡就是没有任何 truth mode 会加载的卡，也就是没人会收到的卡。
+    """A card assigned to no posture is a card no truth mode loads, which is a card nobody receives.
 
-    这正是 `acr.contract.skills` 存在要防的那个失败，高一层：运行时报告提供了方法而模型什么也没拿到。
+    That is the failure `acr.contract.skills` exists to prevent, one level up: the run reports that
+    method was offered while the model received nothing at all.
     """
     from pathlib import Path
 
@@ -225,11 +232,12 @@ def test_every_eval_card_in_the_tree_belongs_to_exactly_one_posture():
 
 
 def test_blind_is_the_default_because_a_key_must_be_asked_for():
-    """默认 BLIND，和 `acr attribute case` 显式的默认值一致。
+    """BLIND by default, matching `acr attribute case`'s own explicit default.
 
-    这修掉了一处真实隐患：`cli_attribute` 的 `resolved_mode = mode or (GOLD if gold else
-    BLIND)` 让**光是传了 --gold** 就把归因升到 GOLD，而 GOLD 的边界宣称那份 key 人工裁定过。
-    按 §4.1 那是 HUMAN 权限才能赋予的。现在必须有人把 --truth-mode GOLD 打出来。
+    This fixes a real latent defect: `cli_attribute`'s `resolved_mode = mode or (GOLD if gold else
+    BLIND)` let the MERE PRESENCE of `--gold` promote the attribution to GOLD, and GOLD's boundary
+    asserts that key was human adjudicated. Under §4.1 that is authority only the HUMAN plane may
+    grant. Now somebody has to type `--truth-mode GOLD`.
     """
     from acr.commands.cli_signal import DEFAULT_TRUTH_MODE, _eval_skill_names
     assert DEFAULT_TRUTH_MODE == "BLIND"
@@ -238,7 +246,7 @@ def test_blind_is_the_default_because_a_key_must_be_asked_for():
 
 
 def test_an_explicit_eval_skills_list_still_overrides_the_truth_mode():
-    """逃生口保留：truth mode 是一对命名默认，不是白名单。"""
+    """The escape hatch stays: a mode is a named pair of defaults, not a whitelist."""
     from acr.commands.cli_signal import _eval_skill_names
     assert _eval_skill_names("eval-overconfidence, eval-missed-evidence") == (
         "eval-overconfidence", "eval-missed-evidence")
@@ -258,11 +266,12 @@ def test_an_unknown_truth_mode_is_refused_and_names_the_real_ones(tmp_path, monk
 
 def test_an_unknown_truth_mode_is_refused_on_a_kind_that_would_have_ignored_it(
         tmp_path, monkeypatch):
-    """`--kind rule` 从不读 truth mode，而这正是它仍然必须被检查的理由。
+    """`--kind rule` never reads the truth mode, and that is exactly why it still has to be checked.
 
-    `_check_kind` 立的规矩是：在选项**解析时**拒绝，不在命令体里。只在消费它的分支上校验，
-    意味着确定性那一趟上打错的 `--truth-mode GOLDD` 被静默接受，而操作员要等到排在后面的
-    agent 运行才知道。
+    The rule `_check_kind` set is: refuse AS THE OPTION IS PARSED, not in the command body.
+    Validating only in the branch that consumes it means a mistyped `--truth-mode GOLDD` on the
+    deterministic pass is accepted in silence, and the operator does not find out until an agent
+    run later in the queue.
     """
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
     m = _manifest(tmp_path, "ruled")
@@ -275,10 +284,11 @@ def test_an_unknown_truth_mode_is_refused_on_a_kind_that_would_have_ignored_it(
 
 @pytest.mark.parametrize("cmd", ["run", "batch"])
 def test_both_commands_name_the_truth_modes_in_their_help(cmd: str):
-    """断言在 mode 的**名字**上，不在字符串 `--mode` 上。
+    """The assertion is on the mode NAMES, not on the string `--mode`.
 
-    `--model` 含有子串 `--mode`，所以这条测试最显然的写法会在 flag 还不存在时就通过 —— 第一版
-    就是这样，而 CLI 当时回的是 `No such option: --mode`。
+    `--model` contains `--mode` as a substring, so the most obvious way to write this test passes
+    while the flag does not exist yet — that is what the first version did, and the CLI was
+    answering `No such option: --mode` at the time.
     """
     from acr.commands.cli_signal import EVAL_MODES
     res = runner.invoke(signal_app, [cmd, "--help"])
@@ -289,10 +299,11 @@ def test_both_commands_name_the_truth_modes_in_their_help(cmd: str):
 
 
 def test_the_truth_mode_decides_the_cards_and_reaches_attribution(monkeypatch, tmp_path):
-    """一个被解析而没接线的 flag 等于没有 flag。
+    """A flag that is parsed and never wired is not a flag.
 
-    两件事一起断言：渲染出的卡片块（模型唯一看得见的东西），以及 `mode` 真的到了
-    `attribute_case_payload` —— 否则归因会自己按 `--gold` 推导，卡片和边界指令又会矛盾。
+    Two things asserted together: the rendered card block (the only thing the model ever sees), and
+    that `mode` really arrives at `attribute_case_payload` — otherwise attribution derives it from
+    `--gold` on its own, and the cards and the boundary instruction contradict each other again.
     """
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
     import acr.commands.cli_attribute as CA
@@ -309,9 +320,9 @@ def test_the_truth_mode_decides_the_cards_and_reaches_attribution(monkeypatch, t
                                      "--truth-mode", "REGISTRY_REFERENCE",
                                      "--local-root", str(tmp_path)])
     assert res.exit_code == 0, res.output
-    assert seen["mode"] == "REGISTRY_REFERENCE"          # 边界指令跟着走
+    assert seen["mode"] == "REGISTRY_REFERENCE"          # the boundary instruction follows
     block = seen["eval_skills_prompt"]
-    assert "eval skill: eval-key-challenge" in block     # 卡片也跟着走
+    assert "eval skill: eval-key-challenge" in block     # and so do the cards
     assert "eval skill: eval-missed-evidence" not in block
 
 
@@ -611,7 +622,7 @@ def test_the_manifest_does_not_crowd_the_trace_out_of_the_packet(tmp_path: Path)
     assert "search_notes" in J._render(packet)          # the trace survived the budget
 
 
-@pytest.mark.provider_seam   # 客户端在围栏拒绝之前就被构造了；没有请求发出
+@pytest.mark.provider_seam   # the client is built before the fence refuses; no request is sent
 def test_the_fence_is_judges_own_and_not_a_copy(tmp_path, monkeypatch):
     """`correctness` is `==`. Asking the judge for it must fail with judge()'s own sentence.
 
@@ -629,7 +640,7 @@ def test_the_fence_is_judges_own_and_not_a_copy(tmp_path, monkeypatch):
     assert "DeterministicEvaluatorExists" in flat and "acr.evaluation.evals.score" in flat
 
 
-@pytest.mark.provider_seam   # 同上
+@pytest.mark.provider_seam   # as above
 def test_a_dimension_the_registry_never_heard_of_is_refused(tmp_path, monkeypatch):
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
     m = _traced(tmp_path, "unknown")
@@ -708,14 +719,17 @@ def test_the_json_judge_model_is_public_and_the_old_name_still_resolves():
 
 
 def test_the_agent_kind_gets_more_turns_than_acr_attribute_case_defaults_to():
-    """回归：12 次调用装不下八段流程加四张复盘卡。
+    """Regression: 12 model calls do not fit eight pipeline stages plus four eval cards.
 
-    第一次真实归因停在 11/12，`cause: UNRESOLVED`，理由是"model-call limit reached without a
-    gate-valid attribution"——反事实检验和唱反调复核都没做，报告门控于是（正确地）拒绝把它
-    标为已解决。一个产不出交付物的默认值不是预算，是墙。
+    The first live attribution stopped at 11 of 12 with `cause: UNRESOLVED` and the rationale
+    "model-call limit reached without a gate-valid attribution" — the counterfactual test and the
+    skeptic review were both skipped, and the report gate then, correctly, refused to call it
+    resolved. A default under which the deliverable cannot be produced is not a budget, it is a
+    wall.
 
-    提到 24 之后同一个案例跑完了八段，`gate_rejections` 为空，结论仍是 UNRESOLVED——但换成了
-    "独立的唱反调模型不接受这个因果链"，也就是对抗性检查在起作用，而不是预算撞墙。
+    Raised to 24, the same case finished all eight stages with `gate_rejections` empty and the
+    conclusion still UNRESOLVED — but it became "an independent skeptic model does not accept this
+    causal chain", which is the adversarial check working rather than the budget hitting a wall.
     """
     from acr.commands.cli_signal import DEFAULT_AGENT_CHART_READS, DEFAULT_AGENT_MODEL_CALLS
     assert DEFAULT_AGENT_MODEL_CALLS > 12
@@ -723,7 +737,7 @@ def test_the_agent_kind_gets_more_turns_than_acr_attribute_case_defaults_to():
 
 
 def test_both_agent_budgets_reach_the_attribution_payload(monkeypatch):
-    """参数必须真的穿到底 —— 加了 flag 却没接线，和没加一样。"""
+    """Both budgets must reach the bottom — a flag added and never wired is no flag at all."""
     import acr.commands.cli_attribute as CA
     import acr.commands.cli_signal as cs
     seen = {}
@@ -748,14 +762,16 @@ def test_both_budget_flags_are_offered_on_both_commands(cmd: str):
 
 
 def test_the_agent_batch_reaches_the_diagnosis_at_all(tmp_path, monkeypatch):
-    """回归：`_batch_signals` 的函数体用了两个签名里没有的名字。
+    """Regression: `_batch_signals`'s body used two names its signature did not have.
 
-    `acr signal batch --kind agent` 于是对每一个 run 抛 `NameError`，而这条路径上的
-    `except Exception` 正是为"一个坏 run 不算整批"写的——它把 NameError 一视同仁地记成
-    per-run error，整批以 exit 2 结束，看起来像"这批 run 都有问题"，而不是"这个命令从来没跑过"。
-    上面那个测试只检查 flag 出现在 help 里，`--kind agent` 的批量路径没有任何测试穿过。
+    `acr signal batch --kind agent` therefore raised `NameError` on every run, and the
+    `except Exception` on that path — written for "one bad run is not the batch" — filed the
+    NameError like any other per-run error. The whole batch ended in exit 2, which reads as "every
+    run in this cohort is bad" rather than "this command has never once worked". The test above only
+    checks that the flags appear in `--help`; no test went through the `--kind agent` batch path at
+    all.
 
-    这是两个模式跑一个 cohort 的必经之路，所以在这里补上。
+    That path is the only way to run one cohort under two modes, so the coverage lands here.
     """
     monkeypatch.delenv("ACR_LOCAL_ARTIFACT_ROOT", raising=False)
     import acr.commands.cli_attribute as CA
@@ -780,15 +796,18 @@ def test_the_agent_batch_reaches_the_diagnosis_at_all(tmp_path, monkeypatch):
     assert "eval-key-challenge" in seen[0]["eval_skills_prompt"]     # and so does the mode
 
 
-# ============================================================ 卡片的身份，不是它的长度
+# ==================================================== CARD IDENTITY, NOT CARD LENGTH
 
 def test_the_eval_skill_block_is_identified_by_its_content_not_its_length():
-    """诊断 agent 读到的方法卡是 prompt 内容，而记录下来的只有 `eval_skills_bytes` —— 一个字节数。
+    """The method cards the diagnostic agent reads are prompt content, and all that was recorded
+    was `eval_skills_bytes` — a byte count.
 
-    两套完全不同的卡片长度相同就无法区分；一张卡被原地改过，字节数常常一动不动。这跟
-    `prompt_assets` 当初被加进来要修的是同一个缺陷：进了 prompt 的东西没有身份记录。区别在于
-    这一半在诊断面，而诊断面的产出正是后来 `attribute meta-certify` 要拿去评的东西 —— 用哪套方法
-    得出的因果判断，读的人得能说出来。
+    Two completely different card sets of the same length cannot be told apart, and when a card is
+    edited in place the byte count often does not move at all. This is the same defect
+    `prompt_assets` was added to fix: something entered the prompt with no record of its identity.
+    The difference is that this half is on the diagnosis plane, and the diagnosis plane's output is
+    exactly what `attribute meta-certify` later grades — a reader has to be able to say which
+    method produced a causal judgement.
     """
     from acr.contract.skills import eval_skills_block, eval_skills_identity
 
@@ -813,17 +832,19 @@ def test_two_different_card_sets_do_not_share_a_hash():
 
 
 def test_the_hash_is_taken_from_the_block_that_was_actually_sent():
-    """接的是**已经渲染好的字符串**，不是重新渲染一遍。
+    """It takes the ALREADY-RENDERED STRING; it does not render a second time.
 
-    如果这个函数自己再渲染一次，它和 prompt 之间就有两次渲染 —— 一个 `skills_dir` 不一致就够让
-    manifest 描述一段模型从没读到的文本。哈希必须来自同一个对象。
+    If this function rendered again, there would be two renderings between it and the prompt — one
+    inconsistent `skills_dir` is enough to make the manifest describe text the model never read.
+    The hash has to come from the same object that was sent.
     """
     import inspect
 
     from acr.contract.skills import eval_skills_identity
     src = inspect.getsource(eval_skills_identity)
-    assert "eval_skills_block" not in src, "不能在这里第二次渲染"
-    assert eval_skills_identity("", [])["content_hash"] == "", "没有卡就没有哈希，不是空串的哈希"
+    assert "eval_skills_block" not in src, "no second rendering here"
+    assert eval_skills_identity("", [])["content_hash"] == "", (
+        "no cards means no hash, not the hash of an empty string")
 
 
 def test_no_cards_is_an_explicit_absence_not_a_zero_length_block():
@@ -833,7 +854,8 @@ def test_no_cards_is_an_explicit_absence_not_a_zero_length_block():
 
 
 def test_the_signal_envelope_carries_the_identity_and_not_the_byte_count(tmp_path, monkeypatch):
-    """走到信封为止。一个只在 helper 里正确、而没进产出的身份记录，读的人拿不到。"""
+    """All the way to the envelope. An identity record that is right inside the helper and never
+    reaches the output is one no reader can get at."""
     import acr.commands.cli_attribute as CA
 
     seen = {}
@@ -849,14 +871,16 @@ def test_the_signal_envelope_carries_the_identity_and_not_the_byte_count(tmp_pat
     monkeypatch.setattr(CA, "_run_one", _fake_run_one)
     monkeypatch.setattr(CA, "_packet_for", lambda **kw: _StubPacket(), raising=False)
     env = CA.attribute_case_payload.__doc__
-    assert env is not None   # 只是确认签名还在，真正的断言在下面
+    assert env is not None   # only that the signature is still there; the real assertion is below
 
     import inspect
     sig = inspect.signature(CA.attribute_case_payload)
     assert "eval_skills_names" in sig.parameters, (
-        "身份需要卡片名，而 payload 只收到渲染后的文本")
-    # 看 **产出的键**，不看源码字符串。前一版断言源码里不出现 `eval_skills_bytes`，
-    # 结果被自己那段记述旧缺陷的注释绊倒 —— 同一类错误今天第二次，所以这里不再对源码做子串匹配。
+        "the identity needs the card names, and the payload only receives the rendered text")
+    # Look at the KEYS THAT ARE PRODUCED, not at a source string. The previous version asserted that
+    # `eval_skills_bytes` does not appear in the source and was tripped by its own comment recording
+    # the old defect — the same class of mistake twice in one day, so no substring matching on
+    # source here.
     from acr.contract.skills import eval_skills_block, eval_skills_identity
     env_keys = eval_skills_identity(eval_skills_block(["eval-cluster-failures"]),
                                     ["eval-cluster-failures"])

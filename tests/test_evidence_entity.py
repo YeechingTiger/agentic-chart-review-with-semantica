@@ -1,19 +1,24 @@
-"""一条引文说的是哪个标本，要能写下来。
+"""Which specimen a quote is about has to be writable down.
 
-"对的文档、错的片段"——真实的原文，说的却是另一个标本——是 eval-overconfidence 点名的
-失败模式，而扁平的 span 列表在结构上无法表达它：没有地方写"这条说的是 A，那条说的是 B"。
+"Right document, wrong passage" — a real quote from the source that is nevertheless about another
+specimen — is the failure mode eval-overconfidence names, and a flat list of spans cannot express it
+structurally: there is nowhere to write "this row is about A and that one is about B".
 
-原本这里还有一个 `entity_answer_mismatch`，拿锚点和 `reported_lesion` 精确比对。
-2026-07-31 在十二次真实运行上测量：CRITICAL 报了十二次，十二次全错。两边根本不是同类
-字符串——锚点是短标签，`reported_lesion` 是模型写的一整句解释——相等只可能不成立，
-所以那个检查在正确的运行上也无法通过。一个永远为真的 CRITICAL 比没有检查更坏：它教人
-连带跳过同一严重度里的 `patient_crossover`。
+There used to be an `entity_answer_mismatch` here as well, comparing each anchor against
+`reported_lesion` by exact equality. Measured on twelve real runs on 2026-07-31: CRITICAL on all
+twelve, and wrong all twelve times. The two sides are not the same kind of string at all — an anchor
+is a short label, `reported_lesion` is a whole sentence of explanation the model wrote — so equality
+can only fail, which means that check could not pass on a correct run either. A CRITICAL that is
+always true is worse than no check: it teaches a reader to skip `patient_crossover` along with it,
+since they share a severity class.
 
-改成 `multiple_anchored_entities`：只数锚点有几个不同的标签，不判断它们是否一致。
-这是数据答得了的问题；"两种说法是不是同一个病灶"是临床判断，写进 Python 就是
-DETERMINISTIC_RULES_REMOVED.md 记录过的那个错误。
+It became `multiple_anchored_entities`: count how many distinct anchor labels there are, and do not
+judge whether they agree. That is a question the data can answer; "are these two phrasings the same
+lesion" is clinical judgement, and writing it into Python is the mistake
+DETERMINISTIC_RULES_REMOVED.md records.
 
-字段可选：没锚点不是缺陷，是没用起来。检查在没有锚点时沉默。
+The field is optional: no anchor is not a defect, it is a facility left unused. The check stays
+silent when there is no anchor.
 """
 from __future__ import annotations
 
@@ -33,7 +38,9 @@ def test_entity_defaults_to_empty_so_old_records_still_load():
 
 
 def test_same_span_different_entity_is_not_a_duplicate():
-    """去重键必须带上实体，否则两个标本的同位置引文会被吞掉一条。"""
+    """The de-duplication key must carry the entity, or one of two quotes at the same offsets about
+    two different specimens gets swallowed.
+    """
     led = EvidenceLedger()
     led.add(Evidence("N1", "p", "2024-01-01", 0, 10, "x", "histology", entity="specimen A"))
     led.add(Evidence("N1", "p", "2024-01-01", 0, 10, "x", "histology", entity="specimen B"))
@@ -48,7 +55,9 @@ def test_identical_entity_still_de_duplicates():
 
 
 def test_the_rendered_ledger_shows_the_anchor():
-    """渲染给模型看的台账里要有实体，否则模型看不见自己刚记下的区分。"""
+    """The ledger rendered back to the model has to carry the entity, or the model cannot see the
+    distinction it just recorded.
+    """
     led = EvidenceLedger()
     led.add(Evidence("N1", "p", "2024-01-01", 0, 10, "x", "histology", entity="specimen A"))
     assert "specimen A" in led.render()
@@ -66,15 +75,19 @@ def _run(evidence, reported_lesion="") -> RunRecord:
 
 
 def test_no_detector_reads_the_anchor():
-    """回归：`entity` 上不许再挂检测器，除非工具契约先要求标签稳定。
+    """Regression: no detector may hang on `entity` again unless the tool contract first requires a
+    stable label.
 
-    两个都写过、都在同一批十二次运行上测过、都删了。`entity_answer_mismatch` 拿锚点和
-    `reported_lesion`（一整句散文）精确比对，12/12 报 CRITICAL，12 次全错。
-    `multiple_anchored_entities` 改数不同标签的个数，12/12 报，只有 1 次对——另外四次是
-    同一个病灶换了说法（"肿块"→"癌"），而那正是病历的写法。
+    Both were written, both were measured on the same batch of twelve runs, both were deleted.
+    `entity_answer_mismatch` compared each anchor against `reported_lesion` (a whole sentence of
+    prose) by exact equality: CRITICAL on 12 of 12, wrong all 12 times.
+    `multiple_anchored_entities` counted distinct labels instead: fired on 12 of 12 and was right
+    about 1 — the other four were one lesion under a name that had moved ("mass" → "carcinoma"),
+    which is exactly how a chart is written.
 
-    它测的是措辞漂移，不是实体个数。要把 "sigmoid colon mass" 和 "sigmoid colon carcinoma"
-    判成一个东西，需要临床判断；这棵树已经为"把临床判断写进 Python"付过一次代价。
+    It measures phrasing drift, not entity count. Deciding that "sigmoid colon mass" and "sigmoid
+    colon carcinoma" name one thing takes clinical judgement, and this tree has already paid once
+    for writing clinical judgement into Python.
     """
     ev = [{"note_id": "N1", "start": 0, "end": 9, "entity": "left upper lobe"},
           {"note_id": "N2", "start": 0, "end": 9, "entity": "right lower lobe"}]
@@ -116,7 +129,9 @@ def _toolbox(tmp_path):
 
 
 def test_the_tool_carries_the_anchor_through_to_the_ledger(tmp_path):
-    """schema 上有这个参数还不够——`_t_record_evidence` 得真的把它传进 `Evidence`。"""
+    """Having the parameter in the schema is not enough — `_t_record_evidence` has to actually pass
+    it through into `Evidence`.
+    """
     tb = _toolbox(tmp_path)
     out, _ = tb.dispatch("record_evidence",
                          {"note_id": _NOTE_ID, "start": 0, "end": 16,

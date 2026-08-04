@@ -1,46 +1,53 @@
-# 从 AgentLoop 到 ACR：医疗 Chart Review Agent 的运行、评估与持续改进方法论
+# From AgentLoop to ACR: running, evaluating and continuously improving a medical chart-review agent
 
-> 状态：方法论基线  
-> 文档日期：2026-07-29  
-> 适用项目：`agentic-chart-review`  
-> 资料范围：AgentLoop 产品能力与用户指南全覆盖；纯阿里云接入步骤、OpenAPI
-> operation、RAM 字段和计费细节只索引，不作为 ACR 设计要求。
+> Status: methodology baseline  
+> Document date: 2026-07-29  
+> Applies to: `agentic-chart-review`  
+> Source scope: full coverage of AgentLoop's product capabilities and user guides; the
+> Alibaba-Cloud-only onboarding steps, OpenAPI operations, RAM fields and billing details are
+> indexed only and are not ACR design requirements.
 
-实现层的稳定 contracts、Module/Skill/Capability/Stage 边界、独立 Audit 和兼容迁移
-见 [`ACR_MODULE_ARCHITECTURE_V2.md`](ACR_MODULE_ARCHITECTURE_V2.md)。
+The stable contracts at the implementation level, the Module/Skill/Capability/Stage boundaries,
+the independent Audit plane and the compatibility migration are in
+[`ACR_MODULE_ARCHITECTURE_V2.md`](ACR_MODULE_ARCHITECTURE_V2.md).
 
-## 0. 结论先行
+## 0. Conclusion first
 
-ACR 不应该把所有“检查 agent 的东西”都叫 eval。一个完整系统至少包含以下七层：
+ACR must not call everything that "checks the agent" an eval. A complete system contains at
+least the following seven layers:
 
-| 层 | 何时运行 | 核心问题 | 能否影响当前答案 |
+| Layer | When it runs | Core question | Can it affect the current answer |
 |---|---|---|---|
-| Task contract | 运行前冻结 | 任务在问什么，什么证据和答案才成立 | 是，定义答案边界 |
-| In-request controls | 当前请求内 | 这个答案是否被允许提交 | 是，可拒绝、abstain 或转人工 |
-| Runtime policies | 当前请求内 | agent 怎样搜索、扩展和分配算力 | 是，但它们是待验证策略，不是天然正确 |
-| Observability | 当前请求中记录 | 实际发生了什么 | 否，只记录事实 |
-| Audit | 运行中预检或运行后关联 | 是否发生安全、隐私、越权事件 | 预检可阻断；事后事件不改写既有答案 |
-| Evaluation & attribution | trace 完成后 | 结果和过程好不好，为什么失败 | 否，只评分、归因和路由 |
-| Experiment & optimization | 开发/发布前 | 某个改变是否真的提升质量 | 只决定下一版本是否发布 |
+| Task contract | frozen before the run | what is the task asking, and what evidence and answers count | Yes, it defines the answer boundary |
+| In-request controls | inside the current request | is this answer allowed to be submitted | Yes, it can reject, abstain or route to a human |
+| Runtime policies | inside the current request | how the agent searches, expands and allocates compute | Yes, but they are policies awaiting validation, not automatically correct |
+| Observability | recorded during the current request | what actually happened | No, it only records facts |
+| Audit | preflight during the run, or correlated after it | did a safety, privacy or authority violation occur | Preflight can block; a post-hoc incident does not rewrite an answer that already exists |
+| Evaluation & attribution | after the trace completes | how good are the result and the process, and why did it fail | No, it only scores, attributes and routes |
+| Experiment & optimization | development / before release | does a given change genuinely improve quality | It only decides whether the next version ships |
 
-最重要的区分是：
+The distinctions that matter most:
 
-1. **Requirement 不是 evaluator。** 患者隔离、证据准入、字段格式和负向答案的
-   proof obligation 是系统执行合同。
-2. **Policy 不是 requirement。** 搜哪些词、读多少文档、是否多 agent、是否“看全”
-   都是有成本的策略，必须通过实验获得继续存在的资格。
-3. **Evaluator type 不是 evaluator category。** `CODE / LLM / AGENT / HUMAN`
-   描述“用什么执行评价”；安全、正确性、证据、过程、效率和归因描述“评价什么”。
-4. **Gate pass 不是 answer correct。** Gate 只能证明系统定义的义务被执行，不能证明
-   搜索词、证据宇宙和临床规则本身正确。
-5. **Eval signal 不直接修改 agent。** 它先形成有证据的 failure event 和 repair
-   obligation，再修改一个有 owner 的资产，并经过 paired validation。
+1. **A requirement is not an evaluator.** Patient isolation, evidence admissibility, field format
+   and the proof obligation on a negative answer are contracts the system executes.
+2. **A policy is not a requirement.** Which terms to search, how many documents to read, whether
+   to run multiple agents, whether to "see everything" — these are policies with a cost, and they
+   must earn the right to keep existing through experiment.
+3. **Evaluator type is not evaluator category.** `CODE / LLM / AGENT / HUMAN` describe "what
+   executes the evaluation"; safety, correctness, evidence, process, efficiency and attribution
+   describe "what is being evaluated".
+4. **A gate pass is not a correct answer.** A gate can only prove that the obligations the system
+   defined were executed. It cannot prove that the search terms, the evidence universe and the
+   clinical rules are themselves right.
+5. **An eval signal does not modify the agent directly.** It first becomes an evidenced failure
+   event and a repair obligation, then modifies one asset that has an owner, and then
+   passes paired validation.
 
 ---
 
-## 1. AgentLoop 到底是什么
+## 1. What AgentLoop actually is
 
-AgentLoop 的产品主线不是单独的 Agent-as-a-Judge，而是：
+AgentLoop's product through-line is not Agent-as-a-Judge on its own. It is:
 
 ```text
 Observability / Trace
@@ -57,248 +64,269 @@ Production traces
         ↺
 ```
 
-官方将完整 trajectory 作为基础数据单元，同一份轨迹同时服务于观测、审计、评估、
-实验、数据加工和经验挖掘。官方 QuickStart 的实操顺序是创建 AgentSpace、接入
-观测、构建 evaluator、创建 evaluation task、导入和标注 dataset、管理 Prompt/Skill、
-使用 Memory，最后形成数据飞轮。
+The official documentation treats the complete trajectory as the base data unit: the same
+trajectory serves observability, audit, evaluation, experiment, data processing and experience
+mining at once. The hands-on order in the official QuickStart is create an AgentSpace, connect
+observability, build an evaluator, create an evaluation task, import and annotate a dataset,
+manage Prompt/Skill, use Memory, and finally close the data flywheel.
 
-对 ACR 有用的是这种**闭环分工**，而不是阿里云控制台、SLS 或 eBPF 的具体实现。
+What is useful to ACR is this **closed-loop division of labour**, not the specific implementation
+in the Alibaba Cloud console, SLS or eBPF.
 
-### 1.1 能力地图与 ACR 取舍
+### 1.1 Capability map and what ACR takes
 
-| AgentLoop 能力 | 官方作用 | ACR 决定 |
+| AgentLoop capability | What it does officially | ACR decision |
 |---|---|---|
-| AgentSpace | 团队/业务域的资源、权限和数据边界 | 改造采用：本地 workspace + task bundle + local artifact root |
-| Observability | Agent/Tool/Model/Retriever/Memory 的 trace、指标和拓扑 | 直接采用思想：统一 trace ontology |
-| Audit | 原始事实 → finding → incident → investigation | 直接采用两级模型；患者边界额外前置为 runtime control |
-| Evaluation | Evaluator + Evaluation Task + Analysis | 直接采用三段式结构 |
-| Agent-as-a-Judge | evaluator 自带 Prompt、Skill 和工具，读取 trajectory | 改造采用：同患者、只读、能力 broker、不能确认临床 truth |
-| Experiment | 对模型、Prompt、Agent、工具配置做重复、可比测试 | 直接采用；增加 chart-observable gold 和 paired patient comparison |
-| Dataset | 承载 trace、标注、gold、bad cases、experiment cases | 改造采用：患者数据只在 repo 外本地引用，不复制入共享库 |
-| Pipeline | 过滤、去重、采样、聚类、AI 加工、写入数据集 | 直接采用思想：本地 append-only event pipeline |
-| Annotation | 人工模板化标注 | 改造采用：registrar/clinician/engineer 的角色化 adjudication |
-| Prompt/Skill assets | 版本、diff、label、灰度和运行时加载 | 直接采用；扩展到 spec、tool、runtime policy 和 evaluator |
-| Experience Library | 从成功/失败轨迹提炼可复用的“做事方法” | 后续采用：只允许无 PHI、经验证的方法资产 |
-| Memory | 保存用户或环境的长期上下文 | 默认不用于患者 chart；禁止跨患者记忆 |
-| OpenAPI/RAM/Billing | 云产品集成、权限和成本 | 只索引，不接入 Alibaba Cloud |
+| AgentSpace | resource, permission and data boundary for a team or business domain | Adopt with changes: local workspace + task bundle + local artifact root |
+| Observability | trace, metrics and topology for Agent/Tool/Model/Retriever/Memory | Adopt the idea directly: one unified trace ontology |
+| Audit | raw facts → finding → incident → investigation | Adopt the two-level model directly; the patient boundary is additionally pulled forward into a runtime control |
+| Evaluation | Evaluator + Evaluation Task + Analysis | Adopt the three-part structure directly |
+| Agent-as-a-Judge | the evaluator carries its own Prompt, Skill and tools and reads the trajectory | Adopt with changes: same patient, read-only, capability broker, may not confirm clinical truth |
+| Experiment | repeatable, comparable tests over models, Prompts, Agents and tool configuration | Adopt directly; add chart-observable gold and paired patient comparison |
+| Dataset | carries traces, annotations, gold, bad cases and experiment cases | Adopt with changes: patient data is referenced locally outside the repo only, never copied into a shared library |
+| Pipeline | filter, dedupe, sample, cluster, AI processing, write into a dataset | Adopt the idea directly: a local append-only event pipeline |
+| Annotation | templated human annotation | Adopt with changes: role-based adjudication by registrar/clinician/engineer |
+| Prompt/Skill assets | version, diff, label, staged rollout and runtime loading | Adopt directly; extend to specs, tools, runtime policies and evaluators |
+| Experience Library | distil reusable "ways of doing things" from successful and failed trajectories | Adopt later: only PHI-free, validated method assets are allowed |
+| Memory | persist long-term context about a user or an environment | Not used for patient charts by default; cross-patient memory is forbidden |
+| OpenAPI/RAM/Billing | cloud product integration, permissions and cost | Indexed only, no Alibaba Cloud integration |
 
-### 1.2 AgentLoop 中几个容易混淆的概念
+### 1.2 A few concepts in AgentLoop that are easy to confuse
 
-#### Trace 与 Trajectory
+#### Trace and Trajectory
 
-- Trace 是一次请求的调用链事实，包含模型、工具、检索、输入输出、耗时和 Token。
-- Trajectory 是适合后续评估和经验挖掘的完整 Agent 执行表示。
-- ACR 不需要保存不可验证的长篇 CoT；需要保存结构化事件、模型/工具 I/O、evidence
-  ledger、plan revision、gate decision、termination 和 hash lineage。
+- A trace is the call-chain fact of one request: model, tools, retrieval, inputs and outputs,
+  latency and tokens.
+- A trajectory is the complete representation of an agent execution, in a form suited to later
+  evaluation and experience mining.
+- ACR does not need to store unverifiable long-form CoT. It needs to store structured events,
+  model/tool I/O, the evidence ledger, plan revisions, gate decisions, termination and hash
+  lineage.
 
-#### Audit 与 Evaluation
+#### Audit and Evaluation
 
-- AgentLoop Audit 先提供中性的 Audit Facts：Session、Token、Tool 和行为事实；Risk
-  Audit 才把安全或边界信号从低保真 `Finding` 关联为高保真 `Incident`。
-- ACR v1 采用 application-level Risk Audit，并把完整 Audit Facts 平台、eBPF 和实体
-  调查列为 out of scope。Audit 仍然是独立治理平面，不是 CODE evaluator 的别名。
-- Evaluation 面向质量：正确性、证据、任务完成、工具选择、执行效率等。
-- “PHI 出现在外部 provider 请求中”是 incident；“答案引用错病理报告”是质量错误。
-  二者可能发生在同一 trajectory，但不能用同一结论类型表示。
+- AgentLoop Audit first provides neutral Audit Facts: Session, Token, Tool and behavioural facts.
+  Only Risk Audit correlates a safety or boundary signal from a low-fidelity `Finding` into a
+  high-fidelity `Incident`.
+- ACR v1 adopts application-level Risk Audit and puts the full Audit Facts platform, eBPF and
+  entity investigation out of scope. Audit remains an independent governance plane, not another
+  name for a CODE evaluator.
+- Evaluation is about quality: correctness, evidence, task completion, tool selection, execution
+  efficiency and so on.
+- "PHI appeared in a request to an external provider" is an incident; "the answer cited the wrong
+  pathology report" is a quality error. Both can happen in the same trajectory, but they cannot be
+  expressed as the same kind of conclusion.
 
-#### Evaluation 的三个组件
+#### The three components of Evaluation
 
-1. **Evaluator**：一个版本化评价标准。
-2. **Evaluation Task**：绑定数据源、采样、变量映射、evaluator 和运行策略。
-3. **Analysis**：聚合趋势、筛选 bad case、下钻单个 trajectory。
+1. **Evaluator**: one versioned evaluation standard.
+2. **Evaluation Task**: binds the data source, sampling, variable mapping, evaluator and run
+   policy.
+3. **Analysis**: aggregates trends, filters bad cases, drills down into a single trajectory.
 
-Evaluator 不能同时兼任任务编排、budget、selector 和 certification。ACR v2 使用
-`ModuleAsset` 定义 evaluator，`PipelineProfile` 定义条件和依赖，`EvaluationTask`
-绑定数据与权限，`CertificationSuite` 独立保存认证标准。旧 `EvaluatorSpec` 仅作为
-兼容 adapter。
+An evaluator cannot simultaneously double as task orchestration, budget, selector and
+certification. ACR v2 uses `ModuleAsset` to define an evaluator, `PipelineProfile` to define
+conditions and dependencies, `EvaluationTask` to bind data and permissions, and
+`CertificationSuite` to hold certification standards separately. The old `EvaluatorSpec` survives
+only as a compatibility adapter.
 
-#### Experience 与 Memory
+#### Experience and Memory
 
-- Experience 回答“这种任务通常怎样做更好”，例如先看 definitive resection，再处理
-  biopsy/resection precedence。
-- Memory 回答“这个用户或环境过去是什么情况”。
-- Patient chart 不是 Memory。ACR 不得把患者内容写成跨 run、跨患者可召回记忆。
-- ACR Experience 只能保存通用方法、适用条件、来源 trajectory hashes、验证指标和
-  版本，不能保存患者答案、原文或未经验证的“经验”。
+- Experience answers "how is this kind of task usually done better" — for example, look at the
+  definitive resection first, then handle biopsy/resection precedence.
+- Memory answers "what has been true of this user or this environment in the past".
+- A patient chart is not Memory. ACR must not write patient content into memory that is
+  recallable across runs or across patients.
+- ACR Experience may store only a general method, its applicability conditions, the source
+  trajectory hashes, the validation metrics and a version. It may not store patient answers,
+  source text or unvalidated "experience".
 
-#### AgentLoop 的“online”不等于同一请求内
+#### AgentLoop's "online" does not mean inside the same request
 
-- “持续/在线 evaluation”指新 trace 产生后自动触发评价，通常是 nearline post-run。
-- Experiment 文档中的“online experiment”指由 AgentLoop 服务端调用目标端点；
-  “offline”指从用户本地发起。它不是 runtime gate 的同义词。
-- ACR 统一使用 `IN_REQUEST`、`POST_RUN_CONTINUOUS` 和
-  `OFFLINE_DEVELOPMENT`，避免只写 real-time/online。
+- "Continuous/online evaluation" means evaluation is triggered automatically once a new trace
+  appears, usually nearline post-run.
+- "Online experiment" in the Experiment documentation means the AgentLoop server side calls the
+  target endpoint; "offline" means the run is started from the user's own machine. It is not a
+  synonym for a runtime gate.
+- ACR consistently uses `IN_REQUEST`, `POST_RUN_CONTINUOUS` and `OFFLINE_DEVELOPMENT`, and avoids
+  writing only real-time/online.
 
 ---
 
-## 2. ACR 的标准分层
+## 2. ACR's standard layering
 
-### 2.1 Task contract：任务合同
+### 2.1 Task contract
 
-Task contract 是领域语义，不是 agent 的导航说明，也不是 evaluator。
+A task contract is domain semantics. It is not navigation instructions for the agent, and it is
+not an evaluator.
 
-每个任务包应冻结：
+Every task package should freeze:
 
-- 字段、value domain、状态和输出 schema；
-- patient/entity/time scope；
-- evidence eligibility 和 source precedence；
-- 正向 witness 要求；
-- 负向/absence 主张的可观察范围与 proof obligation；
-- abstention 边界；
-- conflict rule 和必须由人工决定的边界；
-- 每个语义元素的来源、版本、owner 和 sign-off。
+- the fields, their value domain, statuses and the output schema;
+- patient/entity/time scope;
+- evidence eligibility and source precedence;
+- what a positive witness must be;
+- the observable scope and the proof obligation for a negative/absence claim;
+- the abstention boundary;
+- conflict rules and the boundaries where a human must decide;
+- the source, version, owner and sign-off for every semantic element.
 
-跨领域复用的不是一份巨型 spec，而是相同的合同 schema。肿瘤 registry、药物使用、
-复发、心血管 phenotype 可以有不同 spec，但共享同一执行和评估框架。
+What gets reused across domains is not one giant spec, it is the same contract schema. A cancer
+registry, medication use, recurrence and a cardiovascular phenotype may each have a different
+spec, but they share one execution and evaluation framework.
 
-### 2.2 In-request controls：当前请求内的硬控制
+### 2.2 In-request controls: the hard controls inside the current request
 
-Runtime control 必须满足至少一个条件：
+A runtime control must satisfy at least one of these conditions:
 
-- 这是不可协商的安全/权限边界；
-- 输出不满足它就逻辑上无效；
-- 它是便宜、确定性、可重放的检查；
-- 失败后有明确的 reject、abstain 或 human-review 行为。
+- it is a non-negotiable safety/authority boundary;
+- an output that does not satisfy it is logically invalid;
+- it is a cheap, deterministic, replayable check;
+- there is a defined reject, abstain or human-review behaviour on failure.
 
-ACR 应保留的 control：
+The controls ACR should keep:
 
-| Control | 为什么属于 runtime | 失败行为 |
+| Control | Why it belongs in the runtime | Behaviour on failure |
 |---|---|---|
-| 当前患者范围 | 跨患者证据使答案无效 | 立即拒绝工具调用 |
-| Provider/PHI 边界 | 数据发送前才能有效防护 | preflight 阻断 |
-| Tool allowlist/read-only | 未记录读取会破坏 evidence ledger | 拒绝调用 |
-| Spec、policy 和工具版本冻结 | 无法重放的答案不可比较 | 拒绝启动或标为 unvalidated |
-| Evidence admissibility | FOUND 必须有合格 witness | 拒绝提交 |
-| Field format/value checks | 结构上无效的答案不能流出 | 拒绝提交 |
-| 负向 proof obligation | “没有/证据不足”是全局性主张 | 未闭合则 abstain/review |
-| 已发现 conflict/open thread | 不能忽略 chart 自己暴露的矛盾 | 继续调查或人工复核 |
-| Hard budget | 防止无限循环和无界花费 | `BUDGET_EXHAUSTED`/review |
+| Current patient scope | cross-patient evidence makes the answer invalid | refuse the tool call immediately |
+| Provider/PHI boundary | protection is only effective before the data is sent | preflight block |
+| Tool allowlist/read-only | an unrecorded read corrupts the evidence ledger | refuse the call |
+| Spec, policy and tool version freeze | an answer that cannot be replayed cannot be compared | refuse to start, or mark as unvalidated |
+| Evidence admissibility | FOUND must have an eligible witness | refuse the submission |
+| Field format/value checks | a structurally invalid answer must not leave the system | refuse the submission |
+| Negative proof obligation | "absent / not enough evidence" is a global claim | abstain/review while it is not closed |
+| Discovered conflict/open thread | a contradiction the chart itself exposed cannot be ignored | keep investigating, or route to human review |
+| Hard budget | prevents unbounded loops and unbounded spend | `BUDGET_EXHAUSTED`/review |
 
-Runtime control 不负责判断整个临床答案正确，也不应包含未经实验验证的“最佳搜索
-路径”。
+A runtime control is not responsible for judging that the whole clinical answer is correct, and it
+should not contain an experimentally unvalidated "best search path".
 
-### 2.3 Runtime policies：运行时性能策略
+### 2.3 Runtime policies: run-time performance policies
 
-Policy 决定 agent 怎样完成合同：
+A policy decides how the agent fulfils the contract:
 
-- 初始检索词和 document-type routing；
-- 文档阅读顺序；
-- sampling frame 和 sample size；
-- plan expansion；
-- conflict refinement；
-- 多 trajectory 的触发条件；
-- model、temperature、context management；
-- experience retrieval；
-- 成本在搜索、阅读和确认之间的分配。
+- initial search terms and document-type routing;
+- the order documents are read in;
+- sampling frame and sample size;
+- plan expansion;
+- conflict refinement;
+- the trigger conditions for multiple trajectories;
+- model, temperature, context management;
+- experience retrieval;
+- how cost is divided between searching, reading and confirming.
 
-Policy 可以影响当前 run，但不能因为“看起来完备”就被提升为 requirement。每个 policy
-必须：
+A policy may affect the current run, but it must not be promoted to a requirement just because it
+"looks thorough". Every policy must:
 
-1. 有稳定 `policy_id/version/hash`；
-2. 记录预期改善的 failure mode；
-3. 能被 feature flag 或 profile 替换；
-4. 在同一 task contract 下进行 paired experiment；
-5. 失败时可回滚，而不修改 task semantics。
+1. have a stable `policy_id/version/hash`;
+2. record the failure mode it is expected to improve;
+3. be replaceable by a feature flag or a profile;
+4. be run in a paired experiment under the same task contract;
+5. be rollback-able on failure, without modifying task semantics.
 
-### 2.4 Observability：中性事实层
+### 2.4 Observability: the neutral fact layer
 
-Observability 只回答“发生了什么”：
+Observability answers only "what happened":
 
-- run/session/trace/span IDs；
-- model/tool/retrieval/gate/output event；
-- 输入输出 hash、版本、耗时、tokens、cost；
-- documents listed/searched/read；
-- evidence 和 coverage ledger；
-- plan revisions、rejections、retries、termination；
-- provider boundary 和 patient scope。
+- run/session/trace/span IDs;
+- model/tool/retrieval/gate/output events;
+- input and output hashes, versions, latency, tokens, cost;
+- documents listed/searched/read;
+- the evidence and coverage ledger;
+- plan revisions, rejections, retries, termination;
+- provider boundary and patient scope.
 
-Trace 不能因为某个 evaluator 暂时不需要某字段就删掉；同一 trace 将来还要服务 audit、
-evaluation、experiment 和 attribution。
+A trace field must not be deleted because one evaluator temporarily does not need it; the same
+trace still has to serve audit, evaluation, experiment and attribution later.
 
-### 2.5 Audit：安全证据链
+### 2.5 Audit: the safety evidence chain
 
-ACR 采用 AgentLoop 的两级模型：
+ACR adopts AgentLoop's two-level model:
 
 ```text
 Raw facts
-  → Finding（高召回、单点信号）
+  → Finding (high recall, single-point signal)
   → correlation
-  → Incident（证据链闭合、可行动）
+  → Incident (evidence chain closed, actionable)
   → investigation / disposition
 ```
 
-示例：
+Examples:
 
-- 日志中检测到像姓名的文本：Finding；
-- 姓名随 chart 内容进入 external provider 请求：Incident；
-- 工具参数出现另一个 patient ID：Incident；
-- repo 外本地路径包含患者内容但未越过声明边界：需要调查，不自动等于泄露。
+- text that looks like a name is detected in a log: Finding;
+- that name enters an external provider request along with chart content: Incident;
+- another patient ID appears in a tool argument: Incident;
+- a local path outside the repo contains patient content but has not crossed a declared boundary:
+  needs investigation, and does not automatically amount to a leak.
 
-两种防线应并存：
+Two lines of defence should coexist:
 
-- `IN_REQUEST`：patient scope、provider trust boundary、tool allowlist 等 preflight；
-- `POST_RUN_CONTINUOUS`：从完整 trace 关联遗漏的 PHI/data-flow incident。
+- `IN_REQUEST`: preflight on patient scope, provider trust boundary, tool allowlist and so on;
+- `POST_RUN_CONTINUOUS`: correlate, from the complete trace, the PHI/data-flow incidents that were
+  missed.
 
-当前实现只使用 application events；它不宣称能检测未被应用上报的 process/file/
-network side effect。`RuntimeEvidenceRef` 是未来 adapter 边界，不是已经实现的 eBPF
-能力。
+The current implementation uses application events only; it does not claim to detect a
+process/file/network side effect that the application did not report. `RuntimeEvidenceRef` is a
+boundary for a future adapter, not an eBPF capability that already exists.
 
-### 2.6 Evaluation：独立质量评价
+### 2.6 Evaluation: independent quality evaluation
 
-#### 两条正交分类轴
+#### Two orthogonal classification axes
 
-“如何评”和“评什么”必须分开。
+"How to evaluate" and "what to evaluate" must be kept apart.
 
-**执行方式：**
+**Execution mode:**
 
-| 类型 | 能力 | 权限 |
+| Type | Capability | Authority |
 |---|---|---|
-| CODE | 确定性、可重放、便宜 | 可创建 incident 或阻断版本发布 |
-| LLM | 单轮、无工具、明确 rubric | 只筛查和排序 |
-| AGENT | 读 trajectory、调用声明工具、最小补读 | 只调查、归因和路由 |
-| HUMAN | 临床/registry/spec semantic 裁决 | 确认 gold、批准 semantic change |
+| CODE | deterministic, replayable, cheap | may create an incident or block a version from shipping |
+| LLM | single turn, no tools, explicit rubric | screening and ranking only |
+| AGENT | reads the trajectory, calls declared tools, minimal supplementary reads | investigation, attribution and routing only |
+| HUMAN | clinical/registry/spec semantic adjudication | confirms gold, approves a semantic change |
 
-AgentLoop API 原生类型是 `CODE / LLM / AGENT`；`HUMAN` 是 ACR 为医疗责任和
-adjudication 增加的 authority plane。
+The native types in the AgentLoop API are `CODE / LLM / AGENT`; `HUMAN` is an authority plane ACR
+adds for medical accountability and adjudication.
 
-**评价领域：**
+**Evaluation domain:**
 
-| 大类 | 评价内容 | 典型实现 |
+| Category | What it evaluates | Typical implementation |
 |---|---|---|
-| Safety & boundary | PHI、跨患者、外发、权限 | CODE audit + human investigation |
-| Outcome & abstention | value/status 是否正确，是否过度断言 | CODE 对 gold；HUMAN 裁决 |
-| Evidence & grounding | quote、document standing、source precedence、未读矛盾 | CODE + AGENT |
-| Process & control integrity | gate/ledger/termination 是否一致，tool/plan 是否异常 | CODE |
-| Reliability & efficiency | provider failure、retry、cost、latency、documents read | CODE |
-| Causal attribution | 哪个 defect 解释目标错误，应该修改哪类资产 | AGENT + HUMAN |
+| Safety & boundary | PHI, cross-patient, egress, authority | CODE audit + human investigation |
+| Outcome & abstention | is the value/status correct, is it over-asserted | CODE against gold; HUMAN adjudicates |
+| Evidence & grounding | quote, document standing, source precedence, unread contradictions | CODE + AGENT |
+| Process & control integrity | are gate/ledger/termination consistent, are tool/plan behaviours anomalous | CODE |
+| Reliability & efficiency | provider failure, retry, cost, latency, documents read | CODE |
+| Causal attribution | which defect explains the target error, which class of asset should change | AGENT + HUMAN |
 
-`Agent-as-a-Judge` 是执行方式，不是第七个评价领域。
+`Agent-as-a-Judge` is an execution mode, not a seventh evaluation domain.
 
-#### CODE 优先原则
+#### CODE first
 
-同一子问题存在确定性答案时，LLM/AGENT 不得重判：
+When a deterministic answer to the same sub-question exists, LLM/AGENT must not re-judge it:
 
-- quote offset 能否复现：CODE；
-- field exact match：CODE；
-- 是否跨患者读取：CODE；
-- 某段临床文本是否真正支持某一编码：可能需要 AGENT/HUMAN；
-- registry 值是否是当前 chart 的 truth：HUMAN。
+- whether a quote offset reproduces: CODE;
+- field exact match: CODE;
+- whether a read crossed patients: CODE;
+- whether a passage of clinical text genuinely supports a given code: may need AGENT/HUMAN;
+- whether the registry value is the truth of the current chart: HUMAN.
 
-#### Eval 不应影响已完成答案
+#### Eval must not affect an answer that is already finished
 
-Post-run evaluator 可以：
+A post-run evaluator may:
 
-- 标记 run；
-- 创建 incident；
-- 排入人工复核；
-- 阻断 candidate bundle 发布；
-- 创建 bad-case/repair obligation。
+- flag the run;
+- create an incident;
+- queue the case for human review;
+- block a candidate bundle from shipping;
+- create a bad-case/repair obligation.
 
-它不能悄悄改写原 run 的 answer 或把自己的推测写成 confirmed truth。
+It may not quietly rewrite the original run's answer, or write its own conjecture down as
+confirmed truth.
 
-### 2.7 Causal attribution：从发现缺陷到解释目标错误
+### 2.7 Causal attribution: from finding a defect to explaining the target error
 
-发现一个真实 defect，不等于它解释了目标错误。归因必须绑定显式 target event：
+Finding a real defect does not mean it explains the target error. Attribution must be bound to an
+explicit target event:
 
 ```text
 Target event
@@ -310,151 +338,161 @@ Target event
   → attribution gate
 ```
 
-每个 cause 应标记：
+Every cause should be labelled:
 
 - `relation_to_target = EXPLAINS | CONTRIBUTES | UNRELATED_DEFECT | UNKNOWN`
 - `causal_strength = OBSERVED | PLAUSIBLE | COUNTERFACTUAL_SUPPORTED | HUMAN_CONFIRMED`
 
-只有 `EXPLAINS + COUNTERFACTUAL_SUPPORTED` 才能成为强模型归因；临床内容仍需 human
-confirmation。
+Only `EXPLAINS + COUNTERFACTUAL_SUPPORTED` can become a strong model-side attribution; clinical
+content still needs human confirmation.
 
-### 2.8 Experiment 与发布
+### 2.8 Experiment and release
 
-Evaluation 描述当前表现；Experiment 回答“某个改变是否造成改善”。
+Evaluation describes current performance; Experiment answers "did a given change cause an
+improvement".
 
-一个有效 experiment 必须固定：
+A valid experiment must hold fixed:
 
-- patient set 和 chart snapshot；
-- task contract/spec hash；
-- model/provider 和 seed set；
-- budget；
-- evaluator bundle；
-- truth/adjudication version。
+- the patient set and the chart snapshot;
+- the task contract/spec hash;
+- the model/provider and the seed set;
+- the budget;
+- the evaluator bundle;
+- the truth/adjudication version.
 
-并只改变预先声明的资产：
+and must change only the assets declared in advance:
 
-- spec；
-- retrieval/runtime policy；
-- Prompt/Skill；
-- Tool/check；
-- model；
-- experience bundle。
+- the spec;
+- the retrieval/runtime policy;
+- the Prompt/Skill;
+- a tool/check;
+- the model;
+- the experience bundle.
 
-结果必须逐病例比较，同时报告 accuracy、abstention、overclaim、evidence validity、
-subgroup、cost、latency、calls 和 documents read。平均分提升不能掩盖 critical
-regression。
+Results must be compared case by case, reporting accuracy, abstention, overclaim, evidence
+validity, subgroup, cost, latency, calls and documents read together. A rise in the mean must not
+cover up a critical regression.
 
 ---
 
-## 3. Coverage：必须拆成四件事
+## 3. Coverage: it has to be split into four things
 
-“要求 agent 看全”混合了四种不同概念。
+"Require the agent to see everything" mixes four different concepts together.
 
-### 3.1 Claim obligation：答案欠什么证明
+### 3.1 Claim obligation: what proof the answer owes
 
-这是 task contract。
+This is the task contract.
 
-- 对正向 `FOUND`：通常一个合格 witness 足够。
-- 对负向、不存在或 `EVIDENCE_INSUFFICIENT`：必须声明观察范围，并证明在这个范围内
-  没有合格 witness，或者明确哪些 evidence gap 阻止结论。
-- 对 source precedence、多个 tumor/entity 或多个时间点：即使是正向答案，也可能要
-  证明更高优先级来源不存在或冲突已关闭。
+- For a positive `FOUND`: one eligible witness is usually enough.
+- For a negative, an absence or `EVIDENCE_INSUFFICIENT`: the observed scope must be declared, and
+  it must be shown that no eligible witness exists within that scope, or which evidence gaps
+  prevent a conclusion must be named.
+- For source precedence, multiple tumors/entities or multiple time points: even a positive answer
+  may have to prove that no higher-precedence source exists, or that the conflict is closed.
 
-### 3.2 Acquisition policy：怎样获得证明
+### 3.2 Acquisition policy: how the proof is obtained
 
-这是可替换 runtime policy：
+This is a replaceable runtime policy:
 
-- exhaustive read；
-- keyword search；
-- document-type routing；
-- sample misses；
-- time-window coverage；
-- conflict-triggered expansion。
+- exhaustive read;
+- keyword search;
+- document-type routing;
+- sample misses;
+- time-window coverage;
+- conflict-triggered expansion.
 
-它们可能提高召回，也可能增加成本、制造 rejection loop 或导致错误 abstention。
+They may raise recall, and they may also raise cost, create a rejection loop, or cause a wrong
+abstention.
 
-### 3.3 Enforcement：何时拒绝答案
+### 3.3 Enforcement: when an answer is refused
 
-这是 runtime control：
+This is a runtime control:
 
-- positive witness 不合格：拒绝 `FOUND`；
-- negative proof 未闭合：不得输出强负向结论；
-- 已发现 conflict/open thread 未关闭：继续调查或转人工；
-- 搜索策略已无可行扩展：返回明确 gap，而不是伪造 consensus。
+- the positive witness is not eligible: refuse `FOUND`;
+- the negative proof is not closed: no strong negative conclusion may be emitted;
+- a discovered conflict/open thread is not closed: keep investigating or route to a human;
+- the search policy has no viable expansion left: return an explicit gap rather than manufacturing
+  a consensus.
 
-### 3.4 Coverage evaluation：这套做法是否有效
+### 3.4 Coverage evaluation: does this approach work
 
-这是 post-run evaluation/experiment：
+This is post-run evaluation/experiment:
 
-- gate 是否与 ledger 一致；
-- 是否漏掉后来发现的 witness；
-- 是否降低 critical overclaim；
-- 是否提高 chart-observable exact match；
-- 是否增加 abstention、loop、成本和 subgroup regression。
+- is the gate consistent with the ledger;
+- did it miss a witness that was found later;
+- did it lower critical overclaim;
+- did it raise chart-observable exact match;
+- did it raise abstention, loops, cost and subgroup regression.
 
-### 3.5 ACR 的默认 coverage 立场
+### 3.5 ACR's default coverage position
 
-1. 不把“读完所有文档”作为跨任务通用要求。
-2. 只对负向/absence 主张和确需全局 precedence 的任务保留 proof obligation。
-3. 正向答案在 witness 合格、已发现冲突关闭后允许停止。
-4. agent 可以自行决定导航路径；runtime 可以独立抽样 misses，防止 agent 用自己选择的
-   文档证明自己搜索充分。
-5. 当前 stratified coverage、关键词、sample size 和阈值都是工程假设；在真实
-   chart-observable gold 上验证前不能宣称它们提高性能。
+1. "Read every document" is not adopted as a general requirement across tasks.
+2. A proof obligation is kept only for negative/absence claims and for tasks that genuinely need
+   global precedence.
+3. A positive answer is allowed to stop once the witness is eligible and discovered conflicts are
+   closed.
+4. The agent may decide its own navigation path; the runtime may sample misses independently, so
+   that the agent cannot prove its own search was sufficient using documents it selected itself.
+5. The current stratified coverage, keywords, sample size and thresholds are all engineering
+   assumptions; they cannot be claimed to improve performance until they are validated on real
+   chart-observable gold.
 
 ### 3.6 Coverage ablation
 
-建议四臂：
+Four arms are proposed:
 
-| Arm | 行为 |
+| Arm | Behaviour |
 |---|---|
-| A. Witness-only | 正向 witness 后停止；负向直接明确不足，不做广泛 closure |
-| B. Negative-proof | 只有即将提交负向结论时才启动 closure |
-| C. Current stratified | 当前 stratified search + forced sampling |
-| D. Adaptive | 仅在 conflict、entity/time ambiguity、gate risk 时扩大搜索 |
+| A. Witness-only | stop after a positive witness; a negative states insufficiency directly, with no broad closure |
+| B. Negative-proof | closure only starts when a negative conclusion is about to be submitted |
+| C. Current stratified | the current stratified search + forced sampling |
+| D. Adaptive | widen the search only on conflict, entity/time ambiguity or gate risk |
 
-第一轮 10 个真实病例在完成 chart-observable adjudication 前，只能比较：
+Until chart-observable adjudication of the first round of 10 real cases is complete, only the
+following can be compared:
 
-- calls、cost、documents read、latency；
-- rejection loop、provider/runtime degradation；
-- evidence admissibility、gate consistency；
-- registry disagreement 的变化。
+- calls, cost, documents read, latency;
+- rejection loops, provider/runtime degradation;
+- evidence admissibility, gate consistency;
+- the change in registry disagreement.
 
-只有被人工确认可从当前 chart 推出的字段才能进入 accuracy、overclaim 和 causal
-improvement 结论。10 例仍是探索性 pilot，不能单独批准全局 policy。
+Only fields a human has confirmed are derivable from the current chart may enter conclusions about
+accuracy, overclaim and causal improvement. Ten cases are still an exploratory pilot and cannot
+approve a global policy on their own.
 
 ---
 
-## 4. Eval 信号怎样改善系统
+## 4. How an eval signal improves the system
 
-Eval 输出必须路由到明确资产 owner，而不是统一归因成“模型不够好”。
+Eval output must be routed to a named asset owner, not attributed uniformly to "the model is not
+good enough".
 
-| 观察到的信号 | 首要区分 | 允许的 repair target |
+| Observed signal | The first distinction to make | Allowed repair target |
 |---|---|---|
-| Gold witness 从未 surfaced | 搜索词错误还是 evidence universe 漏类 | retrieval asset/runtime policy |
-| Witness 已读但没采用 | source standing、语义理解还是 entity/time | Skill/Prompt；必要时 spec form |
-| 正确答案被 gate 拒绝 | task obligation 错还是 control 实现错 | proof contract 或 deterministic control |
-| 错误答案通过 gate | gate 漏检还是 task semantic 错 | answer check/control 或 spec content |
-| Registry disagreement | registry 是否 chart-derivable | human adjudication，不能自动 patch |
-| 多 runs 分歧 | value、evidence、entity、time 还是 provider | targeted attribution/experiment |
-| `SPEC_INSUFFICIENT` loop | 真 spec gap 还是 coverage dead-end 被误路由 | gate/termination routing |
-| PHI/cross-patient incident | preflight 是否缺失 | runtime safety control |
-| 重试、超时、成本尖峰 | provider、tool、policy 还是 prompt | runtime/tool/model/policy |
-| 某成功路径重复有效 | 是否跨病例成立、是否泄漏 PHI | certified experience asset |
+| Gold witness was never surfaced | wrong search terms, or a class missing from the evidence universe | retrieval asset/runtime policy |
+| Witness was read but not used | source standing, semantic understanding, or entity/time | Skill/Prompt; the spec form if necessary |
+| The correct answer was rejected by the gate | the task obligation is wrong, or the control implementation is wrong | proof contract or deterministic control |
+| A wrong answer passed the gate | the gate missed it, or the task semantics are wrong | answer check/control or spec content |
+| Registry disagreement | is the registry chart-derivable | human adjudication; no automatic patch |
+| Runs disagree with each other | value, evidence, entity, time, or provider | targeted attribution/experiment |
+| `SPEC_INSUFFICIENT` loop | a real spec gap, or a coverage dead-end that was misrouted | gate/termination routing |
+| PHI/cross-patient incident | is a preflight missing | runtime safety control |
+| Retries, timeouts, cost spikes | provider, tool, policy, or prompt | runtime/tool/model/policy |
+| One successful path is repeatedly effective | does it hold across cases, does it leak PHI | certified experience asset |
 
-### 4.1 Truth mode 决定结论上限
+### 4.1 Truth mode caps what can be concluded
 
-| 模式 | 可用信号 | 允许结果 |
+| Mode | Signals available | Conclusions allowed |
 |---|---|---|
-| BLIND | trace、spec、detector、多次 run、chart probe | anomaly、hypothesis、test obligation |
-| REGISTRY_REFERENCE | 未裁决 registry 值 | disagreement、adjudication obligation |
-| GOLD | chart-observable gold 和 witness | confirmed mismatch、contrastive failure packet |
-| HUMAN | 角色化签名裁决 | confirmed gold、semantic approval、disposition |
+| BLIND | trace, spec, detector, repeated runs, chart probe | anomaly, hypothesis, test obligation |
+| REGISTRY_REFERENCE | unadjudicated registry values | disagreement, adjudication obligation |
+| GOLD | chart-observable gold and witness | confirmed mismatch, contrastive failure packet |
+| HUMAN | role-based signed adjudication | confirmed gold, semantic approval, disposition |
 
-没有 gold 时仍然可以改进 safety、runtime reliability、gate consistency、evidence
-admissibility 和成本；不能把 clinical correctness hypothesis 当成 truth。
+Without gold you can still improve safety, runtime reliability, gate consistency, evidence
+admissibility and cost; you cannot treat a clinical correctness hypothesis as truth.
 
-### 4.2 一次修复的闭环
+### 4.2 The loop for one repair
 
 ```text
 Trace
@@ -470,237 +508,243 @@ Trace
   → production monitoring
 ```
 
-禁止：
+Forbidden:
 
-- evaluator 直接修改 production spec；
-- 用 majority vote 代替 evidence gate；
-- 用模型 confidence 代替 human confirmation；
-- 为匹配 registry 教 agent 猜 outside-chart 信息；
-- 用同一批 diagnosis cases 无限调参再称为 sealed test。
-
----
-
-## 5. Framework 开发阶段与 Task 使用阶段
-
-### 5.1 Framework 开发阶段应该完成
-
-这些能力跨所有 chart-review task 共享：
-
-- 统一 trace ontology 和 immutable run manifest；
-- patient/provider/tool capability broker；
-- task contract、runtime control、runtime policy 的独立 hash；
-- `CODE / LLM / AGENT / HUMAN` runner 和权限边界；
-- audit `Finding → Incident` correlation；
-- evaluator registry、task runner、analysis/event store；
-- truth-mode isolation；
-- attribution target/counterfactual/skeptic gate；
-- experiment、paired comparison、release gate；
-- asset lineage：spec、Prompt、Skill、Tool、model、policy、evaluator、experience；
-- local-only PHI storage 与 append-only bad-case library；
-- evaluator 自身 certification 和 drift monitoring。
-
-Framework 不能硬编码肺癌、STORE 或某一科室的临床知识。
-
-### 5.2 每个新 Task onboarding 时完成
-
-Task package 至少包含：
-
-- extraction spec / field contract；
-- evidence source policy 和 precedence；
-- entity/time model；
-- positive/negative proof obligation；
-- retrieval assets；
-- task-specific skills；
-- task-specific deterministic checks；
-- evaluator profile；
-- gold/registry/blind 数据策略；
-- subgroup 和 critical-error 定义；
-- runtime policy experiment；
-- human owner 和 sign-off。
-
-### 5.3 Task 生产运行时使用
-
-每例默认只运行：
-
-- frozen task contract；
-- cheapest safe runtime policy；
-- in-request controls；
-- complete trace；
-- cheap CODE audit。
-
-只有异常病例才触发：
-
-- conflict refinement；
-- unread-evidence evaluator；
-- causal attribution；
-- human review。
-
-生产 RUN plane 不携带 gold 或 registry reference。
-
-### 5.4 Task 持续改进时使用
-
-- Continuous post-run CODE evaluation：全量或高比例。
-- LLM/AGENT evaluation：异常选择和成本受控采样。
-- Human adjudication：registry disagreement、临床语义和 semantic patch。
-- Periodic experiment：新 model/spec/policy/skill/tool/evaluator/experience 版本。
-- Bad-case cluster：按 target/cause/parameter 聚类，而不是按自由文本摘要聚类。
+- an evaluator modifying a production spec directly;
+- a majority vote standing in for the evidence gate;
+- model confidence standing in for human confirmation;
+- teaching the agent to guess outside-chart information in order to match the registry;
+- tuning endlessly on the same batch of diagnosis cases and then calling it a sealed test.
 
 ---
 
-## 6. ACR 对 AgentLoop 的采用边界
+## 5. The framework development phase and the task usage phase
 
-### 6.1 直接采用
+### 5.1 What the framework development phase should deliver
 
-- trajectory-first observability；
-- Evaluator / Evaluation Task / Analysis 分工；
-- CODE/LLM/AGENT evaluator；
-- audit finding/incident 两级模型；
-- trace → dataset → annotation → experiment → asset 的数据飞轮；
-- Prompt/Skill 的版本、diff、label 和灰度；
-- experience 是方法而不是答案。
+These capabilities are shared by every chart-review task:
 
-### 6.2 改造采用
+- one unified trace ontology and an immutable run manifest;
+- the patient/provider/tool capability broker;
+- independent hashes for the task contract, the runtime controls and the runtime policy;
+- the `CODE / LLM / AGENT / HUMAN` runners and their authority boundaries;
+- audit `Finding → Incident` correlation;
+- the evaluator registry, the task runner, the analysis/event store;
+- truth-mode isolation;
+- the attribution target/counterfactual/skeptic gate;
+- experiment, paired comparison, release gate;
+- asset lineage: spec, Prompt, Skill, Tool, model, policy, evaluator, experience;
+- local-only PHI storage and an append-only bad-case library;
+- certification and drift monitoring of the evaluators themselves.
 
-- `HUMAN` 作为独立 authority plane；
-- patient-scoped chart tools 和 PHI-local artifact boundary；
-- chart-observable gold，不盲从 registry；
-- deterministic check 对同一子问题优先；
-- agent evaluator 只能 screen/route；
-- semantic patch 必须 human sign-off；
-- dataset 只保存本地引用和 hash，不复制真实 chart；
-- Memory 默认禁用；Experience 必须无 PHI、经验证、可撤销。
+The framework must not hard-code lung cancer, STORE, or the clinical knowledge of one department.
 
-### 6.3 不采用
+### 5.2 Done when each new task is onboarded
 
-- 不把患者数据发送到 Alibaba Cloud；
-- 不依赖 SLS、ARMS、MSE 或 eBPF 才能运行；
-- 不保存大量自由文本 CoT；
-- 不允许 evaluator 自主上线修改；
-- 不允许跨患者 memory；
-- 不把在线评分当作当前请求的 clinical gate；
-- 不因流程“看起来完整”就强制读全 chart。
+A task package contains at least:
+
+- the extraction spec / field contract;
+- the evidence source policy and precedence;
+- the entity/time model;
+- the positive/negative proof obligation;
+- retrieval assets;
+- task-specific skills;
+- task-specific deterministic checks;
+- the evaluator profile;
+- the gold/registry/blind data policy;
+- subgroup and critical-error definitions;
+- the runtime policy experiment;
+- a human owner and sign-off.
+
+### 5.3 Used when a task runs in production
+
+Each case runs, by default, only:
+
+- the frozen task contract;
+- the cheapest safe runtime policy;
+- the in-request controls;
+- a complete trace;
+- a cheap CODE audit.
+
+Only anomalous cases trigger:
+
+- conflict refinement;
+- the unread-evidence evaluator;
+- causal attribution;
+- human review.
+
+The production RUN plane carries no gold and no registry reference.
+
+### 5.4 Used when a task is continuously improved
+
+- Continuous post-run CODE evaluation: every trace, or a high proportion of them.
+- LLM/AGENT evaluation: anomaly selection and cost-controlled sampling.
+- Human adjudication: registry disagreement, clinical semantics and semantic patches.
+- Periodic experiment: new model/spec/policy/skill/tool/evaluator/experience versions.
+- Bad-case cluster: clustered by target/cause/parameter, not by free-text summary.
 
 ---
 
-## 7. 对当前仓库的具体解释
+## 6. The boundary of what ACR adopts from AgentLoop
 
-本节原先逐个列出扁平模块该叫什么名字（`agent.py`: runtime orchestration，`answer_gate.py`:
-in-request controls，等等），并指出 README 的 "audit layer — this is the product" 混淆了三件事。
-那份清单**已经被目录结构本身取代**：`src/acr/` 现在按平面分成十个包，每个模块所在的目录就是
-它属于哪一层，而"允许依赖谁"由 `tests/test_layering.py` 断言。
+### 6.1 Adopted directly
 
-现在读这一节请看 README §2.0 的那张表：plane -> `src/acr/<dir>` -> `assets/<dir>` -> 它回答
-哪个问题。一份需要人去和代码比对的命名清单，正是它当初要纠正的那种东西。
+- trajectory-first observability;
+- the Evaluator / Evaluation Task / Analysis division of labour;
+- CODE/LLM/AGENT evaluators;
+- the two-level audit finding/incident model;
+- the trace → dataset → annotation → experiment → asset data flywheel;
+- version, diff, label and staged rollout for Prompt/Skill;
+- experience is a method, not an answer.
 
-## 8. 官方文档 coverage matrix
+### 6.2 Adopted with changes
 
-状态说明：
+- `HUMAN` as an independent authority plane;
+- patient-scoped chart tools and a PHI-local artifact boundary;
+- chart-observable gold, rather than following the registry blindly;
+- a deterministic check takes precedence on the same sub-question;
+- an agent evaluator may only screen and route;
+- a semantic patch requires human sign-off;
+- a dataset stores only local references and hashes, never a copy of the real chart;
+- Memory is disabled by default; Experience must be PHI-free, validated and revocable.
 
-- **深读**：已用于本文方法论。
-- **索引**：确认能力边界，但不展开云平台操作细节。
-- **采用**：ACR 直接采用核心思想。
-- **改造**：采用思想但增加医疗、PHI 或本地边界。
-- **不接入**：记录存在，但 ACR 不连接该云服务。
+### 6.3 Not adopted
 
-### 8.1 产品、概念与快速入门
+- patient data is not sent to Alibaba Cloud;
+- nothing depends on SLS, ARMS, MSE or eBPF in order to run;
+- large volumes of free-text CoT are not stored;
+- an evaluator is not allowed to push its own changes live;
+- cross-patient memory is not allowed;
+- online scoring is not treated as a clinical gate for the current request;
+- reading the whole chart is not forced because the process "looks complete".
 
-| 文档 | 状态 | ACR 用途 |
+---
+
+## 7. What this means concretely for the current repository
+
+This section used to list, module by module, what each flat module should be called (`agent.py`:
+runtime orchestration, `answer_gate.py`: in-request controls, and so on), and to point out that
+README's "audit layer — this is the product" conflated three things. That list **has been
+replaced by the directory structure itself**: `src/acr/` is now split into ten packages by plane,
+the directory a module sits in is which layer it belongs to, and "who it may depend on" is
+asserted by `tests/test_layering.py`.
+
+To read this section now, look at the table in README §2.0: plane -> `src/acr/<dir>` ->
+`assets/<dir>` -> the question it answers. A naming list that a person has to diff against the
+code by hand is exactly the kind of thing it was written to correct.
+
+## 8. Coverage matrix for the official documentation
+
+Status legend:
+
+- **Deep read**: already used in this methodology.
+- **Indexed**: the capability boundary is confirmed, but the cloud-platform operational detail is
+  not unpacked.
+- **Adopted**: ACR adopts the core idea directly.
+- **Adapted**: the idea is adopted, with medical, PHI or local boundaries added.
+- **Not integrated**: its existence is recorded, but ACR does not connect to that cloud service.
+
+### 8.1 Product, concepts and quick start
+
+| Document | Status | Use in ACR |
 |---|---|---|
-| [What is AgentLoop](https://help.aliyun.com/en/document_detail/3033860.html) | 深读/改造 | 总体闭环与 trajectory-first |
-| [核心概念](https://help.aliyun.com/zh/document_detail/3042001.html) | 深读/采用 | AgentSpace、Trajectory、Dataset、Pipeline、Evaluation、Experience、Memory |
-| [QuickStart 全流程](https://help.aliyun.com/en/document_detail/3033823.html) | 深读/改造 | 闭环顺序和资产关系 |
-| [计费说明](https://help.aliyun.com/zh/document_detail/3044490.html) | 索引/不接入 | 证明 evaluation/experiment/data 都有独立成本 |
-| [RAM 权限参考](https://help.aliyun.com/en/document_detail/3033852.html) | 索引/改造 | least privilege 思想 |
-| [OpenAPI operations](https://help.aliyun.com/en/document_detail/3041792.html) | 索引/不接入 | API 能力边界 |
+| [What is AgentLoop](https://help.aliyun.com/en/document_detail/3033860.html) | Deep read / adapted | the overall closed loop and trajectory-first |
+| [Core concepts](https://help.aliyun.com/zh/document_detail/3042001.html) | Deep read / adopted | AgentSpace, Trajectory, Dataset, Pipeline, Evaluation, Experience, Memory |
+| [QuickStart end-to-end](https://help.aliyun.com/en/document_detail/3033823.html) | Deep read / adapted | the order of the closed loop and the relationships between assets |
+| [Billing](https://help.aliyun.com/zh/document_detail/3044490.html) | Indexed / not integrated | evidence that evaluation, experiment and data each carry their own cost |
+| [RAM permission reference](https://help.aliyun.com/en/document_detail/3033852.html) | Indexed / adapted | the least-privilege idea |
+| [OpenAPI operations](https://help.aliyun.com/en/document_detail/3041792.html) | Indexed / not integrated | the API capability boundary |
 
 ### 8.2 Observability
 
-| 文档 | 状态 | ACR 用途 |
+| Document | Status | Use in ACR |
 |---|---|---|
-| [AI agent observability](https://help.aliyun.com/en/document_detail/3042586.html) | 深读/采用 | capability map |
-| [Trace](https://help.aliyun.com/en/document_detail/3042591.html) | 深读/采用 | request/span 结构、回放 |
-| [Session analysis](https://help.aliyun.com/en/cms/cloudmonitor-2-0/conversational-analysis-of-ai-agent) | 深读/改造 | run/session 聚合、成本和错误下钻 |
-| [Scenario-based analysis](https://help.aliyun.com/zh/document_detail/3042597.html) | 索引/改造 | 多维趋势分析 |
-| [AI Agent 接入应用监控](https://help.aliyun.com/zh/document_detail/3046111.html) | 索引/不接入 | 探针与 OpenTelemetry 接入思想 |
+| [AI agent observability](https://help.aliyun.com/en/document_detail/3042586.html) | Deep read / adopted | capability map |
+| [Trace](https://help.aliyun.com/en/document_detail/3042591.html) | Deep read / adopted | request/span structure, replay |
+| [Session analysis](https://help.aliyun.com/en/cms/cloudmonitor-2-0/conversational-analysis-of-ai-agent) | Deep read / adapted | run/session aggregation, cost and error drill-down |
+| [Scenario-based analysis](https://help.aliyun.com/zh/document_detail/3042597.html) | Indexed / adapted | multi-dimensional trend analysis |
+| [Connecting an AI Agent to application monitoring](https://help.aliyun.com/zh/document_detail/3046111.html) | Indexed / not integrated | the probe and OpenTelemetry onboarding idea |
 
-具体框架/产品接入页（LangChain、Dify、OpenAI、AgentScope、Hermes、Coding Agents 等）
-全部归入 Access Center 索引；它们改变采集方式，不改变 ACR 方法论。
+The per-framework and per-product onboarding pages (LangChain, Dify, OpenAI, AgentScope, Hermes,
+Coding Agents and so on) are all filed under the Access Center index; they change how data is
+collected, not the ACR methodology.
 
 ### 8.3 Audit
 
-| 文档 | 状态 | ACR 用途 |
+| Document | Status | Use in ACR |
 |---|---|---|
-| [AI Agent 审计](https://help.aliyun.com/zh/document_detail/3045691.html) | 深读/采用 | audit 总体分层 |
-| [审计接入指南](https://help.aliyun.com/zh/document_detail/3045692.html) | 深读/改造 | application facts + runtime facts |
-| [审计管理](https://help.aliyun.com/zh/document_detail/3045693.html) | 深读/改造 | 独立开关、持续任务 |
-| [审计规则说明](https://help.aliyun.com/zh/document_detail/3045694.html) | 深读/采用 | Finding → Incident |
-| [风险事件字段说明](https://help.aliyun.com/zh/document_detail/3045695.html) | 索引/改造 | incident schema |
-| [风险审计](https://help.aliyun.com/zh/document_detail/3045696.html) | 深读/改造 | 风险排序和调查入口 |
-| [实体调查](https://help.aliyun.com/zh/document_detail/3045697.html) | 深读/改造 | patient/provider/tool/entity 关联 |
-| [审计事实](https://help.aliyun.com/zh/document_detail/3045698.html) | 深读/采用 | 中性事实不等于风险 |
+| [AI Agent audit](https://help.aliyun.com/zh/document_detail/3045691.html) | Deep read / adopted | the overall audit layering |
+| [Audit onboarding guide](https://help.aliyun.com/zh/document_detail/3045692.html) | Deep read / adapted | application facts + runtime facts |
+| [Audit management](https://help.aliyun.com/zh/document_detail/3045693.html) | Deep read / adapted | independent switches, continuous tasks |
+| [Audit rule reference](https://help.aliyun.com/zh/document_detail/3045694.html) | Deep read / adopted | Finding → Incident |
+| [Risk event field reference](https://help.aliyun.com/zh/document_detail/3045695.html) | Indexed / adapted | incident schema |
+| [Risk audit](https://help.aliyun.com/zh/document_detail/3045696.html) | Deep read / adapted | risk ranking and the entry point for investigation |
+| [Entity investigation](https://help.aliyun.com/zh/document_detail/3045697.html) | Deep read / adapted | patient/provider/tool/entity correlation |
+| [Audit facts](https://help.aliyun.com/zh/document_detail/3045698.html) | Deep read / adopted | a neutral fact is not a risk |
 
 ### 8.4 Evaluation
 
-| 文档 | 状态 | ACR 用途 |
+| Document | Status | Use in ACR |
 |---|---|---|
-| [评估概述](https://help.aliyun.com/zh/document_detail/3042179.html) | 深读/采用 | Evaluator/Task/Analysis |
-| [评估器](https://help.aliyun.com/zh/document_detail/3042180.html) | 深读/改造 | 预置维度、Prompt、Skill、MCP |
-| [评估任务](https://help.aliyun.com/zh/document_detail/3042181.html) | 深读/采用 | trace/log/dataset、采样、持续/历史 |
-| [Evaluator API schema](https://help.aliyun.com/zh/document_detail/3045378.html) | 深读/改造 | CODE/LLM/AGENT、变量映射、版本 |
+| [Evaluation overview](https://help.aliyun.com/zh/document_detail/3042179.html) | Deep read / adopted | Evaluator/Task/Analysis |
+| [Evaluators](https://help.aliyun.com/zh/document_detail/3042180.html) | Deep read / adapted | built-in dimensions, Prompt, Skill, MCP |
+| [Evaluation tasks](https://help.aliyun.com/zh/document_detail/3042181.html) | Deep read / adopted | trace/log/dataset, sampling, continuous/historical |
+| [Evaluator API schema](https://help.aliyun.com/zh/document_detail/3045378.html) | Deep read / adapted | CODE/LLM/AGENT, variable mapping, versions |
 
 ### 8.5 Experiment
 
-| 文档 | 状态 | ACR 用途 |
+| Document | Status | Use in ACR |
 |---|---|---|
-| [实验操作指南](https://help.aliyun.com/zh/document_detail/3046601.html) | 深读/改造 | LLM/Agent 实验、在线/离线定义、trajectory 变量 |
+| [Experiment operations guide](https://help.aliyun.com/zh/document_detail/3046601.html) | Deep read / adapted | LLM/Agent experiments, the online/offline definitions, trajectory variables |
 
-离线结果上报、服务注册和控制台操作页归入索引；ACR 采用本地 paired experiment，
-不向 AgentLoop 上报患者实验结果。
+Offline result reporting, service registration and the console operation pages are filed under the
+index; ACR uses local paired experiments and does not report patient experiment results to
+AgentLoop.
 
-### 8.6 Data Center、Pipeline 与 Annotation
+### 8.6 Data Center, Pipeline and Annotation
 
-| 文档 | 状态 | ACR 用途 |
+| Document | Status | Use in ACR |
 |---|---|---|
-| [数据集概述](https://help.aliyun.com/zh/document_detail/3042278.html) | 深读/改造 | 结构化数据资产 |
-| [数据集控制台接入](https://help.aliyun.com/zh/document_detail/3042280.html) | 深读/改造 | trace/CSV/manual 来源 |
-| [数据标注](https://help.aliyun.com/zh/document_detail/3041820.html) | 深读/改造 | human adjudication UI/schema 思想 |
-| [Pipeline 用户指南](https://help.aliyun.com/zh/cms/cloudmonitor-2-0/user-guide-for-agentloop-pipeline) | 深读/采用 | 清洗、三级去重、聚类采样、AI 加工 |
-| [Pipeline 参考](https://help.aliyun.com/zh/cms/cloudmonitor-2-0/product-feature-documentation) | 索引/不接入 | operators/API/limits |
+| [Dataset overview](https://help.aliyun.com/zh/document_detail/3042278.html) | Deep read / adapted | structured data assets |
+| [Dataset console onboarding](https://help.aliyun.com/zh/document_detail/3042280.html) | Deep read / adapted | trace/CSV/manual sources |
+| [Data annotation](https://help.aliyun.com/zh/document_detail/3041820.html) | Deep read / adapted | the human adjudication UI/schema idea |
+| [Pipeline user guide](https://help.aliyun.com/zh/cms/cloudmonitor-2-0/user-guide-for-agentloop-pipeline) | Deep read / adopted | cleaning, three-level dedupe, cluster sampling, AI processing |
+| [Pipeline reference](https://help.aliyun.com/zh/cms/cloudmonitor-2-0/product-feature-documentation) | Indexed / not integrated | operators/API/limits |
 
 ### 8.7 Agent Assets
 
-| 文档 | 状态 | ACR 用途 |
+| Document | Status | Use in ACR |
 |---|---|---|
-| [Agent 资产概述](https://help.aliyun.com/zh/document_detail/3041729.html) | 深读/采用 | 独立版本、status、labels |
-| [Prompts 管理](https://help.aliyun.com/zh/document_detail/3041730.html) | 深读/改造 | draft/publish/diff/label/动态加载 |
-| [Skills 管理](https://help.aliyun.com/zh/document_detail/3041731.html) | 深读/采用 | SKILL.md、import、version、labels |
+| [Agent asset overview](https://help.aliyun.com/zh/document_detail/3041729.html) | Deep read / adopted | independent versions, status, labels |
+| [Prompt management](https://help.aliyun.com/zh/document_detail/3041730.html) | Deep read / adapted | draft/publish/diff/label/dynamic loading |
+| [Skill management](https://help.aliyun.com/zh/document_detail/3041731.html) | Deep read / adopted | SKILL.md, import, version, labels |
 
-### 8.8 Experience 与 Memory
+### 8.8 Experience and Memory
 
-| 文档 | 状态 | ACR 用途 |
+| Document | Status | Use in ACR |
 |---|---|---|
-| [经验库产品介绍](https://help.aliyun.com/zh/document_detail/3047255.html) | 深读/改造 | 方法资产，不是答案 |
-| [经验库使用指南](https://help.aliyun.com/zh/document_detail/3047254.html) | 深读/改造 | trajectory mining、持续挖掘、runtime Skill recall |
-| [记忆模块控制台接入](https://help.aliyun.com/zh/cms/cloudmonitor-2-0/memory-module-console-operating-guidelines) | 深读/默认不采用 | Facts/Episodic/Summary、检索和生命周期 |
-| [QuickStart 的 Memory 集成](https://help.aliyun.com/en/document_detail/3033823.html) | 深读/默认不采用 | Mem0 接口与长期/短期记忆 |
+| [Experience Library product introduction](https://help.aliyun.com/zh/document_detail/3047255.html) | Deep read / adapted | a method asset, not an answer |
+| [Experience Library user guide](https://help.aliyun.com/zh/document_detail/3047254.html) | Deep read / adapted | trajectory mining, continuous mining, runtime Skill recall |
+| [Memory module console onboarding](https://help.aliyun.com/zh/cms/cloudmonitor-2-0/memory-module-console-operating-guidelines) | Deep read / not adopted by default | Facts/Episodic/Summary, retrieval and lifecycle |
+| [Memory integration in QuickStart](https://help.aliyun.com/en/document_detail/3033823.html) | Deep read / not adopted by default | the Mem0 interface and long-term/short-term memory |
 
 ---
 
-## 9. 方法论验收问题
+## 9. Methodology acceptance questions
 
-今后新增任何 ACR 机制，都先回答：
+Before any new ACR mechanism is added, answer these first:
 
-1. 它属于 task contract、control、policy、observability、audit、evaluation、experiment
-   还是 experience？
-2. 它在 `IN_REQUEST`、`POST_RUN_CONTINUOUS` 还是 `OFFLINE_DEVELOPMENT` 运行？
-3. 它凭什么有权阻断当前答案？
-4. 它评价的维度是什么，执行方式是什么？
-5. 它是否依赖 gold；没有 gold 时结论上限是什么？
-6. 它发现信号后修改哪个资产，谁是 owner？
-7. 它怎样通过 paired experiment 证明收益？
-8. 它是否会复制 PHI、跨患者、泄漏 answer key 或积累未经验证的“经验”？
-9. 停止条件是什么？
-10. 如果移除它，哪个已证明的指标会退化？
+1. Does it belong to task contract, control, policy, observability, audit, evaluation, experiment
+   or experience?
+2. Does it run at `IN_REQUEST`, `POST_RUN_CONTINUOUS` or `OFFLINE_DEVELOPMENT`?
+3. On what authority may it block the current answer?
+4. What dimension does it evaluate, and what executes the evaluation?
+5. Does it depend on gold; without gold, what is the cap on its conclusions?
+6. Which asset does it modify once it finds a signal, and who owns that asset?
+7. How does it prove its benefit through a paired experiment?
+8. Could it copy PHI, cross patients, leak the answer key, or accumulate unvalidated "experience"?
+9. What is its stopping condition?
+10. If it is removed, which proven metric degrades?
 
-如果第 10 个问题没有证据，机制应标为 `EXPERIMENTAL_POLICY`，不能因为“看起来考虑
-完备”就成为永久硬要求。
+If there is no evidence for question 10, the mechanism should be labelled `EXPERIMENTAL_POLICY`;
+it cannot become a permanent hard requirement just because it "looks thoroughly thought through".

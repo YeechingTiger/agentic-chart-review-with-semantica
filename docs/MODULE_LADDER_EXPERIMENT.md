@@ -289,7 +289,7 @@ E2 left "the cards lose to an empty slot" unexplained. The first explanation off
 cards fail to invent retrieval terms — was **measured and refused**: counting every search term
 against the spec's five required ones, every card invents terms, and most invent MORE than B0.
 
-| arm | 搜索/人 | 自创词/人 | 占比 |
+| arm | searches/patient | invented terms/patient | share |
 |---|---|---|---|
 | B0-base | 7.4 | 2.4 | 32% |
 | native | 9.7 | 4.7 | 48% |
@@ -430,7 +430,7 @@ refuses to print a comparison across more than one. Verified against the contami
 rather than a fixture:
 
 ```
-拒绝比较：这些臂跑在 2 个不同的 spec 版本上
+refusing to compare: these arms ran on 2 different spec versions
   depth-first-stop    ['1b8834600b7b']
   depth-first-nostop  ['3e3aa2ca6ea6']
 ```
@@ -469,7 +469,7 @@ pre-registration edited to match what you later thought of is not one.
 
 Three arms, eighteen charts each, one spec hash (`3e3aa2ca6ea6`), no card in any of them.
 
-| arm | 读/人 | 词/人 | 自创词/人 | 全部 | SYNX | 中饵 | 读到关键 |
+| arm | reads/patient | terms/patient | invented/patient | all | SYNX | bait sprung | reached key |
 |---|---|---|---|---|---|---|---|
 | `conditional` | 5.2 | 16.1 | 13.2 | **17/18** | 5/6 | 1/6 | 5/6 |
 | `floor` | 5.8 | 22.1 | 18.3 | 16/18 | 5/6 | 1/6 | 5/6 |
@@ -537,8 +537,8 @@ proof. That is `conditional`, and it is the best arm on every column.
 - **The six SYNX charts are built to punish priors.** On the twelve ordinary charts `prior` is
   12/12 and `floor` is 11/12. A prior costs nothing where it is right. What the real mix of
   right-and-wrong looks like on a clinical corpus, this cannot say.
-- **`读到关键` is a proxy** — "read a document stamped with the gold diagnosis date". On SYNX01
-  `prior` answered correctly while scoring `没读到`, because that chart resolves through a
+- **`reached key` is a proxy** — "read a document stamped with the gold diagnosis date". On SYNX01
+  `prior` answered correctly while scoring `not reached`, because that chart resolves through a
   retrospective remark that states the date without the imaging being opened. The proxy
   overcounts misses; the SYNX accuracy column is the hard one.
 - **Accuracy is underpowered**, as pre-committed. 17/16/15 over 18 charts decides nothing. The

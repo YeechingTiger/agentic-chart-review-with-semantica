@@ -2,7 +2,8 @@
 
 `contract/code_tables.py` opens by naming three jobs the module does, the second being:
 
-    2. `check_values()` 返回带类型的问题给评测面**计数**，永不用于拒绝。
+    2. `check_values()` returns typed problems for the evaluation plane to **count**, never to
+       reject.
 
 `check_values` had ZERO non-test callers in `src/` or `tools/`. The table is loaded (fail-closed on
 a typo), rendered into the prompt, and recorded in the manifest — all INPUT-side. Nothing compared

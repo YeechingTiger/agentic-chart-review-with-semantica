@@ -96,7 +96,8 @@ def main() -> None:
     print(f"{'':<{w}}" + "".join(f"{a:>22}" for a in out))
     for c in cols:
         print(f"{c:<{w}}" + "".join(f"{out[a][c]!s:>22}" for a in out))
-    print("\n准确率/弃答/交卷率不在这张表里 —— 那是 `acr eval score` 的，不在这里重算。")
+    print("\nAccuracy, abstention and gate rates are not in this table — those belong to "
+          "`acr eval score` and are not recomputed here.")
 
 
 if __name__ == "__main__":

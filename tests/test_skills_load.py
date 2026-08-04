@@ -108,8 +108,9 @@ def test_reference_pointers_resolve(skill_dir: Path):
     404s; repo-relative is what works from the repo root, which is where deep_runner must be
     launched anyway.
     """
-    # SKILLS_DIR 现在是 <root>/assets/skills，所以 repo root 要再上一层。指针本身写成
-    # 仓库根相对的 `assets/skills/…`，两者相接才是真实路径。
+    # SKILLS_DIR is now <root>/assets/skills, so the repo root is one level further up. The pointers
+    # themselves are written repo-root-relative as `assets/skills/...`, and only the two joined
+    # together are the real path.
     repo = SKILLS_DIR.parents[1]
     for md in skill_dir.rglob("*.md"):
         for ref in re.findall(r"`(assets/skills/[A-Za-z0-9_/.-]+\.md)`", md.read_text()):
@@ -119,11 +120,14 @@ def test_reference_pointers_resolve(skill_dir: Path):
 
 
 def test_every_skills_frontmatter_parses_and_a_tactic_declares_its_precondition():
-    """一个未加引号、含冒号的 `precondition:` 让 YAML 解析失败，而失败是以 collection error
-    的形式出现的 —— 整个测试套件收集不起来，报的是别的文件的名字。这条把它变成一句能读的话。
+    """An unquoted `precondition:` containing a colon makes the YAML fail to parse, and the failure
+    arrives as a collection error -- the whole suite fails to collect and the name it reports is
+    some other file's. This one turns that into a sentence somebody can read.
 
-    同时钉住：`tactic` 槽的卡必须声明 precondition。战术之所以从 policy 槽拆出来，就是
-    因为它只在前提成立时才有内容；不说前提的战术，和一张普通的卡没有区别。
+    It pins one more thing: a card in the `tactic` slot must declare a precondition. The only reason
+    tactics were split out of the policy slot is that a tactic has content only when its
+    precondition holds; a tactic that does not state its precondition is no different from an
+    ordinary card.
     """
     import re
 

@@ -18,12 +18,14 @@ import yaml
 
 from .kernel import AssetRef, digest
 
-#: 一个 kind 只有在既有 Protocol 又有实现时才留在这里。2026-08-03 删掉了 `RUNTIME_CONTROL`
-#: 和 `REPAIR_STRATEGY`：两者的 Protocol 在同一天随各自唯一的实现一起删除
-#: (`review/runtime_controls.py`、`improvement/repair_loop.py`，生产代码零引用)，而 kind 留了
-#: 下来 —— 于是 `assets/module_catalog/runtime_controls/` 里五份 YAML 继续通过 `__post_init__`
-#: 的 kind 校验并被 `from_directory` 正常加载，声明着没有任何代码能运行的资产。校验放行是因为
-#: 名单里有这个名字，而名单是删除时唯一没人想起来改的地方。
+#: A kind stays here only while it has both a Protocol and an implementation. `RUNTIME_CONTROL` and
+#: `REPAIR_STRATEGY` were dropped on 2026-08-03: their Protocols were deleted that same day along
+#: with the single implementation of each (`review/runtime_controls.py`,
+#: `improvement/repair_loop.py`, zero references from production code), while the kinds stayed —
+#: so the five YAML files under `assets/module_catalog/runtime_controls/` kept passing the kind
+#: check in `__post_init__` and kept loading normally through `from_directory`, declaring assets
+#: that no code can run. The check let them through because the name was in this set, and this set
+#: was the one place nobody remembered to edit when the deletion happened.
 MODULE_KINDS = frozenset({
     "RUNTIME_POLICY",
     "AUDIT_RULE",
@@ -843,9 +845,11 @@ class AuditRule(Protocol):
 class Evaluator(Protocol):
     def evaluate(self, context: Any) -> Any: ...
 
-# 2026-08-03 这里曾有 `RuntimeControl` 和 `RepairStrategy` 两个 protocol，各自的唯一实现
-# (`review/runtime_controls.py`、`improvement/repair_loop.py`) 在生产代码里零引用，删除时把
-# protocol 一起带走：一个没有实现者的 protocol，是同一份死代码往上挪了一层，而且读起来像是
-# 系统有这个能力。真正的强制在 `review/answer_gate.py`(答案义务)、`core/spend.py:74`
-# (预算上限)、`review/agent.py` 的 `_undeclared`(工具白名单)、`core/local_artifacts.py`
-# (病人衍生数据不出 worktree)，以及"一次运行只绑一个 PatientChart"这个对象图事实里。
+# 2026-08-03: two protocols, `RuntimeControl` and `RepairStrategy`, used to sit here. The single
+# implementation of each (`review/runtime_controls.py`, `improvement/repair_loop.py`) had zero
+# references from production code, and deleting them took the protocols with them: a protocol with
+# no implementer is the same dead code moved up one level, and it reads as though the system has
+# that capability. The real enforcement lives in `review/answer_gate.py` (answer obligations),
+# `core/spend.py:74` (budget ceiling), `_undeclared` in `review/agent.py` (the tool allowlist),
+# `core/local_artifacts.py` (patient-derived data never leaves the worktree), and in the
+# object-graph fact that one run binds exactly one PatientChart.

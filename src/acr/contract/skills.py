@@ -53,20 +53,24 @@ SKILLS_DIR = asset_dir(str(site.skills_root()))
 #: guidance, small enough that three of them do not dominate a prompt.
 MAX_SKILL_BYTES = 12_000
 
-#: 一张卡装在哪个槽。槽不是分类标签，是装配位置。
+#: Which slot a card is assembled into. A slot is not a category label, it is an assembly position.
 #:
-#: `policy` 恰好装一张，并且总是生效 —— 它是一次运行的检索方针，是对照试验里唯一被替换的
-#: 变量。`tactic` 不限张数且各带前提，因为一个战术是前提成立时才可以调用的动作，不是整个方
-#: 针；2026-08-02 之前八张卡挤在同一个槽里八选一，量到的是不同种类干预之间的差别，不是策略
-#: 之间的差别。
+#: `policy` holds exactly one and always applies — it is this run's retrieval policy, the one
+#: variable a controlled comparison replaces. `tactic` holds any number and each card carries its
+#: own precondition, because a tactic is a move that may be called once its precondition holds, not
+#: a whole policy; before 2026-08-02 eight cards were crowded into one slot as an eight-way choice,
+#: and what that measured was the difference between kinds of intervention, not the difference
+#: between policies.
 #:
-#: 这个槽 2026-08-03 之前叫 `controller`，那个名字是从架构文档里搬来的，而文档里的
-#: Strategic Controller 是一次独立的模型调用，输出 CONTINUE / STOP / ABSTAIN / ESCALATE 的
-#: 封闭枚举且不碰检索。这里从来没有那个东西：没有任何代码读这个槽做决定，它唯一的去处是
-#: `names()` 的渲染顺序。一个承诺了不存在机制的名字，在这棵树上已经付过一次代价（见
-#: `tools/run_ladder.py` 的开头）。`experience` 只在经验
-#: 臂打开。`task` 最多一张，跟着 spec 走。`general` 不限张数，是每个条件都有的东西。`eval`
-#: 属于评测那边的 agent，永远不进跑病历的提示词。
+#: This slot was called `controller` until 2026-08-03. That name was carried over from the
+#: architecture document, where the Strategic Controller is a separate model call that emits a
+#: closed enum of CONTINUE / STOP / ABSTAIN / ESCALATE and never touches retrieval. No such thing
+#: has ever existed here: no code reads this slot to make a decision, and its only destination is
+#: the render order in `names()`. A name that promises a mechanism which does not exist has already
+#: cost this tree once (see the top of `tools/run_ladder.py`). `experience` is turned on only in
+#: the experience arm. `task` holds at most one and follows the spec. `general` holds any number
+#: and is what every condition has. `eval` belongs to the evaluation agent and never enters the
+#: prompt of a chart run.
 SLOTS: tuple[str, ...] = ("task", "policy", "tactic", "experience", "general", "eval")
 
 _FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)

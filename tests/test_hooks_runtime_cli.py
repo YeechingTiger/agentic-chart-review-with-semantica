@@ -151,7 +151,7 @@ def test_runtime_profile_is_executed_and_recorded_in_lineage(tmp_path, scripted_
     assert record["coverage_gate_validated"] is False
 
 
-@pytest.mark.provider_seam   # 它测的就是 chat_model 本身，底下的 ChatOpenAI 已被换掉
+@pytest.mark.provider_seam   # it tests chat_model itself; the ChatOpenAI underneath is faked out
 def test_chat_model_adapts_litellm_openai_prefix_for_openai_compatible_endpoint(
         monkeypatch):
     """The shared ACR_MODEL may be LiteLLM-qualified; ChatOpenAI needs a deployment name."""

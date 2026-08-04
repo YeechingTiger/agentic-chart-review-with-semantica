@@ -9,8 +9,8 @@ config hashes, 294 of them recording no config hash at all):
 
   1. `--model TOTALLY-WRONG-MODEL` was accepted in silence and written into the baseline.
   2. A run tree spanning two spec hashes scored as ONE clean baseline and reported +5.6 points.
-     `tools/analyze_arms.py` refuses exactly this ("拒绝比较：这些臂跑在 N 个不同的 spec 版本上");
-     `eval score` averaged it.
+     `tools/analyze_arms.py` refuses exactly this ("Refusing to compare: these arms ran on
+     N different spec versions"); `eval score` averaged it.
   3. Two arms that genuinely differed — a whole skill card in the prompt — produced
      `key_differences: []` and `verdict: OK`, because the four key parts were identical and the
      part that moved (`prompt_assets`) was in no key.

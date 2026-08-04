@@ -1,9 +1,11 @@
-"""评测卡只能教怎么找原因，不能教怎么判分。
+"""An eval skill may only teach how to find a cause. It may not teach how to score.
 
-判分是 `evals.py` 的确定性函数的事：correctness 就是 `==`。让 AI 判分会洗白弃答——
-病历里确实没写、机器人正确地答了 EVIDENCE_INSUFFICIENT，AI judge 却当成"没完成任务"扣分，
-优化这种分数等于教模型在最高风险的子群上猜。围栏写在提示词里一次改写就没了；写在这里，
-改写就红。
+Scoring is the business of the deterministic functions in `evals.py`: correctness is `==`. Letting
+an AI score whitewashes abstention — the chart genuinely does not say so, the agent correctly
+answered EVIDENCE_INSUFFICIENT, and the AI judge marks it down as "did not finish the task".
+Optimising against a score like that is teaching the model to guess on exactly the subpopulation
+where guessing is most dangerous. A fence written into the prompt is gone after one rewording;
+written here, a rewording turns red.
 """
 from __future__ import annotations
 
@@ -46,7 +48,8 @@ def test_eval_skill_declares_what_it_may_judge(name: str):
 
 @pytest.mark.parametrize("name", _eval_skills())
 def test_eval_skill_does_not_instruct_scoring(name: str):
-    """一张教 AI 宣布对错的卡，就是把判分从程序挪回了模型。"""
+    """A card that teaches the AI to declare right or wrong has moved scoring back out of the
+    program and into the model."""
     body = load_skill_body(name).lower()
     hits = [v for v in EVAL_FORBIDDEN_VERBS if re.search(rf"\b{re.escape(v)}\b", body)]
     assert not hits, (

@@ -1,16 +1,19 @@
 """Strata: the stratification a spec DECLARES, and which documents fall in each.
 
-从 spec 的 `proof_obligation.for_negative` 推导出来的，所以属于合同层而不是运行时策略。
+Derived from a spec's `proof_obligation.for_negative`, so it belongs to the contract layer and not
+to runtime policy.
 
-为什么它从 `coverage.py` 搬出来
-------------------------------
-`assetdev` 和 `derive` 需要按 spec 分层，于是它们 import 了 `coverage` —— 一个运行时平面的
-模块。方向没错，但那意味着改 `coverage` 的一个函数签名会动到 improvement 平面，而这三个
-符号从来不是"怎样搜索"的策略：它们是"这个 spec 声明了哪些层，一份文档属于哪一层"，也就是
-答案含义的一部分。`tests/test_layering.py` 把这两条登记为动作 B。
+Why it moved out of `coverage.py`
+---------------------------------
+`assetdev` and `derive` need to stratify by spec, so they imported `coverage` — a module on the
+runtime plane. The direction was not wrong, but it meant that changing one function signature in
+`coverage` reached into the improvement plane, and these three symbols were never a policy about
+"how to search": they are "which strata this spec declares, and which stratum a document falls in",
+which is part of what the answer MEANS. `tests/test_layering.py` registers those two edges as
+action B.
 
-`coverage.py` 仍然转出这三个名字，因为 `CoverageLedger` 的 API 就以它们为参数 —— 那是自然的
-再导出，不是兼容层。
+`coverage.py` still re-exports the three names, because `CoverageLedger`'s API takes them as
+parameters — that is a natural re-export, not a compatibility shim.
 """
 from __future__ import annotations
 

@@ -53,6 +53,30 @@ _MINCHARS = typer.Option(..., "--min-term-chars",
 _ROOT = typer.Option(None, "--labels-root",
                      help=f"where labellings live; refuses anywhere inside the repository. "
                           f"Default ${lab.LABELS_ROOT_ENV} or {lab.DEFAULT_LABELS_ROOT}")
+#: WHICH QUESTIONS THE SCAN PUTS. The one place a question is added to a scan or taken out of it,
+#: exposed here because the useful experiment is "what does it cost, and what does it answer,
+#: without question 4" and that experiment has to be runnable without editing a prompt.
+_QUESTIONS = typer.Option(
+    "", "--questions",
+    help="comma list of the scan questions to ask; default all of "
+         + ",".join(q.name for q in lab.DEFAULT_QUESTIONS)
+         + ". DROPPING ONE CHANGES prompt_hash AND THEREFORE THE DIRECTORY THE LABELS LAND IN: a "
+           "reduced scan does not resume a full one, and `progress`/`export` must be given the "
+           "same list to find it. "
+         + " and ".join(lab.MANDATORY_QUESTIONS) + " cannot be dropped.")
+
+
+def _questions(names: str) -> tuple[lab.ScanQuestion, ...]:
+    """A comma list -> the selection, turning the module's refusals into an exit code.
+
+    An unknown name is refused rather than ignored: a typo would silently drop a question, write a
+    directory nobody meant to write, and come back looking like a completed scan.
+    """
+    try:
+        return lab.selected_questions([n for n in names.split(",") if n.strip()] or None)
+    except lab.LabellingError as e:
+        con.print(f"[red]{e}[/]")
+        raise typer.Exit(2) from e
 
 
 def _requirement(spec_path: str) -> lab.Requirement:
@@ -69,10 +93,11 @@ def _requirement(spec_path: str) -> lab.Requirement:
         raise typer.Exit(2) from e
 
 
-def _store(root, spec_path: str, terms: lab.TermConfig, model: str):
+def _store(root, spec_path: str, terms: lab.TermConfig, model: str, questions=None):
     req = _requirement(spec_path)
     try:
-        return req, lab.LabelStore(root, model=model, requirement=req, terms=terms)
+        return req, lab.LabelStore(root, model=model, requirement=req, terms=terms,
+                                   questions=questions)
     except lab.LabellingError as e:
         con.print(f"[red]{e}[/]")
         raise typer.Exit(2) from e
@@ -107,6 +132,7 @@ def scan(
                                        "once the label file's own spend reaches this."),
     max_terms_per_note: int = _MAXTERMS,
     min_term_chars: int = _MINCHARS,
+    questions: str = _QUESTIONS,
     labels_root: str = _ROOT,
     concurrency: int = typer.Option(8, "--concurrency"),
     max_note_chars: int = typer.Option(24_000, "--max-note-chars",
@@ -125,12 +151,13 @@ def scan(
     rerunning after the ceiling trips picks up exactly where it stopped and re-spends nothing.
     """
     terms = lab.TermConfig(max_terms_per_note=max_terms_per_note, min_term_chars=min_term_chars)
-    # The model name is part of the store key, so it must be settled BEFORE the store is
-    # opened — including in --dry-run, or the dry run would plan against a different file
-    # from the one the real run appends to.
+    # The model name and the question selection are part of the store key, so both must be settled
+    # BEFORE the store is opened — including in --dry-run, or the dry run would plan against a
+    # different file from the one the real run appends to.
     model = f"openai/{lab.DEPLOYMENT}"
-    req, store = _store(labels_root, spec, terms, model)
-    cfg = lab.ScanConfig(max_usd=max_usd, requirement=req, terms=terms,
+    asked = _questions(questions)
+    req, store = _store(labels_root, spec, terms, model, asked)
+    cfg = lab.ScanConfig(max_usd=max_usd, requirement=req, terms=terms, questions=asked,
                          concurrency=concurrency, max_note_chars=max_note_chars)
 
     c = Corpus(Path(corpus))
@@ -144,6 +171,7 @@ def scan(
     spent = store.spend()
     plan = _price(todo, cfg, store)
     plan |= {"spec_id": req.spec_id, "requirement_hash": req.hash, "run_key": store.key,
+             "questions": [q.name for q in asked],
              "store_dir": str(store.dir), "model": model, "n_patients": len(pids),
              "n_notes_in_scope": len(items), "n_already_labelled": len(items) - len(todo),
              "n_pending": len(todo), "spend_so_far_usd": round(spent, 6), "max_usd": max_usd}
@@ -196,7 +224,7 @@ def _price(todo, cfg: lab.ScanConfig, store: lab.LabelStore) -> dict:
 
 def _print_plan(plan: dict) -> None:
     t = Table("what", "value")
-    for k in ("spec_id", "requirement_hash", "run_key", "model", "n_patients",
+    for k in ("spec_id", "requirement_hash", "run_key", "questions", "model", "n_patients",
               "n_notes_in_scope", "n_already_labelled", "n_pending", "spend_so_far_usd",
               "max_usd", "input_cost_floor_usd", "measured_mean_usd_per_label",
               "projected_usd_at_measured_mean"):
@@ -212,6 +240,7 @@ def progress(
     spec: str = _SPEC,
     max_terms_per_note: int = _MAXTERMS,
     min_term_chars: int = _MINCHARS,
+    questions: str = _QUESTIONS,
     labels_root: str = _ROOT,
     out: str = typer.Option("", "--out", help="write the summary JSON here"),
 ):
@@ -221,9 +250,13 @@ def progress(
     verbatim quote of the note, and `tests/test_no_phi_in_tree.py` exists because that
     material got into the tree once already — so this command must stay safe to redirect into
     a file inside the repository.
+
+    `--questions` has to match the scan's, because the selection keys the directory: given the
+    default while the scan dropped one, this counts an empty store and reports zero labels.
     """
     terms = lab.TermConfig(max_terms_per_note=max_terms_per_note, min_term_chars=min_term_chars)
-    req, store = _store(labels_root, spec, terms, f"openai/{lab.DEPLOYMENT}")
+    req, store = _store(labels_root, spec, terms, f"openai/{lab.DEPLOYMENT}",
+                        _questions(questions))
     try:
         labels = list(store.load().values())
     except lab.LabelShapeError as e:
@@ -274,7 +307,7 @@ def progress(
 @label_app.command("export")
 def cmd_export(
     spec: str = _SPEC, max_terms_per_note: int = _MAXTERMS, min_term_chars: int = _MINCHARS,
-    labels_root: str = _ROOT,
+    questions: str = _QUESTIONS, labels_root: str = _ROOT,
     out: str = typer.Option(..., "--out", help="write the assetdev-shaped labelling here"),
 ):
     """Re-shape a completed scan into the labelling `acr assets` reads.
@@ -296,7 +329,8 @@ def cmd_export(
     two modules stay coupled by a format; this is the thing that makes the sentence true.
     """
     terms = lab.TermConfig(max_terms_per_note=max_terms_per_note, min_term_chars=min_term_chars)
-    req, store = _store(labels_root, spec, terms, f"openai/{lab.DEPLOYMENT}")
+    req, store = _store(labels_root, spec, terms, f"openai/{lab.DEPLOYMENT}",
+                        _questions(questions))
     labels = [ll for ll in store.load().values() if ll.ok]
     if not labels:
         con.print("[red]no completed labels in this store — run `acr label scan` first[/]")

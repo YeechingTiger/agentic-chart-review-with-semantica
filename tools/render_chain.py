@@ -1,15 +1,17 @@
-"""把一次运行的审阅链渲染成可读的一串动作，从第一步到停止。
+"""Render one run's review chain as a readable sequence of actions, from the first step to the stop.
 
-为什么需要它
-----------
-`chain_report` 报的是链的**健康度**（可解析比率、深度、断点）。这个工具报的是链**本身**：
-按顺序，模型做了什么、给出的理由是什么、gate 说了什么、最后为什么停。一个数字告诉你链有
-没有断，一串动作才告诉你这条 policy 长什么样。
+WHY IT IS NEEDED
+----------------
+`chain_report` reports the chain's **health** (resolvable ratio, depth, breaks). This tool reports
+the chain **itself**: in order, what the model did, what reason it gave, what the gate said, and why
+it stopped in the end. A number tells you whether the chain is broken; only the sequence of actions
+tells you what this policy looks like.
 
-四个臂跑同一个病人，把它们并排读，policy 的形状就直接可见 —— 这比任何一张卡的描述都准，
-因为卡是意图，这是行为。
+Run four arms over the same patient, read them side by side, and the shape of the policy is directly
+visible — more accurate than any card's description of it, because a card is intent and this is
+behaviour.
 
-用法：
+Usage:
     .venv/bin/python tools/render_chain.py <manifest.json> [--max N]
 """
 
@@ -25,12 +27,12 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 from acr.evaluation import evals as E
 from acr.evaluation.evidence_chain import chain_report
 
-#: 每种工具在链里怎么读。名字不是给机器的，是给读的人的。
+#: How each tool reads inside the chain. These names are not for a machine, they are for the reader.
 VERB = {
-    "list_documents": "清点", "document_type_summary": "清点类型",
-    "search_notes": "检索", "search_documents": "检索", "search": "检索",
-    "read_document": "读", "read_documents_batch": "批量读", "read_section": "读段落",
-    "submit_answer": "提交", "gate": "闸门",
+    "list_documents": "inventory", "document_type_summary": "type census",
+    "search_notes": "search", "search_documents": "search", "search": "search",
+    "read_document": "read", "read_documents_batch": "batch read", "read_section": "read section",
+    "submit_answer": "submit", "gate": "gate",
 }
 
 
@@ -52,12 +54,14 @@ def render(path: pathlib.Path, max_rows: int = 40) -> None:
 
     print(f"\n{'=' * 78}\n{path.parent.name.split('__')[0]:20s} {path.stem}")
     print(f"{'=' * 78}")
-    print(f"答案 {ans.get('status')} {json.dumps(ans.get('value') or {}, ensure_ascii=False)[:60]}"
+    print(f"answer  {ans.get('status')} "
+          f"{json.dumps(ans.get('value') or {}, ensure_ascii=False)[:60]}"
           f"  | gate_validated={m.get('gate_validated')}")
-    print(f"链   {rep['n_links']} 步 | 可解析 {rep['n_grounded']} | 散文 {rep['n_prose_only']}"
-          f" | 无来源 {rep['n_unsourced']} | 深度 {rep['max_depth']}")
-    print(f"停在 {m.get('termination_reason') or '—'}"
-          f" | 步数 {m.get('steps')} | 模型调用 {(m.get('usage') or {}).get('llm_calls')}")
+    print(f"chain   {rep['n_links']} steps | grounded {rep['n_grounded']}"
+          f" | prose {rep['n_prose_only']}"
+          f" | unsourced {rep['n_unsourced']} | depth {rep['max_depth']}")
+    print(f"stopped {m.get('termination_reason') or '—'}"
+          f" | steps {m.get('steps')} | llm calls {(m.get('usage') or {}).get('llm_calls')}")
     print("-" * 78)
 
     links = rep["links"]
@@ -70,12 +74,13 @@ def render(path: pathlib.Path, max_rows: int = 40) -> None:
                 "UNRESOLVED_REF": "?", "FORWARD_REF": "!"}[ln["status"]]
         ref = f" ←{ln['ref']}" if ln.get("ref") else ""
         why = (ln["why"] or "").replace("\n", " ")[:52]
-        print(f"{ln['seq']:>3} {mark} {verb:<10s} {_arg(ev):<46s}{ref}")
+        print(f"{ln['seq']:>3} {mark} {verb:<12s} {_arg(ev):<46s}{ref}")
         if why:
             print(f"      └ {why}")
     if len(links) > max_rows:
-        print(f"    … 另有 {len(links) - max_rows} 步（--max 调整）")
-    print("图例：→ 指针可解析   · 只有散文理由   (空) 无理由   ? 解析不到   ! 指向未来")
+        print(f"    … {len(links) - max_rows} more steps (raise with --max)")
+    print("legend: → pointer resolves   · prose reason only   (blank) no reason   "
+          "? does not resolve   ! points at the future")
 
 
 def main() -> int:

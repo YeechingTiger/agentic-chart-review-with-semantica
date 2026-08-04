@@ -1,10 +1,12 @@
-"""一次读要说明它为什么发生，否则归因只能靠相邻位置猜。
+"""A read should say why it happened, or attribution has nothing but adjacency to guess from.
 
-轨迹是平铺的事件序列，事件之间没有连线。归因 agent 被要求"分清记录证明的和推测的"，
-但在没有成因字段的轨迹上，"第 9 步读 D12 是因为第 7 步搜索返回了它"永远是推测——
-而报告不会说它是推测。这个字段把它变成记录。
+A trace is a flat sequence of events with no links between them. The attribution agent is told to
+"separate what the trace proves from what is inferred", but on a trace with no cause field, "step 9
+read D12 because step 7's search returned it" is always an inference — and the report will not say
+that it is one. This field turns it into a record.
 
-不填不拒：成因是判断，判断可以缺席，缺席要能被数出来。
+Not filled in, not refused: a cause is a judgement, a judgement is allowed to be absent, and its
+absence has to be countable.
 """
 from __future__ import annotations
 
@@ -55,14 +57,15 @@ def test_retrieval_tools_ask_for_a_cause(tool: str):
 
 @pytest.mark.parametrize("tool", ["read_document", "read_documents_batch", "search_notes"])
 def test_cause_is_never_required(tool: str):
-    """记录，不是闸门。必填会把判断变成仪式。"""
+    """A record, not a gate. Making it required would turn a judgement into a ritual."""
     for s in TOOL_SCHEMAS:
         if s["function"]["name"] == tool:
             assert CAUSE_PARAM not in s["function"]["parameters"].get("required", [])
 
 
 def test_dispatch_accepts_and_strips_the_cause(toolbox_with_one_doc):
-    """`_t_` 方法不必知道这个参数——它在 dispatch 就被摘掉了，一处而不是每个工具一处。"""
+    """The `_t_` methods need not know about this parameter — dispatch strips it, in one place
+    rather than one place per tool."""
     tb = toolbox_with_one_doc
     out, _ms = tb.dispatch("read_document", {"note_id": NOTE_ID, CAUSE_PARAM: "search #7 hit"})
     assert "error" not in out
@@ -70,7 +73,7 @@ def test_dispatch_accepts_and_strips_the_cause(toolbox_with_one_doc):
 
 
 def test_dispatch_clears_the_cause_between_calls(toolbox_with_one_doc):
-    """上一次的成因不许粘到下一次——那会造出一条没人写过的因果连线。"""
+    """One call's cause must not stick to the next — that invents a causal link nobody wrote."""
     tb = toolbox_with_one_doc
     tb.dispatch("read_document", {"note_id": NOTE_ID, CAUSE_PARAM: "thread T3"})
     tb.dispatch("read_document", {"note_id": NOTE_ID})
@@ -87,7 +90,7 @@ def test_detector_counts_reads_with_no_cause():
         {"kind": "tool", "tool": "read_document", "because": "search #2 hit"},
         {"kind": "tool", "tool": "read_document", "because": ""},
         {"kind": "tool", "tool": "read_document"},
-        {"kind": "tool", "tool": "submit_answer"},          # 不是读，不进分母
+        {"kind": "tool", "tool": "submit_answer"},          # not a read, not in the denominator
     ])
     findings = detect_uncaused_reads(run)
     assert len(findings) == 1
@@ -104,8 +107,8 @@ def test_detector_is_silent_when_every_read_has_a_cause():
 
 
 def test_detector_is_silent_on_a_run_with_no_reads():
-    """零阅读是 detect_zero_document_read 的案子，不是这个检测器的——两个检测器报同一件事，
-    读的人会以为是两个问题。"""
+    """Zero reads is `detect_zero_document_read`'s case, not this detector's — two detectors
+    reporting one fact reads as two problems."""
     assert detect_uncaused_reads(RunRecord(manifest={}, trace=[])) == []
 
 

@@ -199,14 +199,20 @@ def every_field(verdict: str, requirement: L.Requirement = MED) -> dict[str, str
     return {name: verdict for name in requirement.field_names}
 
 
-def reply_json(*, verdicts: dict[str, str], quote: str = "", terms=()) -> str:
-    """The exact shape of the two-question contract, so a test can vary one answer at a time.
+def reply_json(*, verdicts: dict[str, str], quote: str = "", terms=(), **answers) -> str:
+    """The exact shape of the contract, so a test can vary one answer at a time.
 
     Note what has no per-field form here and must not grow one: the quote. ONE span for the
     document, however many fields it speaks to.
+
+    EVERY SELECTED QUESTION IS ANSWERED, including the three this file is not about: an absent key
+    is refused by `parse_label_response` — a question unanswered is not a question answered with
+    nothing — so the answers below are the empty ones, which is what these notes would truthfully
+    get. A test that cares about them passes its own through `**answers`.
     """
     return json.dumps({"admissibility": {"verdicts": verdicts, "quote": quote},
-                       "retrieval_terms": [{"term": t, "reason": r} for t, r in terms]})
+                       "retrieval_terms": [{"term": t, "reason": r} for t, r in terms],
+                       "asserted_values": {}, "pointers": [], "copied_forward": None} | answers)
 
 
 def reply_for(blob: str) -> str:
@@ -744,7 +750,7 @@ def test_a_per_note_labelling_on_disk_cannot_be_read_as_a_per_field_one(store, t
     store.path.write_text(json.dumps(old_row) + "\n", encoding="utf-8")
     with pytest.raises(L.LabelShapeError):
         store.load()  # NOT swallowed by the torn-line handling
-    assert L.PROMPT_VERSION == "labelling/4"  # bumped with the shape; see prompt_hash
+    assert L.PROMPT_VERSION == "labelling/5"  # bumped with the shape; see prompt_hash
 
 
 def test_the_stored_row_carries_the_per_field_answer_and_a_collapse_that_is_never_read_back(store):

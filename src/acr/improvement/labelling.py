@@ -7,11 +7,34 @@ Given any development set of patients and any requirement, decide, per note:
   1. does this note bear on the requirement, and in what way (its STANDING) — asked and answered
      ONCE PER FIELD of the requirement, never once for the note;
   2. which terms in it would let a searcher find it for that requirement — ONE list per note, for
-     the requirement as a whole.
+     the requirement as a whole;
+  3. what value the note ASSERTS per field, each beside the verbatim span it was read from;
+  4. what the note POINTS AT — verbatim spans naming another document, date or identifier, which
+     is the indirect evidence that says where the direct evidence is;
+  5. whether the content bearing on the requirement is ORIGINAL to this note or CARRIED FORWARD.
 
-Aggregated, those two answers become the keyword list and the document-type policy for that
-requirement. That is the whole job. This module does not extract an answer, does not hold one,
-and does not know what the requirement is about.
+Aggregated, 1 and 2 become the keyword list and the document-type policy for that requirement; 3
+becomes the conflict rate, the naive-answer baseline and the only stopping evidence anywhere (how
+many notes per chart can establish an answer); 4 is what tells a reading agent where to go next
+rather than only whether it has arrived; and 5 is the honest denominator for every claim about how
+much reading is wasted, because on a real record duplication is most of the corpus.
+
+That is the whole job. This module still does not hold an answer key and does not know what the
+requirement is about — question 3 records what the NOTE says, which is a reading of one document
+and not the answer for a patient; `audit_relevance` at the bottom of this file remains the only
+place an answer key is ever in the room, deliberately after the fact.
+
+THE QUESTIONS ARE A REGISTRY, NOT A TEMPLATE
+--------------------------------------------
+Each of the five is one `ScanQuestion` in `QUESTIONS`: its text, its slice of the reply contract,
+the keys its answer arrives under, and the parser for those keys. `note_prompt` assembles the
+selected ones and knows nothing about any of them; `selected_questions` is where one is dropped;
+`prompt_hash` carries the selection, so a scan that asks four questions cannot land in the file of
+a scan that asked five. That is the whole reason for the indirection: the useful experiment is
+"what does this cost, and what does it answer, WITHOUT question 4", and a question typed into a
+template is a question nobody can subtract without editing the template and moving every hash.
+`standing` and `retrieval` cannot be dropped — a scan without standing is not a cheaper scan, it
+is the same price per note for nothing to aggregate.
 
 WHY STANDING IS PER FIELD AND NOT PER NOTE
 ------------------------------------------
@@ -131,6 +154,7 @@ import threading
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field, replace
+from dataclasses import fields as dc_fields
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -171,8 +195,20 @@ class NotALabellableSpecError(LabellingError):
     """A spec cannot define the three standing classes, so nothing here can label against it."""
 
 
-class PromptContractError(LabellingError):
-    """The model's reply did not satisfy the response contract."""
+class LabelReplyError(LabellingError):
+    """The model's reply did not satisfy the response contract.
+
+    Raised for exactly one class of fault: the reply is not an answer to a question that was
+    ASKED. A missing field, an invented field, a verdict outside the three classes, an absent key
+    for a selected question — every one of them means the reply was not shaped by the contract it
+    was shown, so the parts that do line up are not evidence of anything either.
+    """
+
+
+#: The name this exception carried while the scan asked two questions. Kept because `derive`,
+#: the CLI and three test modules raise-check against it, and renaming it in nine places would be
+#: a diff about nothing; there is one class here, under two names.
+PromptContractError = LabelReplyError
 
 
 class LabelShapeError(LabellingError):
@@ -326,12 +362,15 @@ class Requirement:
 
 
 # ============================================================================
-# THE PROMPT — one note in, two answers out. NO CLINICAL CONTENT BELOW THIS LINE.
+# THE PROMPT — one note in, one answer per SELECTED question. NO CLINICAL CONTENT BELOW THIS LINE.
 # ============================================================================
 
 #: Bump when the wording changes. `prompt_hash()` moves on its own; this is the human-readable
-#: version that appears in a write-up.
-PROMPT_VERSION = "labelling/4"
+#: version that appears in a write-up. `labelling/5` is the generation that also records what the
+#: document ASSERTS, what it POINTS AT and whether its content is ORIGINAL: three more answers per
+#: row, so the 912 rows written under `labelling/4` answer a different question and are kept in a
+#: different directory rather than averaged with these.
+PROMPT_VERSION = "labelling/5"
 
 SYSTEM_PROMPT = (
     "You are reading ONE document in isolation, on behalf of someone who holds the requirement "
@@ -340,65 +379,6 @@ SYSTEM_PROMPT = (
     "only what THIS document is and what it says, in its own words. "
     "Reply with a single JSON object and nothing else."
 )
-
-#: The two questions. Every clinical word the model sees arrives through `{requirement}`, which
-#: is rendered from the spec; nothing in this template names a disease, an organ, a document
-#: vocabulary or a coding system, because the previous version did and every one of those words
-#: was a lie the moment the requirement moved.
-NOTE_PROMPT_TEMPLATE = """\
-DOCUMENT TYPE: {doc_type}    DOCUMENT DATE: {date}
-
---- BEGIN DOCUMENT ---
-{text}
---- END DOCUMENT ---
-
-{requirement}
-
-QUESTION 1 — WHAT STANDING DOES THIS DOCUMENT HAVE, FIELD BY FIELD?
-
-Answer SEPARATELY FOR EVERY FIELD listed above, under that field's exact name. One verdict for the
-whole document is not wanted and will not do: a document can be among the best sources in the
-record for one field and unable to settle another, and a single answer cannot say so.
-
-Standing is a property of the DOCUMENT, not only of its wording. The same sentence can establish
-an answer in the document that first rendered it and establish nothing in a document that copied
-it forward. Judge which of those you are holding, once per field:
-
-  "can_establish"    FOR THIS FIELD, this document contains something that satisfies the evidence
-                     rules above, rendered in THIS document by whoever was entitled to render it.
-  "merely_mentions"  FOR THIS FIELD it bears on the question — it restates, carries forward,
-                     refers to, plans around or argues against an answer — but by the rules above
-                     THIS document cannot establish it.
-  "neither"          FOR THIS FIELD the document does not bear on the question at all.
-
-All {n_fields} field name(s) must appear, spelled exactly: {field_list}. Omitting one is not the
-same as answering "neither" for it: a reply that leaves a field out is refused, not filled in.
-
-THEN ONE QUOTE FOR THE WHOLE DOCUMENT, NOT ONE PER FIELD. A single sentence, copied character for
-character out of the text above, showing why the fields you did not call "neither" are not
-"neither". Quotes are checked against the document automatically and an unverifiable one is
-recorded as such. If every field is "neither", leave the quote empty.
-
-QUESTION 2 — WHICH TERMS IN THIS DOCUMENT WOULD LET A SEARCHER FIND IT? A retrieval question
-about the requirement above. Someone who holds that requirement but has NOT read this document
-must search every document of every patient by text. Which terms, AS THIS DOCUMENT SPELLS THEM,
-would surface it?
-
-  * Copy each term character for character out of the document; terms are checked against the
-    text automatically, and one that is not there is discarded.
-  * At most {max_terms} terms, each at least {min_chars} characters. Fewer is better; do not pad.
-  * Nothing that would also match most documents of most patients — "patient", "note", "date",
-    "history". A term that matches everything retrieves everything, which is not retrieval.
-  * Offer a term because it INDICATES the answer this requirement asks for, not because it is
-    frequent: a word that keeps company with the answer is worth less than a rare one that names
-    it, or names the instrument that produced it.
-  * Tag each term with exactly ONE reason class:
-    {reason_classes}
-
-Reply with exactly this JSON, where each TERM is {{"term": "", "reason": "<one reason class>"}}
-and every <VERDICT> is one of: {verdict_classes}
-{{"admissibility": {{"verdicts": {verdict_skeleton}, "quote": ""}},
- "retrieval_terms": [TERM, ...]}}"""
 
 ADMISSIBILITY_VERDICTS = ("can_establish", "merely_mentions", "neither")
 BEARS_ON_QUESTION = ("can_establish", "merely_mentions")
@@ -413,6 +393,368 @@ BEARS_ON_QUESTION = ("can_establish", "merely_mentions")
 #: aggregates under `REASON_CLASSES`; the two modules are coupled by this vocabulary, and
 #: `tests/test_labelling.py` fails if they drift apart.
 TERM_REASONS = ("names_the_answer", "names_the_document", "names_the_section", "other")
+
+#: What every question is asked ABOUT, and the only part of the prompt that is not selectable: the
+#: document, and the requirement rendered from the spec. Every clinical word the model sees arrives
+#: through `{requirement}`; nothing in this file names a disease, an organ, a document vocabulary
+#: or a coding system, because the first version did and every one of those words was a lie the
+#: moment the requirement moved.
+PROMPT_HEADER = """\
+DOCUMENT TYPE: {doc_type}    DOCUMENT DATE: {date}
+
+--- BEGIN DOCUMENT ---
+{text}
+--- END DOCUMENT ---
+
+{requirement}"""
+
+#: Where a question's position in the SELECTION is written into its text. Substituted by
+#: `note_prompt` at assembly time rather than left to `str.format`, because the number depends on
+#: which questions were selected: drop one and the ones after it renumber themselves, which is the
+#: whole point of numbering them here instead of typing "QUESTION 4" into a template.
+_NUMBER = "{number}"
+
+REPLY_INSTRUCTION = "REPLY WITH EXACTLY THIS JSON OBJECT AND NOTHING ELSE:"
+
+
+@dataclass(frozen=True)
+class ScanQuestion:
+    """ONE question the scan may put to the model, and everything needed to ask and read it.
+
+    THE POINT OF THIS TYPE IS THAT THERE IS EXACTLY ONE PLACE A QUESTION IS INJECTED OR REMOVED.
+    A question hard-coded into a prompt template is a question nobody can drop without editing the
+    template, and editing the template moves `prompt_hash` for every scan — so the cheap experiment
+    ("what does the scan cost, and what does it answer, without question 4?") is not cheap and is
+    therefore never run. Here it is a selection, the selection rides on `prompt_hash`, and the two
+    scans land in two directories with a manifest each naming what it asked.
+
+    `prompt` is this question's text with `{placeholders}` the caller fills, plus `{number}` for
+    its position. `reply_shape` is its slice of the single JSON object the reply must be — the
+    shapes are joined into one object, so a question carries its own line of the contract rather
+    than that contract living in a footer somebody has to remember to edit. `reply_keys` are the
+    top-level keys its answer arrives under: they are what makes "this question was not asked"
+    different from "this question was asked and not answered", which is the distinction the parser
+    turns into an empty default in the first case and a refusal in the second.
+    """
+
+    name: str
+    prompt: str
+    reply_shape: str
+    reply_keys: tuple[str, ...]
+    #: Parses this question's keys out of the whole reply object and returns the `LabelReply`
+    #: fields it contributes, by field name. It lives on the entry so that adding a question adds
+    #: no branch anywhere: nothing outside this registry asks which question it is holding.
+    parse: Callable[[Mapping[str, Any], "_ReplyContext"], dict[str, Any]]
+    default_on: bool = True
+
+
+@dataclass(frozen=True)
+class _ReplyContext:
+    """Everything a question's parser may look at besides the reply itself."""
+
+    #: The field list the reply is checked against. A parser that did not hold it would have to
+    #: accept whatever keys came back, which is the missing-field bug with extra steps.
+    requirement: Requirement
+    terms: TermConfig
+    #: The note as it was sent. Anything the model claims to have COPIED is checked against this;
+    #: with it empty nothing can be, and a span offered under it is discarded and counted rather
+    #: than stored as though it had been checked.
+    note_text: str
+    #: The answers of the questions asked BEFORE this one, by `LabelReply` field name — the same
+    #: dict the parse loop is filling. A later question sometimes has to be consistent with an
+    #: earlier one: there is nothing to call carried-forward on a document that bears on no field,
+    #: and only question 1's answer says whether that is the case.
+    answers: dict[str, Any]
+
+
+def _parse_standing(obj: Mapping[str, Any], ctx: _ReplyContext) -> dict[str, Any]:
+    """Question 1: one verdict per field, and the one span that justifies whichever bear."""
+    adm = obj.get("admissibility")
+    if not isinstance(adm, Mapping):
+        raise LabelReplyError(
+            f"'admissibility' must be an object, got {type(adm).__name__} ({adm!r})")
+    if "verdicts" not in adm and "verdict" in adm:
+        raise LabelReplyError(
+            f"reply answered question 1 once for the whole document (verdict="
+            f"{adm['verdict']!r}). It is asked once per field: "
+            f"{list(ctx.requirement.field_names)}. Copying one answer onto every field is the "
+            "conflation this contract removed.")
+    verdicts = _parse_verdicts(adm.get("verdicts"), ctx.requirement)
+    bears = any(v in BEARS_ON_QUESTION for v in verdicts.values())
+    quote = str(adm.get("quote") or "").strip()
+    # A note said to bear on the question, with nothing shown for it, is a verdict with no
+    # evidence: unauditable, and indistinguishable from a model that guessed at the class. ONE
+    # quote covers however many fields were not "neither" — see `Admissibility`.
+    if bears and not quote:
+        raise LabelReplyError(
+            f"{[n for n, v in verdicts.items() if v in BEARS_ON_QUESTION]} were called "
+            f"non-'neither' with no quote; the sentence that makes it so is what makes the "
+            "classification reviewable, and there is no reading without it")
+    # An all-"neither" note carries no quote by contract, so anything offered with one is
+    # discarded rather than stored beside verdicts that do not license it.
+    return {"admissibility": Admissibility(verdicts, quote if bears else "")}
+
+
+def _parse_retrieval(obj: Mapping[str, Any], ctx: _ReplyContext) -> dict[str, Any]:
+    """Question 2: the terms, capped and structurally filtered. Verified later, against the note."""
+    raw = obj.get("retrieval_terms")
+    if not isinstance(raw, list):
+        raise LabelReplyError(
+            f"'retrieval_terms' must be a list, got {type(raw).__name__} ({raw!r})")
+    proposed, n_proposed = _parse_terms(raw, ctx.terms)
+    return {"terms": proposed, "n_terms_proposed": n_proposed}
+
+
+def _parse_asserted_values(obj: Mapping[str, Any], ctx: _ReplyContext) -> dict[str, Any]:
+    """Question 3: the value this document asserts per field, each beside the span it was read from.
+
+    An empty object is an answer — most documents assert nothing for most fields — and it is not
+    the same as the question having gone unasked, which is why the absence of the key is refused
+    upstream rather than read as this.
+    """
+    raw = obj.get("asserted_values") or {}
+    if not isinstance(raw, Mapping):
+        raise LabelReplyError(
+            f"'asserted_values' must be an object keyed by field name, got {type(raw).__name__} "
+            f"({raw!r}); one entry per field this document asserts something for.")
+    wanted = ctx.requirement.field_names
+    out: dict[str, AssertedValue] = {}
+    for key, item in raw.items():
+        name = str(key).strip()
+        # The rule question 1 already applies, for the same reason: a value for a field nobody
+        # asked about was not shaped by the field list the reply was shown, so the entries that
+        # DO line up are not evidence either — and folding it in would make the scan's subject
+        # depend on the model.
+        if name not in wanted:
+            raise LabelReplyError(
+                f"reply asserts a value for {name!r}, which this requirement does not declare "
+                f"({list(wanted)}). A field nobody asked for is an invented answer.")
+        if not isinstance(item, Mapping):
+            raise LabelReplyError(
+                f"the value asserted for {name!r} must be an object carrying 'value' and "
+                f"'as_written', got {type(item).__name__} ({item!r})")
+        span = str(item.get("as_written") or "").strip()
+        if not span:
+            raise LabelReplyError(
+                f"the value asserted for {name!r} carries no 'as_written' span. The value is a "
+                "coding and cannot be checked against the text; the span it was read from is the "
+                "only thing that can be, and a coding with nothing behind it is unauditable.")
+        out[name] = AssertedValue(value=_as_text(item.get("value")), as_written=span)
+    return {"asserted_values": out}
+
+
+def _parse_pointers(obj: Mapping[str, Any], ctx: _ReplyContext) -> dict[str, Any]:
+    """Question 4: the spans naming where the answer is SOMEWHERE ELSE, verified against the note.
+
+    Verified here and not later, unlike the terms: a term survives its own verification as a
+    RANKED proposal whose cap must bite before anything is checked, while a pointer is nothing but
+    a span — an unverifiable one is not a weaker pointer, it is not a pointer. Discarded, and
+    counted, because a hallucination rate that is silently swallowed is the one number that would
+    have said the question is failing.
+    """
+    raw = obj.get("pointers") or []
+    if not isinstance(raw, list):
+        raise LabelReplyError(
+            f"'pointers' must be a list of spans copied out of the document, got "
+            f"{type(raw).__name__} ({raw!r})")
+    proposed = [s for s in (str(p).strip() for p in raw) if s]
+    verified = [s for s in proposed if verify_quote(s, ctx.note_text)]
+    return {"pointers": tuple(dict.fromkeys(verified)),
+            "n_pointers_proposed": len(proposed),
+            "n_pointers_hallucinated": len(proposed) - len(verified)}
+
+
+def _parse_originality(obj: Mapping[str, Any], ctx: _ReplyContext) -> dict[str, Any]:
+    """Question 5: was the content that bears on the question carried forward, or written here?
+
+    `None` is an answer and never a default for "unknown": a document that bears on no field has
+    no content whose originality could be judged, and `False` there would assert that it does.
+    """
+    raw = obj.get("copied_forward")
+    if raw is not None and not isinstance(raw, bool):
+        raise LabelReplyError(
+            f"'copied_forward' must be true, false or null, got {type(raw).__name__} ({raw!r}). "
+            "A string here would be a third value nothing downstream knows how to count.")
+    adm = ctx.answers.get("admissibility")
+    if adm is not None and not adm.bears_on_question:
+        return {"copied_forward": None}
+    return {"copied_forward": raw}
+
+
+#: THE QUESTIONS, IN RENDER ORDER. Adding one to the scan is adding one entry here; removing one is
+#: leaving its name out of the selection. Nothing outside this tuple branches on a question's name.
+QUESTIONS: tuple[ScanQuestion, ...] = (
+    ScanQuestion(
+        name="standing",
+        reply_keys=("admissibility",),
+        parse=_parse_standing,
+        reply_shape='"admissibility": {{"verdicts": {verdict_skeleton}, "quote": ""}}',
+        prompt="""\
+QUESTION """ + _NUMBER + """ — WHAT STANDING DOES THIS DOCUMENT HAVE, FIELD BY FIELD?
+
+Answer SEPARATELY FOR EVERY FIELD listed above, under that field's exact name. One verdict for the
+whole document is not wanted and will not do: a document can be among the best sources in the
+record for one field and unable to settle another, and a single answer cannot say so.
+
+Standing is a property of the DOCUMENT, not only of its wording. The same sentence can establish
+an answer in the document that first rendered it and establish nothing in a document that copied
+it forward. Judge which of those you are holding, once per field, with one of: {verdict_classes}
+
+  "can_establish"    FOR THIS FIELD, this document contains something that satisfies the evidence
+                     rules above, rendered in THIS document by whoever was entitled to render it.
+  "merely_mentions"  FOR THIS FIELD it bears on the question — it restates, carries forward,
+                     refers to, plans around or argues against an answer — but by the rules above
+                     THIS document cannot establish it.
+  "neither"          FOR THIS FIELD the document does not bear on the question at all.
+
+All {n_fields} field name(s) must appear, spelled exactly: {field_list}. Omitting one is not the
+same as answering "neither" for it: a reply that leaves a field out is refused, not filled in.
+
+THEN ONE QUOTE FOR THE WHOLE DOCUMENT, NOT ONE PER FIELD. A single sentence, copied character for
+character out of the text above, showing why the fields you did not call "neither" are not
+"neither". Quotes are checked against the document automatically and an unverifiable one is
+recorded as such. If every field is "neither", leave it empty.""",
+    ),
+    ScanQuestion(
+        name="retrieval",
+        reply_keys=("retrieval_terms",),
+        parse=_parse_retrieval,
+        reply_shape='"retrieval_terms": [{{"term": "", "reason": "<one reason class>"}}, ...]',
+        prompt="""\
+QUESTION """ + _NUMBER + """ — WHICH TERMS IN THIS DOCUMENT WOULD LET A SEARCHER FIND IT? A
+retrieval question about the requirement above. Someone who holds that requirement but has NOT
+read this document must search every document of every patient by text. Which terms, AS THIS
+DOCUMENT SPELLS THEM, would surface it?
+
+  * Copy each term character for character out of the document; terms are checked against the
+    text automatically, and one that is not there is discarded.
+  * At most {max_terms} terms, each at least {min_chars} characters. Fewer is better; do not pad.
+  * Nothing that would also match most documents of most patients — "patient", "note", "date",
+    "history". A term that matches everything retrieves everything, which is not retrieval.
+  * Offer a term because it INDICATES the answer this requirement asks for, not because it is
+    frequent: a word that keeps company with the answer is worth less than a rare one that names
+    it, or names the instrument that produced it.
+  * Tag each term with exactly ONE reason class:
+    {reason_classes}""",
+    ),
+    ScanQuestion(
+        name="value",
+        reply_keys=("asserted_values",),
+        parse=_parse_asserted_values,
+        reply_shape='"asserted_values": {{"<FIELD NAME>": {{"value": "", "as_written": ""}}}}',
+        prompt="""\
+QUESTION """ + _NUMBER + """ — WHAT VALUE DOES THIS DOCUMENT ASSERT FOR EACH FIELD?
+
+For every field you did NOT call "neither" above, and for no other field, give the value THIS
+document asserts for it, in the notation that field's description asks for, together with the span
+you read it from. Leave a "neither" field out entirely: a document that does not bear on a field
+asserts nothing for it, and an empty entry is not an assertion.
+
+  * "value" is YOUR reading, normalised. It is NOT checked against the document and cannot be —
+    one fact is written many ways, and a normalised value often appears nowhere in the text.
+  * "as_written" IS checked against the document, character for character, the same way the span
+    above is. It is what makes a reading error tellable apart from an invention, so a value
+    offered without one is refused and the reply with it.
+  * Report what THIS document asserts, even where you judged that it may not settle the matter.
+    Whether it settles it is the standing question above and was already answered there.""",
+    ),
+    ScanQuestion(
+        name="pointers",
+        reply_keys=("pointers",),
+        parse=_parse_pointers,
+        reply_shape='"pointers": ["<SPAN COPIED OUT OF THE DOCUMENT>", ...]',
+        prompt="""\
+QUESTION """ + _NUMBER + """ — WHAT DOES THIS DOCUMENT POINT AT?
+
+Not what would find THIS document — that was asked above — but what this document says about where
+the answer was settled or recorded SOMEWHERE ELSE: another document it names, a date it attributes
+an answer to, an identifier, accession or number it cites for one. A signpost, not a mention: "see
+the report of 3/12" says where to look next; "known history of X" says only that somebody knew.
+
+  * Copy each span character for character out of the document. Pointers are checked against the
+    document automatically and one that is not there is discarded and counted, as a term is.
+  * Only spans that would let a reader ASK FOR something — a name, a date, an identifier. Not a
+    span that merely repeats the answer: that was the question above.
+  * A document that points nowhere is the ordinary case. Answer with an empty list; do not pad
+    it.""",
+    ),
+    ScanQuestion(
+        name="originality",
+        reply_keys=("copied_forward",),
+        parse=_parse_originality,
+        reply_shape='"copied_forward": true | false | null',
+        prompt="""\
+QUESTION """ + _NUMBER + """ — IS THE CONTENT THAT BEARS ON THE QUESTION ORIGINAL TO THIS DOCUMENT?
+
+You have judged this already, because the standing question above turns on it: the same sentence
+can establish an answer in the document that first rendered it and establish nothing in a document
+that copied it forward. This asks you to REPORT that judgement, which costs no further reading.
+
+  true   the content bearing on the requirement was carried into this document from somewhere
+         earlier — restated, imported, pasted or summarised out of another document.
+  false  it is original here: this document is where that content was written down.
+  null   there is nothing to judge, because this document bears on no field at all.""",
+    ),
+)
+
+#: The two nobody may drop. Every downstream consumer reads standing — it is what the keyword list,
+#: the document-type policy and the whole audit at the bottom of this file are computed from — and
+#: `retrieval_terms` is the other asset the scan exists to produce. A run without them is not a
+#: cheaper scan, it is a scan of nothing, at the same price per note.
+MANDATORY_QUESTIONS = ("standing", "retrieval")
+
+
+def _refuse_dropping_mandatory(names: Sequence[str]) -> None:
+    """One message for one refusal, wherever a selection arrives from."""
+    dropped = [n for n in MANDATORY_QUESTIONS if n not in set(names)]
+    if dropped:
+        raise LabellingError(
+            f"{dropped} cannot be dropped from a scan. Every consumer of these labels reads "
+            "standing — the keyword list, the document-type policy and the audit are all computed "
+            "from it — and the terms are the other asset the scan is bought for. A reading without "
+            "them costs the same per note and produces nothing to aggregate.")
+
+
+def selected_questions(names: Sequence[str] | None = None) -> tuple[ScanQuestion, ...]:
+    """The questions to ask, in render order. `None` means the `default_on` set.
+
+    Refuses an unknown name rather than ignoring it: a typo silently dropping a question would
+    move `prompt_hash`, write a directory the operator did not mean to write, and read as a
+    completed scan of a question nobody answered.
+    """
+    by_name = {q.name: q for q in QUESTIONS}
+    if names is None:
+        return tuple(q for q in QUESTIONS if q.default_on)
+    wanted = [str(n).strip() for n in names if str(n).strip()]
+    unknown = [n for n in wanted if n not in by_name]
+    if unknown:
+        raise LabellingError(f"no such scan question {unknown}; this scan can ask "
+                             f"{[q.name for q in QUESTIONS]}")
+    _refuse_dropping_mandatory(wanted)
+    return tuple(q for q in QUESTIONS if q.name in set(wanted))
+
+
+def note_prompt(questions: Sequence[ScanQuestion]) -> str:
+    """The selected questions -> the template `build_note_prompt` fills. THE ONE ASSEMBLY POINT.
+
+    Deliberately generic over `QUESTIONS`: it numbers the questions in render order, lays them
+    out under one header, and joins their reply shapes into the single JSON object the reply must
+    be. Nothing here knows what any question is about, so there is no case to extend when one is
+    added and no branch to delete when one is dropped.
+    """
+    blocks = [q.prompt.replace(_NUMBER, str(i)) for i, q in enumerate(questions, 1)]
+    shapes = ",\n ".join(q.reply_shape for q in questions)
+    return "\n\n".join([PROMPT_HEADER, *blocks, f"{REPLY_INSTRUCTION}\n" + "{{" + shapes + "}}"])
+
+
+#: The DEFAULT assembly, and the thing to read when you want to know what the scan asks. Every
+#: scan that does not select otherwise sends exactly this; `prompt_hash` hashes it, so rewording
+#: any question moves every default scan's directory.
+NOTE_PROMPT_TEMPLATE = note_prompt(selected_questions())
+
+#: The default selection as a value, so a dataclass field and a keyword argument can default to
+#: it without either of them deciding what the default is.
+DEFAULT_QUESTIONS: tuple[ScanQuestion, ...] = selected_questions()
 
 
 @dataclass(frozen=True)
@@ -437,14 +779,17 @@ class TermConfig:
             raise ValueError(f"need max_terms_per_note >= 1 and min_term_chars >= 1, got {self}")
 
 
-def build_note_prompt(note: NoteForReading, *, requirement: Requirement,
-                      terms: TermConfig) -> list[dict]:
+def build_note_prompt(note: NoteForReading, *, requirement: Requirement, terms: TermConfig,
+                      questions: Sequence[ScanQuestion] | None = None) -> list[dict]:
     """One note and one requirement -> the chat messages that read it.
 
     The only prompt builder in this module, and the signature is the contract: a note, the
-    requirement it is being read against, and the bounds on question 2. No `context` and no
-    `hints` — a channel for free prose is a channel for somebody's clinical opinion to reach
-    the model without passing through a spec that has provenance on it.
+    requirement it is being read against, the bounds on question 2, and which questions to put.
+    No `context` and no `hints` — a channel for free prose is a channel for somebody's clinical
+    opinion to reach the model without passing through a spec that has provenance on it.
+
+    Every placeholder is offered to `note_prompt`'s template whether the selected questions use it
+    or not, which is what lets a question be dropped without a caller here knowing that it was.
     """
     if type(note) is not NoteForReading:
         raise LabellingError(
@@ -457,7 +802,8 @@ def build_note_prompt(note: NoteForReading, *, requirement: Requirement,
             "with Requirement.from_spec(spec) so that the refusals in its constructor run.")
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": NOTE_PROMPT_TEMPLATE.format(
+        {"role": "user", "content": note_prompt(
+            DEFAULT_QUESTIONS if questions is None else questions).format(
             doc_type=note.doc_type, date=note.date, text=note.text,
             requirement=requirement.render(), max_terms=terms.max_terms_per_note,
             min_chars=terms.min_term_chars, reason_classes=" | ".join(TERM_REASONS),
@@ -468,21 +814,30 @@ def build_note_prompt(note: NoteForReading, *, requirement: Requirement,
     ]
 
 
-def prompt_hash(requirement: Requirement, terms: TermConfig) -> str:
+def prompt_hash(requirement: Requirement, terms: TermConfig,
+                questions: Sequence[ScanQuestion] | None = None) -> str:
     """Identity of everything that conditions a label, independent of any note.
 
     Hashing a rendered prompt would give a different hash per note and identify nothing.
-    Hashing the template, the requirement and the bounds identifies the three things that
-    actually condition the answers, so two runs can be compared — or refused comparison — on
+    Hashing the template, the requirement, the bounds and the SELECTION identifies the things
+    that actually condition the answers, so two runs can be compared — or refused comparison — on
     the evidence.
 
-    All three arguments are required and none has a default. `requirement` because both answers
-    are answers ABOUT it. `terms` because the cap and the length floor are rendered into
+    `requirement` and `terms` are required and neither has a default. `requirement` because every
+    answer is an answer ABOUT it. `terms` because the cap and the length floor are rendered into
     question 2 and change what comes back: leaving them out would let a scan capped at 3 terms
     and a scan capped at 30 share a file, and the resulting term list would be a mixture with
     nothing on any row to say so.
+
+    `questions` defaults to `DEFAULT_QUESTIONS`, whose assembly is `NOTE_PROMPT_TEMPLATE`. The
+    SELECTED NAMES go into the blob as well as the assembled text, because two scans asking
+    different question sets are answering different questions: a row from a scan that never asked
+    what a document points at is not a row saying it points nowhere, and only the directory they
+    land in can keep those two apart at the file level.
     """
-    blob = "\0".join([PROMPT_VERSION, SYSTEM_PROMPT, NOTE_PROMPT_TEMPLATE,
+    qs = DEFAULT_QUESTIONS if questions is None else tuple(questions)
+    blob = "\0".join([PROMPT_VERSION, SYSTEM_PROMPT, note_prompt(qs),
+                      "|".join(q.name for q in qs),
                       "|".join(TERM_REASONS), requirement.spec_id, requirement.hash,
                       str(terms.max_terms_per_note), str(terms.min_term_chars)])
     return hashlib.sha256(blob.encode()).hexdigest()[:16]
@@ -578,17 +933,74 @@ class RetrievalTerm:
 
 
 @dataclass(frozen=True)
+class AssertedValue:
+    """Question 3's answer for ONE field: what this document says, and the span it was read from.
+
+    THE VALUE IS A MODEL CODING AND IS NOT CHECKED AGAINST THE TEXT, because it cannot be: one
+    fact has many notations, and a normalised value often appears nowhere in the document it is
+    true of. Checking it would either fail on every correctly normalised answer or be reduced to
+    checking nothing.
+
+    `as_written` is what carries the weight instead. It is a verbatim span, it IS checkable
+    (`verify`), and it is the difference between a reading error — a real span, coded wrong, which
+    is a prompt problem — and an invention, which is a model problem. Any rate computed from
+    `value` is therefore lower-confidence than the standing counts beside it, and the record says
+    so here rather than in a write-up nobody reads.
+
+    Nothing verifies `as_written` eagerly, unlike a pointer: a pointer that is not in the document
+    has nothing left to keep, while a value survives an unverifiable span as evidence that the
+    model read something and coded it. So the span rides on the row and `verify` is one call for
+    whoever holds the note.
+    """
+
+    value: str
+    as_written: str
+
+    def __post_init__(self) -> None:
+        if not str(self.as_written).strip():
+            raise LabelShapeError(
+                f"the asserted value {self.value!r} has no as_written span. The value is a coding "
+                "and nothing can check it; the span is the only auditable half, so a value "
+                "without one is a claim no reader could ever confirm or refute.")
+
+    def verify(self, text: str) -> bool:
+        """Is the span this value was read from really in the note? Not: is the value right."""
+        return verify_quote(self.as_written, text)
+
+
+@dataclass(frozen=True)
 class LabelReply:
-    """The two answers, parsed out of one model reply and not yet checked against the note.
+    """The answers to the questions ASKED, parsed out of one reply and not yet checked as a whole.
+
+    A field left at its default is a question that was not asked OR a question answered with
+    nothing, and those are told apart at the file level rather than here: the manifest and
+    `prompt_hash` say which questions the scan put, so an empty `pointers` in a scan that asked
+    for pointers means the document points nowhere, and the same empty tuple in a scan that did
+    not ask means nobody looked.
 
     `n_terms_proposed` is kept although most of it may be discarded: after the cap has done its
     work, it is the only surviving evidence that a model tried to pad, and "the cap bites on 40%
-    of notes" is the signal that the cap, or the question, needs rewriting.
+    of notes" is the signal that the cap, or the question, needs rewriting. The pointer counters
+    are the same measurement for question 4, and are already final here — see `_parse_pointers`.
     """
 
     admissibility: Admissibility
     terms: tuple[RetrievalTerm, ...] = ()
     n_terms_proposed: int = 0
+    asserted_values: Mapping[str, AssertedValue] = field(default_factory=dict)
+    pointers: tuple[str, ...] = ()
+    n_pointers_proposed: int = 0
+    n_pointers_hallucinated: int = 0
+    copied_forward: bool | None = None
+
+    @property
+    def retrieval_terms(self) -> tuple[RetrievalTerm, ...]:
+        """`terms` under the name `NoteLabel` gives them, for a caller assembling a row.
+
+        Still UNVERIFIED: the name matches the row's, the state does not, and `verify_terms` is
+        what closes that gap. It is a property and not a second field so there is one tuple.
+        """
+        return self.terms
 
 
 @dataclass(frozen=True)
@@ -617,6 +1029,22 @@ class NoteLabel:
     retrieval_terms: tuple[RetrievalTerm, ...] = ()
     n_terms_proposed: int = 0
     n_terms_hallucinated: int = 0
+    #: Question 3: field name -> the value this document asserts, beside the span it was read
+    #: from. Empty on a document that asserts nothing, and on every row written before question 3
+    #: was asked — `prompt_hash` is what tells those apart, and it moved.
+    asserted_values: Mapping[str, AssertedValue] = field(default_factory=dict)
+    #: Question 4, after verification: verbatim spans naming another document, date or identifier.
+    #: The counters mirror question 2's, for the same reason — a silently shortened list would read
+    #: as a document that points nowhere when it in fact pointed at something the model invented.
+    pointers: tuple[str, ...] = ()
+    n_pointers_proposed: int = 0
+    n_pointers_hallucinated: int = 0
+    #: Question 5. `None` is not "no": it means there was nothing to judge, because the document
+    #: bears on no field or because the question was not asked. `False` would assert that there IS
+    #: content here and that it is original, which on an all-"neither" document is a claim nobody
+    #: made, and duplication is most of a real record — this is the denominator every statement
+    #: about wasted reading is divided by, so a manufactured `False` inflates it silently.
+    copied_forward: bool | None = None
     model: str = ""
     prompt_hash: str = ""
     scanned_at: str = ""
@@ -645,11 +1073,22 @@ class NoteLabel:
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any]) -> NoteLabel:
-        """A row -> a label, refusing loudly anything that is not this generation's shape."""
+        """A row -> a label, refusing loudly anything that is not this generation's shape.
+
+        A ROW WRITTEN BEFORE A QUESTION EXISTED READS AS THE EMPTY DEFAULT AND NEVER AS AN ANSWER.
+        912 labels answer questions 1 and 2 only; they stay readable here, with no `pointers`, no
+        `asserted_values` and `copied_forward` at `None` — never at `False`, which would be this
+        method inventing a judgement nobody made. What the row does NOT carry is that it was never
+        asked, and `prompt_hash` on the row is what says so.
+        """
         kw = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}
         kw["admissibility"] = _admissibility_from_dict(d.get("admissibility") or {})
         kw["retrieval_terms"] = tuple(
             RetrievalTerm(**t) for t in (d.get("retrieval_terms") or []))
+        kw["asserted_values"] = _asserted_values_from_dict(d.get("asserted_values") or {})
+        kw["pointers"] = tuple(str(p) for p in (d.get("pointers") or ()))
+        cf = d.get("copied_forward")
+        kw["copied_forward"] = cf if isinstance(cf, bool) else None
         return cls(**kw)
 
 
@@ -675,6 +1114,46 @@ def _admissibility_from_dict(raw: Any) -> Admissibility:
         return Admissibility()
     return Admissibility(verdicts=raw["verdicts"], quote=str(raw.get("quote") or ""),
                          quote_verified=bool(raw.get("quote_verified")))
+
+
+def _as_text(value: Any) -> str:
+    """A coded value as it is stored: text, whatever notation the model replied in.
+
+    A boolean field comes back as `true` and a numeric one as a number, and `str(True)` would put
+    `"True"` on the row for a field whose own allowable values are `true` / `false`. JSON's
+    spelling is the one the reply used and the one a reader of the row will compare against.
+    """
+    if isinstance(value, str):
+        return value.strip()
+    return "" if value is None else json.dumps(value, default=str)
+
+
+def _asserted_values_from_dict(raw: Any) -> dict[str, AssertedValue]:
+    """Question 3's stored answer -> the values, or `LabelShapeError`. ABSENT READS AS EMPTY.
+
+    The second place two generations of label meet; `_admissibility_from_dict` is the first and
+    the harder one. It is easier here because an added key has an honest empty reading that a
+    reshaped key does not: a row with no `asserted_values` was written by a scan that did not ask
+    question 3, and an empty mapping says exactly that much and no more. There is nothing to widen
+    and therefore nothing to invent.
+
+    A stored entry with no span still raises, through `AssertedValue` itself: this module never
+    wrote one, so a row carrying one came from somewhere else and reading it as a value would put
+    an unauditable coding into a rate that is reported as measured.
+    """
+    if not isinstance(raw, Mapping):
+        raise LabelShapeError(
+            f"'asserted_values' must be an object keyed by field name, got {type(raw).__name__} "
+            f"{raw!r}")
+    out: dict[str, AssertedValue] = {}
+    for key, item in raw.items():
+        if not isinstance(item, Mapping):
+            raise LabelShapeError(
+                f"the asserted value for {key!r} must be an object carrying 'value' and "
+                f"'as_written', got {type(item).__name__} {item!r}")
+        out[str(key)] = AssertedValue(value=_as_text(item.get("value")),
+                                      as_written=str(item.get("as_written") or ""))
+    return out
 
 
 def _parse_terms(raw: Any, terms: TermConfig) -> tuple[tuple[RetrievalTerm, ...], int]:
@@ -732,51 +1211,53 @@ def _parse_verdicts(raw: Any, requirement: Requirement) -> dict[str, str]:
     return out
 
 
-def parse_label_response(text: str, *, requirement: Requirement, terms: TermConfig) -> LabelReply:
-    """Model reply -> the two answers, or `PromptContractError`.
+def parse_label_response(text: str, *, requirement: Requirement, terms: TermConfig,
+                         note_text: str = "",
+                         questions: Sequence[ScanQuestion] | None = None) -> LabelReply:
+    """Model reply -> the answers to the questions ASKED, or `LabelReplyError`.
 
     Strict about the things that would corrupt a measurement, lenient about the rest. An unknown
     verdict is a hard error rather than being folded into "neither", because that would put a
     shrug in the standing column and nothing on the row would ever say so.
 
+    ONLY THE SELECTED QUESTIONS ARE PARSED AND ONLY THEY ARE REQUIRED. A question that was not put
+    cannot be unanswered, so its keys are neither looked for nor read if they happen to be there —
+    its field stays at the empty default. A question that WAS put and whose key is absent is
+    refused, because "question 4 unanswered" and "question 4 answered with nothing" are different
+    facts and only the second is a measurement: an empty list, an empty object and `null` are all
+    answers, and an absent key is not one.
+
     `requirement` is required and has no default: question 1's answer is only checkable against
     the field list it was asked about, and a parser that did not hold that list would have to
     accept whatever set of keys came back — which is the missing-field bug with extra steps.
+
+    `note_text` is what the copied spans are checked against, and it defaults to empty for the
+    callers that parse a reply with no note in hand. Under that default a pointer cannot be
+    verified and is therefore discarded — visibly, in `n_pointers_proposed` against an empty
+    `pointers`, never silently. The reading path always passes the note; see `label_note`.
     """
     from ..core.llm import extract_json
 
+    qs = DEFAULT_QUESTIONS if questions is None else tuple(questions)
+    _refuse_dropping_mandatory([q.name for q in qs])
     obj = extract_json(text or "", require="admissibility")
-    adm = obj.get("admissibility") if isinstance(obj, dict) else None
-    if not isinstance(adm, dict) or "__unparsed__" in obj:
-        raise PromptContractError("reply has no 'admissibility' object")
-
-    if "verdicts" not in adm and "verdict" in adm:
-        raise PromptContractError(
-            f"reply answered question 1 once for the whole document (verdict="
-            f"{adm['verdict']!r}). It is asked once per field: {list(requirement.field_names)}. "
-            "Copying one answer onto every field is the conflation this contract removed.")
-    verdicts = _parse_verdicts(adm.get("verdicts"), requirement)
-    bears = any(v in BEARS_ON_QUESTION for v in verdicts.values())
-    quote = str(adm.get("quote") or "").strip()
-    # A note said to bear on the question, with nothing shown for it, is a verdict with no
-    # evidence: unauditable, and indistinguishable from a model that guessed at the class. ONE
-    # quote covers however many fields were not "neither" — see `Admissibility`.
-    if bears and not quote:
-        raise PromptContractError(
-            f"{[n for n, v in verdicts.items() if v in BEARS_ON_QUESTION]} were called "
-            f"non-'neither' with no quote; the sentence that makes it so is what makes the "
-            "classification reviewable, and there is no reading without it")
-
-    # An absent key means question 2 was not answered; an empty list means it was answered "no
-    # term here would find this note", which is the right answer for many notes and must not be
-    # indistinguishable from a model that skipped the question.
-    if not isinstance(obj.get("retrieval_terms"), list):
-        raise PromptContractError("reply has no 'retrieval_terms' list; question 2 unanswered is "
-                                  "not question 2 answered with nothing")
-    proposed, n_proposed = _parse_terms(obj["retrieval_terms"], terms)
-    # An all-"neither" note carries no quote by contract, so anything offered with one is
-    # discarded rather than stored beside verdicts that do not license it.
-    return LabelReply(Admissibility(verdicts, quote if bears else ""), proposed, n_proposed)
+    if not isinstance(obj, dict) or "__unparsed__" in obj:
+        raise LabelReplyError("reply is not the single JSON object the contract asks for")
+    absent = [(q.name, k) for q in qs for k in q.reply_keys if k not in obj]
+    if absent:
+        raise LabelReplyError(
+            f"reply has no {[k for _, k in absent]} and this scan asked "
+            f"{sorted({n for n, _ in absent})}. A question left unanswered is not a question "
+            "answered with nothing: an empty list, an empty object and null are answers, an "
+            "absent key is a reply that was not shaped by the contract it was shown.")
+    answers: dict[str, Any] = {}
+    for q in qs:
+        # THE ONLY DISPATCH. Each question parses its own keys, in render order, so a question
+        # added to the registry is parsed here without a line being changed and a question left
+        # out of the selection cannot raise, cannot fill a field, and cannot be told from one
+        # answered with nothing by anything except `prompt_hash`.
+        answers.update(q.parse(obj, _ReplyContext(requirement, terms, note_text, answers)))
+    return LabelReply(**answers)
 
 
 def verify_quote(quote: str, text: str) -> bool:
@@ -840,11 +1321,15 @@ class LabelStore:
     """
 
     def __init__(self, root: str | Path | None, *, model: str, requirement: Requirement,
-                 terms: TermConfig):
+                 terms: TermConfig, questions: Sequence[ScanQuestion] | None = None):
         self.model, self.requirement, self.terms = model, requirement, terms
+        #: WHICH QUESTIONS THIS FILE'S ROWS ANSWER. In the key through `prompt_hash`, because a
+        #: row from a scan that never asked what a document points at is not a row saying it
+        #: points nowhere, and one file holding both has nothing on either row to say which.
+        self.questions = DEFAULT_QUESTIONS if questions is None else tuple(questions)
         self.key = hashlib.sha256("|".join(
             [model, PROMPT_VERSION, requirement.spec_id,
-             prompt_hash(requirement, terms)]).encode()).hexdigest()[:12]
+             prompt_hash(requirement, terms, self.questions)]).encode()).hexdigest()[:12]
         self.dir = labels_root(str(root) if root is not None else None) / self.key
         self.path = self.dir / "labels.jsonl"
         self._lock = threading.Lock()
@@ -863,7 +1348,11 @@ class LabelStore:
                  # The fields every row in this file answers, so a reader can tell at the door
                  # whether the labelling covers the field it came for.
                  "fields": list(requirement.field_names),
-                 "prompt_hash": prompt_hash(requirement, terms), "terms": asdict(terms),
+                 # The questions every row in this file answers, for the same reason as `fields`:
+                 # a reader can tell at the door whether the scan asked what it came for.
+                 "questions": [q.name for q in self.questions],
+                 "prompt_hash": prompt_hash(requirement, terms, self.questions),
+                 "terms": asdict(terms),
                  "usd_per_1m": [USD_PER_1M_INPUT, USD_PER_1M_OUTPUT],
                  "created_at": _utc_now()}, indent=1))
             os.chmod(manifest, 0o600)
@@ -1007,6 +1496,10 @@ class ScanConfig:
     requirement: Requirement
     #: Question 2's bounds, required for the same reason `max_usd` is: see `TermConfig`.
     terms: TermConfig
+    #: WHICH QUESTIONS TO PUT. Defaulted, unlike the two above, because there is a defensible
+    #: default — the whole `default_on` set — where there is no defensible default ceiling. It is
+    #: part of `prompt_hash`, so a scan that drops one lands in its own directory.
+    questions: tuple[ScanQuestion, ...] = DEFAULT_QUESTIONS
     concurrency: int = 8
     #: Notes longer than this are truncated and the label says so. Input tokens are what this
     #: run is buying, and the tail of a 200KB document is rarely where its standing is decided.
@@ -1052,6 +1545,11 @@ class FullScanRunner:
             raise LabellingError(f"store keyed with {store.terms}, scan configured with "
                                  f"{config.terms}: question 2's bounds are part of the prompt, so "
                                  "these labels would not be comparable with that file's.")
+        if tuple(store.questions) != tuple(config.questions):
+            raise LabellingError(
+                f"store keyed to questions {[q.name for q in store.questions]}, scan configured "
+                f"for {[q.name for q in config.questions]}: those are different questions, and a "
+                "row answering one set says nothing about the other.")
         self.corpus = corpus
         self.store = store
         self.config = config
@@ -1090,30 +1588,37 @@ class FullScanRunner:
         the experiments exclude them. There is no retry here — a rerun is the retry, and it is
         free of the notes already done.
         """
-        req = self.config.requirement
+        req, qs = self.config.requirement, self.config.questions
         base = NoteLabel(
             patient_id=note.patient_id, note_id=note.note_id, doc_type=note.doc_type,
             date=note.date, note_truncated=truncated, spec_id=req.spec_id,
-            model=self.store.model, prompt_hash=prompt_hash(req, self.config.terms),
+            model=self.store.model, prompt_hash=prompt_hash(req, self.config.terms, qs),
             scanned_at=_utc_now())
         pt = ct = 0
         try:
             resp = self.client.chat(
-                build_note_prompt(note, requirement=req, terms=self.config.terms))
+                build_note_prompt(note, requirement=req, terms=self.config.terms, questions=qs))
             pt = int(getattr(resp, "prompt_tokens", 0) or 0)
             ct = int(getattr(resp, "completion_tokens", 0) or 0)
-            reply = parse_label_response(getattr(resp, "content", "") or "",
-                                         requirement=req, terms=self.config.terms)
+            reply = parse_label_response(getattr(resp, "content", "") or "", requirement=req,
+                                         terms=self.config.terms, note_text=note.text,
+                                         questions=qs)
         except Exception as exc:  # noqa: BLE001 — recorded on the label rather than raised
             return replace(base, prompt_tokens=pt, completion_tokens=ct,
                            cost_usd=cost_usd(pt, ct), error=f"{type(exc).__name__}: {exc}"[:300])
         kept, n_hallucinated = verify_terms(reply.terms, note.text)
         adm = reply.admissibility
-        return replace(
-            base, prompt_tokens=pt, completion_tokens=ct, cost_usd=cost_usd(pt, ct),
-            admissibility=replace(adm, quote_verified=verify_quote(adm.quote, note.text)),
-            retrieval_terms=kept, n_terms_proposed=reply.n_terms_proposed,
-            n_terms_hallucinated=n_hallucinated)
+        # ANSWERED FIELDS ARE COPIED BY NAME, so a question added to the registry reaches the row
+        # without a line here — the two records share a field name wherever they hold the same
+        # answer. The three below are the ones verification against the note changes on the way,
+        # and `terms` is deliberately not among the copied: on the row it is the VERIFIED tuple.
+        answered = {f.name: getattr(reply, f.name) for f in dc_fields(reply)
+                    if f.name in NoteLabel.__dataclass_fields__}
+        answered["admissibility"] = replace(adm, quote_verified=verify_quote(adm.quote, note.text))
+        answered["retrieval_terms"] = kept
+        answered["n_terms_hallucinated"] = n_hallucinated
+        return replace(base, **answered, prompt_tokens=pt, completion_tokens=ct,
+                       cost_usd=cost_usd(pt, ct))
 
     def _label_item(self, item: tuple[str, DocMeta]) -> NoteLabel:
         """Read one note out of the corpus and label it. Never raises: the pool's only job is to

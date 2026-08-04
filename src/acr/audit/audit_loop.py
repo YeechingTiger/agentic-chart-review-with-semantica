@@ -847,14 +847,16 @@ def trajectory_integrity_audit(
     )
     return tuple(findings), incidents
 
-# 2026-08-03 这里曾有 `runtime_control_conformance_audit`：一条检查"最终结果是否绕过了记录在案
-# 的硬控制拒绝"的审计规则。它不 import 任何东西，所以删掉 RuntimeControl 协议时它看起来毫发
-# 无伤 —— 它读的是 trace 事件里的 `refused_fields` / `inadmissible_fields` / `rejected_fields` /
-# `disallowed_fields`。而这四个键在 `src/` 里零处写入，在 runs/ 的 454 份 manifest 和 trace 里
-# 零次出现。也就是说：自它被写下起，它一次都不可能触发过。
+# 2026-08-03 `runtime_control_conformance_audit` used to sit here: a rule checking whether the final
+# result had bypassed a hard-control refusal that was on the record. It imported nothing, so deleting
+# the RuntimeControl protocol left it looking untouched — what it read was the trace events'
+# `refused_fields` / `inadmissible_fields` / `rejected_fields` / `disallowed_fields`. Those four keys
+# are written in ZERO places under `src/` and occur zero times across the 454 manifests and traces
+# under runs/. Which is to say: from the day it was written it could never once have fired.
 #
-# 这是"删一个机制会留下什么"的标准形状，而留下它的那次删除是我做的。一条读事件而不 import 类型
-# 的规则，在依赖图上是隐形的；判定它死掉的唯一办法是问"还有谁写它读的那些键"。
+# This is the standard shape of what deleting a mechanism leaves behind, and the deletion that left
+# this one behind was mine. A rule that reads events rather than importing a type is invisible on the
+# dependency graph; the only way to judge it dead is to ask who else writes the keys it reads.
 
 def _audit_asset(
     module_id: str, implementation_id: str, description: str

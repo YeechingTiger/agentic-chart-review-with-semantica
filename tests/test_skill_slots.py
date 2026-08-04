@@ -1,8 +1,10 @@
-"""每张卡必须说清自己装在哪个槽。
+"""Every card must say which slot it is assembled into.
 
-装错槽不是小事：`search` 槽的卡是做对照试验时唯一被替换的变量，一张 `task` 卡混进去，
-两次 run 的差别就不再只来自检索策略，而结论会照样被写进报告。所以槽位是声明的、
-校验的，不是靠目录名猜的。
+The wrong slot is not a small thing: the card in the `search` slot is the one variable that is
+replaced when a controlled comparison is run, and if a `task` card slips in there, the difference
+between the two runs no longer comes only from the retrieval strategy — and the conclusion gets
+written into the report all the same. So a slot is declared and checked, not guessed from the
+directory name.
 """
 from __future__ import annotations
 
@@ -27,7 +29,8 @@ from acr.core import site
 SKILLS_DIR = Path(__file__).resolve().parents[1] / "assets" / "skills"
 _FM = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 
-# `assets/skills/guideline-to-rules/SKILL.md` 从未写过——见 tests/test_skills_load.py:49-55。
+# `assets/skills/guideline-to-rules/SKILL.md` was never written — see
+# tests/test_skills_load.py:49-55.
 _NO_SKILL_MD = {"guideline-to-rules"}
 
 
@@ -48,7 +51,7 @@ def test_every_skill_declares_a_known_slot(name: str):
 
 @pytest.mark.parametrize("name", _skill_names())
 def test_declared_slot_matches_the_file(name: str):
-    """skill_slot 读的就是文件里那一行，不是别处推断的。"""
+    """skill_slot reads exactly that one line in the file, not something inferred elsewhere."""
     text = (SKILLS_DIR / name / "SKILL.md").read_text(encoding="utf-8")
     fm = yaml.safe_load(_FM.match(text).group(1))
     if str(fm.get("kind") or "prose") != "prose":
@@ -83,16 +86,19 @@ def test_stack_renders_task_then_policy_then_general():
 
 
 def test_stack_rejects_a_skill_in_the_wrong_slot():
-    """把一张 general 卡塞进 policy 槽——这正是会让对照试验失去意义的装配错误。"""
+    """Stuffing a general card into the policy slot — precisely the assembly error that drains a
+    controlled comparison of its meaning."""
     with pytest.raises(SkillError, match="chart-triage.*declares slot 'general'.*'policy'"):
         SkillStack(policy="chart-triage").validate()
 
 
 def test_stack_rejects_an_eval_skill_in_the_chart_agent(tmp_path: Path):
-    """`slot: eval` 的卡属于评测那边的 agent，装进跑病历的任何一个槽都是错。
+    """A `slot: eval` card belongs to the evaluation agent, so placing it in any slot of a chart
+    run is wrong.
 
-    计划里这条测试直接点名 `eval-contrast-traces`，但那几张卡要到 Task 6 才建出来，现在点名
-    它只会撞上"卡不存在"，测不到槽位校验。这里临时造一张 `slot: eval` 的卡，测的是同一件事。
+    The plan had this test name `eval-contrast-traces` directly, but those cards are not built
+    until Task 6, and naming it now would only hit "that card does not exist" and never reach the
+    slot check at all. So a throwaway `slot: eval` card is built here, and it tests the same thing.
     """
     d = tmp_path / "eval-contrast-traces"
     d.mkdir()
@@ -107,11 +113,13 @@ def test_stack_rejects_an_eval_skill_in_the_chart_agent(tmp_path: Path):
                                         if p.name.startswith("eval-")))
 @pytest.mark.parametrize("slot", ["task", "policy", "general"])
 def test_a_real_eval_card_cannot_be_placed_in_a_chart_slot(name: str, slot: str):
-    """上一条用 tmp_path 造卡测机制；这一条测真卡，走的是用户真会敲的那条路。
+    """The test above builds a card in tmp_path to exercise the mechanism; this one uses the real
+    cards, over the path a user would actually type.
 
-    `--skills general=eval-overconfidence` 是一次手滑就能敲出来的东西，而它一旦通过，跑病历的
-    提示词里就会多出一段"你不许判分"的复盘指令——对一个正在读病历的模型说的话，既不是它的
-    任务，也没有任何存档单会把这件事标红。所以真卡必须在装配时就被拒。
+    `--skills general=eval-overconfidence` is one slip of the fingers away, and once it is accepted
+    the chart-run prompt grows a post-hoc-review passage saying "you are not allowed to score" —
+    words spoken to a model that is in the middle of reading a chart, which are neither its task nor
+    something any manifest would flag in red. So a real card has to be refused at assembly time.
     """
     placed = SkillStack(**({slot: (name,)} if slot == "general" else {slot: name}))
     with pytest.raises(SkillError, match="slot 'eval'"):
@@ -128,15 +136,19 @@ def test_manifest_carries_the_slot():
 
 
 def test_default_profile_renders_the_universal_block_then_the_standing_habits():
-    """默认 profile 送给模型的字节，钉死在这里。
+    """The bytes the default profile sends the model, nailed down here.
 
-    这条测试原来的名字是 `..._exactly_what_it_rendered_before`，理由是：历史上每一次 run 都
-    在 `coverage-judgement` 一张卡下跑，重构顺手多塞两张就会让新旧 run 不可比。那个理由仍然
-    成立，而 2026-08-02 这次是**故意**破坏它的：`tool-contract` 加进了每一个 profile。
+    This test used to be named `..._exactly_what_it_rendered_before`, on these grounds: every run
+    in this tree's history ran under the single card `coverage-judgement`, and a refactor that
+    casually slipped in two more would make the old and the new runs incomparable. That reason still
+    holds, and 2026-08-02 broke it **on purpose**: `tool-contract` was added to every profile.
 
-    为什么值得破坏一次可比性——外部审核指出，`tactic-query-formulation` 知道 substring、hit cap、
-    扫描顺序这些工具事实，别的卡不知道，于是七个臂的差异里一直混着"谁碰巧了解仪器"。工具
-    事实不是策略，属于每一个臂。破坏是一次性的，此后这条测试照旧钉住。
+    Why breaking comparability once was worth it — an outside review pointed out that
+    `tactic-query-formulation` knows the tool facts (substring matching, the hit cap, the scan
+    order) and the other cards do not, so the differences between the seven arms always had "who
+    happened to understand the instrument" mixed into them. A tool fact is not a strategy; it
+    belongs to every arm. The break is a one-off, and from here on this test pins the bytes as
+    before.
     """
     from acr.review.runtime_profiles import DEFAULT_RUNTIME_PROFILE, runtime_policy_skills
     stack = runtime_policy_skills(DEFAULT_RUNTIME_PROFILE)
@@ -165,8 +177,9 @@ def test_default_profile_renders_the_universal_block_then_the_standing_habits():
 
 
 def test_unknown_profile_still_falls_back_to_the_universal_block():
-    """未知 profile 的兜底也必须带工具契约 —— 否则"每一个臂都有"就有一个例外，而例外
-    正好落在没人特意配置过的那条路径上。"""
+    """The fallback for an unknown profile has to carry the tool contract too — otherwise "every arm
+    has it" acquires one exception, and the exception lands on exactly the path nobody ever
+    configured on purpose."""
     from acr.review.runtime_profiles import runtime_policy_skills
     assert runtime_policy_skills("not-a-profile").names() == ("tool-contract", "coverage-judgement")
 
@@ -397,11 +410,13 @@ def test_the_skills_help_documents_every_form_of_the_syntax(command: str):
         assert form in flat, f"{command} --help does not document {form!r}"
 
 
-# --------------------------------------------------------------------- 经验槽
-# 2026-08-02:`experience` 一直写在 SLOTS 里,`experience-adapter/SKILL.md` 也一直声明
-# `slot: experience`,但 `SkillStack` 没有这个字段,`parse_skill_stack` 直接拒绝这个名字。
-# 也就是说三因素实验里的第三个因素 —— 开发集总结出来的先验 —— 根本装不进任何一次运行。
-# 声明了一个槽而装不进去,和没有这个槽是两回事:前者在 SLOTS 的清单里看着是有的。
+# ---------------------------------------------------------------- the experience slot
+# 2026-08-02: `experience` has been written into SLOTS all along, and
+# `experience-adapter/SKILL.md` has declared `slot: experience` all along, but `SkillStack` had no
+# such field and `parse_skill_stack` refused the name outright. Which means the third factor of the
+# three-factor experiment — the prior summarised out of the develop set — could not be stacked into
+# any run at all. Declaring a slot you cannot fill is not the same as not having the slot: the
+# first one looks present in the SLOTS list.
 
 def test_the_experience_slot_can_actually_be_stacked():
     stack = parse_skill_stack("experience=experience-adapter", SkillStack())
@@ -410,7 +425,8 @@ def test_the_experience_slot_can_actually_be_stacked():
 
 
 def test_experience_renders_after_the_tactics_and_before_the_standing_habits():
-    """先验是"有人替你查过的东西",它排在自选战术之后、每个臂都有的东西之前。"""
+    """A prior is "something somebody already looked up for you", so it renders after the tactics
+    this run chose and before the things every arm has."""
     stack = SkillStack(policy="policy-reactive",
                        tactics=("tactic-coverage-pool",),
                        experience=("experience-adapter",),
@@ -420,16 +436,17 @@ def test_experience_renders_after_the_tactics_and_before_the_standing_habits():
 
 
 def test_the_manifest_says_which_card_was_the_experience_one():
-    """否则"这一臂开了先验没有"只能靠卡名去猜。"""
+    """Otherwise "did this arm have a prior turned on or not" can only be guessed from the card's
+    name."""
     rows = skills_manifest(SkillStack(experience=("experience-adapter",)))
     assert [(r["skill"], r["slot"]) for r in rows] == [("experience-adapter", "experience")]
 
 
 def test_experience_appends_with_plus_like_the_other_list_slots(tmp_path: Path):
-    """两张先验卡:一份关键词先验加一份类型先验,是这个槽预期的形状。
+    """Two prior cards — a keyword prior plus a document-type prior — is the shape this slot expects.
 
-    树上现在只有一张 `slot: experience` 的卡,所以第二张在 tmp_path 里造 —— 测的是
-    `+` 这个机制,不是某张卡。
+    The tree holds only one `slot: experience` card today, so the second one is built in tmp_path —
+    what is under test is the `+` mechanism, not any particular card.
     """
     for n in ("prior-a", "prior-b"):
         d = tmp_path / n

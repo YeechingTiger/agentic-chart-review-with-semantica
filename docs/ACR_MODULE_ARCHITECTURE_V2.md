@@ -1,76 +1,80 @@
-# ACR 模块架构 v2
+# ACR module architecture v2
 
-> 状态：已实现的兼容演进基线  
-> 日期：2026-07-29
+> Status: implemented compatible-evolution baseline  
+> Date: 2026-07-29
 
-## 1. 设计原则
+## 1. Design principles
 
-只有能够独立运行、具有 typed input/output、权限、停止条件和 certification
-生命周期的单元才是 module。
+Only a unit that can run on its own and that has typed input/output, authority, a stopping
+condition and a certification lifecycle is a module.
 
-| 名称 | 含义 | 是否是顶层 module |
+| Name | Meaning | Top-level module? |
 |---|---|---|
-| Module | 可独立运行和认证的能力 | 是 |
-| Skill | Agent evaluator 内部的方法说明 | 否 |
-| Capability | 受 scope 和 budget 控制的工具能力 | 否 |
-| Stage | 一个 module 内部的执行阶段 | 否 |
-| Pipeline | Module 的条件、依赖和数据绑定 | 不是 module |
-| Task | 一次运行的数据、truth、预算和权限绑定 | 不是 module |
+| Module | A capability that can be run and certified independently | yes |
+| Skill | Method guidance internal to an agent evaluator | no |
+| Capability | A tool power bounded by scope and budget | no |
+| Stage | An execution phase inside one module | no |
+| Pipeline | The conditions, dependencies and data bindings over modules | not a module |
+| Task | The data, truth, budget and authority bindings of one run | not a module |
 
-系统采用四个平面，而不是把所有检查都放进 Eval：
+The system uses four planes instead of putting every check into Eval:
 
 ```text
 Execution
   → canonical Trajectory
-  → Audit              行为事实和治理边界
-  → Evaluation         任务质量和因果归因
-  → Improvement        修复、paired validation、采用
+  → Audit              behavioural facts and governance boundaries
+  → Evaluation         task quality and causal attribution
+  → Improvement        repair, paired validation, adoption
 ```
 
-现有 deepagents extraction 保持原位。canonical trajectory 直接从当前
-trace/manifest 构造；旧 EvalLoop、重复 evaluator catalog 和兼容 CLI 已移除。
+The existing deepagents extraction stays where it is. The canonical trajectory is built directly
+from the current trace/manifest; the old EvalLoop, the duplicate evaluator catalog and the
+compatibility CLI have been removed.
 
 ## 2. Stable Kernel
 
-`acr.kernel` 定义跨任务稳定的公共对象：
+`acr.kernel` defines the shared objects that stay stable across tasks:
 
-- `AssetRef`：所有 spec、policy、prompt、skill、tool、evaluator、audit rule 和
-  repair strategy 的内容寻址引用。
-- `Trajectory`：一次完整 agent execution 的不可变、analysis-ready 记录。
-- `TargetRef`：signal 所解释的 run/field/evidence/tool/gate 等明确目标。
-- `SignalEnvelope`：Audit、Evaluation、Attribution 和 Repair 输出共享的薄 envelope。
+- `AssetRef`: the content-addressed reference for every spec, policy, prompt, skill, tool,
+  evaluator, audit rule and repair strategy.
+- `Trajectory`: the immutable, analysis-ready record of one complete agent execution.
+- `TargetRef`: the explicit target a signal is about — run, field, evidence, tool, gate.
+- `SignalEnvelope`: the thin envelope shared by Audit, Evaluation, Attribution and Repair output.
 
-`TrajectoryAdapter` 从 extraction manifest/trace 生成 canonical trajectory。Chart 原文仍留在
-repo 外本地 artifact；trajectory event 中的自由文本只保留 hash 和长度，分析模块
-按授权读取原始本地引用。
+`TrajectoryAdapter` produces the canonical trajectory from the extraction manifest/trace. Chart
+text stays in local artifacts outside the repo; free text in a trajectory event keeps only a hash
+and a length, and analysis modules read the original local reference under an explicit grant.
 
 ## 3. Module Families
 
-`acr.modules` 只定义五类 module protocol：
+`acr.modules` defines only five kinds of module protocol:
 
-1. `RuntimePolicy`：搜索、coverage、扩展和停止策略。
-2. `AuditRule`：truth-blind 行为边界检查。
-3. `Evaluator`：CODE/LLM/AGENT/HUMAN 质量评价。
+1. `RuntimePolicy`: search, coverage, expansion and stopping policy.
+2. `AuditRule`: truth-blind behavioural boundary checks.
+3. `Evaluator`: CODE/LLM/AGENT/HUMAN quality evaluation.
 
-> 2026-08-03：本文曾列五类，另两类是 `RuntimeControl`(请求内 allow/deny/require) 和
-> `RepairStrategy`(signal → repair obligation 路由)。两者各自唯一的实现在生产代码里零引用，
-> 已连同 protocol 一并删除。第 8 节描述的 `acr.repair_loop` 保证从未在任何活路径上生效。
+> 2026-08-03: this document used to list five kinds. The other two were `RuntimeControl`
+> (in-request allow/deny/require) and `RepairStrategy` (signal → repair obligation routing). The
+> single implementation of each had zero references in production code, so both were deleted along
+> with their protocols. The `acr.repair_loop` guarantees described in section 8 therefore never
+> took effect on any live path.
 
-YAML 只能引用显式注册的 `implementation_id`。系统不允许从 YAML 动态 import
-任意 Python 代码。
+YAML may refer only to an explicitly registered `implementation_id`. The system does not allow
+dynamic import of arbitrary Python code from YAML.
 
-## 4. Asset、Pipeline、Task 和 Certification
+## 4. Asset, Pipeline, Task and Certification
 
-原 `EvaluatorSpec` 同时保存 evaluator、selector、dependency、budget 和 synthetic
-fixtures。v2 将其拆开：
+The old `EvaluatorSpec` held the evaluator, the selector, dependencies, the budget and synthetic
+fixtures all at once. v2 splits it apart:
 
-- `ModuleAsset`：module 身份、I/O、runner、truth modes、capability request 和最大权限。
-- `PipelineProfile`：node、condition、dependency、input binding、capability allowlist、
-  budget ceiling 和权限 ceiling。
-- `EvaluationTask`：trajectory cohort、truth mode、model、seed、实际 budget 和 grant。
-- `CertificationSuite`：must-pass/must-fail fixtures、calibration cohort 和阈值。
+- `ModuleAsset`: module identity, I/O, runner, truth modes, capability requests and maximum
+  authority.
+- `PipelineProfile`: nodes, conditions, dependencies, input bindings, the capability allowlist, the
+  budget ceiling and the authority ceiling.
+- `EvaluationTask`: trajectory cohort, truth mode, model, seed, the actual budget and the grants.
+- `CertificationSuite`: must-pass/must-fail fixtures, the calibration cohort and thresholds.
 
-Task 的 effective capability 是：
+A task's effective capability is:
 
 ```text
 module requested
@@ -79,18 +83,18 @@ module requested
 ∩ current patient scope
 ```
 
-Task 只能缩小 capability、budget 和 authority，不能扩大。
+A task can only narrow capability, budget and authority, never widen them.
 
-## 5. Audit 与 Evaluation
+## 5. Audit and Evaluation
 
 ### Audit
 
-AgentLoop 的 Audit 包含两部分：
+AgentLoop's Audit has two parts:
 
-- Audit Facts：Session、Turn、Tool、Token 和行为事实。
-- Risk Audit：Finding → correlation → Incident → investigation。
+- Audit Facts: session, turn, tool, token and behavioural facts.
+- Risk Audit: Finding → correlation → Incident → investigation.
 
-ACR v1 只实现 application-level Risk Audit：
+ACR v1 implements only the application-level Risk Audit:
 
 - patient boundary
 - PHI/provider boundary
@@ -99,38 +103,39 @@ ACR v1 只实现 application-level Risk Audit：
 - trajectory integrity
 - hard runtime-control conformance
 
-Audit 不接收 `TruthContext`，不判断 clinical correctness，也不产生 semantic spec
-repair。Audit output 独立存入：
+Audit does not receive a `TruthContext`, does not judge clinical correctness, and does not produce
+semantic spec repair. Audit output is stored separately in:
 
 ```text
 <local-root>/audit/findings.jsonl
 <local-root>/audit/incidents.jsonl
 ```
 
-eBPF、进程/文件/网络采集、实体图谱、实时告警和 SIEM 不在 v1 范围。
+eBPF, process/file/network collection, entity graphs, real-time alerting and SIEM are out of scope
+for v1.
 
 ### Evaluation
 
-`acr.evaluation_pipeline` 的 `EvaluationContext` 将普通 typed channels 与
-`TruthContext` 分开。BLIND channel 递归拒绝 gold、answer key 或 registry reference。
+The `EvaluationContext` of `acr.evaluation_pipeline` keeps ordinary typed channels separate from
+`TruthContext`. A BLIND channel recursively rejects gold, answer keys and registry references.
 
-`EvaluationResult` 不含 `AuditFinding` 或 `AuditIncident`。安全 signal 可以作为引用
-进入 attribution，但不能被 evaluator 重新裁判。
+`EvaluationResult` contains no `AuditFinding` or `AuditIncident`. A security signal may enter
+attribution as a reference, but it cannot be re-adjudicated by an evaluator.
 
-内置 v2 CODE evaluators：
+Built-in v2 CODE evaluators:
 
 - `evidence-validity`
 - `gate-effectiveness`
 
-`causal-attribution@2.0.0` 已登记为 AGENT `ModuleAsset`，具体 tool loop 仍由
-`acr attribute` 执行；其中的 targeted probe 覆盖未读证据矛盾检查，不再维护一套
-重复的 standalone contradiction runtime。
+`causal-attribution@2.0.0` is registered as an AGENT `ModuleAsset`; the tool loop itself is still
+executed by `acr attribute`. Its targeted probe covers the unread-evidence contradiction check, so
+a duplicate standalone contradiction runtime is no longer maintained.
 
-## 6. Attribution 的内部模块
+## 6. The internal modules of Attribution
 
-原 `attribution_modules` 实际表示一个 evaluator 内部的 stages，而不是八个独立
-evaluators。正式名称为 `AttributionStage`、`AttributionStageProfile` 和
-`AttributionStageRegistry`。
+What used to be `attribution_modules` in fact denotes stages inside one evaluator, not eight
+independent evaluators. The formal names are `AttributionStage`, `AttributionStageProfile` and
+`AttributionStageRegistry`.
 
 ```text
 target framing
@@ -142,49 +147,50 @@ target framing
 → attribution gate
 ```
 
-整个序列仍然只产生一个 `AttributionReport`。
+The whole sequence still produces exactly one `AttributionReport`.
 
 ## 7. Coverage
 
-Coverage 被拆成：
+Coverage is split into:
 
-- `CoveragePolicy`：怎样搜索，属于 RuntimePolicy。
-- `CoverageState`：实际读到什么，属于 Trajectory。
-- coverage effectiveness：策略是否有效，属于 Evaluation/Experiment。
+- `CoveragePolicy`: how to search, which belongs to RuntimePolicy.
+- `CoverageState`: what was actually read, which belongs to Trajectory.
+- coverage effectiveness: whether the policy works, which belongs to Evaluation/Experiment.
 
-`acr.runtime_profiles` 提供两个可比较基线：
+`acr.runtime_profiles` provides two comparable baselines:
 
 - `witness-first-baseline`
 - `current-stratified-coverage`
 
-它们已经接入 `run_patient`、`acr run|batch|consistency` 和 `acr extract` 的
-`--runtime-profile`。默认值仍为 `current-stratified-coverage`。每个 manifest 和
-`run_start` event 都保存 profile ref、version 和 content hash。
+They are already wired into `run_patient` and the `--runtime-profile` option of
+`acr run|batch|consistency` and `acr extract`. The default is still `current-stratified-coverage`.
+Every manifest and every `run_start` event stores the profile ref, its version and its content
+hash.
 
-`witness-first-baseline` 仍执行 patient scope、工具权限、字段格式、answer check、
-positive evidence 和 open-thread control；它要求先列出患者文档，但不会执行负例的
-forced sampling 或 stratified exclusion gate。它接受的 `EVIDENCE_INSUFFICIENT`
-明确记录 `negative_basis=WITNESS_FIRST_BASELINE`，不附加 `coverage_attested`，
-也不作为 coverage-validated answer 报告。
+`witness-first-baseline` still enforces patient scope, tool authority, field format, the answer
+check, positive evidence and the open-thread control; it requires listing the patient's documents
+first, but it runs neither forced sampling of negatives nor the stratified exclusion gate. An
+`EVIDENCE_INSUFFICIENT` it accepts records `negative_basis=WITNESS_FIRST_BASELINE` explicitly,
+carries no `coverage_attested`, and is not reported as a coverage-validated answer.
 
-任何“必须看全”的性能主张都需要在相同 patient、model、seed 和 budget 下比较
-accuracy、critical miss、overclaim、abstention、evidence validity、documents read
-和 cost。
+Any "you must read everything" performance claim has to be compared under the same patient, model,
+seed and budget on accuracy, critical miss, overclaim, abstention, evidence validity, documents
+read and cost.
 
 ## 8. Improvement
 
-`acr.repair_loop` 保证：
+`acr.repair_loop` guarantees:
 
-- Audit Incident 只路由到 security/control repair。
-- Evaluation signal 经 attribution 后路由到 spec/retrieval/skill/gate/runtime owner。
-- `REGISTRY_REFERENCE` 只能产生 adjudication/clinician question。
-- Semantic repair 必须同时具有 GOLD 和 human adjudication。
-- 所有 proposal 仍需 paired validation；有 critical、per-case 或 subgroup regression
-  时不得接受。
+- An Audit Incident routes only to security/control repair.
+- An Evaluation signal routes, after attribution, to the spec/retrieval/skill/gate/runtime owner.
+- `REGISTRY_REFERENCE` can only produce an adjudication/clinician question.
+- Semantic repair must have both GOLD and human adjudication.
+- Every proposal still needs paired validation, and must not be accepted when there is a critical,
+  per-case or subgroup regression.
 
-## 9. Catalog 与 CLI
+## 9. Catalog and CLI
 
-独立 catalogs：
+Separate catalogs:
 
 ```text
 assets/module_catalog/
@@ -192,19 +198,19 @@ assets/pipeline_catalog/
 assets/certification_catalog/
 ```
 
-CLI：
+CLI:
 
 - `acr audit rules|run|summarize|incidents`
 - `acr evaluation modules|validate|run|batch|summarize|compare`
-- 原 `acr eval` 保持纯 CODE
-- `acr attribute` 是唯一 model-using attribution 入口
+- the original `acr eval` stays pure CODE
+- `acr attribute` is the only model-using attribution entry point
 
-## 10. 明确不做
+## 10. Explicitly not doing
 
-- eBPF 和 host/process/network 全栈采集
-- 动态 Python plugin import
-- 云控制台、dashboard、RBAC、SIEM
-- 通用数据湖或向量 dataset 平台
-- Memory/Experience 自动注入
-- 在线自动修改或发布 semantic spec
-- LLM 驱动的安全阻断
+- eBPF and full-stack host/process/network collection
+- dynamic Python plugin import
+- cloud console, dashboard, RBAC, SIEM
+- a general-purpose data lake or vector dataset platform
+- automatic Memory/Experience injection
+- online automatic modification or publication of a semantic spec
+- LLM-driven security blocking

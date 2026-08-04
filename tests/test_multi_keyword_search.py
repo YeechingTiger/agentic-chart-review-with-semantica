@@ -1,20 +1,24 @@
-"""检索一次接受多个关键词，而且每个词的命中要分开报。
+"""One search call takes several keywords, and each term's hits are reported separately.
 
-为什么这是工具的事而不是策略的事
---------------------------------
-E2 实测：`search-breadth-first` 在十八张图上发了 506 次检索，`biopsy` 一个词八十六次。当时
-读成"这张卡教模型做了无用功"，但那只是一半 —— 另一半是**工具一次只收一个词**，所以"用五个
-词覆盖这份病历"在记录里必然是五次调用，无论策略怎么写。
+WHY THIS IS THE TOOL'S PROBLEM AND NOT A POLICY'S
+-------------------------------------------------
+Measured in E2: `search-breadth-first` issued 506 searches over eighteen charts, eighty-six of them
+for `biopsy` alone. That was read at the time as "this card teaches the model to do useless work",
+but that is only half of it — the other half is that **the tool took one term per call**, so
+"cover this chart with five terms" was necessarily five calls in the record, however the policy was
+written.
 
-把词表放进一次调用，同样的覆盖成本从 N 次变成 1 次。这不改变任何策略，它把"扫得宽"从一个
-预算问题变回一个检索问题 —— 而 E2 的另一半发现是 breadth-first 打开的文档反而比空槽更少
-（2.6 对 3.3），因为预算烧在了发检索上。
+Put the term list into one call and the same coverage costs 1 call instead of N. This changes no
+policy; it turns "sweep wide" from a budget problem back into a retrieval problem — and the other
+half of E2's finding was that breadth-first opened FEWER documents than the empty slot (2.6 against
+3.3), because the budget was burned on issuing searches.
 
-每个词的命中必须分开
---------------------
-合并成一个池子会丢掉唯一有用的那条信息：**哪个词把这份文档捞出来的**。E2 的链里
-`read ←9` 和 `read ←10` 之所以能区分是哪次检索起的作用，靠的就是每次检索是独立事件。
-一次多词调用如果把结果拍平，就把这条信息又丢回去了。
+EACH TERM'S HITS MUST STAY SEPARATE
+-----------------------------------
+Merging them into one pool throws away the one piece of information that is any use: **which term
+pulled this document out**. In E2's chains, `read ←9` and `read ←10` can be told apart as to which
+search did the work only because each search is its own event. A multi-term call that flattens its
+results throws that information straight back away.
 """
 from __future__ import annotations
 
@@ -32,7 +36,7 @@ def chart():
 
 
 def test_a_single_string_still_works(chart):
-    """向后兼容：已记录的每一次运行都传字符串。"""
+    """Backward compatibility: every run already recorded passes a string."""
     from acr.review.tools.toolbox import Toolbox
     out = Toolbox.search_many(chart, "adenocarc", max_hits=25)
     assert out["terms"] == ["adenocarc"]
@@ -48,7 +52,8 @@ def test_several_terms_in_one_call(chart):
 
 
 def test_hits_stay_attributed_to_the_term_that_found_them(chart):
-    """合并成一个池子会丢掉"哪个词捞出这份文档"，而那正是因果链里唯一有用的区分。"""
+    """Merging into one pool loses "which term pulled this document out", and that is the one
+    distinction in the causal chain that is any use."""
     from acr.review.tools.toolbox import Toolbox
     out = Toolbox.search_many(chart, ["adenocarc", "biopsy"], max_hits=25)
     for term, block in out["by_term"].items():
@@ -57,7 +62,8 @@ def test_hits_stay_attributed_to_the_term_that_found_them(chart):
 
 
 def test_the_cap_is_per_term_not_shared(chart):
-    """共享上限会让第一个词吃掉预算，后面的词看起来像"这份病历里没有"。"""
+    """A shared cap would let the first term eat the budget and make every later term look like
+    "not in this chart"."""
     from acr.review.tools.toolbox import Toolbox
     out = Toolbox.search_many(chart, ["a", "e"], max_hits=3)
     for block in out["by_term"].values():
@@ -65,7 +71,7 @@ def test_the_cap_is_per_term_not_shared(chart):
 
 
 def test_an_empty_term_list_is_refused_not_silently_empty(chart):
-    """空词表返回"零命中"读起来像"这份病历什么都没有"。"""
+    """An empty term list returning "zero hits" reads as "this chart contains nothing"."""
     from acr.review.tools.toolbox import Toolbox
     out = Toolbox.search_many(chart, [], max_hits=5)
     assert out.get("error")

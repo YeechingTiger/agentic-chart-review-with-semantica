@@ -959,9 +959,10 @@ def detect_value_domain_violation(run: RunRecord, *, spec=None) -> list[Finding]
     """A submitted value that is not a code in the table the run was SHOWN. Advisory.
 
     THE MODULE SAID THIS WAS COUNTED AND NOTHING COUNTED IT. `contract/code_tables.py`'s docstring
-    names three jobs, the second being "`check_values()` 返回带类型的问题给评测面**计数**" — and
-    `check_values` had zero non-test callers. The table was loaded (fail-closed on a typo), rendered
-    into the prompt, and recorded in the manifest: all INPUT-side. Nothing compared what came back.
+    names three jobs, the second being "`check_values()` returns typed problems for the evaluation
+    plane to **count**" — and `check_values` had zero non-test callers. The table was loaded
+    (fail-closed on a typo), rendered into the prompt, and recorded in the manifest: all INPUT-side.
+    Nothing compared what came back.
 
     The two failures that module records as its own motivation both passed uncounted: a run coding
     morphology `7205` (not an ICD-O-3 code) and one writing "C341 is the right middle lobe" and
@@ -1495,8 +1496,9 @@ def compare(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict:
 
     # A MIXTURE IS NOT AN ENDPOINT. Measured: a run tree spanning two spec hashes scored as one
     # clean baseline and this function reported +5.6 points. `tools/analyze_arms.py:191` refuses the
-    # identical shape in prose ("拒绝比较：这些臂跑在 N 个不同的 spec 版本上"); the evaluation plane
-    # averaged it, because nothing here had ever read what the manifests said about their own arm.
+    # identical shape in prose ("refusing to compare: these arms ran on N different spec versions");
+    # the evaluation plane averaged it, because nothing here had ever read what the manifests said
+    # about their own arm.
     # Checked before the collision guard: a collision breaks only the per-instance arm, whereas a
     # mixture means neither file describes one configuration and no column is interpretable.
     b_mix, b_con = _identity_problems(before)

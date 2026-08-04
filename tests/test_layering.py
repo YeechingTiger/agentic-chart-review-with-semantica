@@ -1,45 +1,59 @@
-"""每个模块属于哪一层，以及低层不许 import 高层。
+"""Which layer every module belongs to, and that a lower layer may not import a higher one.
 
-为什么这条测试先于目录存在
---------------------------
-`src/acr/` 是 73 个平铺模块，读的人无法看出哪个属于 chart review agent、哪个属于 audit、
-哪个属于 evaluation、哪个属于 diagnosis，也无法看出它们怎么合在一起。目录能表达这件事，
-但目录会被下一个人重新打乱，而且一次搬迁之后没有任何东西阻止 `evals.py` 反过来 import
-`agent.py`。所以先把分层写成断言，再搬目录 —— 搬迁由这条测试保护，而不是由搬迁者的记性。
+Why this test exists before the directories do
+----------------------------------------------
+`src/acr/` was 73 flat modules, and a reader could not see which of them belonged to the chart
+review agent, which to audit, which to evaluation, which to diagnosis, nor how they fit
+together. Directories can say that, but the next person will reshuffle them, and after a single
+move nothing stops `evals.py` from importing `agent.py` back the other way. So the layering was
+written as an assertion first and the directories were moved second — the move is protected by
+this test, not by the mover's memory.
 
-层的定义不是"文件放在哪"，是**允许依赖谁**。两条规则：
+A layer is not defined by "where the file sits", it is defined by **who it may depend on**. Two
+rules:
 
-    1. 低层不得 import 高层。同层之间不限制。
-    2. 干活的平面之间只能通过共享层的类型相见 —— 也就是"输入输出的形式"。直接 import
-       对方的函数是代码耦合，即使方向合法。
+    1. A lower layer must not import a higher one. Within a layer there is no restriction.
+    2. Work planes may meet each other only through the types of a shared layer — that is,
+       through "the shape of the input and the output". Importing the other one's functions is
+       code coupling, even when the direction is legal.
 
-十层，自下而上。前三层是共享的 I/O 契约，其余是干活的平面：
+Ten layers, bottom to top. The first three are the shared I/O contract, the rest are work planes:
 
-  0 core         跨任务稳定的公共物：AssetRef/Trajectory/SignalEnvelope、本地 artifact
-                 边界、模型客户端、花费、状态、module protocol。不含任何领域语义。
-  0 chartstore   病历数据访问。和 kernel 同 rank 但分开命名：kernel 是抽象词汇，这一层是
-                 "怎么把一个病人的文档读出来"，而三个平面都要读。
-  1 contract     任务合同与其词表：spec、答案契约、字段格式检查、指南三值逻辑、skill 装配、
-                 rule catalog、分层声明、值域码表。"这个答案必须意味着什么"住在这里。
-  2 review       chart review agent 本身：编排、请求内硬控制、coverage 策略、工具面、
-                 manifest 序列化。唯一能产出答案的一层。
-  3 audit        安全/边界证据链。Finding → Incident。不接收 TruthContext。
-  3 evaluation   质量评价。truth mode 是参数而非前提。
-  3 diagnosis    因果归因。绑定显式 target event，解释那一个错误。
-                 这三层同 rank：它们是同一条 trajectory 上三种不能互相替代的结论类型，
-                 彼此不得依赖 —— audit 不许 import evaluation 正是"audit 不是 CODE
-                 evaluator 的别名"这句话的可执行形式。
-  4 improvement  修复路由、资产调优、标注。
-  4 authoring    新任务/新变量的 onboarding 与 spec 静态检查。开发面，不在跑病历的路上。
-  5 usecase      **某一个** use case 特有的知识。癌症登记是其中一个，不是框架。
-  6 cli          入口。可以依赖任何层，不许被任何层依赖。
+  0 core         The common things that stay stable across tasks: AssetRef/Trajectory/
+                 SignalEnvelope, the local artifact boundary, the model client, spend, state,
+                 the module protocol. No domain semantics at all.
+  0 chartstore   Chart data access. Same rank as kernel but named apart: kernel is the abstract
+                 vocabulary, this layer is "how one patient's documents get read out", and all
+                 three planes have to read.
+  1 contract     The task contract and its vocabulary: spec, the answer contract, field format
+                 checks, the guideline's three-valued logic, skill assembly, the rule catalog,
+                 the layering declaration, value-domain code tables. "What this answer must
+                 mean" lives here.
+  2 review       The chart review agent itself: orchestration, the in-request hard controls, the
+                 coverage policy, the tool surface, manifest serialisation. The only layer that
+                 can produce an answer.
+  3 audit        The safety/boundary evidence chain. Finding → Incident. Takes no TruthContext.
+  3 evaluation   Quality assessment. Truth mode is a parameter, not a premise.
+  3 diagnosis    Causal attribution. Bound to an explicit target event, explaining that one
+                 error.
+                 These three share a rank: they are three kinds of conclusion over the same
+                 trajectory that cannot substitute for one another, and they must not depend on
+                 each other — audit not being allowed to import evaluation is the executable
+                 form of the sentence "audit is not an alias for a CODE evaluator".
+  4 improvement  Repair routing, asset tuning, labelling.
+  4 authoring    Onboarding for a new task or a new variable, and static checks on a spec. A
+                 development plane, not on the path of a chart run.
+  5 usecase      Knowledge specific to **one particular** use case. The cancer registry is one
+                 of them, not the framework.
+  6 cli          The entry point. May depend on any layer, may not be depended on by any layer.
 
-`usecase` 排在 cli 之下、其余之上，是因为一个 use case 应该坐在边缘：框架 import 它，
-就是框架被那个 use case 绑住了。
+`usecase` sits below cli and above everything else because a use case belongs at the edge: the
+framework importing it is the framework being tied to that one use case.
 
-两个登记清单现在都是空的：`KNOWN_DOMAIN_COUPLING`（框架依赖 use case）和
-`KNOWN_DIRECT_COUPLING`（工作平面之间直接 import）。它们空着但保留，因为规则还在 ——
-清单只能变短，而那里是下一个想违反规则的人被迫写下理由的地方。
+Both registries are empty right now: `KNOWN_DOMAIN_COUPLING` (the framework depending on a use
+case) and `KNOWN_DIRECT_COUPLING` (a direct import between work planes). They are empty and kept
+anyway, because the rules are still here — the lists may only get shorter, and they are the place
+where the next person who wants to break a rule is forced to write down why.
 """
 from __future__ import annotations
 
@@ -52,15 +66,19 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "acr"
 
-#: (rank, 层名, 模块). rank 相同 = 同层，互相不限制；rank 小的不许 import rank 大的。
+#: (rank, layer name, modules). Equal rank = same layer, no restriction between them; a smaller
+#: rank may not import a larger one.
 LAYERS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
-    # 搬迁已完成：每个模块都住在自己平面的目录里，层由**路径**决定，所以这些清单全部为空。
-    # 保留元组的第三位不是形式：一个新增的顶层模块（还没决定属于哪个平面）会落在这里，
-    # 而 `test_every_module_is_assigned_to_a_layer` 要求它被明确归位。
+    # The move is done: every module lives in its own plane's directory and the layer is decided
+    # by the **path**, so all of these lists are empty. Keeping the third slot of the tuple is
+    # not a formality: a newly added top-level module — one whose plane has not been decided yet
+    # — lands here, and `test_every_module_is_assigned_to_a_layer` demands that it be placed
+    # explicitly.
     #
-    # 目录名 `core` 而不是 `kernel`：包会遮蔽同名的 `kernel.py`，而那是这一层的核心词汇，
-    # 不该为了目录名改名。`commands` 而不是 `cli`：同理，且 `acr.commands.cli:app` 是
-    # console 入口。
+    # The directory is named `core` and not `kernel`: a package would shadow the `kernel.py` of
+    # the same name, and that file is this layer's core vocabulary, which should not be renamed
+    # for the sake of a directory name. `commands` and not `cli`: same reason, and
+    # `acr.commands.cli:app` is the console entry point.
     (0, "core", ()),
     (0, "chartstore", ()),
     (1, "contract", ()),
@@ -73,28 +91,33 @@ LAYERS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
     (5, "usecase", ()),
 )
 
-#: 框架反过来依赖某一个 use case 的边。每条写明哪项工作会删掉它。
-#: 这个清单只能变短 —— 新增一条就是把框架又焊死在肿瘤登记上一次。
+#: Edges where the framework depends back on one particular use case. Each entry names the piece
+#: of work that will delete it. This list may only get shorter — adding a line is welding the
+#: framework onto the tumour registry one more time.
 #:
-#: 空了。原先三条 —— `spec` / `agent` / `run_manifest` 各自 import `icdo3` —— 由动作 C
-#: 一次删掉：`icdo3.py` 换成领域中立的 `code_tables.py`，三个写死的轴变成 `assets/codes/*.yaml`
-#: 里声明的 `axes:`。留着这个空 dict 而不是删掉它，是因为规则还在：下一次有人让框架
-#: import 一个 use case 模块，`test_no_layer_imports_a_higher_one` 会红，而这里是他被迫
-#: 写下理由的地方。
+#: Empty now. There used to be three — `spec` / `agent` / `run_manifest` each importing `icdo3` —
+#: and action C deleted all three at once: `icdo3.py` was replaced by the domain-neutral
+#: `code_tables.py`, and the three hard-coded axes became the `axes:` declared in
+#: `assets/codes/*.yaml`. This empty dict is kept rather than deleted because the rule is still
+#: here: the next time someone makes the framework import a use case module,
+#: `test_no_layer_imports_a_higher_one` goes red, and this is where they are forced to write down
+#: why.
 KNOWN_DOMAIN_COUPLING: dict[tuple[str, str], str] = {}
 
 
-#: 允许被跨平面共享的两层。它们承载的正是"输入输出的形式"：`core` 是 AssetRef /
-#: Trajectory / SignalEnvelope，`contract` 是 spec 与其词表。一个工作平面通过这两层认识
-#: 另一个平面的产物，是设计要求；直接 import 对方的函数，是代码耦合。
+#: The two layers that may be shared across planes. What they carry is exactly "the shape of the
+#: input and the output": `core` is AssetRef / Trajectory / SignalEnvelope, `contract` is the spec
+#: and its vocabulary. A work plane knowing another plane's product through these two layers is a
+#: design requirement; importing the other plane's functions is code coupling.
 SHARED_LAYERS = ("core", "chartstore", "contract")
 
-#: 干活的平面。它们之间**只能**通过 SHARED_LAYERS 的类型和落盘的 artifact 相见。
+#: The work planes. They may meet each other **only** through the types of SHARED_LAYERS and
+#: through artifacts written to disk.
 WORK_LAYERS = ("review", "audit", "evaluation", "diagnosis", "improvement", "authoring",
                "usecase")
 
-#: 今天还存在的直接耦合，以及删掉它的那个动作。键是 (源模块, 目标模块)。
-#: 和 KNOWN_DOMAIN_COUPLING 一样：只能变短。
+#: The direct couplings that still exist today, and the action that deletes each one. The key is
+#: (source module, target module). Same as KNOWN_DOMAIN_COUPLING: it may only get shorter.
 KNOWN_DIRECT_COUPLING: dict[tuple[str, str], str] = {}
 
 
@@ -103,13 +126,16 @@ def _modules() -> dict[str, pathlib.Path]:
             for p in SRC.rglob("*.py") if p.name != "__init__.py"}
 
 
-#: 层名 -> rank。目录搬迁正在进行，所以一个模块的层有两个来源，按这个顺序：
+#: Layer name -> rank. The directory move is in progress, so a module's layer has two sources, in
+#: this order:
 #:
-#:   1. 它的路径 —— `acr/diagnosis/attribution.py` 就在 diagnosis 层，不需要谁去登记；
-#:   2. `LAYERS` 里的显式清单 —— 还没搬进平面目录的那些。
+#:   1. Its path — `acr/diagnosis/attribution.py` is in the diagnosis layer, nobody has to
+#:      register it;
+#:   2. The explicit lists in `LAYERS` — the modules not yet moved into a plane directory.
 #:
-#: 搬迁完成时 `LAYERS` 的模块清单会全部空掉，而这份 rank 表留下：它是那条唯一规则要的
-#: 顺序，也是目录名的权威来源。分片搬迁因此不需要每片都改这个文件。
+#: When the move finishes the module lists in `LAYERS` all go empty, and this rank table stays: it
+#: is the ordering the one rule needs, and it is the authoritative source for the directory names.
+#: A move done in slices therefore does not need to edit this file in every slice.
 PLANE_RANK: dict[str, int] = {name: r for r, name, _ in LAYERS} | {"commands": 6}
 
 
@@ -117,9 +143,9 @@ def _layer_of() -> tuple[dict[str, str], dict[str, int]]:
     plane, rank = {}, {}
     for r, name, names in LAYERS:
         for n in names:
-            assert n not in plane, f"{n} 在 LAYERS 里出现了两次"
+            assert n not in plane, f"{n} appears twice in LAYERS"
             plane[n], rank[n] = name, r
-    for m in _modules():                    # 路径优先：已搬进平面目录的以目录为准
+    for m in _modules():                    # Path wins: once moved into a plane dir, the dir rules
         head = m.split(".")[0]
         if head in PLANE_RANK:
             plane[m], rank[m] = head, PLANE_RANK[head]
@@ -127,10 +153,12 @@ def _layer_of() -> tuple[dict[str, str], dict[str, int]]:
 
 
 def _edges() -> dict[str, set[str]]:
-    """模块 -> 它 import 的其他 acr 模块。函数体内的延迟 import 也算。
+    """Module -> the other acr modules it imports. A deferred import inside a function body counts.
 
-    延迟 import 必须算：`run_manifest` 就是在函数里 import `document_concepts` 的，而那
-    正是分层要管的依赖。只看模块层的 import 会把这一类全部漏掉，然后报告一切正常。
+    Deferred imports have to count: `run_manifest` is exactly the module that imports
+    `document_concepts` from inside a function, and that is precisely the kind of dependency the
+    layering is there to govern. Looking only at module-level imports would miss the whole class of
+    them and then report that everything is fine.
     """
     mods = _modules()
     out: dict[str, set[str]] = collections.defaultdict(set)
@@ -146,71 +174,82 @@ def _edges() -> dict[str, set[str]]:
 
 
 def test_every_module_is_assigned_to_a_layer():
-    """没被分层的模块就是没人说得清它属于哪个平面 —— 那正是这次要消除的状态。
+    """A module with no layer is a module nobody can say which plane it is in — exactly the state
+    this work exists to remove.
 
-    新增一个模块必须同时决定它属于哪一层。这个决定写在 LAYERS 里，而不是留给下一个读
-    目录的人猜。
+    Adding a module means deciding which layer it is in at the same time. That decision is written
+    down in LAYERS, not left for the next person reading the directory tree to guess.
     """
     plane, _ = _layer_of()
     mods = set(_modules())
     unassigned = mods - set(plane)
-    assert not unassigned, f"未分层: {sorted(unassigned)}"
+    assert not unassigned, f"not assigned to a layer: {sorted(unassigned)}"
     stale = set(plane) - mods
-    assert not stale, f"LAYERS 里的模块已不存在: {sorted(stale)}"
+    assert not stale, f"modules listed in LAYERS no longer exist: {sorted(stale)}"
 
 
 def test_no_layer_imports_a_higher_one():
-    """唯一的规则。违反它的每一条都必须先登记在 KNOWN_DOMAIN_COUPLING 里。"""
+    """The one rule. Every violation of it has to be registered in KNOWN_DOMAIN_COUPLING first."""
     plane, rank = _layer_of()
-    # cli 是入口，rank 高于一切，且不许被依赖 —— 后者由下一个测试单独断言。
+    # cli is the entry point: its rank is above everything, and it may not be depended on — the
+    # latter half is asserted separately by the next test.
     bad = []
     for src, targets in _edges().items():
         for dst in targets:
             if rank[src] < rank[dst] and (src, dst) not in KNOWN_DOMAIN_COUPLING:
                 bad.append(f"{plane[src]}/{src} -> {plane[dst]}/{dst}")
     assert not bad, (
-        "低层 import 了高层:\n  " + "\n  ".join(sorted(bad))
-        + "\n\n要么这个模块分错了层，要么这是一处真的倒挂。不要靠往 "
-          "KNOWN_DOMAIN_COUPLING 加一行来消掉它 —— 那个清单只收 usecase 耦合。")
+        "a lower layer imported a higher one:\n  " + "\n  ".join(sorted(bad))
+        + "\n\nEither this module is in the wrong layer, or this is a real inversion. Do not make "
+          "it go away by adding a line to KNOWN_DOMAIN_COUPLING — that list only takes usecase "
+          "couplings.")
 
 
 def test_nothing_depends_on_the_cli():
-    """CLI 是入口。任何一层 import 它，就意味着那层的行为取决于有没有人从命令行进来。"""
+    """The CLI is the entry point. Any layer that imports it makes that layer's behaviour depend on
+    whether someone came in from the command line."""
     def is_cli(m: str) -> bool:
         return m.startswith("commands.")
 
     offenders = [f"{s} -> {t}" for s, ts in _edges().items() for t in ts
                  if is_cli(t) and not is_cli(s)]
-    assert not offenders, f"非 CLI 模块依赖 CLI: {sorted(offenders)}"
+    assert not offenders, f"non-CLI modules depend on the CLI: {sorted(offenders)}"
 
 
 @pytest.mark.parametrize("a,b", [("audit", "evaluation"), ("audit", "diagnosis"),
                                  ("evaluation", "audit"), ("evaluation", "diagnosis"),
                                  ("diagnosis", "audit")])
 def test_the_three_post_run_planes_do_not_depend_on_each_other(a: str, b: str):
-    """三种结论类型不能互相替代，所以也不能互相依赖。
+    """The three kinds of conclusion cannot substitute for one another, so they cannot depend on one
+    another either.
 
-    `diagnosis -> evaluation` 不在参数表里，是唯一被允许的方向：归因需要读确定性评分器
-    才能知道自己在解释哪个错误（README 的原话是"ask the scorer"），这是设计要求的依赖。
-    反过来则不行：evaluation 一旦依赖 diagnosis，"是否正确"就会开始等一个模型的意见。
+    `diagnosis -> evaluation` is absent from the parameter list, and it is the one direction that is
+    allowed: attribution has to read the deterministic scorer in order to know which error it is
+    explaining (the README's own words are "ask the scorer"), and that dependency is a design
+    requirement. The reverse is not: the moment evaluation depends on diagnosis, "is this correct"
+    starts waiting on a model's opinion.
     """
     plane, _ = _layer_of()
     by_plane = {p: {m for m, pl in plane.items() if pl == p} for p in (a, b)}
     edges = _edges()
     offenders = [f"{s} -> {t}" for s in by_plane[a] for t in edges.get(s, ())
                  if t in by_plane[b]]
-    assert not offenders, f"{a} 依赖了 {b}: {sorted(offenders)}"
+    assert not offenders, f"{a} depends on {b}: {sorted(offenders)}"
 
 
 def test_work_planes_touch_each_other_only_through_the_io_contract():
-    """独立模块的判据：平面之间不许直接 import，只准共享 kernel/contract 的类型。
+    """The criterion for an independent module: no direct import between planes, only shared
+    kernel/contract types.
 
-    这比"低层不许 import 高层"严。分层只说明依赖方向合法，不说明耦合方式合法：
-    `derive -> coverage [assign_strata]` 方向没错，但它意味着改 coverage 的一个函数签名会
-    动到 improvement 平面。而 `audit`、`evaluation`、`diagnosis` 读的应该是同一条
-    Trajectory 和同一个 SignalEnvelope —— 那是形式，不是函数。
+    This is stricter than "a lower layer may not import a higher one". Layering only says the
+    direction of a dependency is legal, it says nothing about the form of the coupling being legal:
+    `derive -> coverage [assign_strata]` has the direction right, but it means that changing one
+    function signature in coverage reaches into the improvement plane. Whereas what `audit`,
+    `evaluation` and `diagnosis` should be reading is the same Trajectory and the same
+    SignalEnvelope — that is a shape, not a function.
 
-    每条例外都必须登记，并写明哪个动作删掉它。清单只能变短。
+    Every exception has to be registered, naming the action that deletes it. The list may only get
+    shorter.
     """
     plane, _ = _layer_of()
     work = set(WORK_LAYERS)
@@ -225,58 +264,70 @@ def test_work_planes_touch_each_other_only_through_the_io_contract():
             if (src, dst) not in KNOWN_DIRECT_COUPLING:
                 bad.append(f"{plane[src]}/{src} -> {dp}/{dst}")
     assert not bad, (
-        "工作平面之间出现了新的直接耦合:\n  " + "\n  ".join(sorted(bad))
-        + "\n\n平面之间只应共享 kernel/contract 的类型和落盘 artifact。要么把被依赖的东西"
-          "下移到共享层，要么让调用方读产物而不是调函数。")
+        "a new direct coupling appeared between work planes:\n  " + "\n  ".join(sorted(bad))
+        + "\n\nPlanes should share only kernel/contract types and artifacts written to disk. "
+          "Either move the depended-on thing down into a shared layer, or make the caller read "
+          "the product instead of calling the function.")
 
 
 def test_the_direct_coupling_list_only_shrinks():
-    """登记的耦合必须还在。修好了不删登记项，下一次同样的耦合会搭这个便车。"""
+    """A registered coupling has to still be there. Fixing one without deleting its entry lets the
+    next identical coupling ride in on it."""
     edges = _edges()
     gone = [f"{s} -> {t}" for (s, t) in KNOWN_DIRECT_COUPLING if t not in edges.get(s, ())]
-    assert not gone, f"这些耦合已消失，从 KNOWN_DIRECT_COUPLING 删掉: {sorted(gone)}"
+    assert not gone, (
+        f"these couplings are gone, delete them from KNOWN_DIRECT_COUPLING: {sorted(gone)}")
 
 
 def test_the_declared_work_and_shared_layers_are_real():
-    """守卫上面两条：层名打错会让整条断言静默变成空检查。
+    """Guards the two tests above: a mistyped layer name silently turns a whole assertion into an
+    empty check.
 
-    `plane.get(src) not in work` 对一个拼错的层名永远为真，于是测试通过而什么都没查。
+    `plane.get(src) not in work` is always true for a misspelled layer name, so the test passes
+    having checked nothing.
     """
     declared = {name for _, name, _ in LAYERS} | {"commands"}
     for name in SHARED_LAYERS + WORK_LAYERS:
-        assert name in declared, f"{name!r} 不是 LAYERS 里的层名"
+        assert name in declared, f"{name!r} is not a layer name in LAYERS"
     assert not set(SHARED_LAYERS) & set(WORK_LAYERS)
     assert declared == set(SHARED_LAYERS) | set(WORK_LAYERS) | {"commands"}, (
-        "有层既不共享也不干活 —— 它属于哪一类必须被明确决定")
+        "a layer is neither shared nor a work plane — which of the two it is has to be decided "
+        "explicitly")
 
 
 def test_the_domain_coupling_list_only_shrinks():
-    """登记的每一条都必须是真的还在那里 —— 修好了就要从清单里删掉。
+    """Every registered entry has to genuinely still be there — once it is fixed it comes off the
+    list.
 
-    一个描述早已消失的耦合的豁免项，会让下一次同样的耦合悄悄搭上便车。
+    An exemption describing a coupling that disappeared long ago lets the next identical coupling
+    ride in quietly.
     """
     edges = _edges()
     gone = [f"{s} -> {t}" for (s, t) in KNOWN_DOMAIN_COUPLING if t not in edges.get(s, ())]
     assert not gone, (
-        f"这些耦合已经不存在了，从 KNOWN_DOMAIN_COUPLING 删掉: {sorted(gone)}")
+        f"these couplings no longer exist, delete them from KNOWN_DOMAIN_COUPLING: {sorted(gone)}")
 
 
-#: 临床词。只在**可执行代码**里被禁止，不在散文里 —— 见 `_clinical_hits` 的说明。
+#: Clinical words. Forbidden in **executable code** only, not in prose — see the note on
+#: `_clinical_hits`.
 CLINICAL_WORDS = ("histolog", "topograph", "morpholog", "icdo", "icd-o", "tumour", "tumor",
                   "carcinom", "oncolog", "biopsy", "primary_site", "seer", "ajcc")
 
 
 def _clinical_hits(path: pathlib.Path) -> list[str]:
-    """可执行代码里出现的临床词：标识符名，以及非 docstring 的字符串字面量。
+    """Clinical words occurring in executable code: identifier names, and string literals that are
+    not docstrings.
 
-    整文件 grep 是这条测试的第一版，它红在两处而两处都是假阳性：`kernel.py:3` 的
-    "deliberately knows nothing about tumour registries" 是在**声明**中立，`llm.py` 的
-    docstring 里有一句 `"pathology OR biopsy"` 的示例。两者都不驱动任何行为。
+    A whole-file grep was the first version of this test, and it went red in two places that were
+    both false positives: `kernel.py:3`'s "deliberately knows nothing about tumour registries" is
+    **declaring** neutrality, and `llm.py` has a `"pathology OR biopsy"` example inside a docstring.
+    Neither drives any behaviour.
 
-    这个仓库对领域耦合的标准是 `labelling.py:342` 那条 —— 模板里不许**命名**疾病、器官、
-    文档词表或编码系统，因为"every one of those words was a lie the moment the requirement
-    moved"。会说谎的是代码里的那个名字，不是解释它为什么不在那里的句子。所以查标识符和
-    活的字符串，放过 docstring 与注释（注释根本不进 AST）。
+    This repository's standard for domain coupling is the one at `labelling.py:342` — a template
+    may not **name** a disease, an organ, a document vocabulary or a coding system, because "every
+    one of those words was a lie the moment the requirement moved". What lies is that name in the
+    code, not the sentence explaining why it is not there. So check identifiers and live strings,
+    and let docstrings and comments through (comments never reach the AST at all).
     """
     tree = ast.parse(path.read_text(encoding="utf-8"))
     docstrings = set()
@@ -309,32 +360,36 @@ def _clinical_hits(path: pathlib.Path) -> list[str]:
 
 
 def test_the_core_layer_names_no_clinical_concept():
-    """core 层里 `kernel.py` 的 docstring 说它"deliberately knows nothing about tumour registries"。断言它。
+    """In the core layer, `kernel.py`'s docstring says it "deliberately knows nothing about tumour
+    registries". Assert it.
 
-    只查 core 层，因为这是唯一一层可以要求零领域词的：contract 层会合法地出现字段名，
-    review 层的 prompt 里会出现文档类型。领域中立的完整检查是另一件事，这里只钉最里层 ——
-    一条能通过的窄断言，胜过一条必须靠豁免清单才能通过的宽断言。
+    Only the core layer is checked, because it is the only layer that can be held to zero domain
+    words: the contract layer legitimately carries field names, and the review layer's prompts
+    carry document types. A complete domain-neutrality check is a separate piece of work; this pins
+    the innermost layer only — a narrow assertion that passes beats a broad one that can only pass
+    on the back of an exemption list.
     """
     plane, _ = _layer_of()
     hits = {m: h for m, path in _modules().items()
             if plane.get(m) == "core" and (h := _clinical_hits(path))}
-    assert not hits, f"core 层的可执行代码里出现临床概念: {hits}"
+    assert not hits, f"clinical concepts in the executable code of the core layer: {hits}"
 
 
 def test_the_clinical_word_check_can_actually_fail(tmp_path: pathlib.Path):
-    """守卫上一条：一个只会通过的检查等于没有检查。
+    """Guards the test above: a check that can only pass is not a check.
 
-    两个断言，方向相反 —— 代码里的名字必须被抓到，散文里的同一个词必须被放过。第一版
-    整文件 grep 抓到了后者，所以这里把"放过散文"也钉住，否则修完假阳性之后没有任何东西
-    阻止有人把它改回整文件搜索。
+    Two assertions pointing in opposite directions — a name in the code has to be caught, and the
+    same word in prose has to be let through. The first version's whole-file grep caught the latter,
+    so "prose is let through" is pinned here too; otherwise, once the false positive was fixed,
+    nothing would stop someone changing it back to a whole-file search.
     """
     bad = tmp_path / "bad.py"
     bad.write_text('def f(histology_code):\n    return {"primary_site": histology_code}\n',
                    encoding="utf-8")
-    assert _clinical_hits(bad), "代码里的临床标识符必须被抓到"
+    assert _clinical_hits(bad), "a clinical identifier in code has to be caught"
 
     prose = tmp_path / "prose.py"
     prose.write_text('"""This module knows nothing about tumour registries or biopsy reports."""\n'
                      'def f(x):\n    """Not about histology either."""\n    return x\n',
                      encoding="utf-8")
-    assert not _clinical_hits(prose), "docstring 里的同一个词必须被放过"
+    assert not _clinical_hits(prose), "the same word inside a docstring has to be let through"
