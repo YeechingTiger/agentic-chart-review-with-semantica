@@ -325,6 +325,31 @@ def eval_skills_block(names: Sequence[str], skills_dir: Path | str | None = None
     return "\n".join(parts)
 
 
+def eval_skills_identity(block: str, names: Sequence[str]) -> dict:
+    """The identity of a rendered eval-skills block: which cards, and a hash of what was sent.
+
+    WHAT WAS RECORDED BEFORE was `eval_skills_bytes` — a byte count. Two entirely different card
+    sets of equal length are indistinguishable by it, and a card edited in place very often does not
+    change its length at all. That is the same defect `prompt_assets` was added to fix, in the
+    diagnosis plane: content that reaches a model with no record of which content it was.
+
+    It matters here specifically because `attribute meta-certify` scores these diagnoses against
+    human adjudications. "Which method produced this causal judgement" is the first thing that
+    comparison needs, and a length cannot answer it.
+
+    TAKES THE RENDERED BLOCK, never the names alone. Rendering a second time here would put two
+    renders between the prompt and the record, and one `skills_dir` disagreement would then make the
+    manifest describe text no model ever read.
+
+    An empty hash for no cards, not the hash of an empty string: "no method was loaded" and "a
+    method was loaded and it rendered to nothing" are different facts about a diagnosis.
+    """
+    import hashlib
+    return {"names": list(names), "n_cards": len(names), "n_chars": len(block),
+            "content_hash": (hashlib.sha256(block.encode("utf-8")).hexdigest()[:16]
+                             if block else "")}
+
+
 def skills_block(stack: SkillStack, skills_dir: Path | str | None = None) -> str:
     """Render the stack for the system prompt, in slot order.
 

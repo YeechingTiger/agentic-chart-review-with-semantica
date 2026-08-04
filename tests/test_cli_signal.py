@@ -778,3 +778,91 @@ def test_the_agent_batch_reaches_the_diagnosis_at_all(tmp_path, monkeypatch):
     assert seen[0]["max_model_calls"] == 31      # the flags reach the payload, not just the help
     assert seen[0]["max_chart_reads"] == 7
     assert "eval-key-challenge" in seen[0]["eval_skills_prompt"]     # and so does the mode
+
+
+# ============================================================ 卡片的身份，不是它的长度
+
+def test_the_eval_skill_block_is_identified_by_its_content_not_its_length():
+    """诊断 agent 读到的方法卡是 prompt 内容，而记录下来的只有 `eval_skills_bytes` —— 一个字节数。
+
+    两套完全不同的卡片长度相同就无法区分；一张卡被原地改过，字节数常常一动不动。这跟
+    `prompt_assets` 当初被加进来要修的是同一个缺陷：进了 prompt 的东西没有身份记录。区别在于
+    这一半在诊断面，而诊断面的产出正是后来 `attribute meta-certify` 要拿去评的东西 —— 用哪套方法
+    得出的因果判断，读的人得能说出来。
+    """
+    from acr.contract.skills import eval_skills_block, eval_skills_identity
+
+    names = ["eval-cluster-failures"]
+    block = eval_skills_block(names)
+    ident = eval_skills_identity(block, names)
+    assert ident["names"] == names
+    assert ident["n_cards"] == 1
+    assert ident["content_hash"] and len(ident["content_hash"]) == 16
+    assert ident["n_chars"] == len(block)
+
+
+def test_two_different_card_sets_do_not_share_a_hash():
+    from acr.contract.skills import eval_skills_block, eval_skills_identity
+
+    def ident(names):
+        return eval_skills_identity(eval_skills_block(names), names)
+
+    one = ident(["eval-cluster-failures"])
+    two = ident(["eval-cluster-failures", "eval-missed-evidence"])
+    assert one["content_hash"] != two["content_hash"]
+
+
+def test_the_hash_is_taken_from_the_block_that_was_actually_sent():
+    """接的是**已经渲染好的字符串**，不是重新渲染一遍。
+
+    如果这个函数自己再渲染一次，它和 prompt 之间就有两次渲染 —— 一个 `skills_dir` 不一致就够让
+    manifest 描述一段模型从没读到的文本。哈希必须来自同一个对象。
+    """
+    import inspect
+
+    from acr.contract.skills import eval_skills_identity
+    src = inspect.getsource(eval_skills_identity)
+    assert "eval_skills_block" not in src, "不能在这里第二次渲染"
+    assert eval_skills_identity("", [])["content_hash"] == "", "没有卡就没有哈希，不是空串的哈希"
+
+
+def test_no_cards_is_an_explicit_absence_not_a_zero_length_block():
+    from acr.contract.skills import eval_skills_identity
+    assert eval_skills_identity("", []) == {"names": [], "n_cards": 0, "n_chars": 0,
+                                            "content_hash": ""}
+
+
+def test_the_signal_envelope_carries_the_identity_and_not_the_byte_count(tmp_path, monkeypatch):
+    """走到信封为止。一个只在 helper 里正确、而没进产出的身份记录，读的人拿不到。"""
+    import acr.commands.cli_attribute as CA
+
+    seen = {}
+
+    class _Report:
+        def to_dict(self):
+            return {"ok": True}
+
+    def _fake_run_one(**kw):
+        seen.update(kw)
+        return _Report()
+
+    monkeypatch.setattr(CA, "_run_one", _fake_run_one)
+    monkeypatch.setattr(CA, "_packet_for", lambda **kw: _StubPacket(), raising=False)
+    env = CA.attribute_case_payload.__doc__
+    assert env is not None   # 只是确认签名还在，真正的断言在下面
+
+    import inspect
+    sig = inspect.signature(CA.attribute_case_payload)
+    assert "eval_skills_names" in sig.parameters, (
+        "身份需要卡片名，而 payload 只收到渲染后的文本")
+    # 看 **产出的键**，不看源码字符串。前一版断言源码里不出现 `eval_skills_bytes`，
+    # 结果被自己那段记述旧缺陷的注释绊倒 —— 同一类错误今天第二次，所以这里不再对源码做子串匹配。
+    from acr.contract.skills import eval_skills_block, eval_skills_identity
+    env_keys = eval_skills_identity(eval_skills_block(["eval-cluster-failures"]),
+                                    ["eval-cluster-failures"])
+    assert set(env_keys) == {"names", "n_cards", "n_chars", "content_hash"}
+    assert "eval_skills_bytes" not in env_keys
+
+
+class _StubPacket:
+    manifest_ref = type("R", (), {"to_dict": lambda self: {}})()

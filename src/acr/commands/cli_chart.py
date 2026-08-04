@@ -77,6 +77,29 @@ PRIOR = typer.Option(
          "off is the baseline arm and produces a byte-identical prompt.")
 
 
+PLANNER = typer.Option(
+    "", "--planner",
+    help="where the run STARTS looking: `spec-strata` (the contract's hand-written strata and "
+         "declared keywords — a supplied prior) or `patient-inventory` (every type this patient has, "
+         "no keywords — the absence of one). Empty means whatever --runtime-profile chooses, which "
+         "is what every run recorded before 2026-08-04 used. Split out because the profile moved "
+         "this AND whether coverage is enforced, so no arm could attribute a result to either.")
+
+
+def _planner(value: str) -> str:
+    """Validated here, before any model call, so a typo costs nothing.
+
+    A bad `--planner` reaching `run_patient` would raise mid-run on the first patient of a batch,
+    after the run directory exists and a trace has been opened — the shape of failure `preflight` was
+    added to `tools/run_ladder.py` to end.
+    """
+    from ..review.agent import PLANNERS
+    if value and value not in PLANNERS:
+        raise typer.BadParameter(f"unknown planner {value!r}; one of {list(PLANNERS)}, "
+                                 f"or leave it empty to take the runtime profile's choice")
+    return value
+
+
 def _load_prior(path: str):
     """A prior, or None. Refuses a path that does not load rather than running without one.
 
@@ -154,6 +177,7 @@ def run(
     out: str = typer.Option("runs", "--out"),
     site_mapping: str = SITE_MAPPING,
     prior: str = PRIOR,
+    planner: str = PLANNER,
     temperature: float = typer.Option(1.0, "--temperature"),
     seed: int = typer.Option(1234, "--seed",
                              help="validation-sampling seed; fix it to make two runs comparable"),
@@ -196,6 +220,7 @@ def run(
     sp = load_spec(spec)
     mapping = _load_site_mapping(sp, site_mapping)
     prior_asset = _load_prior(prior)
+    pl = _planner(planner)
     stack = _skill_stack(runtime_profile, skills)
     c = Corpus(Path(corpus))
     ch = c.chart(patient)
@@ -210,7 +235,7 @@ def run(
                          model=chat, max_model_calls=max_steps, seed=seed,
                          max_usd=max_usd, runtime_profile=runtime_profile,
                          skill_stack=stack, site_mapping=mapping,
-                         retrieval_prior=prior_asset))
+                         retrieval_prior=prior_asset, planner=pl))
         return
 
     from ..review.conflict_refinement import run_conflict_refinement
@@ -268,6 +293,7 @@ def batch(
     out: str = typer.Option("runs", "--out"),
     site_mapping: str = SITE_MAPPING,
     prior: str = PRIOR,
+    planner: str = PLANNER,
 ):
     """Run one spec across many patients.
 
@@ -279,6 +305,7 @@ def batch(
     sp = load_spec(spec)
     mapping = _load_site_mapping(sp, site_mapping)
     prior_asset = _load_prior(prior)
+    pl = _planner(planner)
     stack = _skill_stack(runtime_profile, skills)
     c = Corpus(Path(corpus))
     pids = [p.strip() for p in patients_arg.split(",") if p.strip()] or c.patient_ids()
@@ -293,7 +320,7 @@ def batch(
                                        max_usd=max_usd,
                                        runtime_profile=runtime_profile,
                                        skill_stack=stack, site_mapping=mapping,
-                                       retrieval_prior=prior_asset))
+                                       retrieval_prior=prior_asset, planner=pl))
         except Exception as e:  # noqa: BLE001
             con.print(f"[red]{pid} failed: {e}[/]")
             results.append({"patient_id": pid, "error": str(e)})
@@ -333,6 +360,7 @@ def consistency(
     out: str = typer.Option("runs", "--out"),
     site_mapping: str = SITE_MAPPING,
     prior: str = PRIOR,
+    planner: str = PLANNER,
 ):
     """Run the same spec N times to measure SELF-consistency.
 
@@ -344,6 +372,7 @@ def consistency(
     sp = load_spec(spec)
     mapping = _load_site_mapping(sp, site_mapping)
     prior_asset = _load_prior(prior)
+    pl = _planner(planner)
     c = Corpus(Path(corpus))
     stack = _skill_stack(runtime_profile, skills)
     run_dir = cli_common.unique_run_dir(out)
@@ -354,7 +383,7 @@ def consistency(
                         max_model_calls=max_steps, seed=seed, run_id=f"{patient}__c{i}",
                         max_usd=max_usd, runtime_profile=runtime_profile,
                         skill_stack=stack, site_mapping=mapping,
-                        retrieval_prior=prior_asset)
+                        retrieval_prior=prior_asset, planner=pl)
         outs.append(r)
         con.print(f"  run {i+1}/{n}: {r['answer'].get('status')} "
                   f"{json.dumps(r['answer'].get('value', {}), ensure_ascii=False)}")

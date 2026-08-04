@@ -1405,6 +1405,41 @@ def plan_from_spec(spec, chart, mapping=None) -> CoveragePlan:
             p.rationale[t] = "matched no stratum; unjudged defaults to search, not to junk"
     return p
 
+#: What actually has to move for the planner axis to be worth an arm. `source` and `rationale`
+#: differ on EVERY spec — they are labels naming which planner ran — so counting them would report
+#: every axis live and the check below would be worthless.
+_PLAN_SURFACE = ("read_all", "search", "sample", "keywords", "initial_keywords")
+
+
+def planner_axis_is_live(spec, chart) -> dict:
+    """Whether `spec-strata` and `patient-inventory` differ on THIS contract, and in what.
+
+    MEASURED AND IT MATTERS: `plan_from_spec` degenerates when a contract declares no strata — every
+    document type falls to `search`, which is precisely what `plan_from_patient_inventory` produces.
+    On `STORE.390.date_of_initial_diagnosis` the two plans differ only in the `source` label and the
+    per-type `rationale` prose. The retrieval surface is identical.
+
+    Every ladder and floor run in this tree used STORE.390. So `tools/run_floor.py`'s "prior versus
+    floor" arms — whose stated claim is that the spec's hand-written plan is a supplied prior worth
+    falsifying — compared two behaviourally identical plans, and the whole measured difference came
+    from the policy half of `--runtime-profile`: coverage activation and the spec view. Splitting the
+    flag was necessary and is not sufficient; a driver that spends $108 on an axis with nothing to
+    vary has bought nothing, so the drivers ask this before they spend.
+    """
+    a, b = plan_from_spec(spec, chart).to_dict(), plan_from_patient_inventory(spec, chart).to_dict()
+    differs = [k for k in _PLAN_SURFACE if sorted(a.get(k) or []) != sorted(b.get(k) or [])]
+    return {
+        "live": bool(differs),
+        "differs_in": differs,
+        "why": ("the two planners produce different retrieval surfaces on this contract"
+                if differs else
+                "this contract declares no strata and no keywords, so `plan_from_spec` sends every "
+                "document type to `search` — the same surface `plan_from_patient_inventory` builds. "
+                "Only the `source` label and the per-type `rationale` differ, and an arm that varies "
+                "a label measures nothing."),
+    }
+
+
 def plan_from_patient_inventory(spec, chart) -> CoveragePlan:
     """An unbiased retrieval surface for the guideline-only experiment.
 

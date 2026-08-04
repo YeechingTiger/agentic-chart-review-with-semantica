@@ -85,3 +85,103 @@ def test_the_tactic_arms_cover_every_tactic_card_in_the_tree():
     on_disk = {p.name for p in (site.skills_root()).iterdir()
                if p.name.startswith("tactic-")}
     assert set(ladder._TACTICS) == on_disk, "the tactic ladder and the tree disagree"
+
+
+# ============================================================ 花钱之前得先说清楚花多少
+
+@pytest.fixture(scope="module")
+def budget():
+    return _load("_driver_budget")
+
+
+def test_the_ceiling_is_reported_in_the_unit_it_actually_is(budget):
+    """`--max-usd` 是 `acr batch` 的 **单次运行** 上限,梯子把它印成 `$3.00/arm`。
+
+    27 张图一条臂,所以那条 `--dry-run` 的行把最坏情况少报了 27 倍。这不是排版问题:
+    `--dry-run` 存在的唯一理由就是"先看要花多少再决定跑不跑",而它给出的数字是真实上限的 1/27。
+    """
+    r = budget.budget_report(n_arms=7, n_charts=27, max_usd_per_run=3.0)
+    assert r["runs"] == 189
+    assert r["per_run_ceiling_usd"] == 3.0
+    assert r["worst_case_usd"] == 567.0, "7 臂 × 27 图 × $3 单次上限"
+
+
+def test_the_line_names_both_numbers_and_which_is_which(budget):
+    """只印总额会被读成"已经定了要花这么多";只印单次上限就是原来的缺陷。两个都印,并说明单位。"""
+    line = budget.budget_line(budget.budget_report(n_arms=2, n_charts=18, max_usd_per_run=3.0))
+    assert "$3.00" in line and "per run" in line
+    assert "$108.00" in line and "worst case" in line
+    assert "36 run" in line
+
+
+def test_a_single_run_is_not_pluralised_into_a_worse_number(budget):
+    r = budget.budget_report(n_arms=1, n_charts=1, max_usd_per_run=0.5)
+    assert r["worst_case_usd"] == 0.5
+
+
+def test_both_drivers_print_the_bound_not_the_per_run_ceiling(ladder, capsys, monkeypatch):
+    """两个脚本各自算一遍,就是两个对"这要花多少"的答案,而其中一个已经错过一次。
+
+    看的是 **输出**,不是源码。第一版这条测试断言源码里不出现 `/arm` —— 结果它被自己那段
+    解释旧缺陷的注释绊倒了。一个对源码做子串匹配的守卫,会把对缺陷的记述当成缺陷本身。
+    """
+    # `run_floor` 返回 2(它对着 STORE.390 拒绝一条 INERT 的 planner 轴),`run_ladder` 返回 0。
+    # 这条测试问的是预算那一行,所以只看输出,不看返回码 —— 返回码有它自己的测试。
+    for mod in (_load("run_floor"), ladder):
+        monkeypatch.setattr(mod.subprocess, "run", lambda *a, **k: _Probe())
+        mod.main(["--dry-run", "--max-usd", "3.0", "--patients", "SYN0001,SYN0002,SYN0003"])
+        out = capsys.readouterr().out
+        assert "$3.00 per run" in out, f"{mod.__name__} 没说清单位"
+        assert "worst case" in out, f"{mod.__name__} 没给出上限"
+        assert "/arm" not in out, f"{mod.__name__} 还在把单次上限印成每臂上限"
+
+
+# ============================================================ --help 不能开始花钱
+
+def test_run_floor_parses_its_arguments_before_doing_anything():
+    """`run_floor.py` 没有 argparse。`python tools/run_floor.py --help` 会忽略这个参数,
+    直接启动 36 次真实的 batch —— 一个想弄清楚脚本怎么用的人会为此付钱。
+
+    返回 2 而不是 0,因为它当场发现了一件更要紧的事:见下一条。
+    """
+    floor = _load("run_floor")
+    assert floor.main(["--dry-run"]) == 2
+
+
+def test_run_floor_refuses_an_inert_planner_axis(capsys):
+    """它的表头说"两条臂,一个变量:runtime profile" —— 而 STORE.390 一个 stratum 都没声明,
+    所以 `plan_from_spec` 把每个类型都送进 `search`,和 `plan_from_patient_inventory` 一模一样。
+
+    这条脚本的整个主张是"spec 手写的计划是一个值得被证伪的先验"。在这份契约上它不是变量:
+    两条臂差的只有 coverage 政策和 spec 视图。$108 买不到关于计划的任何一个字,所以这里拒绝,
+    而不是加一行警告 —— 警告会被读一次,然后变成输出格式的一部分。
+    """
+    floor = _load("run_floor")
+    assert floor.main(["--dry-run"]) == 2
+    out = capsys.readouterr().out
+    assert "INERT" in out and "Refusing" in out
+
+
+def test_run_floor_dry_run_spawns_no_subprocess(monkeypatch):
+    """"不花钱"这件事要被证明,不是被声明。原来的脚本连一个可以打桩的边界都没有。"""
+    floor = _load("run_floor")
+    calls = []
+    monkeypatch.setattr(floor.subprocess, "run",
+                        lambda *a, **k: calls.append(a) or _Probe())
+    # 在 INERT 拒绝之前就返回,所以连 `--help` 探针都还没跑到 —— 这正是要证明的:
+    # 拒绝发生在花钱之前,而且发生在任何子进程之前。
+    assert floor.main(["--dry-run"]) == 2
+    assert calls == []
+
+
+class _Probe:
+    returncode = 0
+    stdout = "--patients"
+    stderr = ""
+
+
+def test_run_floor_still_refuses_an_arm_whose_profile_does_not_exist():
+    """把守卫证伪一次:preflight 不是恒真的。"""
+    floor = _load("run_floor")
+    with pytest.raises(Exception):
+        floor.preflight([("bogus", "no-such-runtime-profile")])

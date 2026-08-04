@@ -43,8 +43,11 @@ import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-from acr.contract.skills import SkillStack, parse_skill_stack
+from _driver_budget import budget_line, budget_report  # noqa: E402
+
+from acr.contract.skills import SkillStack, parse_skill_stack  # noqa: E402
 
 SPEC = "assets/specs/STORE.390.date_of_initial_diagnosis.yaml"
 
@@ -149,12 +152,17 @@ def preflight(arms: list[tuple[str, str]]) -> list[tuple[str, SkillStack]]:
     return out
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--group", default="policy", choices=[*GROUPS, "all"])
     ap.add_argument("--dry-run", action="store_true",
                     help="validate every arm and print what would run; spend nothing")
-    ap.add_argument("--max-usd", type=float, default=3.0, help="per arm")
+    # PER RUN, which is what it always was: `cli_common.MAX_USD` is "priced per-run ceiling in USD".
+    # This said "per arm" and the line below printed `$3.00/arm`, so `--dry-run` on the 27-chart
+    # cohort understated the bound 27-fold — in the one output whose only purpose is to let somebody
+    # decide whether to spend the money.
+    ap.add_argument("--max-usd", type=float, default=3.0,
+                    help="PER RUN. The worst case for the whole invocation is arms x charts x this.")
     ap.add_argument("--patients", default=PATIENTS)
     #: `batch` runs each chart ONCE, so a repeat is a separate seed and a separate output root.
     #: One root per seed rather than one directory per (arm, seed) cell, because `analyze_arms`
@@ -162,15 +170,23 @@ def main() -> int:
     #: ladder, and an effect whose ranking flips between them is noise wearing a result's
     #: clothes. Do not average them into one number without saying you did.
     ap.add_argument("--seed", type=int, default=1234)
-    args = ap.parse_args()
+    #: THE CONFOUND, now nameable. `--runtime-profile` selects the initial retrieval plan AND
+    #: whether coverage is active from the first model call, so every arm this ladder has ever run
+    #: varied "better plan" and "stricter policy" together. Empty keeps the profile's choice, which
+    #: is what every recorded run used; setting it holds the plan fixed while the policy moves.
+    ap.add_argument("--planner", default="", choices=["", "spec-strata", "patient-inventory"],
+                    help="empty means whatever RUNTIME_PROFILE chooses")
+    args = ap.parse_args(argv)
 
     arms = arms_for(args.group)
     resolved = preflight(arms)
     n_charts = len(args.patients.split(","))
     print(f"group={args.group}  arms={len(arms)}  charts={n_charts}  seed={args.seed}  "
-          f"profile={RUNTIME_PROFILE}  ceiling=${args.max_usd:.2f}/arm")
+          f"profile={RUNTIME_PROFILE}  planner={args.planner or '(the profile decides)'}")
     for name, stack in resolved:
         print(f"  {name:<22} {', '.join(stack.names()) or '(base only)'}")
+    print(budget_line(budget_report(n_arms=len(arms), n_charts=n_charts,
+                                    max_usd_per_run=args.max_usd)))
     if args.dry_run:
         # AND the subcommand resolves. An arm table that validates perfectly is still useless
         # if the command it is handed to does not exist.
@@ -197,6 +213,7 @@ def main() -> int:
              "--spec", SPEC, "--runtime-profile", RUNTIME_PROFILE,
              "--skills", clause, "--patients", args.patients,
              "--seed", str(args.seed), "--max-usd", str(args.max_usd),
+             *(["--planner", args.planner] if args.planner else []),
              "--out", str(out_root / name)],
             cwd=ROOT, capture_output=True, text=True, check=False,
             env={**os.environ, "PYTHONPATH": "src"})

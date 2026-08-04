@@ -5,11 +5,13 @@ import hashlib
 import hmac
 import json
 import secrets
+from collections.abc import Sequence
 from pathlib import Path
 
 import typer
 from rich.table import Table
 
+from ..contract.skills import eval_skills_identity
 from ..core import cli_common, site
 from ..core.cli_common import API_BASE, CORPUS, MODEL, con
 
@@ -182,6 +184,10 @@ def attribute_case_payload(*, run: str, spec: str, case_id: str,
                            min_term_chars: int, max_rejection_repeats: int,
                            token_band: str, turn_band: str,
                            gold: str = "", eval_skills_prompt: str = "",
+                           #: The card NAMES behind `eval_skills_prompt`. Needed because
+                           #: the envelope has to say WHICH method produced a diagnosis,
+                           #: and a rendered block cannot be read back into its card list.
+                           eval_skills_names: Sequence[str] = (),
                            signal_type: str = "ATTRIBUTION_REPORT",
                            mode: str = "", registry_reference: str = "", case_map: str = "",
                            corpus: str = str(site.corpus_root()), model: str | None = None,
@@ -234,7 +240,12 @@ def attribute_case_payload(*, run: str, spec: str, case_id: str,
     )
     return {"schema": "acr.signal/1", "signal_type": signal_type, "kind": "agent",
             "run": run, "spec": spec, "deterministic": False,
-            "eval_skills_bytes": len(eval_skills_prompt.encode("utf-8")),
+            # THE IDENTITY, not the length. `eval_skills_bytes` was a byte count: two
+            # different card sets of equal length were indistinguishable, and a card edited
+            # in place usually keeps its length. `attribute meta-certify` scores these
+            # diagnoses against human adjudications, and "which method produced this causal
+            # judgement" is the first thing that comparison needs.
+            "eval_skills": eval_skills_identity(eval_skills_prompt, eval_skills_names),
             "report": report.to_dict(),
             # The library path the command prints. Returned rather than printed because a
             # dispatcher writing to stdout in the middle of building a JSON envelope is how

@@ -469,3 +469,97 @@ def test_cli_split_measure_evolve_certify_adopt(tmp_path, spec_path, lab):
     assert "verdict: supports" in run("certify", *base, "--out", str(cert))
     assert "adopted" in run("adopt", "--spec", str(spec_path), "--cert", str(cert))
     load_spec(spec_path)
+
+
+# ------------------------------------------------------- the answer-leak check has a caller now
+
+def test_the_answer_leak_check_reaches_the_command(tmp_path):
+    """IMPLEMENTED AND INERT. `certify(gold_values=...)` is the one check the negative control
+    provably cannot perform — a term that IS the answer points at it on every dev case, so
+    shuffling the labels genuinely destroys it and the permutation test PASSES it — and
+    `cmd_certify` never passed a key, so no invocation of the CLI could ever run it.
+
+    `AnswerLeaked`'s own docstring says the term is "worthless on test, where nobody supplies the
+    answer". That is the whole failure mode of a dev-set search, and it had no caller.
+    """
+    import inspect
+
+    import typer
+    sig = inspect.signature(A.cmd_certify)
+    p = sig.parameters["answer_key"]
+    assert p.default is not inspect.Parameter.empty
+    assert isinstance(p.default, typer.models.OptionInfo)
+
+
+def test_the_key_is_folded_to_the_field_under_development(tmp_path):
+    """One field per certification, so a term is compared against the answers it could leak.
+
+    Folding every field's values together would flag a `histology` term for rendering some
+    patient's `primary_site`, which is a different variable and not a leak in this asset.
+    """
+    key = {"P1__S": {"fields": {"histology": "8140", "primary_site": "C341"}},
+           "P2__S": {"fields": {"histology": None}},
+           "P3": {"fields": {}}}
+    got = A.gold_values_for(key, field="histology")
+    assert got == {"P1__S": ["8140"]}, (
+        "None means abstention is correct and there is no value to leak; a case with no entry for "
+        "this field says nothing about it")
+
+
+def test_a_key_that_says_nothing_about_this_field_refuses_rather_than_examining_nothing():
+    """A CHECK THAT CANNOT FIRE MUST SAY SO. The operator passed `--answer-key` to turn this on;
+    silently certifying with an empty comparison would report a clean leak check that never looked,
+    which is the shape `verify_mechanisms` exists to find."""
+    with pytest.raises(A.AssetDevelopmentError, match="answer key"):
+        A.gold_values_for({"P1__S": {"fields": {"primary_site": "C341"}}}, field="histology",
+                          require=True)
+
+
+def test_the_check_reads_the_candidates_own_terms(plan, lab, split):
+    """IT READ `evolution.final.keywords`, AND `final` IS A `Metrics`.
+
+    So the block would have raised `AttributeError` the first time it executed — and it never
+    executed, because no caller passed a key. "Implemented" was worth nothing: the check was broken
+    behind a guard nothing satisfied, and only wiring a caller could reveal that.
+    """
+    ev = A.evolve(plan, lab, split, kind=A.KEYWORDS)
+    if ev.candidate is None:
+        pytest.skip("this labelling accepted no move; the leak check sits after that refusal")
+    assert not hasattr(ev.final, "keywords"), "the old expression's target does not exist"
+    assert A.candidate_terms(ev.candidate), "the candidate is where the proposed terms are"
+
+
+def test_a_strata_move_has_no_terms_to_leak():
+    """`value` is `(doc_type, stratum)` pairs. Comparing those against gold values would find
+    nothing while looking like a check that ran."""
+    c = A.Candidate(kind=A.STRATA, field_name=FIELD, stratum="searched", element="e",
+                    value=(("Path-Report", "can_establish"),))
+    assert A.candidate_terms(c) == []
+
+
+def test_a_leaking_term_is_refused_and_the_control_would_not_have_caught_it(plan, lab, split):
+    """The end-to-end property, on the real refusal path. The permutation control PASSES this term:
+    it points at the answer on every dev case, so shuffling the labels genuinely destroys it."""
+    ev = A.evolve(plan, lab, split, kind=A.KEYWORDS)
+    if ev.candidate is None:
+        pytest.skip("this labelling accepted no move; the leak check sits after that refusal")
+    terms = A.candidate_terms(ev.candidate)
+    if not terms:
+        pytest.skip("no terms to leak")
+    with pytest.raises(A.AnswerLeaked, match="does not transfer"):
+        A.certify(ev, lab, split, model=lab.model, gold_values={"P1": [terms[0]]})
+
+
+def test_a_clean_key_does_not_refuse(plan, lab, split):
+    """The guard has to be falsifiable: a key whose values no term renders must certify or fail for
+    some other stated reason, never for a leak."""
+    ev = A.evolve(plan, lab, split, kind=A.KEYWORDS)
+    if ev.candidate is None:
+        pytest.skip("no move")
+    try:
+        A.certify(ev, lab, split, model=lab.model,
+                  gold_values={"P1": ["20991231"]}, today="2026-07-27")
+    except A.AnswerLeaked:
+        raise AssertionError("a date no term contains is not a leak") from None
+    except A.AssetDevelopmentError:
+        pass          # the negative control may still refuse; that is a different verdict

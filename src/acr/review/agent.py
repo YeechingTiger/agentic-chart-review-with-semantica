@@ -94,6 +94,43 @@ from .run_manifest import (
 #: rule, not about which functions happen to exist.
 READ_TOOLS = ("read_document", "read_documents_batch")
 
+#: WHERE A RUN STARTS LOOKING, as its own axis. Named rather than branched, because the name is what
+#: an arm records and what a reader compares.
+#:
+#:   spec-strata        the spec's hand-written strata projected onto this chart: document types
+#:                      sorted into read_all / search / sample, plus the declared keywords. A
+#:                      SUPPLIED PRIOR about where to look — `plan_from_spec`'s own docstring calls
+#:                      it "the arm the develop plane wants to falsify".
+#:   patient-inventory  every document type this patient has, no keywords, no type-to-concept
+#:                      mapping. The ABSENCE of that prior, which is what a baseline measures.
+#:
+#: These were selected by `starts_with_coverage_assets(runtime_profile)` — the same predicate that
+#: decides whether COVERAGE IS ENFORCED from the first model call. So one flag moved a supplied prior
+#: and an enforcement policy together, and every arm this repo has run varied both. See
+#: `tests/test_the_planner_is_its_own_axis.py`.
+PLANNERS = ("spec-strata", "patient-inventory")
+
+
+def resolve_planner(planner: str, runtime_profile: str) -> tuple[str, str]:
+    """`(name, provenance)`. `""` means whatever the profile chooses, which is the default.
+
+    The default HAS to reproduce the profile's choice exactly: every run recorded before this axis
+    existed took it, and a default that differed would make each of those baselines unreproducible
+    while the manifests still claimed the same profile.
+
+    `provenance` is recorded beside the name on the `seed_provenance` precedent. A reader who cannot
+    tell an explicit choice from an inherited default cannot tell a reproduced arm from a shopped
+    one — and cannot tell whether a later edit to a profile's default silently moved an old arm.
+    """
+    from .runtime_profiles import starts_with_coverage_assets
+    if not planner:
+        return ("spec-strata" if starts_with_coverage_assets(runtime_profile)
+                else "patient-inventory"), "runtime_profile"
+    if planner not in PLANNERS:
+        raise ValueError(f"unknown planner {planner!r}; one of {list(PLANNERS)}")
+    return planner, "explicit"
+
+
 #: Every `run_patient` parameter that DEFINES THE ARM, and the manifest key it reaches
 #: `experiment_config_hash` through. `tests/test_every_arm_switch_reaches_the_arm_hash.py` fails when
 #: a parameter is in neither this dict nor `WITHIN_ARM_PARAMETERS`.
@@ -112,6 +149,10 @@ ARM_PARAMETERS: dict[str, str] = {
     "seed": "sample_seed",
     "max_usd": "max_usd",
     "runtime_profile": "runtime_profile_ref",          # and runtime_profile_hash
+    # SPLIT OUT OF `runtime_profile` on 2026-08-04. It selects the initial retrieval plan and
+    # nothing else; coverage activation, the runtime policy's positive terms and the spec view stay
+    # on the profile. Folding any of those back in would rebuild the confound under a new name.
+    "planner": "planner",
     "skill_stack": "prompt_assets.skills",
     "retrieval_prior": "prompt_assets.retrieval_prior",
     "site_mapping": "prompt_assets.site_mapping",
@@ -950,7 +991,12 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
                      # `experiment_config_hash` could not tell their arms from the baseline. See
                      # `ARM_PARAMETERS`. `task_context` is the text already appended to
                      # `system_prompt` by the caller; only its hash is recorded.
-                     site_mapping=None, task_context: str = "") -> dict:
+                     site_mapping=None, task_context: str = "",
+                     # `(name, provenance)` from `resolve_planner`, resolved by the caller because
+                     # the caller is where the profile is known. Recorded, not re-derived: a manifest
+                     # that reconstructed this from the profile would be back to reporting one flag
+                     # for two decisions.
+                     planner_record: tuple[str, str] | None = None) -> dict:
     """One patient, one spec, through the library's graph. Returns the manifest."""
     from ..contract.answer_contract import (
         NO_COVERAGE_CLAIM,
@@ -1172,6 +1218,19 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         "runtime_policy_plan": (
             runtime_policy_plan.to_dict() if runtime_policy_plan is not None else None
         ),
+        # WHERE THIS RUN STARTED LOOKING, and whether anybody chose it. Until 2026-08-04 this was
+        # a consequence of `runtime_profile_ref` and appeared in no field, so a reader comparing two
+        # arms could not tell a supplied retrieval prior from an enforced coverage policy — the two
+        # moved on one flag. `provenance` is the `seed_provenance` precedent: an inherited default
+        # and a pinned choice are the same plan and different arms, because a later edit to the
+        # profile's default moves one of them and not the other.
+        "planner": {
+            "name": (planner_record or ("spec-strata", "runtime_profile"))[0],
+            "provenance": (planner_record or ("spec-strata", "runtime_profile"))[1],
+            "runtime_profile": (
+                runtime_profile_asset.module_id if runtime_profile_asset is not None
+                else "current-stratified-coverage"),
+        },
         "spec_id": spec.spec_id, "spec_hash": spec.spec_hash,
         # WHAT THE MODEL WAS SHOWN, hashed. `spec_hash` and `runtime_profile_hash` covered the
         # contract and the policy; they did not cover the three blocks added to the prompt on
@@ -1334,6 +1393,10 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         "spec_hash": manifest["spec_hash"],
         "runtime_profile_ref": manifest.get("runtime_profile_ref"),
         "runtime_profile_hash": manifest.get("runtime_profile_hash"),
+        # The whole block, provenance included. Two runs with the same plan where one pinned it and
+        # one inherited it are not one arm: a later edit to the profile's default moves only the
+        # second, so a comparison that treated them as identical would silently span two plans.
+        "planner": manifest["planner"],
         # Covers skills, the retrieval prior, the tool surface, the value domain, the site mapping
         # and the additional task context — every block rendered into the prompt or the plan.
         "prompt_assets": manifest["prompt_assets"],
@@ -1552,6 +1615,9 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
                 ctx_out: list | None = None, max_usd: float = 5.0,
                 additional_task_context: str = "",
                 runtime_profile: str = "current-stratified-coverage",
+                #: `""` = whatever `runtime_profile` chooses, which is what every recorded run took.
+                #: See `PLANNERS` for why this is no longer part of that flag.
+                planner: str = "",
                 case: CaseContext | None = None,
                 skill_stack=None,
                 site_mapping=None,
@@ -1636,11 +1702,14 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
     toolbox = Toolbox(chart, evidence, coverage,
                       known_doc_types=corpus.doc_type_vocabulary(), spec=spec)
     coverage_plan = plan_from_spec(spec, chart, site_mapping)
-    plan = (
-        coverage_plan
-        if starts_with_coverage_assets(runtime_profile_asset.ref)
-        else plan_from_patient_inventory(spec, chart)
-    )
+    # WHICH PLAN THE RUN STARTS FROM, as its own decision. This read
+    # `starts_with_coverage_assets(profile)` — the same predicate three lines down that decides
+    # whether coverage is ENFORCED — so a supplied retrieval prior and an enforcement policy moved
+    # as one flag and no arm could attribute a result to either. `""` reproduces the profile's
+    # choice exactly, which is what every recorded run took.
+    planner_name, planner_provenance = resolve_planner(planner, runtime_profile)
+    plan = (coverage_plan if planner_name == "spec-strata"
+            else plan_from_patient_inventory(spec, chart))
     coverage_state = {
         "active": bool(starts_with_coverage_assets(runtime_profile_asset.ref)),
         "reason": (
@@ -1762,6 +1831,7 @@ def run_patient(*, spec, corpus, patient_id: str, out_dir, model, max_model_call
         # hash is the only form of it that belongs in an artifact written beside patient output.
         site_mapping=site_mapping,
         task_context=additional_task_context,
+        planner_record=(planner_name, planner_provenance),
         seed_record={"effective": seed, "provenance": "caller_supplied",
                      "caller_supplied": True},
         runtime_profile_asset=runtime_profile_asset,

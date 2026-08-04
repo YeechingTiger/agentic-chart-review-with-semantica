@@ -33,7 +33,7 @@ import json
 import os
 import random
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, fields, replace
 from datetime import date
 from pathlib import Path
@@ -43,6 +43,7 @@ import typer
 import yaml
 
 from ..contract.spec import ProvenanceRecord, load_spec
+from .answer_leak import leaking_terms
 
 DEV, TEST = "dev", "test"
 AssetKind = Literal["keywords", "strata"]
@@ -854,6 +855,67 @@ def _negative_control(evolution: Evolution, labelling: Labelling, split: Split, 
                            _held_out_gain(evolution, labelling, split, test_notes), tuple(gains))
 
 
+def candidate_terms(candidate: Candidate) -> list[str]:
+    """The terms this candidate would put into the spec, flat. Empty for a non-keyword move.
+
+    THE CANDIDATE, not the starting plan. The leak check asks whether the move being certified
+    renders a development answer; the incumbent spec's own keywords are neither derived here nor
+    what this certification is about, and flagging them would refuse every certification against a
+    contract whose hand-written terms happen to be distinctive.
+
+    A `strata` move's `value` is `(doc_type, stratum)` pairs — a document-type assignment cannot be
+    an answer literal, so there is nothing to leak and this returns nothing rather than comparing
+    tuples against gold values, which is the shape of a check that cannot fail.
+    """
+    if candidate.kind != KEYWORDS:
+        return []
+    out: list[str] = []
+    for item in candidate.value:
+        if isinstance(item, str):
+            out.append(item)
+        elif isinstance(item, (tuple, list)):
+            # `(stratum, terms)` pairs, which is how a keyword list is carried elsewhere.
+            out.extend(str(t) for t in item[-1] if isinstance(item[-1], (tuple, list)))
+    return [t for t in out if t]
+
+
+def gold_values_for(answer_key: Mapping[str, Any], *, field: str,
+                    require: bool = False) -> dict[str, list[str]]:
+    """`{case: [gold value]}` for ONE field, from the file `acr eval score --answer-key` takes.
+
+    ONE FIELD, because a leak is relative to the variable being developed. Folding every field's
+    values together would refuse a `histology` term for rendering some patient's `primary_site` —
+    a different variable, and not something that term could be leaking here.
+
+    `None` is dropped. In this format `None` asserts that ABSTENTION is the correct answer, so
+    there is no value for a term to render; and a case carrying no entry for this field says
+    nothing about it either way.
+
+    `require=True` refuses an empty result. The operator passed `--answer-key` in order to turn this
+    check on, and certifying with an empty comparison would report a clean answer-leak check that
+    never looked at anything — a check that cannot fire, which is what `verify_mechanisms` exists to
+    catch elsewhere in this tree.
+    """
+    out: dict[str, list[str]] = {}
+    for case, row in (answer_key or {}).items():
+        if not isinstance(row, Mapping):
+            continue
+        fields = row.get("fields")
+        if not isinstance(fields, Mapping) or field not in fields:
+            continue
+        v = fields.get(field)
+        if v is None or not str(v).strip():
+            continue
+        out[str(case)] = [str(v).strip()]
+    if require and not out:
+        raise AssetDevelopmentError(
+            f"the answer key says nothing about {field!r}: no case carries a value for it, so the "
+            f"answer-leak check would examine nothing and pass. Either this key is for another "
+            f"variable, or every case in it asserts that abstention is correct. Drop --answer-key "
+            f"to certify without the check — it will say that it did not run.")
+    return out
+
+
 def certify(evolution: Evolution, labelling: Labelling, split: Split, *, model: str,
             on: str = TEST, spec_id: str = "", today: str | None = None,
             gold_values: dict[str, list] | None = None) -> Certification:
@@ -867,27 +929,28 @@ def certify(evolution: Evolution, labelling: Labelling, split: Split, *, model: 
     search on permuted labels and comparing held-out gains. A caller who wants numbers without
     that comparison is not certifying anything, and `measure()` will give them the numbers.
     """
-    # BEFORE the negative control, because it is the one failure that control cannot see: a term
-    # that IS the answer survives permutation honestly. Optional only so that a caller without a
-    # key can still certify; supplying one and having it leak is a refusal, not a note.
-    if gold_values:
-        from .answer_leak import leaking_terms
-        # `keywords` is (stratum, terms) pairs, not a flat list — flattened here, because
-        # passing the pairs would compare tuples against gold values and silently find
-        # nothing, which is the shape of a check that cannot fail.
-        terms = [t for _, group in evolution.final.keywords for t in group]
-        leaks = leaking_terms(terms=terms, gold_values=gold_values)
-        if leaks:
-            raise AnswerLeaked(
-                "derived terms render development answers, so their dev-set gain does not "
-                "transfer: " + "; ".join(str(x) for x in leaks[:5])
-                + (f" (+{len(leaks) - 5} more)" if len(leaks) > 5 else ""))
-
     test_notes = _guards(evolution, labelling, split, on)
     if evolution.candidate is None:
         raise AssetDevelopmentError("the evolution accepted no move, so there is nothing to "
                                     "certify. The incumbent asset stands — a real and reportable "
                                     "outcome. Record it; do not certify an empty change.")
+
+    # BEFORE the negative control, because it is the one failure that control cannot see: a term
+    # that IS the answer survives permutation honestly. Optional only so that a caller without a
+    # key can still certify; supplying one and having it leak is a refusal, not a note.
+    #
+    # THIS BLOCK READ `evolution.final.keywords`, AND `final` IS A `Metrics`. It would have raised
+    # `AttributeError: 'Metrics' object has no attribute 'keywords'` the first time it ran — and it
+    # never ran, because `cmd_certify` passed no key until 2026-08-04. Not merely inert: broken
+    # behind a guard nothing satisfied, which is why "implemented" was never worth anything here.
+    if gold_values:
+        leaks = leaking_terms(terms=candidate_terms(evolution.candidate),
+                              gold_values=gold_values)
+        if leaks:
+            raise AnswerLeaked(
+                "derived terms render development answers, so their dev-set gain does not "
+                "transfer: " + "; ".join(str(x) for x in leaks[:5])
+                + (f" (+{len(leaks) - 5} more)" if len(leaks) > 5 else ""))
     control = _negative_control(evolution, labelling, split, on, test_notes)
     if not control.passed:
         raise NegativeControlFailed(
@@ -1127,11 +1190,35 @@ def cmd_evolve(spec: str = _SPEC, field: str = _FIELD, labelling: str = _LAB, sp
 def cmd_certify(spec: str = _SPEC, field: str = _FIELD, labelling: str = _LAB,
                 split: str = _SPLIT, kind: str = _KIND, stratum: str = _STRAT,
                 cost_weight: float = _WEIGHT,
+                answer_key: str = typer.Option(
+                    "", "--answer-key",
+                    help="the file `acr eval score --answer-key` takes. Turns on the ANSWER-LEAK "
+                         "check, which the negative control provably cannot perform: a term that "
+                         "IS the answer points at it on every dev case, so shuffling the labels "
+                         "genuinely destroys it and the permutation test passes it. Without this "
+                         "the check does not run and the certificate says so."),
                 out: str = typer.Option(..., "--out", help="certificate JSON to write")):
     """Rerun the dev search, control it against shuffled labels, score it ONCE on the test half."""
     s, plan, lab, sp = _inputs(spec, field, labelling, split)
+    # BEFORE the search, so a key for the wrong variable costs nothing. `require=True`: an operator
+    # who passed the flag asked for the check, and a check that examines nothing must refuse rather
+    # than report a clean result.
+    gold = None
+    if answer_key:
+        path = Path(answer_key).expanduser()
+        if not path.is_file():
+            raise typer.BadParameter(f"no answer key at {path}")
+        try:
+            gold = gold_values_for(json.loads(path.read_text(encoding="utf-8")),
+                                   field=field, require=True)
+        except (json.JSONDecodeError, AssetDevelopmentError) as e:
+            raise typer.BadParameter(str(e)) from e
     ev = evolve(plan, lab, sp, kind=kind, stratum=stratum, cost_weight=cost_weight)
-    cert = certify(ev, lab, sp, model=lab.model, spec_id=s.spec_id)
+    cert = certify(ev, lab, sp, model=lab.model, spec_id=s.spec_id, gold_values=gold)
+    # STATED EITHER WAY. A certificate whose answer-leak check did not run and one whose check
+    # passed are different claims, and only the first is a reason to go and find a key.
+    typer.echo(f"answer-leak check: {f'ran over {len(gold)} keyed case(s)' if gold else
+               'NOT RUN — pass --answer-key. The negative control cannot substitute for it.'}")
     _write(Path(out), json.dumps(cert.to_dict(), indent=1) + "\n")
     typer.echo(_line("dev", cert.dev))
     typer.echo(_line("TEST (held out)", cert.test))

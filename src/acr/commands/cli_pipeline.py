@@ -54,7 +54,7 @@ from ..evaluation.explain import (
     scaffold_explanation,
     side_input_record,
 )
-from .cli_chart import PRIOR, SITE_MAPPING
+from .cli_chart import PLANNER, PRIOR, SITE_MAPPING, _planner
 
 pipeline_app = typer.Typer(add_completion=False)
 
@@ -197,6 +197,7 @@ def extract(
     out: str = typer.Option("runs", "--out"),
     site_mapping: str = SITE_MAPPING,
     prior: str = PRIOR,
+    planner: str = PLANNER,
     dry_run: bool = typer.Option(False, "--dry-run",
                                  help="resolve, plan and cost the work without calling a model"),
 ):
@@ -266,7 +267,8 @@ def extract(
                     max_model_calls=max_steps, seed=seed or 1234,
                     run_id=f"{pid}__{sid}", max_usd=max_usd,
                     runtime_profile=runtime_profile, skill_stack=stack,
-                    site_mapping=mapping, retrieval_prior=prior_asset)
+                    site_mapping=mapping, retrieval_prior=prior_asset,
+                    planner=_planner(planner))
             except Exception as e:  # noqa: BLE001
                 # One patient failing must not silently shrink the cohort: the row survives,
                 # carries the error, and the command exits non-zero at the end.

@@ -357,7 +357,7 @@ def _agent_signal(*, run: str, spec: str, gold: str, case_id: str,
                   max_model_calls: int = DEFAULT_AGENT_MODEL_CALLS,
                   max_chart_reads: int = DEFAULT_AGENT_CHART_READS) -> dict:
     """The diagnostic agent over one run. Provider imports live here, not at module scope."""
-    from ..contract.skills import SkillError, eval_skills_block
+    from ..contract.skills import SkillError, eval_skills_block, eval_skills_identity
 
     try:
         # Validates slot and `judges` before spending. A card that is not `slot: eval` is an
@@ -369,10 +369,16 @@ def _agent_signal(*, run: str, spec: str, gold: str, case_id: str,
     # To stderr, not stdout. An agent run takes minutes and an operator deserves to see what
     # method was loaded before it starts, but stdout is the envelope and a progress line in the
     # middle of it is how machine-readable output stops being machine-readable.
-    _err.print(f"[dim]{len(eval_skills)} eval skills, {len(block.encode('utf-8'))} bytes[/]")
+    # The IDENTITY on the progress line too, not a byte count. An operator watching a
+    # multi-minute agent run should see which method it loaded, and the same value the
+    # envelope records — so a diagnosis in a library can be matched to the line that
+    # announced it.
+    ident = eval_skills_identity(block, list(eval_skills))
+    _err.print(f"[dim]{ident['n_cards']} eval skill(s) {ident['names']}, content {ident['content_hash'] or '(none)'}[/]")
     from .cli_attribute import attribute_case_payload
     return attribute_case_payload(
         run=run, spec=spec, gold=gold, case_id=case_id, eval_skills_prompt=block,
+        eval_skills_names=list(eval_skills),
         signal_type=SIGNAL_TYPE_FOR_KIND["agent"], case_map=case_map, local_root=local_root,
         # PASSED, not left to be derived. `cli_attribute` falls back to
         # `mode or (GOLD if gold else BLIND)`, so an unset mode turns the mere presence of
