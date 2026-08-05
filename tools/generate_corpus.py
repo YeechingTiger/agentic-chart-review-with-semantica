@@ -174,6 +174,16 @@ class Blueprint:
     #: value -> why it loses, as a CODE from `REJECTION_CODES`. Prose cannot be compared across
     #: charts, and which KIND of rejection a reasoner gets wrong is the question worth asking.
     gold_rejections: dict = field(default_factory=dict)
+    #: WHICH CONFLICT RULES APPLIED, per a human reader, keyed spec_id -> rule_id. The denominator for
+    #: `rule_assessment`'s `not_considered` column: four rules over twenty-seven charts means most
+    #: rules genuinely do not apply to most charts, so that state is only a finding when gold says the
+    #: rule applied. Absent is NOT "inapplicable" — `rule_gold.missed_rules` counts positive claims
+    #: only, so an unannotated chart contributes to no denominator.
+    #:
+    #: Declared HERE because this generator is the single source of `_ground_truth.json`. Annotating
+    #: the JSON directly would have been wiped by the next regeneration, silently, which is the class
+    #: of loss the corpus's determinism otherwise protects against.
+    rule_gold: dict = field(default_factory=dict)
     #: What the answerability axis should say, kept apart from the values by construction.
     gold_answerability: str = "VALUE_AVAILABLE"
     #: `clear` / `competing` / `no_answer`. The `clear` stratum is where false competition is
@@ -242,6 +252,15 @@ BLUEPRINTS = [
         tissue=True, recurrence_type="00", recurrence_date="",
         imaging=["Chest-CT-W-Contr", "PET-CT-Skull-Base-Thigh"],
         notes="Exercises the [390] cytology-vs-pathology boundary case and a clean 00 (disease-free, no recurrence).",
+        rule_gold={"STORE.390.date_of_initial_diagnosis": {"conflict_rule.1": {
+            "applicable": True,
+            "applicability_evidence":
+                "Cytology 2023-04-12 read as 'suspicious for adenocarcinoma' precedes the "
+                "confirmatory core biopsy of 2023-04-27, so the ambiguous-cytology rules are in play.",
+            "discriminating_fact_truth": {"impression_at_ambiguous_cytology": True},
+            "discriminator_evidence":
+                "an oncology note of the same admission records a clinical impression of malignancy",
+            "answer_changes_if_fact_flips": True}}},
     ),
     Blueprint(
         pid="SYN0002", pattern="evidence gap — biopsy performed at outside hospital",
@@ -479,6 +498,16 @@ BLUEPRINTS = [
         candidate_stratum="competing",
         gold_candidates=('20220309', '20220214'),
         gold_rejections={'20220214': 'AMBIGUOUS_CYTOLOGY_UNSUPPORTED'}, index_date="20220309",
+        rule_gold={"STORE.390.date_of_initial_diagnosis": {"conflict_rule.2": {
+            "applicable": True,
+            "applicability_evidence":
+                "Cytology of 2022-02-14 is ambiguous ('suspicious for') and precedes the "
+                "confirmatory biopsy of 2022-03-09.",
+            "discriminating_fact_truth": {"impression_at_ambiguous_cytology": False},
+            "discriminator_evidence":
+                "no physician's clinical impression of cancer accompanies the cytology; recorded "
+                "in gold_rejections as AMBIGUOUS_CYTOLOGY_UNSUPPORTED for 20220214",
+            "answer_changes_if_fact_flips": True}}},
         dx_date_why=("Cytology of 2022-02-14 is ambiguous ('suspicious for') and NO physician's "
                      "clinical impression of cancer accompanies it, so STORE.390's second "
                      "conflict_rule applies and the biopsy date governs."),
@@ -1868,6 +1897,7 @@ def build_patient(bp: Blueprint, out_root: Path) -> dict:
         # analyser reads as "exclude from the candidate metrics" rather than as zero.
         "candidate_stratum": bp.candidate_stratum,
         "gold_candidates": list(bp.gold_candidates),
+        "rule_gold": {k: dict(v) for k, v in (bp.rule_gold or {}).items()},
         "gold_rejections": dict(bp.gold_rejections),
         "gold_answerability": bp.gold_answerability,
         "designer_notes": bp.notes,

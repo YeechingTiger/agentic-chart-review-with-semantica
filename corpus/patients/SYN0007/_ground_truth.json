@@ -5,6 +5,7 @@
   "gold_candidates": [
     "20200917"
   ],
+  "rule_gold": {},
   "gold_rejections": {},
   "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "STORE [523] boundary case: 'Code 3 if any malignant invasion is present, no matter how limited.' The prose says intraductal (which reads in situ) but reports focal invasion.",

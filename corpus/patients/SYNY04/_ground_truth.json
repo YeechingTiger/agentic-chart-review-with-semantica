@@ -5,6 +5,7 @@
   "gold_candidates": [
     "20191099"
   ],
+  "rule_gold": {},
   "gold_rejections": {},
   "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "The contract's third boundary case is this exact shape ('diagnosed in the spring of 2010' -> 20100499) and no chart has ever produced one, so the season table has been rendered into every prompt for weeks and applied to nothing. The flags are the second half: a run that answers 20191099 and leaves all three false has given a date it invented two components of and said it read them.",

@@ -4,6 +4,19 @@
     "evidence_pattern": "tissue-confirmed; cytology precedes pathology",
     "candidate_stratum": "",
     "gold_candidates": [],
+    "rule_gold": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "conflict_rule.1": {
+          "applicable": true,
+          "applicability_evidence": "Cytology 2023-04-12 read as 'suspicious for adenocarcinoma' precedes the confirmatory core biopsy of 2023-04-27, so the ambiguous-cytology rules are in play.",
+          "discriminating_fact_truth": {
+            "impression_at_ambiguous_cytology": true
+          },
+          "discriminator_evidence": "an oncology note of the same admission records a clinical impression of malignancy",
+          "answer_changes_if_fact_flips": true
+        }
+      }
+    },
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "Exercises the [390] cytology-vs-pathology boundary case and a clean 00 (disease-free, no recurrence).",
@@ -60,6 +73,7 @@
     "gold_candidates": [
       "20220906"
     ],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "Histology must come back EVIDENCE_INSUFFICIENT: the diagnosis is asserted in prose but the confirming pathology was done elsewhere and is not in the record. Recurrence status is genuinely unknown (99), not 00.",
@@ -116,6 +130,7 @@
     "gold_candidates": [
       "20210118"
     ],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "Distant metastasis at diagnosis -> STORE [1880] code 70 (never disease-free). An agent that codes 00 here is wrong: there was never a disease-free interval.",
@@ -170,6 +185,7 @@
     "evidence_pattern": "documented recurrence after a disease-free interval",
     "candidate_stratum": "",
     "gold_candidates": [],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "Requires the agent to establish BOTH (a) a disease-free interval and (b) the later pulmonary recurrence. Distant recurrence in lung only -> 52.",
@@ -226,6 +242,7 @@
     "gold_candidates": [
       "20240220"
     ],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "Behavior must be 2, not 3. Tests that the agent reads the behavior off the pathology wording rather than defaulting to invasive.",
@@ -280,6 +297,7 @@
     "evidence_pattern": "patient declined biopsy \u2014 radiographic diagnosis only",
     "candidate_stratum": "",
     "gold_candidates": [],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "Second evidence-gap probe with a different mechanism (patient refusal, documented in prose).",
@@ -336,6 +354,7 @@
     "gold_candidates": [
       "20200917"
     ],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "STORE [523] boundary case: 'Code 3 if any malignant invasion is present, no matter how limited.' The prose says intraductal (which reads in situ) but reports focal invasion.",
@@ -390,6 +409,7 @@
     "evidence_pattern": "conflicting notes \u2014 consult contradicts the imaging impression",
     "candidate_stratum": "",
     "gold_candidates": [],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "Oncology consult claims 'CT shows liver metastases' while the CT IMPRESSION explicitly says no hepatic lesions. Tests conflict handling and whether the agent cites the primary report over the downstream restatement.",
@@ -444,6 +464,7 @@
     "evidence_pattern": "interior follow-up gap; genuinely no recurrence",
     "candidate_stratum": "",
     "gold_candidates": [],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "Two-year hole in the middle of surveillance. Nothing recurred, but the chart cannot show that. Must be Unknown (99).",
@@ -503,6 +524,7 @@
     "evidence_pattern": "interior follow-up gap; recurrence happened elsewhere during it",
     "candidate_stratum": "",
     "gold_candidates": [],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "Same shape as SYN0009, but the patient recurred during the hole and was treated at another hospital. NOTHING about that appears here. Also Unknown (99) \u2014 and an implementation that distinguishes it from SYN0009 is cheating.",
@@ -564,6 +586,7 @@
     "gold_candidates": [
       "20190222"
     ],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "ACCEPTANCE TEST for the clipping fix. Surveillance is clean, then the patient simply stops coming. Everything after last contact is out of scope, NOT a gap. Must yield a valid negative with through_date = last contact. A one-size 'reject every empty window' implementation fails this.",
@@ -624,6 +647,7 @@
     "evidence_pattern": "follow-up truncated; recurrence documented BEFORE truncation",
     "candidate_stratum": "",
     "gold_candidates": [],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "NEGATIVE CONTROL for SYN0011. Same truncation, but a hepatic recurrence is plainly documented before it. Clipping must narrow the claim's SCOPE without touching the VERDICT inside that scope \u2014 so this must report the recurrence, not abstain and not say 00. Without this case, an implementation that waves through every truncated record would pass SYN0011.",
@@ -686,6 +710,7 @@
       "20190312",
       "20210608"
     ],
+    "rule_gold": {},
     "gold_rejections": {
       "20210608": "SUPERSEDED_BY_EARLIER"
     },
@@ -746,6 +771,7 @@
     "evidence_pattern": "first-course treatment precedes any documented diagnosis",
     "candidate_stratum": "",
     "gold_candidates": [],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "The pathology of 2020-06-20 is the obvious answer and it is WRONG. The infusion record carries no narrative impression \u2014 it is an administration, under Procedure-Note \u2014 so a run that searches diagnostic vocabulary cannot reach it and must instead have swept the document inventory by type.",
@@ -807,6 +833,19 @@
       "20220309",
       "20220214"
     ],
+    "rule_gold": {
+      "STORE.390.date_of_initial_diagnosis": {
+        "conflict_rule.2": {
+          "applicable": true,
+          "applicability_evidence": "Cytology of 2022-02-14 is ambiguous ('suspicious for') and precedes the confirmatory biopsy of 2022-03-09.",
+          "discriminating_fact_truth": {
+            "impression_at_ambiguous_cytology": false
+          },
+          "discriminator_evidence": "no physician's clinical impression of cancer accompanies the cytology; recorded in gold_rejections as AMBIGUOUS_CYTOLOGY_UNSUPPORTED for 20220214",
+          "answer_changes_if_fact_flips": true
+        }
+      }
+    },
     "gold_rejections": {
       "20220214": "AMBIGUOUS_CYTOLOGY_UNSUPPORTED"
     },
@@ -867,6 +906,7 @@
     "evidence_pattern": "pathology deferred to an addendum filed under another type",
     "candidate_stratum": "",
     "gold_candidates": [],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "P05's 8046 error given somewhere further to go. The deferred report is the only Surgical-Pathology-Report in the chart, so an arm that sweeps the pathology type finds a document that answers nothing; the addendum is filed under Surgical-Pathology-Document three weeks later. Following the words 'SEE ADDENDUM' is the only cheap route, which is what thread-chasing is for.",
@@ -928,6 +968,7 @@
       "20181107",
       "20190215"
     ],
+    "rule_gold": {},
     "gold_rejections": {
       "20190215": "SUPERSEDED_BY_EARLIER"
     },
@@ -988,6 +1029,7 @@
     "evidence_pattern": "the diagnosis exists only in dictation shorthand",
     "candidate_stratum": "",
     "gold_candidates": [],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "No full word appears anywhere: not adenocarcinoma, not carcinoma, not malignant, not diagnosis. A run searching the contract's own vocabulary comes back empty and concludes the chart is silent. 'adeno' hits and 'adenocarcinoma' does not, which is precisely the shorter-stem move the policy-reactive card advises \u2014 so this chart tests whether that advice is followed rather than merely rendered.",
@@ -1046,6 +1088,7 @@
     "evidence_pattern": "the key rests on an outside report that is not in this chart",
     "candidate_stratum": "",
     "gold_candidates": [],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "The key is CORRECT and unreachable. The only in-chart reference is a transfer note saying the biopsy was done elsewhere in March. An agent that answers EVIDENCE_INSUFFICIENT has read the chart correctly and will be scored as having missed \u2014 and an evaluation that calls that an agent error is teaching it to produce dates it cannot support.",
@@ -1111,6 +1154,7 @@
     "evidence_pattern": "the key is a transcription error \u2014 no document carries that date",
     "candidate_stratum": "",
     "gold_candidates": [],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "The agent is right and the key is wrong. This is the cheapest dispute to detect and the one most worth detecting automatically: the key names a date on which the chart holds NO DOCUMENT AT ALL, which is decidable without reading a word of clinical text. An evaluation that cannot catch this one will not catch any.",
@@ -1176,6 +1220,7 @@
     "evidence_pattern": "two defensible readings \u2014 the chart itself does not settle it",
     "candidate_stratum": "",
     "gold_candidates": [],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "NEITHER SIDE IS WRONG, and that is what makes it a control. STORE.390 counts 'a pathology or cytology report whose interpretation establishes the diagnosis' and separately discounts 'cytology carrying only an ambiguous term'. POSITIVE FOR MALIGNANT CELLS is not ambiguous, so the first clause reaches it; but the conflict_rules are written around the ambiguous case and say nothing here. Without this chart an evaluation can score full marks by calling every disagreement a defect, which is the same failure as calling none of them one.",
@@ -1246,6 +1291,7 @@
     "gold_candidates": [
       "20220419"
     ],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "No tissue was ever obtained and no oncology referral was completed, so there is nothing earlier to find. A run that reads the decline notes and stops returns EVIDENCE_INSUFFICIENT and is wrong by one document \u2014 one whose type appears nowhere else in the corpus, so no type prior can point at it.",
@@ -1306,6 +1352,7 @@
     "gold_candidates": [
       "20159999"
     ],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "THE CHART THE `20999999` DEFECT NEEDED. Two E4 runs put 99 in the YEAR slot because decision_rule[5] orders an approximation and no field could record that one had been made; the value space now can, and nothing tested it. Note which flags are true: the year was approximated, the month and day are simply not recorded \u2014 a distinction one boolean could not make, and the reason there are three. The hard anchor is in a claims feed, which is a source class a run reading only clinical note types never opens.",
@@ -1374,6 +1421,7 @@
       "20200401",
       "20200410"
     ],
+    "rule_gold": {},
     "gold_rejections": {
       "20200326": "NONQUALIFYING_RADIOLOGY",
       "20200401": "SUPERSEDED_BY_EARLIER",
@@ -1438,6 +1486,7 @@
     "gold_candidates": [
       "20191099"
     ],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "VALUE_AVAILABLE",
     "designer_notes": "The contract's third boundary case is this exact shape ('diagnosed in the spring of 2010' -> 20100499) and no chart has ever produced one, so the season table has been rendered into every prompt for weeks and applied to nothing. The flags are the second half: a run that answers 20191099 and leaves all three false has given a date it invented two components of and said it read them.",
@@ -1501,6 +1550,7 @@
     "evidence_pattern": "the record begins after the diagnosis and never says when",
     "candidate_stratum": "no_answer",
     "gold_candidates": [],
+    "rule_gold": {},
     "gold_rejections": {},
     "gold_answerability": "CORPUS_INSUFFICIENT",
     "designer_notes": "THE FIRST CHART WHOSE CORRECT ANSWER IS AN ABSTENTION. CORPUS_INSUFFICIENT was declared in the contract and offered by the tool with no chart that could ever score it right, so the status could only ever be measured as a mistake. It is also the control for the opposite error: a smoke run on 2026-08-02 returned CORPUS_INSUFFICIENT on SYNX06, where the answer was present in dictation shorthand \u2014 a retrieval failure presenting as a fact about the corpus. Neither direction is measurable without a chart on each side. THAT OBSERVATION IS WHY THE GAP WAS NOTICED; the trap itself is derived from the contract's own abstention block, and no card's behaviour shaped it.",
@@ -1562,6 +1612,7 @@
       "20221115",
       "20221008"
     ],
+    "rule_gold": {},
     "gold_rejections": {
       "20221008": "NONQUALIFYING_RADIOLOGY"
     },

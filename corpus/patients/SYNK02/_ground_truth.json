@@ -3,6 +3,7 @@
   "evidence_pattern": "the key is a transcription error \u2014 no document carries that date",
   "candidate_stratum": "",
   "gold_candidates": [],
+  "rule_gold": {},
   "gold_rejections": {},
   "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "The agent is right and the key is wrong. This is the cheapest dispute to detect and the one most worth detecting automatically: the key names a date on which the chart holds NO DOCUMENT AT ALL, which is decidable without reading a word of clinical text. An evaluation that cannot catch this one will not catch any.",

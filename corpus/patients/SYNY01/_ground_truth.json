@@ -5,6 +5,7 @@
   "gold_candidates": [
     "20220419"
   ],
+  "rule_gold": {},
   "gold_rejections": {},
   "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "No tissue was ever obtained and no oncology referral was completed, so there is nothing earlier to find. A run that reads the decline notes and stops returns EVIDENCE_INSUFFICIENT and is wrong by one document \u2014 one whose type appears nowhere else in the corpus, so no type prior can point at it.",

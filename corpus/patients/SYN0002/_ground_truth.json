@@ -5,6 +5,7 @@
   "gold_candidates": [
     "20220906"
   ],
+  "rule_gold": {},
   "gold_rejections": {},
   "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "Histology must come back EVIDENCE_INSUFFICIENT: the diagnosis is asserted in prose but the confirming pathology was done elsewhere and is not in the record. Recurrence status is genuinely unknown (99), not 00.",

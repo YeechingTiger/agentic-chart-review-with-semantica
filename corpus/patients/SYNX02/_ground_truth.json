@@ -3,6 +3,7 @@
   "evidence_pattern": "first-course treatment precedes any documented diagnosis",
   "candidate_stratum": "",
   "gold_candidates": [],
+  "rule_gold": {},
   "gold_rejections": {},
   "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "The pathology of 2020-06-20 is the obvious answer and it is WRONG. The infusion record carries no narrative impression \u2014 it is an administration, under Procedure-Note \u2014 so a run that searches diagnostic vocabulary cannot reach it and must instead have swept the document inventory by type.",

@@ -3,6 +3,19 @@
   "evidence_pattern": "tissue-confirmed; cytology precedes pathology",
   "candidate_stratum": "",
   "gold_candidates": [],
+  "rule_gold": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "conflict_rule.1": {
+        "applicable": true,
+        "applicability_evidence": "Cytology 2023-04-12 read as 'suspicious for adenocarcinoma' precedes the confirmatory core biopsy of 2023-04-27, so the ambiguous-cytology rules are in play.",
+        "discriminating_fact_truth": {
+          "impression_at_ambiguous_cytology": true
+        },
+        "discriminator_evidence": "an oncology note of the same admission records a clinical impression of malignancy",
+        "answer_changes_if_fact_flips": true
+      }
+    }
+  },
   "gold_rejections": {},
   "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "Exercises the [390] cytology-vs-pathology boundary case and a clean 00 (disease-free, no recurrence).",

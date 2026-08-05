@@ -8,6 +8,7 @@
     "20200401",
     "20200410"
   ],
+  "rule_gold": {},
   "gold_rejections": {
     "20200326": "NONQUALIFYING_RADIOLOGY",
     "20200401": "SUPERSEDED_BY_EARLIER",

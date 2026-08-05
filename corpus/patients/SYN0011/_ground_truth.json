@@ -5,6 +5,7 @@
   "gold_candidates": [
     "20190222"
   ],
+  "rule_gold": {},
   "gold_rejections": {},
   "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "ACCEPTANCE TEST for the clipping fix. Surveillance is clean, then the patient simply stops coming. Everything after last contact is out of scope, NOT a gap. Must yield a valid negative with through_date = last contact. A one-size 'reject every empty window' implementation fails this.",

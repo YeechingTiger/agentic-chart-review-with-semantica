@@ -5,6 +5,7 @@
   "gold_candidates": [
     "20210118"
   ],
+  "rule_gold": {},
   "gold_rejections": {},
   "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "Distant metastasis at diagnosis -> STORE [1880] code 70 (never disease-free). An agent that codes 00 here is wrong: there was never a disease-free interval.",

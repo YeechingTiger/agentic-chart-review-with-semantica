@@ -3,6 +3,7 @@
   "evidence_pattern": "the diagnosis exists only in dictation shorthand",
   "candidate_stratum": "",
   "gold_candidates": [],
+  "rule_gold": {},
   "gold_rejections": {},
   "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "No full word appears anywhere: not adenocarcinoma, not carcinoma, not malignant, not diagnosis. A run searching the contract's own vocabulary comes back empty and concludes the chart is silent. 'adeno' hits and 'adenocarcinoma' does not, which is precisely the shorter-stem move the policy-reactive card advises \u2014 so this chart tests whether that advice is followed rather than merely rendered.",

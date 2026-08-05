@@ -3,6 +3,7 @@
   "evidence_pattern": "the key rests on an outside report that is not in this chart",
   "candidate_stratum": "",
   "gold_candidates": [],
+  "rule_gold": {},
   "gold_rejections": {},
   "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "The key is CORRECT and unreachable. The only in-chart reference is a transfer note saying the biopsy was done elsewhere in March. An agent that answers EVIDENCE_INSUFFICIENT has read the chart correctly and will be scored as having missed \u2014 and an evaluation that calls that an agent error is teaching it to produce dates it cannot support.",

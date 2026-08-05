@@ -3,6 +3,7 @@
   "evidence_pattern": "documented recurrence after a disease-free interval",
   "candidate_stratum": "",
   "gold_candidates": [],
+  "rule_gold": {},
   "gold_rejections": {},
   "gold_answerability": "VALUE_AVAILABLE",
   "designer_notes": "Requires the agent to establish BOTH (a) a disease-free interval and (b) the later pulmonary recurrence. Distant recurrence in lung only -> 52.",

@@ -6,6 +6,7 @@
     "20181107",
     "20190215"
   ],
+  "rule_gold": {},
   "gold_rejections": {
     "20190215": "SUPERSEDED_BY_EARLIER"
   },

@@ -6,6 +6,7 @@
     "20221115",
     "20221008"
   ],
+  "rule_gold": {},
   "gold_rejections": {
     "20221008": "NONQUALIFYING_RADIOLOGY"
   },

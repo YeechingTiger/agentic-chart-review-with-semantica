@@ -6,6 +6,19 @@
     "20220309",
     "20220214"
   ],
+  "rule_gold": {
+    "STORE.390.date_of_initial_diagnosis": {
+      "conflict_rule.2": {
+        "applicable": true,
+        "applicability_evidence": "Cytology of 2022-02-14 is ambiguous ('suspicious for') and precedes the confirmatory biopsy of 2022-03-09.",
+        "discriminating_fact_truth": {
+          "impression_at_ambiguous_cytology": false
+        },
+        "discriminator_evidence": "no physician's clinical impression of cancer accompanies the cytology; recorded in gold_rejections as AMBIGUOUS_CYTOLOGY_UNSUPPORTED for 20220214",
+        "answer_changes_if_fact_flips": true
+      }
+    }
+  },
   "gold_rejections": {
     "20220214": "AMBIGUOUS_CYTOLOGY_UNSUPPORTED"
   },
