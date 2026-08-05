@@ -62,19 +62,44 @@ evidence_rules:
     - "Cytology carrying only an ambiguous term, UNLESS a positive biopsy or a physician's clinical impression of cancer supports it."
     - "A radiology report that merely describes a suspicious mass, absent a physician's diagnostic statement."
 
+# THE FACTS THE CONFLICT RULES TURN ON, declared once and referenced by `turns_on`.
+# Declared here rather than inside each rule because a fact is SHARED: rules 1 and 2 below are one
+# question with opposite branches, and a fact declared inside each would open two obligations for
+# one question, of which resolving either leaves the other reading as open.
+discriminating_facts:
+  - fact_id: impression_at_ambiguous_cytology
+    asks: >-
+      whether a physician's clinical impression of cancer is documented on the same date as the
+      ambiguous cytology, in a document other than the cytology report itself
+    applicable_when: >-
+      an ambiguous cytology precedes a confirmatory tissue diagnosis
+  - fact_id: physician_statement_predating_tissue
+    asks: >-
+      whether a physician's diagnostic statement about the target tumour exists independently of
+      the tissue interpretation, and what date it bears
+    applicable_when: >-
+      a tissue or cytology interpretation is in hand and the chart also contains physician
+      documentation about the same tumour
+
 conflict_rules:
   - if: "cytology with an ambiguous term precedes a confirmatory biopsy AND a physician's clinical impression of cancer exists at the cytology date"
     then: "use the cytology date"
+    turns_on: [impression_at_ambiguous_cytology]
   - if: "cytology with an ambiguous term precedes a confirmatory biopsy AND no clinical impression supports it"
     then: "use the biopsy date"
+    turns_on: [impression_at_ambiguous_cytology]
   # Both strata establish this field, so the pair they form has to be arbitrated by name — a
   # rule that names neither cannot be applied to it. The direction follows decision_rule 1:
   # first date, clinically OR histologically established. Later tissue does not supersede an
   # earlier clinical diagnosis; it confirms one.
   - if: "a tissue or cytology interpretation and a physician's diagnostic statement about the target tumour give different dates"
     then: "use the earlier date, whichever document type it came from, and cite both — tissue confirmation does not reset a diagnosis that a physician had already made"
+    turns_on: [physician_statement_predating_tissue]
   - if: "documents disagree on the date"
     then: "take the earliest that satisfies the decision rules and cite every conflicting source"
+    no_discriminator: >-
+      the residual tie-break. It arbitrates dates already in hand under decision_rule 1 and
+      turns on no further fact about the chart; demanding one here would invent it.
 
 proof_obligation:
   for_positive: >-

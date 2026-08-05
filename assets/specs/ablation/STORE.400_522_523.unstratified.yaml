@@ -52,14 +52,36 @@ when_not_to_use:
 - Lymphoma, leukaemia and other haematopoietic neoplasms — those follow the Hematopoietic and Lymphoid
   Neoplasm rules.
 - Cases diagnosed before 2007-01-01 (Solid Tumor Rules do not apply).
+# THE FACTS THE CONFLICT RULES TURN ON. Identical to the base contract: this arm varies the
+# RETRIEVAL POLICY, not the question, so its rules turn on the same facts.
+discriminating_facts:
+- fact_id: microscopic_description_more_specific
+  asks: >-
+    whether the microscopic description names a more specific morphology than the final pathologic diagnosis does
+  applicable_when: >-
+    a pathology report is in hand and its final diagnosis is non-specific
+- fact_id: definitive_resection_present
+  asks: >-
+    whether a definitive resection pathology report exists in addition to the initial biopsy, and what it states
+  applicable_when: >-
+    two pathology reports are in hand and they disagree
+- fact_id: primary_report_contradicts_the_restatement
+  asks: >-
+    whether the primary report contradicts what the consult note restates, as opposed to merely being silent on it
+  applicable_when: >-
+    a consult note restates a finding that also appears in a primary report
+
 conflict_rules:
 - if: the final pathologic diagnosis is less specific than the microscopic description
   then: 'take the more specific one (STORE example: microscopic ''adenocarcinoma'' over final ''carcinoma
     NOS'' -> 8140)'
+  turns_on: [microscopic_description_more_specific]
 - if: two pathology reports disagree
   then: prefer the definitive resection over the initial biopsy; cite both
+  turns_on: [definitive_resection_present]
 - if: a consult note restates a finding that the primary report contradicts
   then: prefer the primary report and record the contradiction as evidence with stance=contradicts
+  turns_on: [primary_report_contradicts_the_restatement]
 proof_obligation:
   for_positive: One pathology report establishing the histology, plus a statement of the site of origin.
   for_negative:

@@ -46,11 +46,26 @@ evidence_rules:
     - "Absence of any mention of recurrence in the last note. Silence is not remission."
     - "Metastasis documented at or before diagnosis — that is code 70 territory, not a recurrence."
 
+# THE FACTS THE CONFLICT RULES TURN ON, declared once and referenced by `turns_on`.
+discriminating_facts:
+  - fact_id: disease_free_interval_documented
+    asks: >-
+      whether the chart documents a disease-free interval at any point after the initial diagnosis, as opposed to continuous disease
+    applicable_when: >-
+      the record is being read for a recurrence and metastatic disease may have been present at diagnosis
+  - fact_id: follow_up_after_disease_free_statement
+    asks: >-
+      whether any follow-up documentation exists after the disease-free statement, and whether it affirmatively shows continued disease-free status
+    applicable_when: >-
+      a disease-free statement is in hand and the answer would differ between 99 and 00
+
 conflict_rules:
   - if: "metastatic disease is present at diagnosis and no disease-free interval is ever documented"
     then: "code 70, never 00 and never a recurrence code"
+    turns_on: [disease_free_interval_documented]
   - if: "a disease-free statement exists but there is no later follow-up at all"
     then: "prefer 99 over 00 unless the chart affirmatively shows continued disease-free status"
+    turns_on: [follow_up_after_disease_free_statement]
 
 proof_obligation:
   for_positive: "For a recurrence code: evidence of a disease-free interval AND evidence of the later event."

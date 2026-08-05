@@ -132,15 +132,37 @@ when_not_to_use:
   - "Lymphoma and other haematopoietic neoplasms, which use Ann Arbor / Lugano."
   - "Cases diagnosed before 2018-01-01, where AJCC 7th applies and the group definitions differ."
 
+# THE FACTS THE CONFLICT RULES TURN ON, declared once and referenced by `turns_on`.
+discriminating_facts:
+  - fact_id: staging_workup_complete_at_assessment
+    asks: >-
+      whether the staging workup was complete at the time each clinical stage assessment was made
+    applicable_when: >-
+      two clinicians state different clinical stage groups
+  - fact_id: categories_justify_the_stated_group
+    asks: >-
+      whether the stated T, N and M categories justify the stated stage group under the declared staging system
+    applicable_when: >-
+      a stage group and its component categories are both stated
+
 conflict_rules:
   - if: "the resection pathology and the pre-treatment imaging disagree on T or N"
     then: "the resection governs the PATHOLOGIC categories only; the clinical categories stay as they were staged before treatment. Cite both."
+    no_discriminator: >-
+      the clinical and pathologic axes are separate outputs by construction, so this rule partitio
+      ns evidence between two fields rather than deciding between readings of one. No further fact
+      about the chart changes which axis a report governs.
   - if: "two clinicians state different clinical stage groups"
     then: "prefer the assessment made once the staging workup was complete, and record the earlier one with stance=contradicts"
+    turns_on: [staging_workup_complete_at_assessment]
   - if: "the stated stage group is inconsistent with the stated T, N and M"
     then: "prefer the categories, report the group you can justify, and record the contradiction"
+    turns_on: [categories_justify_the_stated_group]
   - if: "the only stage statement in the record is bounded ('at least cT2a')"
     then: "report the determinable categories and EVIDENCE_INSUFFICIENT for the group; do not round the bound"
+    no_discriminator: >-
+      a bounded statement ('at least cT2a') is already the whole of what the record says. The rule
+      refuses to round it, and no additional fact would make the bound determinate.
 
 proof_obligation:
   for_positive: >

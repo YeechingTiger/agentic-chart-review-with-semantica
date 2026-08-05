@@ -183,6 +183,15 @@ def rule_catalog(spec: Any) -> list[RuleRef]:
         out.append(RuleRef(rule_id=rule_id, kind=kind, text=t, text_sha=_sha(t),
                            view_id=view_id))
 
+    # DISCRIMINATING FACTS, addressed by their DECLARED name rather than by position. The name is a
+    # content identity -- the same treatment a stratum gets -- so it survives a conflict rule being
+    # reordered above it, where a positional id would silently come to mean another question.
+    for f in (getattr(spec, "discriminating_facts", []) or []):
+        if isinstance(f, dict) and str(f.get("fact_id") or "").strip():
+            fid = str(f["fact_id"]).strip()
+            add(f"discriminating_fact.{fid}", "discriminating_fact",
+                f.get("asks") or "", f"fact.{fid}")
+
     for i, r in enumerate(getattr(spec, "decision_rule", []) or [], start=1):
         add(f"decision_rule.{i}", "decision_rule", r, f"rule.{i}")
     for i, c in enumerate(getattr(spec, "conflict_rules", []) or [], start=1):

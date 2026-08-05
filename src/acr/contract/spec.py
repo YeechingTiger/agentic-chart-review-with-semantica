@@ -194,6 +194,16 @@ class UnprovenancedElementError(ProvenanceError):
         lines += [f"  - {e.path}   [{e.kind}, read by {e.read_by}]" for e in self.elements]
         super().__init__("\n".join(lines))
 
+class DiscriminatingFactError(ValueError):
+    """A conflict rule's discriminating fact is undeclared, unreferenced or unstated.
+
+    ONE ERROR CLASS PER CONCERN, as `ProvenanceError` / `StaleProvenanceError` /
+    `UnprovenancedElementError` already are: a caller that wants to report "this contract cannot be
+    used because its conflict rules do not say what they turn on" needs to catch that and not a
+    generic ValueError from four other checks.
+    """
+
+
 class StaleProvenanceError(ProvenanceError):
     """A record names an element the spec no longer has.
 
@@ -648,6 +658,16 @@ class ExtractionSpec(BaseModel):
     evidence_rules: dict[str, Any] = Field(default_factory=dict)
     when_not_to_use: list[str] = Field(default_factory=list)
     conflict_rules: list[Any] = Field(default_factory=list)
+    #: The facts this contract's conflict rules turn on, declared ONCE and referenced by
+    #: `conflict_rules[].turns_on`. Declared at spec level rather than inside each rule because a
+    #: fact is SHARED: STORE.390's rules 1 and 2 are one question with opposite branches
+    #: (impression present -> cytology date, absent -> biopsy date), and a fact declared inside each
+    #: would open two obligations for one question, of which resolving either leaves the other
+    #: reading as open.
+    #:
+    #: The `fact_id` is a CONTENT identity, which is how `rule_catalog` already addresses a stratum:
+    #: it survives a rule being reordered above it, where a positional id would not.
+    discriminating_facts: list[dict[str, Any]] = Field(default_factory=list)
     answer_checks: list[Any] = Field(default_factory=list)
     proof_obligation: ProofObligation = Field(default_factory=ProofObligation)
     #: THE OUTCOME SPACE, when this contract declares one. `result.status` maps each outcome
@@ -894,9 +914,18 @@ class ExtractionSpec(BaseModel):
             L += ["WHEN THIS SPEC DOES NOT APPLY:"] + [f"  - {x}" for x in self.when_not_to_use] + [""]
         if self.conflict_rules:
             L.append("CONFLICT RESOLUTION:")
+            facts = {str(f.get("fact_id")): f for f in (self.discriminating_facts or [])}
             for c in self.conflict_rules:
                 if isinstance(c, dict):
                     L.append(f"  - IF {c.get('if','?')} THEN {c.get('then','?')}")
+                    # THE FACT BESIDE THE RULE THAT TURNS ON IT. A fact list rendered apart from its
+                    # rules is a list of questions with no consequences attached, and the model has
+                    # to be able to see which question decides which rule.
+                    for fid in (c.get("turns_on") or []):
+                        f = facts.get(str(fid)) or {}
+                        L.append(f"      turns on [{fid}]: {f.get('asks','?')}")
+                    if not (c.get("turns_on") or []):
+                        L.append(f"      turns on no further fact: {c.get('no_discriminator','')}")
                 else:
                     L.append(f"  - {c}")
             L.append("")
@@ -928,6 +957,94 @@ class ExtractionSpec(BaseModel):
                   "  " + ", ".join(self.search_hints), ""]
         return "\n".join(L)
 
+def check_discriminating_facts(spec: ExtractionSpec) -> None:
+    """Every conflict rule says what it turns on, or says that it turns on nothing.
+
+    THE FAILURE THIS EXISTS FOR is the SYN0001 / SYNX03 mirror pair: two charts identical but for
+    whether an oncology note records a clinical impression on the cytology date. A run cited the
+    cytology conflict rule, asserted "no physician clinical impression of cancer is documented at
+    that date", and had never searched for one. On the mirror chart the same shortcut is correct.
+    Nothing in the runtime could tell them apart, because the fact the rule turns on existed only
+    inside the English of its `if` clause.
+
+    FOUR REFUSALS, and each closes a container that would otherwise carry two meanings:
+
+      * a rule with neither `turns_on` nor `no_discriminator` -- an oversight and a deliberate
+        tie-break are indistinguishable, and STORE.390 has both kinds. Rule 4 ("documents disagree
+        -> take the earliest") genuinely turns on nothing further; demanding a fact there would
+        force one to be invented.
+      * `turns_on: []` with no reason -- the empty list, same problem.
+      * a reference to an undeclared fact -- an obligation with no question in it.
+      * a declared fact nobody references -- it renders into the prompt and hashes into `spec_hash`
+        while enforcing nothing, which `extra="allow"` already lets a typo do silently.
+    """
+    facts = list(spec.discriminating_facts or [])
+    by_id: dict[str, dict] = {}
+    for i, f in enumerate(facts, start=1):
+        if not isinstance(f, dict):
+            raise DiscriminatingFactError(
+                f"{spec.spec_id}: discriminating_facts[{i}] is not a mapping")
+        fid = str(f.get("fact_id") or "").strip()
+        if not fid:
+            raise DiscriminatingFactError(
+                f"{spec.spec_id}: discriminating_facts[{i}] declares no fact_id. The id is the "
+                f"obligation's target; without one the obligation cannot be addressed or resolved.")
+        if fid in by_id:
+            raise DiscriminatingFactError(
+                f"{spec.spec_id}: duplicate fact_id {fid!r}. Two questions under one identity are "
+                f"one obligation in the ledger, so one of them would silently never be asked.")
+        for key in ("asks", "applicable_when"):
+            if not str(f.get(key) or "").strip():
+                raise DiscriminatingFactError(
+                    f"{spec.spec_id}: fact {fid!r} declares no {key!r}. `asks` is what the run goes "
+                    f"and checks; `applicable_when` is what makes the rule potentially relevant. A "
+                    f"fact missing either is a column that can never be filled in.")
+        by_id[fid] = f
+
+    referenced: set[str] = set()
+    for i, rule in enumerate(spec.conflict_rules or [], start=1):
+        where = f"{spec.spec_id}: conflict_rule.{i}"
+        if not isinstance(rule, dict):
+            raise DiscriminatingFactError(
+                f"{where} is prose, not a mapping, so it cannot say what it turns on")
+        turns = [str(x) for x in (rule.get("turns_on") or [])]
+        reason = str(rule.get("no_discriminator") or "").strip()
+        if not turns and not reason:
+            # A RATCHET, NOT A CLIFF. This refusal fires only for a contract that has STARTED
+            # declaring facts, so a half-annotated contract cannot half-comply. A contract that
+            # declares none is loadable and is reported by `spec lint` instead.
+            #
+            # The alternative -- refusing every contract whose conflict rules are silent -- was
+            # tried and would have made 12 contracts under `assets/usecase/crc/` unloadable along
+            # with several test fixtures whose conflict rule is incidental scaffolding. Authoring
+            # discriminating facts for a use case nobody here can speak for is exactly the
+            # fabrication this schema exists to prevent.
+            if not facts:
+                continue
+            raise DiscriminatingFactError(
+                f"{where} declares neither `turns_on` nor `no_discriminator`, and this contract "
+                f"declares {len(facts)} discriminating fact(s). A rule that turns on nothing is "
+                f"legitimate -- a residual tie-break over values already in hand -- but it has to "
+                f"SAY so, because an unstated absence and an oversight are the same bytes. A "
+                f"contract that has started declaring facts must finish.")
+        if not turns and len(reason) <= 20:
+            raise DiscriminatingFactError(
+                f"{where}: `no_discriminator` must give the reason, not a flag. Why does this rule "
+                f"turn on no further fact?")
+        for fid in turns:
+            if fid not in by_id:
+                raise DiscriminatingFactError(
+                    f"{where} turns on {fid!r}, which no discriminating_facts entry declares. "
+                    f"Declared: {sorted(by_id) or '(none)'}")
+            referenced.add(fid)
+
+    if orphans := sorted(set(by_id) - referenced):
+        raise DiscriminatingFactError(
+            f"{spec.spec_id}: discriminating fact(s) {orphans} are declared and referenced by no "
+            f"conflict rule. They would render into every prompt and hash into spec_hash while "
+            f"enforcing nothing.")
+
+
 def _indent(s: str, n: int = 2) -> str:
     pad = " " * n
     return "\n".join(pad + ln for ln in str(s).strip().splitlines())
@@ -947,6 +1064,10 @@ def load_spec(path: str | Path) -> ExtractionSpec:
     data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     spec = ExtractionSpec.model_validate(data)
     bind_provenance(spec)
+    # AFTER provenance, so a contract missing both is told about the provenance first -- that check
+    # is older and its message names the fix. Before `value_domain`, because a contract whose
+    # conflict rules cannot be read is unusable regardless of whether its code table exists.
+    check_discriminating_facts(spec)
     if spec.value_domain:
         # FAIL CLOSED ON A TYPO. A declared table that does not exist would otherwise render an
         # empty value domain into the prompt, and the run would look exactly like one that had
