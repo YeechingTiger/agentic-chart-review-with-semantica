@@ -926,9 +926,17 @@ def _disable_injected_subagent(model) -> None:
 
     profile = HarnessProfile(
         general_purpose_subagent=GeneralPurposeSubagentProfile(enabled=False))
-    candidates = {type(model).__name__.lower(),
-                  str(getattr(model, "_llm_type", "") or ""),
-                  model_identity(model).split(":")[0]}
+    # THE PROVIDER IS THE KEY THAT WORKS, and it is derived two ways because the first three
+    # candidates here were written against a scripted fake whose class name happened to match.
+    # On the first real run — `ChatOpenAI`, the provider seam this repo actually uses — none of
+    # them resolved and `task` reached the tool surface. `langchain_openai.chat_models.base` ->
+    # `openai` is the derivation that holds; `_llm_type` ("openai-chat") gives the same answer by
+    # a different route, and both are kept because a provider package that breaks one may not
+    # break the other.
+    module_root = type(model).__module__.split(".")[0].removeprefix("langchain_")
+    llm_type = str(getattr(model, "_llm_type", "") or "")
+    candidates = {module_root, llm_type, llm_type.split("-")[0],
+                  type(model).__name__.lower(), model_identity(model).split(":")[0]}
     for key in sorted(k for k in candidates if k):
         register_harness_profile(key, profile)
 
