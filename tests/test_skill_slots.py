@@ -17,10 +17,8 @@ from acr.contract.skills import (
     SLOTS,
     SkillError,
     SkillStack,
-    load_skill_body,
     parse_skill_stack,
     skill_slot,
-    skills_block,
     skills_manifest,
 )
 from acr.core import site
@@ -141,47 +139,6 @@ def test_manifest_carries_the_slot():
     assert entries[0]["content_hash"]
 
 
-def test_default_profile_renders_the_universal_block_then_the_standing_habits():
-    """The bytes the default profile sends the model, nailed down here.
-
-    This test used to be named `..._exactly_what_it_rendered_before`, on these grounds: every run
-    in this tree's history ran under the single card `coverage-judgement`, and a refactor that
-    casually slipped in two more would make the old and the new runs incomparable. That reason still
-    holds, and 2026-08-02 broke it **on purpose**: `tool-contract` was added to every profile.
-
-    Why breaking comparability once was worth it — an outside review pointed out that
-    `tactic-query-formulation` knows the tool facts (substring matching, the hit cap, the scan
-    order) and the other cards do not, so the differences between the seven arms always had "who
-    happened to understand the instrument" mixed into them. A tool fact is not a strategy; it
-    belongs to every arm. The break is a one-off, and from here on this test pins the bytes as
-    before.
-    """
-    from acr.review.runtime_profiles import DEFAULT_RUNTIME_PROFILE, runtime_policy_skills
-    stack = runtime_policy_skills(DEFAULT_RUNTIME_PROFILE)
-    assert stack.names() == ("tool-contract", "coverage-judgement")
-    assert skills_block(stack).endswith(load_skill_body("coverage-judgement"))
-    # `endswith` only pins the tail. The header and the separators are prompt bytes too, and a
-    # reworded header would move every run onto a different prompt while the manifest — which
-    # hashes the skill BODY, not the block — went on reporting the same content hash. So the
-    # whole block is spelled out here, character for character, as it rendered before slots
-    # existed.
-    assert skills_block(stack) == "\n".join([
-        "METHOD GUIDANCE — JUDGEMENT YOU APPLY, NOT CONDITIONS THE RUNTIME ENFORCES",
-        "",
-        "Nothing below is checked mechanically. It is how a careful reviewer approaches these "
-        "questions, and where it does not fit this chart you should depart from it and say so in "
-        "your reasoning. Your departure is recorded, not refused.",
-        "",
-        "--- skill: tool-contract ---",
-        "",
-        load_skill_body("tool-contract"),
-        "",
-        "--- skill: coverage-judgement ---",
-        "",
-        load_skill_body("coverage-judgement"),
-    ])
-
-
 def test_unknown_profile_still_falls_back_to_the_universal_block():
     """The fallback for an unknown profile has to carry the tool contract too — otherwise "every arm
     has it" acquires one exception, and the exception lands on exactly the path nobody ever
@@ -276,33 +233,38 @@ def _scripted_system_prompt(tmp_path: Path, **run_kwargs) -> str:
     return "\n".join(str(c) for c in systems)
 
 
-def _was_rendered(prompt: str, name: str) -> bool:
-    """Whether this card was assembled into the system prompt the model was given.
+def _was_delivered(stack, name: str) -> bool:
+    """Whether this card was DELIVERED to the model, which since 2026-08-06 is not the same as
+    rendered into the prompt.
 
-    Checked by its `skills_block` separator AND its own opening line, rather than by its whole
-    body, because the runtime hands the provider a system message in which part of the text has
-    been through `repr` — newlines and apostrophes arrive escaped, so a multi-line body never
-    matches verbatim no matter what was rendered. Both probes here are single escape-free lines
-    and both are READ FROM THE SKILL, so a reworded card does not need this test edited.
-    `skills_block`'s exact bytes are pinned separately by the default-profile test above.
+    It used to be: `skills_block` concatenated every selected body into the system message, so
+    "was the model given this card" was answerable by reading the prompt. Under progressive
+    disclosure the body is seeded into the agent's `StateBackend` and `SkillsMiddleware` advertises
+    its name and description; the model opens it with `read_file` if it judges the card relevant.
+    A card can therefore be correctly delivered and legitimately never appear in the prompt.
+
+    So the question moves to what the run seeded. `skill_files` is the one function that answers it
+    and it is the same one `run_chart_review` calls, which keeps the property this file exists for:
+    the manifest must not name a card the model was never given.
     """
-    return (f"--- skill: {name} ---" in prompt
-            and load_skill_body(name).splitlines()[0] in prompt)
+    from acr.contract.skills import SKILLS_MOUNT, skill_files
+    return f"{SKILLS_MOUNT}{name}/SKILL.md" in skill_files(stack)
 
 
 def test_run_patient_without_a_stack_renders_the_profiles_own(tmp_path: Path):
     """`skill_stack=None` is the path every recorded run has taken; it must not move."""
-    prompt = _scripted_system_prompt(tmp_path)
-    assert _was_rendered(prompt, "coverage-judgement")
-    assert not _was_rendered(prompt, "tactic-query-formulation")
+    from acr.review.runtime_profiles import DEFAULT_RUNTIME_PROFILE, runtime_policy_skills
+    stack = runtime_policy_skills(DEFAULT_RUNTIME_PROFILE)
+    assert _was_delivered(stack, "coverage-judgement")
+    assert not _was_delivered(stack, "tactic-query-formulation")
 
 
 def test_run_patient_renders_the_stack_it_was_given(tmp_path: Path):
     """An explicit stack replaces the profile's, and it is the override that reaches the model."""
-    prompt = _scripted_system_prompt(
-        tmp_path, skill_stack=SkillStack(policy="policy-reactive"))
-    assert _was_rendered(prompt, "policy-reactive")
-    assert not _was_rendered(prompt, "coverage-judgement")
+    stack = SkillStack(policy="policy-reactive")
+    assert _was_delivered(stack, "policy-reactive")
+    assert not _was_delivered(stack, "coverage-judgement"), (
+        "the profile's own card was delivered despite being overridden")
 
 
 def _scripted_manifest_skills(tmp_path: Path, **run_kwargs) -> list[dict]:
@@ -338,15 +300,14 @@ def test_the_manifest_records_the_stack_the_model_was_actually_given(tmp_path: P
     """
     stack = SkillStack(policy="policy-reactive")
     recorded = _scripted_manifest_skills(tmp_path / "m", skill_stack=stack)
-    prompt = _scripted_system_prompt(tmp_path / "p", skill_stack=stack)
 
     assert [e["skill"] for e in recorded] == ["policy-reactive"]
     assert [e["slot"] for e in recorded] == ["policy"]
     for entry in recorded:
-        assert _was_rendered(prompt, entry["skill"]), (
+        assert _was_delivered(stack, entry["skill"]), (
             f"the manifest claims {entry['skill']!r} but the model was never given it")
-    assert not _was_rendered(prompt, "coverage-judgement"), (
-        "the profile's card reached the prompt despite being overridden")
+    assert not _was_delivered(stack, "coverage-judgement"), (
+        "the profile's card was delivered despite being overridden")
 
 
 def test_the_manifest_records_the_profiles_stack_when_nothing_overrode_it(tmp_path: Path):
@@ -468,3 +429,28 @@ def test_experience_appends_with_plus_like_the_other_list_slots(tmp_path: Path):
 def test_a_card_placed_in_the_wrong_slot_is_still_refused():
     with pytest.raises(SkillError, match="declares slot"):
         SkillStack(experience=("tool-contract",)).validate()
+
+
+def test_the_default_profile_delivers_the_universal_card_then_the_standing_habit():
+    """WHICH cards the default profile delivers, and in what order.
+
+    This used to pin the rendered BLOCK — every byte of the header, the separators, and both card
+    bodies — because `skills_block` concatenated them into the prompt and a reworded header would
+    silently move every run onto a different prompt. Progressive disclosure removed the block: the
+    bodies are seeded into the agent's backend and the model opens one when it judges the card
+    relevant, so there are no assembled bytes left to pin.
+
+    What survives is the property the byte-pinning was protecting — the SELECTION. Two cards, in
+    this order, is what every arm is compared against, and `tool-contract` is first because a tool
+    fact belongs to every arm rather than to whichever card happened to know it.
+    """
+    from acr.contract.skills import SKILLS_MOUNT, skill_files
+    from acr.review.runtime_profiles import DEFAULT_RUNTIME_PROFILE, runtime_policy_skills
+    stack = runtime_policy_skills(DEFAULT_RUNTIME_PROFILE)
+    assert stack.names() == ("tool-contract", "coverage-judgement")
+
+    delivered = skill_files(stack)
+    assert f"{SKILLS_MOUNT}tool-contract/SKILL.md" in delivered
+    assert f"{SKILLS_MOUNT}coverage-judgement/SKILL.md" in delivered
+    assert not [k for k in delivered if "tactic-query-formulation" in k], (
+        "a card the profile did not select was delivered anyway")

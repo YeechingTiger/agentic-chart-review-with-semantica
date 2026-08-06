@@ -25,14 +25,19 @@ Which skills load is the RUNTIME PROFILE's decision and not this module's, becau
 retrieval/judgement guidance and swapping it is exactly the kind of change an arm is supposed to
 isolate. `agent` passes the assembled `SkillStack`; nothing here has a default list.
 
-SIZE IS A REAL COST
--------------------
-Every byte here is re-sent on every model call. `thread-chasing/SKILL.md` carries measurement
-tables that exist for a human reader and would be dead weight in a prompt — `load_marker_catalogue`
-already extracts the part the runtime needs. So loading is opt-in per skill, `MAX_SKILL_BYTES`
-refuses a skill that has grown past what a prompt should carry rather than truncating it (a
-truncated instruction is an instruction that ends mid-sentence), and the rendered size is
-returned so a caller can record it.
+SIZE WAS A REAL COST, AND THE CHART PLANE NO LONGER PAYS IT
+-----------------------------------------------------------
+Until 2026-08-06 `skills_block` concatenated every selected card's body into the chart agent's
+system prompt — 9,117 characters of a STORE.390 prompt's 20,531, re-sent on every model call
+whether or not the card applied. `MAX_SKILL_BYTES` existed to stop one card dominating that.
+
+The chart plane now uses `skill_files` and `SkillsMiddleware`: names and descriptions in the
+prompt, bodies opened with `read_file` when the model judges a card relevant. Measured on SYN0001,
+same answer and same gate: 226,367 -> 121,350 tokens, $0.0108 -> $0.0077, 10 -> 8 model calls.
+
+`load_skill_body` and the cap remain because the EVAL plane still front-loads: `eval_skills_block`
+renders bodies for the evaluation agent, which selects a handful of cards deliberately rather than
+letting a model choose. Two planes, two loading strategies, one place that knows both.
 """
 
 from __future__ import annotations
@@ -398,35 +403,38 @@ def eval_skills_identity(block: str, names: Sequence[str]) -> dict:
                              if block else "")}
 
 
-def skills_block(stack: SkillStack, skills_dir: Path | str | None = None) -> str:
-    """Render the stack for the system prompt, in slot order.
+#: Where a run's selected cards live inside its backend. The model opens them with `read_file`.
+SKILLS_MOUNT = "/skills/"
 
-    The header says what they are, because the distinction is the whole point: these are
-    judgement the model applies, not conditions the runtime enforces. A model that departs from
-    a skill is not violating anything — it owes an account of why, and the account is recorded.
+
+def skill_files(stack: SkillStack, skills_dir: Path | str | None = None) -> dict:
+    """The stack's cards, shaped for `invoke(files=...)`.
+
+    PROGRESSIVE DISCLOSURE, NOT CONCATENATION. `skills_block` used to render every selected card's
+    BODY into the system prompt — 9,117 characters of the 20,531 in a STORE.390 prompt, paid on
+    every model call whether or not the card applied. `SkillsMiddleware` puts each card's name and
+    description in the prompt instead and lets the model open the body when it judges the card
+    relevant, which is what the Agent Skills specification is for and what `MAX_SKILL_BYTES` existed
+    to work around.
+
+    Seeded through state rather than read from disk because the agent's backend is `StateBackend`:
+    it has no filesystem behind it, so `read_file` can reach these and nothing else on the machine.
+    That is the whole fence — see `core/tool_surface.LIBRARY_TOOLS`.
     """
-    stack.validate(skills_dir)
-    names = stack.names()
-    if not names:
-        return ""
-    parts = [
-        "METHOD GUIDANCE — JUDGEMENT YOU APPLY, NOT CONDITIONS THE RUNTIME ENFORCES",
-        "",
-        "Nothing below is checked mechanically. It is how a careful reviewer approaches these "
-        "questions, and where it does not fit this chart you should depart from it and say so in "
-        "your reasoning. Your departure is recorded, not refused.",
-    ]
-    for n in names:
-        head = f"--- skill: {n} ---"
-        # A tactic's PRECONDITION has to reach the model or it is frontmatter nobody reads —
-        # and the whole reason tactics were split out of the policy slot is that a move
-        # drawn on a record that does not meet its precondition is a move that gives no
-        # guidance. The policy needs to know when each one applies in order not to call it.
-        pre = skill_meta(n, "precondition", skills_dir)
-        if pre:
-            head += f"\n    CALL THIS WHEN: {pre}"
-        parts += ["", head, "", load_skill_body(n, skills_dir)]
-    return "\n".join(parts)
+    from deepagents.backends.utils import create_file_data
+
+    roots = [Path(skills_dir)] if skills_dir else list(site.skill_roots())
+    out: dict = {}
+    for name in stack.names():
+        src = next((r / name for r in roots if (r / name / "SKILL.md").is_file()), None)
+        if src is None:
+            raise SkillError(f"no skill {name!r} under any of {[str(r) for r in roots]}")
+        for f in sorted(src.rglob("*")):
+            if f.is_file():
+                rel = f.relative_to(src).as_posix()
+                out[f"{SKILLS_MOUNT}{name}/{rel}"] = create_file_data(
+                    f.read_text(encoding="utf-8"))
+    return out
 
 
 def skills_manifest(stack: SkillStack, skills_dir: Path | str | None = None) -> list[dict]:

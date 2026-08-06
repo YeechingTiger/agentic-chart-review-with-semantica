@@ -943,7 +943,8 @@ def _disable_injected_subagent(model) -> None:
 
 def build_agent(*, model, tools: list[StructuredTool], system_prompt: str, ctx: RunContext,
                 backend, max_model_calls: int, summarization_model=None,
-                keep_messages: int = 20, max_usd: float = 5.0, expansion_budget=None):
+                keep_messages: int = 20, max_usd: float = 5.0, expansion_budget=None,
+                skill_stack=None):
     """The graph. Every node comes from the library; every rule comes from a hook.
 
     Middleware order is composition order. `AuditMiddleware` is last so its `wrap_tool_call`
@@ -1010,8 +1011,16 @@ def build_agent(*, model, tools: list[StructuredTool], system_prompt: str, ctx: 
     # solely through `Toolbox`, which is what keeps every read inside the `CoverageLedger`.
     _disable_injected_subagent(model)
     middleware.insert(1, FilesystemMiddleware(backend=backend, tools=["read_file", "ls"]))
+    # `skills=` ONLY WHEN THE STACK HAS CARDS. `SkillsMiddleware` puts each card's name and
+    # description in the prompt and lets the model open the body with `read_file` when it
+    # judges the card relevant — where `skills_block` used to concatenate every selected body
+    # into the system prompt, 9,117 of a STORE.390 prompt's 20,531 characters, on every call.
+    # The bodies are seeded into state by `run_chart_review`; see `skills.skill_files`.
+    from ..contract.skills import SKILLS_MOUNT
+    names = list(skill_stack.names()) if skill_stack is not None else []
     agent = create_deep_agent(model=model, tools=tools, system_prompt=system_prompt,
-                              backend=backend, middleware=middleware)
+                              backend=backend, middleware=middleware,
+                              **({"skills": [SKILLS_MOUNT]} if names else {}))
     assert_tool_surface(agent, ctx.declared)
     return agent
 
@@ -1232,6 +1241,7 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
     # the document is read to the end. What is left is a run that chose not to finish reading, and
     # that is a gap to record in the ledger, not a refusal to argue past.
     agent = build_agent(model=model, tools=tools, system_prompt=system_prompt, ctx=ctx,
+                        skill_stack=skill_stack,
                         backend=backend, max_model_calls=max_model_calls, max_usd=max_usd,
                         expansion_budget=expansion_budget)
 
@@ -1251,8 +1261,12 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # denominator. It is also a prompt change in its own right — the model's QUESTION was a
         # verbatim copy of its own instructions — so leaving it in place and calling the result a
         # baseline was not available.
+        from ..contract.skills import skill_files
         agent.invoke({"messages": [{"role": "user",
-                                    "content": OPENING_TURN.format(patient=chart.patient_id)}]},
+                                    "content": OPENING_TURN.format(patient=chart.patient_id)}],
+                      # The selected cards, into `StateBackend`, where `read_file` can reach
+                      # them and nothing else. Empty when the profile selected no cards.
+                      "files": skill_files(skill_stack) if skill_stack else {}},
                      config={"recursion_limit": recursion_limit_for(agent, max_model_calls)})
     except Exception as e:  # noqa: BLE001 -- a crashed run must still leave its trace
         crashed = True

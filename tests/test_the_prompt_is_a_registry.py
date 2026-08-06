@@ -75,17 +75,28 @@ def ctx():
 # ------------------------------------------------------------------ (1) byte-identical by default
 
 def _expected(c) -> str:
-    """The prompt the `+` chain produced, rebuilt here from the block producers directly.
+    """The prompt, rebuilt here from the block producers directly.
 
     A SECOND, INDEPENDENT ASSEMBLY. Checking the new assembler with the new assembler would pass on
-    any bug it contains; this reproduces the chain's own arithmetic, including its rule that a block
+    any bug it contains; this reproduces the arithmetic separately, including the rule that a block
     rendering "" contributes no separator.
+
+    IT NO LONGER REPRODUCES THE `+` CHAIN, and that claim ended deliberately on 2026-08-06. The
+    skills block used to render every selected card's BODY; it now renders one sentence saying the
+    cards exist and are optional, because `SkillsMiddleware` puts their names and descriptions in
+    the prompt and the model opens a body with `read_file` when it judges the card relevant.
+    Measured on SYN0001, same spec, same answer (20230412), same gate: 226,367 -> 121,350 tokens,
+    $0.0108 -> $0.0077, 10 -> 8 model calls.
+
+    The skills block alone is taken from the registry rather than re-derived, because re-deriving
+    one sentence in two places makes a change-detector out of a property test. What stays
+    independent here — and is what this oracle is for — is the ORDER and the separator arithmetic.
     """
     from acr.contract.code_tables import code_domain_block
-    from acr.contract.skills import skills_block
     from acr.contract.trace import rule_citation_block
     from acr.review.agent import TASK
     from acr.review.document_concepts import anchor_block, baseline_block, experience_block
+    from acr.review.prompt_blocks import _skills
     from acr.review.runtime_profiles import (
         runtime_policy_instruction,
         uses_clinical_contract_view,
@@ -101,19 +112,25 @@ def _expected(c) -> str:
         experience_block(None),
         code_domain_block(c.spec),
         anchor_block(),
-        skills_block(c.skill_stack),
+        _skills(c),
         c.task_context.strip(),
     ]
     return "\n\n".join(p for p in parts if p)
 
 
-def test_the_default_selection_is_byte_identical_to_the_chain_it_replaces(ctx):
-    """THE TEST THAT MATTERS MOST. Every manifest in `runs/` was produced by that chain."""
+def test_the_default_selection_matches_an_independent_assembly(ctx):
+    """THE TEST THAT MATTERS MOST: the registry's order and separator arithmetic, checked by a
+    second assembly that does not share its code.
+
+    It was `..._is_byte_identical_to_the_chain_it_replaces`, and every manifest under `runs/`
+    before 2026-08-06 was produced by that chain. The prompt changed on purpose when the skills
+    block stopped carrying card bodies, so those runs are no longer prompt-comparable with new
+    ones — which is what `experiment_config_hash` is for, and it moves."""
     text, _ = assemble_prompt(ctx)
     assert text == _expected(ctx)
 
 
-def test_it_is_byte_identical_on_a_contract_with_a_value_domain(ctx):
+def test_it_matches_on_a_contract_with_a_value_domain(ctx):
     """STORE.400 declares `value_domain: icdo3_lung`, so `code_domain_block` renders 5,839 chars
     there and nothing on STORE.390. A conditional block is where an off-by-one separator hides."""
     from dataclasses import replace
@@ -202,13 +219,27 @@ def test_dropping_a_block_removes_exactly_its_own_text(ctx):
 
 
 def test_dropping_the_largest_block_is_the_arm_that_could_not_exist(ctx):
-    """`skills_block` is 9,117 characters — roughly a third of the static prompt — and has never
-    been ablated because doing so meant editing `agent.py`."""
+    """Whatever the largest optional block is, an arm must be able to drop it without editing code.
+
+    This asserted `sizes["skills"] > 5_000`, which was true while the skills block carried every
+    selected card's body — 9,117 characters, a third of the static prompt. Progressive disclosure
+    took it to 438 and the assertion became a fossil of the old composition. The property was never
+    about skills being large; it is that the LARGEST optional block is ablatable, since that is the
+    arm nobody could run while the prompt was a `+` chain in `agent.py`.
+    """
     _, sizes = assemble_prompt(ctx)
-    assert sizes["skills"] > 5_000
-    without, _ = assemble_prompt(ctx, blocks=selected_blocks(
+    optional = {k: v for k, v in sizes.items() if k not in REQUIRED_BLOCKS and v}
+    assert optional, "no optional block rendered; there is no ablation to run"
+    largest = max(optional, key=optional.get)
+    kept, sizes_kept = assemble_prompt(ctx, blocks=selected_blocks(
+        [b.name for b in BLOCKS if b.name != largest]))
+    assert sizes_kept.get(largest, 0) == 0, f"{largest!r} still rendered after being dropped"
+    full, _ = assemble_prompt(ctx)
+    assert len(kept) < len(full), "dropping the largest block did not shorten the prompt"
+    # and the named one specifically, since `skills` is the block this registry was built for
+    without_skills, _ = assemble_prompt(ctx, blocks=selected_blocks(
         [b.name for b in BLOCKS if b.name != "skills"]))
-    assert "METHOD GUIDANCE" not in without
+    assert "METHOD GUIDANCE" not in without_skills
 
 
 def test_a_block_that_renders_nothing_contributes_no_separator(ctx):
@@ -372,7 +403,10 @@ def test_the_sizes_are_still_recorded_just_not_in_the_arm(tmp_path):
     assert m["prompt_assets"]["blocks"]["selected"] == [b.name for b in BLOCKS]
     assert "n_chars" not in m["prompt_assets"]["blocks"], "a per-run size cannot ride in the arm"
     sizes = m["prompt_block_chars"]
-    assert sizes["n_chars"]["skills"] > 5_000
+    # Every rendered block's size is recorded; no threshold, because the point is that the numbers
+    # live OUTSIDE the arm hash, not that any one of them is big. `skills` was 9,117 and is now 438.
+    assert sizes["n_chars"], "no per-block sizes were recorded at all"
+    assert "skills" in sizes["n_chars"]
     assert sizes["total_chars"] == sum(sizes["n_chars"].values())
 
 

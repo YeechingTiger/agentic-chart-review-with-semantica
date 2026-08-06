@@ -47,7 +47,6 @@ from typing import Any
 
 from ..contract.code_tables import code_domain_block
 from ..contract.retrieval_prior import to_experience_asset
-from ..contract.skills import skills_block
 from ..contract.trace import rule_citation_block
 from .document_concepts import anchor_block, baseline_block, experience_block
 from .runtime_profiles import runtime_policy_instruction, uses_clinical_contract_view
@@ -168,12 +167,28 @@ def _anchor(c: PromptContext) -> str:
 
 
 def _skills(c: PromptContext) -> str:
-    """METHOD GUIDANCE. Until 2026-07-30 nothing in this tree read a SKILL.md body into a prompt, so
-    moving the coverage obligation into `assets/skills/coverage-judgement/` deleted it rather than
-    relocating it. The profile chooses which cards load; see `acr.contract.skills`. 9,117 characters
-    of the 20,531 in a STORE.390 prompt, and the block whose ablation this registry exists for.
+    """METHOD GUIDANCE, one line about where it is rather than the whole of it.
+
+    Until 2026-08-06 this rendered every selected card's BODY — 9,117 characters of the 20,531 in a
+    STORE.390 prompt, on every model call, whether or not the card applied to the chart in hand.
+    `SkillsMiddleware` now injects each card's name and description and the model opens the body
+    with `read_file` when it judges the card relevant. `MAX_SKILL_BYTES` existed to stop a long card
+    dominating a prompt; under progressive disclosure there is nothing to cap.
+
+    The block survives as a SENTENCE because the ablation this registry exists for still needs
+    something to drop: an arm that removes `skills` must differ from one that keeps it, and the
+    middleware's own block is not ours to withhold. It also tells the model the cards are optional,
+    which their description alone does not.
     """
-    return skills_block(c.skill_stack)
+    names = list(c.skill_stack.names()) if c.skill_stack is not None else []
+    if not names:
+        return ""
+    return ("METHOD GUIDANCE — JUDGEMENT YOU APPLY, NOT CONDITIONS THE RUNTIME ENFORCES\n\n"
+            "The skills listed below are available to you. Nothing in them is checked "
+            "mechanically: they are how a careful reviewer approaches these questions, and where "
+            "one does not fit this chart you should depart from it and say so in your reasoning. "
+            "Your departure is recorded, not refused. Open one with `read_file` when its "
+            "description matches what you are about to do.")
 
 
 def _task_context(c: PromptContext) -> str:
