@@ -61,7 +61,7 @@ def test_a_scoring_instruction_is_caught(tmp_path: Path):
     d = tmp_path / "eval-bad"
     d.mkdir()
     (d / "SKILL.md").write_text(
-        "---\nname: eval-bad\ndescription: x\nslot: eval\njudges: [search_behaviour]\n---\n\n"
+        "---\nname: eval-bad\ndescription: x\nmetadata:\n  slot: eval\n  judges: [search_behaviour]\n---\n\n"
         "Decide whether the answer is correct and mark it as such.\n", encoding="utf-8")
     body = load_skill_body("eval-bad", tmp_path).lower()
     assert any(re.search(rf"\b{re.escape(v)}\b", body) for v in EVAL_FORBIDDEN_VERBS)
@@ -71,7 +71,7 @@ def test_missing_judges_raises(tmp_path: Path):
     d = tmp_path / "eval-nojudge"
     d.mkdir()
     (d / "SKILL.md").write_text(
-        "---\nname: eval-nojudge\ndescription: x\nslot: eval\n---\n\nbody\n", encoding="utf-8")
+        "---\nname: eval-nojudge\ndescription: x\nmetadata:\n  slot: eval\n---\n\nbody\n", encoding="utf-8")
     with pytest.raises(SkillError, match="declares no `judges`"):
         eval_skill_judges("eval-nojudge", tmp_path)
 
@@ -80,7 +80,7 @@ def test_judges_on_a_non_eval_skill_raises(tmp_path: Path):
     d = tmp_path / "not-eval"
     d.mkdir()
     (d / "SKILL.md").write_text(
-        "---\nname: not-eval\ndescription: x\nslot: general\njudges: [x]\n---\n\nbody\n",
+        "---\nname: not-eval\ndescription: x\nmetadata:\n  slot: general\n  judges: [x]\n---\n\nbody\n",
         encoding="utf-8")
     with pytest.raises(SkillError, match="slot 'general'.*judges"):
         eval_skill_judges("not-eval", tmp_path)

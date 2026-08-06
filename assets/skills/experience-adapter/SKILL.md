@@ -1,8 +1,9 @@
 ---
 name: experience-adapter
 description: Use when a keyword list and document-type prior have been supplied with the task and you must decide how far to trust them. Tells you the order to work a supplied plan, what a miss against a high-yield type actually means, when to leave the plan and search on your own words, and what to record when the plan and the chart disagree. The plan is a prior measured on other patients, not a description of this one.
-slot: experience
 license: MIT
+metadata:
+  slot: experience
 ---
 
 # Working a supplied plan without being trapped by it

@@ -178,25 +178,8 @@ def _resolve(env_var: str, relative: str, sibling_repo: str, what: str) -> Path:
 
 
 #: Env var naming the Site Mapping JSON for this deployment's corpus. Read by surfaces that take
-#: no command line — `acr-mcp` — because a mapping belongs to a CORPUS and not to a request.
+#: no command line, because a mapping belongs to a CORPUS and not to a request.
 SITE_MAPPING_ENV = "ACR_SITE_MAPPING"
-
-
-def site_mapping_path() -> Path | None:
-    """The configured Site Mapping file, or None. An ADDRESS, deliberately not the object.
-
-    Loading it would mean `core` importing `contract.site_mapping`, and
-    `tests/test_layering.py::test_no_layer_imports_a_higher_one` forbids that — including a lazy
-    import inside a function body. This module's job is where things are; constructing a contract
-    object is the caller's, and every caller of this is already allowed to.
-    """
-    raw = os.getenv(SITE_MAPPING_ENV, "").strip()
-    if not raw:
-        return None
-    path = Path(raw).expanduser()
-    if not path.is_file():
-        raise FileNotFoundError(f"{SITE_MAPPING_ENV}={raw} is not a file")
-    return path
 
 
 #: Env var holding the pseudonymisation secret. ONE NAME. `audit_loop._fingerprint` read

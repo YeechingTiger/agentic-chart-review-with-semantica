@@ -60,7 +60,6 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from langchain.agents import create_agent
 from langchain.agents.middleware import ModelCallLimitMiddleware, TodoListMiddleware, hook_config
 from langchain.agents.middleware.types import AgentMiddleware, ModelRequest, ToolCallRequest
 from langchain_core.messages import SystemMessage, ToolMessage
@@ -247,6 +246,19 @@ class RunContext:
     #: is how an unearned ledger gets stamped `GATE_VALIDATED`.
     coverage_unreachable: list = field(default_factory=list)
     declared: set[str] = field(default_factory=set)
+    #: EVERY `write_todos` payload, in order — the open-gap ledger's whole history for one run.
+    #:
+    #: The list itself lives in LangGraph state, where `write_todos` REPLACES it wholesale on every
+    #: call. That replacement is what makes the ledger honest in the prompt (no stale copy) and what
+    #: makes it invisible afterwards (no earlier version survives). A run could open a gap at step
+    #: three, close it at step nine, and finish with an empty list that reads exactly like a run
+    #: that never found anything — which is the `not_considered` / `not_applicable` confusion this
+    #: tree keeps meeting, one plane over.
+    #:
+    #: So each write is captured here as it happens. The trace carries them one event per write, so
+    #: a reader can watch which gaps opened, which closed, and in what order; the manifest carries
+    #: the final state and the count.
+    gap_writes: list = field(default_factory=list)
 
     @property
     def gate_validated(self) -> bool:
@@ -413,16 +425,14 @@ class AuditMiddleware(AgentMiddleware):
         open_ = self.ctx.threads.unresolved() if self.ctx.threads else []
         if not open_:
             return ""
-        rows = []
-        for t in open_[:10]:
-            rows.append(
-                f"  - {t.thread_id}: {getattr(t, 'obligation', '') or 'unsettled'}\n"
-                f'    settle it with revise_plan(resolve_threads=[{{"thread_id": '
-                f'"{t.thread_id}", "where_settled": "..."}}])\n'
-                f'    or, if this chart cannot settle it, revise_plan(dismiss_threads=[...]) '
-                f"with a reason")
-        return ("UNSETTLED THREADS — each of these blocks submit_answer until it is settled:\n"
-                + "\n".join(rows))
+        rows = [f"  - {t.thread_id}: {getattr(t, 'obligation', '') or 'unsettled'}"
+                f" ({t.doc_type or 'unknown type'}, {t.note_id})"
+                for t in open_[:10]]
+        return ("UNSETTLED THREADS — a document here deferred its own conclusion and nothing has "
+                "closed it yet. Reading that document to its end closes it automatically. These "
+                "do NOT block your answer: if one bears on the field and you cannot close it, "
+                "record it in write_todos with what would close it, and say so in your "
+                "reasoning.\n" + "\n".join(rows))
 
     def _triggers_block(self) -> str:
         """What was detected mechanically since the last call. DRAINED, so it is said once.
@@ -444,7 +454,7 @@ class AuditMiddleware(AgentMiddleware):
             rows.append(line)
         return ("OBSERVATIONS THAT REQUIRE A RESPONSE — detected mechanically since your last "
                 "turn. You are not being asked whether anything happened; these happened. For "
-                "each one either widen the plan with revise_plan or proceed knowing it stands:\n"
+                "each one either act on it, or record in write_todos why it stands:\n"
                 + "\n".join(rows))
 
     def _docs_by_type(self) -> dict[str, int]:
@@ -512,10 +522,9 @@ class AuditMiddleware(AgentMiddleware):
         nudge = ("You ended a turn without calling a tool, and no answer has passed the gate "
                  "yet, so nothing has been recorded. ")
         if open_ids:
-            nudge += (f"{len(open_ids)} thread(s) still block submit_answer: {open_ids[:5]}. "
-                      "Settle each with revise_plan — resolve_threads if you found where the "
-                      "deferred text was settled, dismiss_threads with a reason if it cannot "
-                      "be settled from this chart. ")
+            nudge += (f"{len(open_ids)} thread(s) are still unsettled: {open_ids[:5]}. They do "
+                      "not block your answer — read the document to its end to close one, or "
+                      "record it in write_todos and answer. ")
         nudge += "Call a tool now, or call submit_answer."
         self.ctx.tracer.emit("act_no_tool_call", severity="warning",
                              n=self.ctx.no_tool_call, unresolved=open_ids,
@@ -529,6 +538,32 @@ class AuditMiddleware(AgentMiddleware):
         return ToolMessage(content=json.dumps(payload, default=str)[:8000],
                            tool_call_id=request.tool_call["id"],
                            name=request.tool_call["name"], status="error")
+
+    def _record_gaps(self, args: dict) -> None:
+        """One `write_todos` payload, kept and traced.
+
+        Stored as `{status: [content, ...]}` rather than as the raw list, because the question a
+        reader asks of a run record is "what was still open when it answered", and a status-keyed
+        view answers it without them reconstructing it from a list of dicts. The raw entries stay
+        in the trace event, so nothing is lost for anyone who wants them.
+
+        Tolerant of a malformed payload on purpose. This is a record of what the model wrote, and a
+        write that does not match the expected shape is itself worth seeing — dropping it would
+        make a confused run look like a quiet one.
+        """
+        todos = args.get("todos")
+        entries = [t for t in todos if isinstance(t, dict)] if isinstance(todos, list) else []
+        by_status: dict[str, list[str]] = {}
+        for t in entries:
+            by_status.setdefault(str(t.get("status") or "unknown"), []).append(
+                str(t.get("content") or "")[:200])
+        self.ctx.gap_writes.append(by_status)
+        self.ctx.tracer.emit(
+            "open_gaps", runtime="deepagents-hooks", step=self.ctx.n_model_calls,
+            n_writes=len(self.ctx.gap_writes), by_status=by_status,
+            n_open=len(by_status.get("pending", [])) + len(by_status.get("in_progress", [])),
+            malformed=(len(entries) != len(todos)) if isinstance(todos, list) else True,
+            entries=entries[:20])
 
     def _undeclared(self, name: str) -> dict | None:
         if name in self.ctx.declared or name in LIBRARY_TOOLS:
@@ -577,6 +612,12 @@ class AuditMiddleware(AgentMiddleware):
         if undeclared is not None:
             return self._refuse(request, undeclared)
         result = handler(request)
+        # THE GAP LEDGER, RECORDED AS IT MOVES. `write_todos` is a library tool, so it does not go
+        # through `Toolbox.dispatch` and nothing else in this file would have seen it — the model
+        # could keep a careful account of what it left open and the run record would show none of
+        # it. Captured here because `wrap_tool_call` is the one hook that sees every tool.
+        if name == "write_todos":
+            self._record_gaps(args)
         # BEFORE detection, always. A read that completes a document must settle its thread
         # before the same result is scanned for markers, or a window read of an
         # already-complete document can re-open what it just closed.
@@ -812,6 +853,86 @@ class AuditMiddleware(AgentMiddleware):
             self.ctx.tracer.trigger(runtime="deepagents", **t.to_dict())
 
 
+#: What the plan IS here, replacing `TodoListMiddleware`'s default text.
+#:
+#: WHY OVERRIDE IT AT ALL. `write_todos` was bound on all 514 recorded runs and called on ZERO of
+#: them, and the library's own prompt is why: *"For simple objectives that only require a few steps,
+#: it is better to just complete the objective directly and NOT use this tool… not for simple
+#: few-step requests."* A chart review is eight to fifteen tool calls, so the model reads that
+#: carve-out and correctly declines. The tool was never broken; it was being told to stay quiet.
+#:
+#: AND THE DEFAULT ASKS FOR THE WRONG OBJECT. It frames the list as breaking a complex objective
+#: into steps — a task tracker. What this run needs recorded is narrower and harder: which questions
+#: bearing on the answer are still OPEN, and what would close each one. A run can execute every step
+#: it planned and still submit with an unchecked discriminator, which is exactly how SYN0001 was
+#: answered wrongly while looking complete.
+#:
+#: NAME THE NEXT ACTION, NOT THE TOPIC. `OpenThreadLedger.render` learned this the expensive way:
+#: on SYN0001 the model was shown an outstanding thread eighteen times and asked to settle it
+#: eighteen times, and called `resolve_threads` zero times, because the tool sat at the bottom of
+#: the prompt. *"An affordance named a long way from the obstacle it clears is one that does not
+#: exist in practice."* So each entry has to carry the call that would close it.
+OPEN_GAPS_PROMPT = """\
+## `write_todos` — the open-gap ledger
+
+Use `write_todos` to record WHAT IS STILL OPEN about this chart and WHAT WOULD CLOSE IT. This is
+not a task tracker and it is not a summary of what you have done; it is the list of questions that
+still bear on the answer and are not yet settled.
+
+Write one entry per open gap. Each entry names two things:
+
+  1. the question that is not yet closed — a fact about this chart you have not established
+  2. the concrete next action that would close it — the search, the document, the tool call
+
+Mark an entry completed the moment its question is settled, and say in the next entry what settling
+it revealed if that opened something new. Revise freely: a gap you find at step nine belongs in the
+list at step nine, not in your final reasoning.
+
+Two things that are NOT gaps: a step you simply have not run yet, and a rule you have decided does
+not apply. A gap is a question whose answer could change what you submit.
+
+Before you submit, the list is the account of what you left open. An empty list asserts that nothing
+bearing on this answer is unresolved — so if something is unresolved, leave it in the list and say
+so rather than clearing it to look finished. An open entry never blocks your answer; it is recorded,
+not enforced.
+"""
+
+OPEN_GAPS_TOOL_DESCRIPTION = """\
+Record the questions about this chart that are still open and the concrete next action that would
+close each one. Replaces the whole list on every call, so send the current state of every gap, not
+only the new ones. Statuses: pending (not yet closed), in_progress (being worked now), completed
+(settled — say what settled it)."""
+
+
+def _disable_injected_subagent(model) -> None:
+    """Turn off the auto-added general-purpose subagent, which is what puts `task` on the surface.
+
+    A harness profile is the only documented lever: `SubAgentMiddleware` is attached whenever at
+    least one synchronous subagent exists, and the general-purpose one is added unless a profile
+    disables it. Profiles are keyed on the provider the harness resolves for the model, and for a
+    PRE-BUILT model instance that resolved key is not published — the library only names it in a
+    warning when a lookup misses. So this registers the candidates it is known to use.
+
+    A MISS IS NOT SILENT, which is why best-effort is acceptable here. `assert_tool_surface` refuses
+    an agent carrying a tool this repo never declared, and `task` is not in `LIBRARY_TOOLS`: a run
+    whose profile failed to resolve dies at construction with the tool named, rather than quietly
+    handing the model a way to spawn work outside the coverage ledger.
+    """
+    from deepagents import (
+        GeneralPurposeSubagentProfile,
+        HarnessProfile,
+        register_harness_profile,
+    )
+
+    profile = HarnessProfile(
+        general_purpose_subagent=GeneralPurposeSubagentProfile(enabled=False))
+    candidates = {type(model).__name__.lower(),
+                  str(getattr(model, "_llm_type", "") or ""),
+                  model_identity(model).split(":")[0]}
+    for key in sorted(k for k in candidates if k):
+        register_harness_profile(key, profile)
+
+
 def build_agent(*, model, tools: list[StructuredTool], system_prompt: str, ctx: RunContext,
                 backend, max_model_calls: int, summarization_model=None,
                 keep_messages: int = 20, max_usd: float = 5.0, expansion_budget=None):
@@ -822,7 +943,9 @@ def build_agent(*, model, tools: list[StructuredTool], system_prompt: str, ctx: 
     and so its `wrap_model_call` appends the plan after `TodoListMiddleware` has added its own
     system-prompt block.
     """
+    from deepagents import FilesystemMiddleware, create_deep_agent
     from deepagents.middleware.summarization import SummarizationMiddleware
+    from langchain.agents.middleware import ContextEditingMiddleware
 
     ctx.declared = {t.name for t in tools}
     if ctx.spend is None:
@@ -830,17 +953,57 @@ def build_agent(*, model, tools: list[StructuredTool], system_prompt: str, ctx: 
         ctx.spend = Spend(max_usd=max_usd, model=model_identity(model))
     middleware = [
         # Planning. Todos live in STATE and `write_todos` REPLACES the list, so a revised plan
-        # leaves no stale copy in the transcript.
-        TodoListMiddleware(),
+        # leaves no stale copy in the transcript — and the replacement is what makes the plan's
+        # EVOLUTION observable: each write is the whole current gap list, so the sequence of writes
+        # is the record of which gaps opened, which closed, and in what order.
+        # The library's tool and state, our text — see `OPEN_GAPS_PROMPT` for why the default is wrong
+        # here and what the zero calls across 514 runs were caused by.
+        TodoListMiddleware(system_prompt=OPEN_GAPS_PROMPT,
+                           tool_description=OPEN_GAPS_TOOL_DESCRIPTION),
         # Context. Compaction plus offload of oversized tool results to the backend.
         SummarizationMiddleware(model=summarization_model or model, backend=backend,
                                 keep=("messages", keep_messages)),
         # The budget the CLI can finally reach, as a library concern rather than a dataclass
         # every construction site forgot to pass.
         ModelCallLimitMiddleware(thread_limit=max_model_calls, exit_behavior="end"),
+        # `ToolErrorMiddleware` IS NOT HERE, and the reason is worth recording because it looked
+        # like an exact swap. `Toolbox.dispatch` catches and returns `{"error": ...}` — a DOMAIN
+        # payload that `_record_reads` and `_detect` then read. The middleware returns an error
+        # `ToolMessage` instead, which those two do not understand. Same intent, different object;
+        # swapping it needs the detection pipeline changed with it, not a line moved.
+        # `ModelRetryMiddleware` IS NOT HERE either, and for a different reason than the tool-error
+        # one above: there was nothing hand-written to replace. Retry already lives on the client
+        # (`cli_common.chat_model`, `max_retries=3`) and that is the SDK's, not ours. Adding the
+        # middleware on top nested two policies — nine attempts for one call — and keeping only the
+        # middleware still cost 40s of backoff per hard provider failure, measured on
+        # `test_runtime_provider_error_is_visible_in_manifest_degradation`.
+        # Older tool results are cleared when the window fills, keeping the recent ones. Nothing
+        # did this before; chart documents are large and one run reads dozens.
+        ContextEditingMiddleware(),
         AuditMiddleware(ctx, budget=expansion_budget),
     ]
-    agent = create_agent(model, tools, system_prompt=system_prompt, middleware=middleware)
+    # THE HARNESS IS THE LIBRARY'S. This was `create_agent` plus a hand-assembled stack, and the
+    # module docstring's reason for that — `create_deep_agent` "injects nine tools nobody asked
+    # for" — was measured against 0.6.x, where there was no supported way to refuse them. On 0.7
+    # there are two, and both are used here:
+    #
+    #   FilesystemMiddleware(tools=[...])   the documented allowlist. `read_file` must stay in it,
+    #                                       and is what progressive disclosure needs to open a
+    #                                       skill; `write_file`, `edit_file`, `delete` and `glob`
+    #                                       never reach the model.
+    #   GeneralPurposeSubagentProfile(...)  disables the auto-added subagent, which is what puts
+    #                                       the `task` tool on the surface. With no synchronous
+    #                                       subagents declared, `SubAgentMiddleware` is not
+    #                                       attached at all.
+    #
+    # The other half of that reason still stands and is answered by the backend rather than by a
+    # tool list: under `StateBackend` there is no filesystem behind `read_file`, so it can reach
+    # only what this run seeded into state. A chart document is not in state — it is reachable
+    # solely through `Toolbox`, which is what keeps every read inside the `CoverageLedger`.
+    _disable_injected_subagent(model)
+    middleware.insert(1, FilesystemMiddleware(backend=backend, tools=["read_file", "ls"]))
+    agent = create_deep_agent(model=model, tools=tools, system_prompt=system_prompt,
+                              backend=backend, middleware=middleware)
     assert_tool_surface(agent, ctx.declared)
     return agent
 
@@ -1051,7 +1214,15 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         # own. Two places wiring the plan and the coverage ledger is the asymmetry the whole
         # audit layer exists to refuse, and a test harness is not exempt from it.
         ctx_out.append(ctx)
-    tools = list(tools) + [make_revise_plan_tool(ctx, expansion_budget)]
+    # NO PLANNING TOOL OF OURS. `revise_plan` was cut on 2026-08-06: `write_todos` is the plan,
+    # and an agent that needs two channels to say what is unfinished has two accounts of it.
+    #
+    # Its retrieval half was never reachable in practice — 0 calls across 514 recorded runs, and
+    # `apply_revision` had no caller outside the tool, so nothing the model could do ever widened a
+    # plan. Its obligation half became unnecessary when the thread refusal went soft: `truncated`
+    # is the only marker that ever blocked, and `OpenThreadLedger` settles it AUTOMATICALLY once
+    # the document is read to the end. What is left is a run that chose not to finish reading, and
+    # that is a gap to record in the ledger, not a refusal to argue past.
     agent = build_agent(model=model, tools=tools, system_prompt=system_prompt, ctx=ctx,
                         backend=backend, max_model_calls=max_model_calls, max_usd=max_usd,
                         expansion_budget=expansion_budget)
@@ -1432,6 +1603,14 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
         "recursion_limit": recursion_limit_for(agent, max_model_calls),
         # Non-zero means the model tried to stop without answering and was sent back.
         "no_tool_call_recoveries": ctx.no_tool_call,
+        # THE OPEN-GAP LEDGER AS IT STOOD AT SUBMISSION, plus how many times it moved. `final` is
+        # the last `write_todos` payload — what the model still considered open when it answered —
+        # and `n_writes` says whether it was maintained at all. The two are different findings:
+        # `n_writes: 0` is a run that never used the ledger, `n_writes: 4, final: {}` is a run that
+        # worked through its gaps and closed them, and both would look identical if only the final
+        # state were kept. Every intermediate write is in the trace as an `open_gaps` event.
+        "open_gaps": {"n_writes": len(ctx.gap_writes),
+                      "final": ctx.gap_writes[-1] if ctx.gap_writes else {}},
         # Non-null means the run was stopped for looping, not for lack of budget.
         "rejection_loop": ctx.stalled,
         "termination_reason": termination,
@@ -1496,142 +1675,6 @@ def run_chart_review(*, spec, chart, toolbox, coverage, evidence, plan, threads,
 #
 # ONE tool, not two, because `CoveragePlan.apply_revision` already applies both halves under
 # one budget and one monotonicity rule. Two tools would be two callers of that rule.
-
-REVISE_PLAN_DESCRIPTION = """Widen the retrieval plan and settle open threads.
-
-The plan may only GROW: add search terms, promote a document type toward more reading. A
-request to remove a term or demote a type is refused — scope that can shrink is not a scope.
-
-Promote to `search` to have a type's documents searched, or `read_all` to have every document
-of it read. `search` is the smaller step; ask for it unless you need the whole type.
-
-Threads: resolve_threads when you found where the deferred text was settled (say where);
-dismiss_threads when it cannot be settled from this chart at all (say why). A thread naming an
-outside facility or an outside institution CANNOT be resolved by reading, because the document
-is not in this record — dismiss it with that reason. An open thread blocks submit_answer."""
-
-
-def make_revise_plan_tool(ctx: RunContext, budget) -> StructuredTool:
-    """The typed channel, as a declared tool so `wrap_tool_call` audits it like any other."""
-    from .coverage_planner import REFUSED_THREAD_NOOP, PlanRevision
-
-    def _revise(add_terms: list | None = None, promote_types: list | None = None,
-                open_threads: list | None = None, resolve_threads: list | None = None,
-                dismiss_threads: list | None = None) -> str:
-        def pairs(rows, second):
-            out = []
-            for r in rows or []:
-                if isinstance(r, dict):
-                    out.append((str(r.get("thread_id", "")), str(r.get(second, "")) or "unstated"))
-                elif isinstance(r, (list, tuple)) and len(r) == 2:
-                    out.append((str(r[0]), str(r[1])))
-            return tuple(out)
-
-        rev = PlanRevision(
-            add_terms=tuple(str(t) for t in (add_terms or [])),
-            # THE TARGET IS THE AGENT'S TO NAME. Forcing `read_all` made every promotion the
-            # largest possible one: a type the plan had put in `sample` jumped straight to
-            # reading every document of it, when `search` is the smaller step and usually the
-            # right one. Monotonicity does not require the biggest move, only that no move
-            # shrinks — `apply_revision` still refuses a demotion.
-            promote_types=tuple(
-                ((str(t.get("type", "")), str(t.get("to", "search"))) if isinstance(t, dict)
-                 else (str(t), "search"))
-                for t in (promote_types or [])),
-            # OPENING is part of the channel too. The runtime opens threads from markers on
-            # its own, but an agent that notices a deferral the detector's catalogue does not
-            # list has no other way to record it — and the THREAD_NOOP refusal class exists
-            # precisely to answer a request to open one that is already open.
-            open_threads=tuple(
-                (str(t.get("note_id", "")), str(t.get("marker", "")), str(t.get("why", "")))
-                if isinstance(t, dict) else tuple(t) for t in (open_threads or [])),
-            resolve_threads=pairs(resolve_threads, "where_settled"),
-            dismiss_threads=pairs(dismiss_threads, "reason"))
-        # PARTIAL ON A BUDGET OVERRUN, all-or-nothing on monotonicity. `fit_terms_to_budget`
-        # owns that distinction and this tool was skipping it, so a request for three terms with
-        # room for two was refused whole — the agent never learned it could have had two, and
-        # re-sent all three. Its docstring is the argument: nothing about the requested terms is
-        # inadmissible, there is simply not enough allowance, and that is a different failure
-        # from a revision that also tried to demote a type.
-        from .plan_expansion import fit_terms_to_budget
-        rev, deferred = fit_terms_to_budget(rev, ctx.plan, budget)
-        ctx.terms_deferred.extend(t for t in deferred if t not in ctx.terms_deferred)
-        outcome = ctx.plan.apply_revision(
-            rev, step=ctx.n_model_calls, trigger="agent_request",
-            observation="requested by the agent through revise_plan", budget=budget,
-            threads=ctx.threads,
-            n_docs_by_type={r["doc_type"]: r["count"] for r in ctx.chart.type_summary()},
-            known_types=[r["doc_type"] for r in ctx.chart.type_summary()])
-        ctx.revisions.append({"requested": rev.__dict__ if hasattr(rev, "__dict__")
-                              else str(rev), "applied": bool(outcome.applied),
-                              "refused": list(outcome.refused),
-                              "terms_deferred": deferred})
-        # THE THREAD HALF IS NOT COLLATERAL DAMAGE OF THE RETRIEVAL HALF. A revision that both
-        # over-reached on types AND resolved the thread blocking the answer used to end the run
-        # twice over — refused, and still thread-blocked, with the resolution nowhere. Thread
-        # bookkeeping cannot violate monotonicity or widen what may be opened, so it does not
-        # belong to the refusal. Re-sent through `apply_revision` rather than applied against
-        # the ledger here, so a resolution's semantics stay defined in one place.
-        salvaged = None
-        if not outcome.applied and getattr(outcome, "refusal_class", None) != REFUSED_THREAD_NOOP:
-            threads_only = PlanRevision(open_threads=rev.open_threads,
-                                        resolve_threads=rev.resolve_threads,
-                                        dismiss_threads=rev.dismiss_threads)
-            if not threads_only.is_empty():
-                salvaged = ctx.plan.apply_revision(
-                    threads_only, step=ctx.n_model_calls, trigger="thread_work_salvage",
-                    observation="the retrieval half of this revision was refused", budget=budget,
-                    threads=ctx.threads,
-                    n_docs_by_type={r["doc_type"]: r["count"] for r in ctx.chart.type_summary()},
-                    known_types=[r["doc_type"] for r in ctx.chart.type_summary()])
-                ctx.tracer.emit("thread_work_salvaged", severity="warning",
-                                applied=salvaged.applied,
-                                threads_opened=salvaged.threads_opened,
-                                threads_resolved=salvaged.threads_resolved,
-                                threads_dismissed=salvaged.threads_dismissed,
-                                refused=list(salvaged.refused),
-                                message=("the retrieval half was refused; its thread operations "
-                                         "were re-applied on their own rather than discarded "
-                                         "with it"))
-        if deferred:
-            ctx.tracer.emit("revision_partially_applied", severity="warning",
-                            deferred_terms=list(deferred), applied=bool(outcome.applied),
-                            message=("the term list did not fit the remaining expansion budget; "
-                                     "what fitted was applied and the rest is named so the "
-                                     "agent does not re-send it"))
-        ctx.tracer.emit("plan_revision", runtime="deepagents-hooks",
-                        applied=bool(outcome.applied), refused=list(outcome.refused),
-                        refusal_class=getattr(outcome, "refusal_class", None))
-        return json.dumps({
-            "applied": bool(outcome.applied), "refused": list(outcome.refused),
-            "thread_work_salvaged": bool(salvaged and salvaged.applied),
-            "unresolved_threads": [t.thread_id for t in ctx.threads.unresolved()],
-            # NAMED, not counted. An agent told only "partly applied" re-sends the part that
-            # already landed, which is the loop this channel exists to end.
-            "terms_deferred_for_budget": list(deferred),
-            # The refusals are returned verbatim rather than summarised: an agent told only
-            # "partly applied" re-sends the part that already landed, which is the loop this
-            # channel exists to end.
-            "note": ("the plan is re-rendered for you on the next turn; do not re-send what "
-                     "was applied")}, default=str)[:6000]
-
-    return StructuredTool.from_function(
-        func=_revise, name="revise_plan", description=REVISE_PLAN_DESCRIPTION,
-        args_schema={"type": "object", "properties": {
-            "add_terms": {"type": "array", "items": {"type": "string"}},
-            "promote_types": {"type": "array", "items": {"type": "object", "properties": {
-                "type": {"type": "string"},
-                "to": {"type": "string", "enum": ["search", "read_all"],
-                       "description": "search is the smaller step; ask for read_all only when "
-                                      "every document of the type must be read"}}}},
-            "resolve_threads": {"type": "array", "items": {"type": "object", "properties": {
-                "thread_id": {"type": "string"}, "where_settled": {"type": "string"}}}},
-            "open_threads": {"type": "array", "items": {"type": "object", "properties": {
-                "note_id": {"type": "string"}, "marker": {"type": "string"},
-                "why": {"type": "string"}}}},
-            "dismiss_threads": {"type": "array", "items": {"type": "object", "properties": {
-                "thread_id": {"type": "string"}, "reason": {"type": "string"}}}}}})
-
 
 def _case_refused_manifest(spec, chart, case, refusal: dict, out_dir, run_id, model,
                            runtime_profile: str) -> dict:

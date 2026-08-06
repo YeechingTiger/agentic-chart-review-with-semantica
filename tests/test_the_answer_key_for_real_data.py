@@ -203,36 +203,3 @@ def test_the_converter_writes_only_through_the_local_store(tmp_path, monkeypatch
     assert (tmp_path / "local" / "work.json").is_file()
     assert typer  # the import is the point: a BadParameter here is a refusal, not a crash
 
-
-def test_eval_score_refuses_a_phi_key_inside_the_worktree(tmp_path):
-    """The refusal fires only on the real danger: a key that DECLARES it holds patient data, sitting
-    where Git can reach it. A synthetic key from `tmp_path` is untouched by it."""
-    from acr.commands.cli_eval import _answer_key
-    safe = tmp_path / "key.json"
-    safe.write_text(json.dumps({"C1": {"fields": {FIELD: "x"}}}), encoding="utf-8")
-    assert _answer_key(str(safe))["C1"]
-
-    import typer
-
-    from acr.core import local_artifacts as LA
-    inside = LA._git_root() / "docs" / "_phi_key_test_only.json"
-    try:
-        inside.write_text(json.dumps({"_contains_phi": True,
-                                      "C1": {"fields": {FIELD: "x"}}}), encoding="utf-8")
-        with pytest.raises(typer.BadParameter, match="contains_phi"):
-            _answer_key(str(inside))
-    finally:
-        inside.unlink(missing_ok=True)
-
-
-def test_a_synthetic_key_inside_the_worktree_is_still_accepted(tmp_path):
-    """The guard must be incapable of refusing something safe — the property the five deleted
-    content checks lacked. `tools/answer_key_from_corpus.py` writes keys with no PHI flag."""
-    from acr.commands.cli_eval import _answer_key
-    from acr.core import local_artifacts as LA
-    inside = LA._git_root() / "docs" / "_synthetic_key_test_only.json"
-    try:
-        inside.write_text(json.dumps({"C1": {"fields": {FIELD: "x"}}}), encoding="utf-8")
-        assert _answer_key(str(inside))["C1"]
-    finally:
-        inside.unlink(missing_ok=True)

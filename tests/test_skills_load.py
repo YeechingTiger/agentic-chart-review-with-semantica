@@ -143,4 +143,6 @@ def test_every_skills_frontmatter_parses_and_a_tactic_declares_its_precondition(
         fm = yaml.safe_load(m.group(1))
         assert isinstance(fm, dict), f"{d.name}: frontmatter is not a mapping"
         if skill_slot(d.name) == "tactic":
-            assert fm.get("precondition"), f"{d.name} sits in the tactic slot and declares no precondition"
+            from acr.contract.skills import skill_meta
+            assert skill_meta(d.name, "precondition"), (
+                f"{d.name} sits in the tactic slot and declares no precondition")

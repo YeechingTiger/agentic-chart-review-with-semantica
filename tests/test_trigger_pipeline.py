@@ -380,60 +380,13 @@ def test_zero_hit_search_reaches_the_agent_and_the_new_term_becomes_an_obligatio
     shown = [m for m in llm.seen_system if TRIGGER_ZERO_HIT_SEARCH in m]
     assert shown, "the zero-hit search never reached the agent"
     assert "OBSERVATIONS THAT REQUIRE A RESPONSE" in shown[0]
-    assert "revise_plan" in shown[0], (
+    assert "write_todos" in shown[0], (
         "an observation with no named way to answer it is a shrug with a label")
     # DRAINED: said once, not re-announced on every later turn.
     assert len(shown) == 1, "the observation was repeated instead of drained"
 
 
 
-
-
-def test_an_unsettled_thread_blocks_submission_and_a_resolution_unblocks_it(spec, chart,
-                                                                           tmp_path):
-    """The gate refuses while a thread is open, and stops refusing FOR THAT REASON once settled.
-
-    Not "and then accepts": the gate has several obligations in a fixed order — evidence first,
-    then the thread — so the script has to record evidence before the thread is what blocks it,
-    and a later refusal for coverage is not this test's business. Asserting acceptance would make
-    the test pass or fail on an unrelated obligation.
-
-    The settlement arrives through `revise_plan`, which is also the only reason the refusal is
-    answerable at all: the gate's `how_to_satisfy` names that call.
-    """
-    nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    good = {"status": "FOUND", "value": {"primary_site": "C341", "histology": "8140",
-                                         "behavior": "3"},
-            "reasoning": "the report is explicit"}
-
-    def cite(prompt):
-        hits = llm.results_for("search_notes")
-        h = (hits[-1].get("hits") or [{}])[-1] if hits else {}
-        return ("record_evidence", {"note_id": h.get("note_id", nid), "start": h.get("start", 0),
-                                    "end": h.get("end", 40), "supports": "histology"})
-
-    llm = ScriptedLLM(acts=[
-        ("read_document", {"note_id": nid, "limit": 40}),      # opens a `truncated` thread
-        ("search_notes", {"query": "carcinoma"}),
-        cite,                                                  # so the thread is what blocks
-        ("submit_answer", good),
-        ("revise_plan", {"resolve_threads": [
-            {"thread_id": f"{nid}#{TRUNCATED}", "where_settled": "paged to the end"}]}),
-        ("submit_answer", good),
-    ], assignments=_assignments(chart))
-    ctx, _, events = _run(spec, chart, llm, tmp_path, "thread", max_steps=10)
-
-    def names_the_thread(e):
-        return any("unsettled thread" in str(m) for m in (e.get("missing") or []))
-
-    rejects = [e for e in events if e.get("kind") == "answer_rejected"]
-    assert rejects, "the submission was never refused"
-    blocked = [i for i, e in enumerate(rejects) if names_the_thread(e)]
-    assert blocked, f"the thread never blocked a submission; refusals were " \
-                    f"{[e.get('why') for e in rejects]}"
-    assert check_threads(ctx.threads) == [], "the resolution did not clear the obligation"
-    assert not any(names_the_thread(e) for e in rejects[blocked[-1] + 1:]), (
-        "the thread was settled and the gate still blocked on it")
 
 
 # ==========================================================================================
@@ -579,42 +532,6 @@ def _tight(**kw):
                 max_documents_opened_by_promotion=500, max_revisions=6)
     base.update(kw)
     return ExpansionBudget(**base)
-
-
-
-def test_thread_work_survives_a_retrieval_half_that_is_refused_outright(spec, chart):
-    """A hallucinated type refuses the revision WHOLE — correctly, for the retrieval half.
-
-    Thread bookkeeping is not the retrieval half: it cannot violate monotonicity and cannot
-    widen what may be opened, so it does not belong to the refusal. A revision that both
-    over-reached on types AND settled the thread blocking the answer used to end the run twice
-    over — refused, and still thread-blocked, with the resolution nowhere.
-    """
-    nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    threads = OpenThreadLedger()
-    threads.open_thread(**_open_kwargs(nid))
-    tool, ctx = _revise_tool(spec, chart, threads=threads)
-
-    r = _revise(tool, promote_types=[{"type": "Not-A-Real-Type", "to": "read_all"}],
-                resolve_threads=[{"thread_id": f"{nid}#{TRUNCATED}",
-                                  "where_settled": "read to the end"}])
-    assert r["applied"] is False, (
-        "the hallucinated type must still be refused; dropping it would leave the agent "
-        "believing it had widened a scope it had not")
-    assert r["thread_work_salvaged"] is True
-    assert check_threads(ctx.threads) == [], "the settlement went down with the refusal"
-
-
-
-def test_a_term_overrun_alone_does_not_end_the_run_while_promotions_remain(spec, chart):
-    """Terms spent is not expansion spent. A type promotion is still affordable."""
-    from acr.review.plan_expansion import expansion_is_spent
-
-    budget = _tight()
-    tool, ctx = _revise_tool(spec, chart, expansion_budget=budget)
-    _revise(tool, add_terms=["mucinous", "signet", "cribriform"])
-    assert expansion_is_spent(ctx.plan, budget, terms_deferred=list(ctx.terms_deferred)) is False, (
-        "the term allowance is gone but the plan can still widen by promoting a type")
 
 
 
@@ -773,80 +690,6 @@ def test_a_no_op_open_alongside_real_work_does_not_refuse_the_real_work(spec, ch
 
 
 
-def test_the_no_op_refusal_reaches_the_model_in_the_loop_it_understands(spec, chart):
-    """The nine identical opens of SYN0001, cut to two, with the answer to them.
-
-    What the model is handed back is the whole point: on the real run it was handed "Your
-    revision was APPLIED" and the re-rendered plan, which is indistinguishable from progress.
-    The tool's return value is that channel now, so the refusal is in the model's hands by
-    construction rather than by a prompt someone remembered to write.
-    """
-    nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    tool, ctx = _revise_tool(spec, chart)
-    ask = dict(open_threads=[{"note_id": nid, "marker": TRUNCATED,
-                              "why": "the read stopped short"}])
-
-    _revise(tool, **ask)          # the first open is the side effect under test
-    second = _revise(tool, **ask)
-
-    assert len(ctx.threads.threads) == 1, "the second open created a second thread"
-    assert second["applied"] is False, "a revision that moved nothing was recorded as one that did"
-    told = json.dumps(second)
-    assert "REFUSED" in told.upper() and nid in told, (
-        "the model was never told its request changed nothing, so it repeats it")
-
-
-# ------------------------------------------------------ the affordance, where the block is
-def test_the_gate_rejection_hands_back_the_way_to_settle_the_thread(spec, chart, tmp_path):
-    """`gate_answer` writes `how_to_satisfy`; `_n_act` used to drop it before the model saw it.
-
-    That key is the only place a rejection says the word `resolve_threads`. Telling a run what
-    is wrong and not what to do about it is how a loop becomes a deadlock.
-    """
-    nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    llm = ScriptedLLM(
-        acts=[("read_document", {"note_id": nid, "limit": 40}),
-              ("submit_answer", {"status": "EVIDENCE_INSUFFICIENT", "reasoning": "scripted",
-                                 "value": {}})],
-        assignments=_assignments(chart))
-    _run(spec, chart, llm, tmp_path, "gate-says-how", max_steps=4)
-
-    (rejection,) = [r for _, r in llm.tool_results if r.get("accepted") is False]
-    assert any("unsettled thread" in m for m in rejection["you_must_still"]), (
-        "fixture assumption: the submission was refused for the thread")
-    assert "resolve_threads" in rejection.get("how_to_satisfy", ""), (
-        "the gate wrote the way out and the boundary threw it away; SYN0001 answered this "
-        "rejection with nine more requests to OPEN the thread and none to resolve it")
-
-
-
-def test_the_prompt_names_the_settling_call_beside_the_thread_that_blocks(spec, chart, tmp_path):
-    """An affordance named a long way from the obstacle it clears does not exist in practice.
-
-    `resolve_threads` sat in a schema at the bottom of the reflect prompt for all eighteen
-    reflections of the real run and was never used once; the agent re-opened the same thread
-    instead. There is no reflect prompt now — the block rides the system message, rebuilt each
-    call — but the rule is the same and so is the test: the way out is printed next to the thing
-    it unblocks.
-    """
-    nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    llm = ScriptedLLM(acts=[("read_document", {"note_id": nid, "limit": 40}),
-                            ("document_type_summary", {}),
-                            ("document_type_summary", {})],
-                      assignments=_assignments(chart))
-    _run(spec, chart, llm, tmp_path, "prompt-names-resolve", max_steps=4)
-
-    shown = [m for call in llm.seen_system for m in [call] if f"{nid}#{TRUNCATED}" in m]
-    assert shown, "the agent was never shown the open thread"
-    for block in shown:
-        threads_block = block.split("UNSETTLED THREADS")[1].split("OBSERVATIONS THAT REQUIRE")[0] \
-            if "OBSERVATIONS THAT REQUIRE" in block else block.split("UNSETTLED THREADS")[1]
-        assert f'"thread_id": "{nid}#{TRUNCATED}"' in threads_block, (
-            "the agent is told the thread blocks it without being told, in the same breath, "
-            "the call that settles it")
-        assert "dismiss_threads" in threads_block
-
-
 # ------------------------------------------------------------------------- the termination
 def test_a_run_that_stops_owing_an_obligation_cannot_ship_a_value(spec, chart, tmp_path):
     """The end of the SYN0001 run, and the thing it was supposed to be.
@@ -959,33 +802,6 @@ def test_three_partial_reads_of_one_document_fire_one_unsettled_thread_trigger(s
     assert len(_triggers(events, TRIGGER_UNSETTLED_THREAD)) == 1, (
         "three short reads of one document are one obligation, not three")
     assert len(ctx.threads.threads) == 1
-
-
-def test_a_resolved_thread_is_not_announced_again_by_a_later_partial_read(spec, chart, tmp_path):
-    """Once settled, a thread must not come back as new debt on the next short read.
-
-    The revision used to arrive through the reflect node's JSON; it arrives through the declared
-    `revise_plan` tool now, which is the same operation with an audit trail. What is asserted is
-    unchanged: the ledger settles once and stays settled.
-    """
-    nid = _first_of_type(chart, PATHOLOGY_TYPE)
-    llm = ScriptedLLM(acts=[
-        ("read_document", {"note_id": nid, "offset": 0, "limit": 40}),
-        ("revise_plan", {"resolve_threads": [
-            {"thread_id": f"{nid}#{TRUNCATED}",
-             "where_settled": "paged to the end and read FINAL DIAGNOSIS"}]}),
-        ("read_document", {"note_id": nid, "offset": 0, "limit": 60}),
-        ("document_type_summary", {}),
-    ], assignments=_assignments(chart))
-    ctx, manifest, events = _run(spec, chart, llm, tmp_path, "resolved-not-reannounced",
-                                 max_steps=6)
-
-    (thread,) = ctx.threads.threads
-    assert thread.state == "resolved", "the revision must have settled it"
-    assert check_threads(ctx.threads) == [], "a settled thread may not block submission"
-    # One trigger for the first short read, and NONE for the one after the resolution.
-    assert len(_triggers(events, TRIGGER_UNSETTLED_THREAD)) == 1, (
-        "the second short read re-announced a thread that was already settled")
 
 
 def test_request_open_names_all_four_outcomes_and_open_thread_no_longer_returns_a_sentinel():
@@ -1230,3 +1046,63 @@ def test_a_gate_obligation_detector_that_crashed_is_not_an_empty_list(spec, char
     assert "RuntimeError" in ev["error"] and "the gate blew up" in ev["error"]
 
 
+
+
+# ================================================================================================
+# THREADS ARE ADVISORY — the property that replaced the refusal on 2026-08-06
+# ================================================================================================
+def test_an_unsettled_thread_is_recorded_and_surfaced_but_does_not_block_the_answer(
+        spec, chart, tmp_path):
+    """What replaced the refusal, and why the ten tests that pinned the refusal were deleted.
+
+    An unsettled thread used to stop `submit_answer`, and `revise_plan` was the only call that
+    cleared one. Both are gone. The arc was already most of the way here: `BLOCKING_MARKERS` had
+    fallen from ~21 markers to `truncated` alone, and `truncated` settles AUTOMATICALLY the moment
+    the document is read to its end (the test above). What the refusal actually caught was a run
+    that chose not to finish a document — and the answer to that is a recorded gap, not a refusal
+    the agent has to argue past with a tool built for the purpose.
+
+    So three things must hold together, and a change that breaks any one of them has removed the
+    obligation rather than softened it:
+
+      OPENED     the partial read still opens the thread — detection is unchanged
+      SURFACED   the prompt still names it, so the model can act on it
+      ADVISORY   the answer is not refused for it
+
+    The third alone would be a regression dressed as a simplification: a thread nobody is told
+    about and nothing blocks on is a thread that does not exist.
+    """
+    nid = _first_of_type(chart, PATHOLOGY_TYPE)
+    llm = ScriptedLLM(
+        acts=[("read_document", {"note_id": nid, "offset": 0, "limit": 40})],
+        assignments=_assignments(chart))
+    agent, result, events = _run(spec, chart, llm, tmp_path, "threads-advisory", max_steps=4)
+
+    # OPENED
+    (t,) = _triggers(events, TRIGGER_UNSETTLED_THREAD)
+    assert t["marker"] == TRUNCATED
+    (thread,) = agent.threads.threads
+    assert thread.state == "open", "the partial read must still leave the thread open"
+
+    # ADVISORY — nothing refused the run for it
+    assert not [e for e in events if e.get("kind") == "open_threads_block_answer"], (
+        "the gate emitted its thread-refusal event; the refusal was supposed to be gone")
+    assert result["answer"], "the run produced no answer at all"
+
+    # SURFACED — and it must not claim to block, because it does not
+    shown = [m for m in llm.seen_system if "UNSETTLED THREADS" in m]
+    assert shown, "an open thread was never named in the prompt"
+    # THE THREADS BLOCK ALONE, not the whole system message. `OPEN_GAPS_PROMPT` says "An open
+    # entry never blocks your answer" a few blocks away, and a substring search over the lot
+    # matched that and called it a false claim — the test reporting its own imprecision.
+    block = shown[-1][shown[-1].index("UNSETTLED THREADS"):].split("\n\n")[0]
+    assert thread.thread_id in block
+    # A POSITIVE ASSERTION, after two imprecise negative ones. "no mention of blocking" is not
+    # the property: the correct text says the threads do NOT block, so a substring search for
+    # "block" matches the right answer as readily as the wrong one. What must hold is that the
+    # prompt states the true standing, because a prompt claiming an enforcement the runtime
+    # dropped is the defect this repo keeps finding.
+    assert "do not block" in block.lower(), (
+        f"the threads block must say where it stands; it says: {block[:200]!r}")
+    assert "write_todos" in block, (
+        "an obligation with no named way to carry it is a shrug with a label")

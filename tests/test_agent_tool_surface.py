@@ -37,10 +37,13 @@ def test_our_tools_plus_the_sanctioned_library_tool_pass():
     assert bound == OURS | {"write_todos"}
 
 
-def test_a_filesystem_tool_is_refused():
+def test_a_filesystem_write_tool_is_refused():
+    """`write_file`, not `read_file`. Read paths were admitted on 2026-08-06 because the backend
+    is `StateBackend` and there is no filesystem behind them; a WRITE tool is refused whatever the
+    backend, because nothing in a chart review has any business writing."""
     with pytest.raises(ToolSurfaceError) as e:
-        assert_tool_surface(_FakeAgent(OURS | {"read_file"}), OURS)
-    assert "read_file" in str(e.value)
+        assert_tool_surface(_FakeAgent(OURS | {"write_file"}), OURS)
+    assert "write_file" in str(e.value)
     assert "coverage ledger" in str(e.value), "the refusal must say WHY, not just that"
 
 
@@ -51,7 +54,9 @@ def test_shell_execution_is_refused():
 
 def test_every_tool_create_deep_agent_would_have_injected_is_refused():
     """Named individually so the message points at the one that appeared."""
-    for name in ("ls", "glob", "grep", "read_file", "write_file", "edit_file", "execute", "task"):
+    # `ls` and `read_file` left this list on 2026-08-06 — see `test_the_sanctioned_set_is_small`.
+    # `task` stays, and it is the one that matters: it spawns work outside the coverage ledger.
+    for name in ("glob", "grep", "write_file", "edit_file", "execute", "task"):
         with pytest.raises(ToolSurfaceError, match=name):
             assert_tool_surface(_FakeAgent(OURS | {name}), OURS)
 
@@ -62,9 +67,25 @@ def test_the_guard_is_a_whitelist_not_a_blacklist():
         assert_tool_surface(_FakeAgent(OURS | {"tool_invented_next_release"}), OURS)
 
 
-def test_only_write_todos_is_sanctioned():
-    """Widening LIBRARY_TOOLS is a decision about the coverage ledger, so it stays small."""
-    assert LIBRARY_TOOLS == frozenset({"write_todos"})
+def test_the_sanctioned_set_is_small_and_says_why_each_member_is_in_it():
+    """Widening `LIBRARY_TOOLS` is a decision about the coverage ledger, so it stays small and the
+    reasoning stays beside it.
+
+    `read_file` and `ls` were admitted when `build_agent` moved onto `create_deep_agent`:
+    progressive disclosure needs the model to open a `SKILL.md`, and under `StateBackend` those
+    two reach only what the run seeded into state — never a chart document, which is reachable
+    solely through `Toolbox`. That admission is CONDITIONAL ON THE BACKEND. Under a
+    `FilesystemBackend` the same two tools reach absolute paths outside the root, so this test
+    also pins the condition: if the backend ever changes, this set must be re-argued."""
+    assert LIBRARY_TOOLS == frozenset({"write_todos", "read_file", "ls"})
+
+    import inspect
+
+    from acr.review import agent as A
+    src = inspect.getsource(A.build_agent)
+    assert "StateBackend" in src or "backend=backend" in src, (
+        "the read-path admission above is only sound while the agent's backend has no filesystem "
+        "behind it")
 
 
 def test_a_missing_tool_is_not_this_check_s_business():

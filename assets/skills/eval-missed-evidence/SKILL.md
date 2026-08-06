@@ -1,9 +1,10 @@
 ---
 name: eval-missed-evidence
 description: Use when the answer key says a value is documented but the run reported it absent or wrong, and you must find why the text was never reached. Tells you the four places a retrieval failure can sit, how to distinguish never-searched from searched-and-missed from read-and-misjudged, and what evidence from the trace each conclusion requires. Does not establish that the value is in the chart - that comes from the answer key and the scorer.
-slot: eval
-judges: [retrieval_failure_locus, term_coverage, type_filter_effect]
 license: MIT
+metadata:
+  slot: eval
+  judges: retrieval_failure_locus term_coverage type_filter_effect
 ---
 
 # The answer was in the chart and the run did not use it

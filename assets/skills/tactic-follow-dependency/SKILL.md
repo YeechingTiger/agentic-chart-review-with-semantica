@@ -1,9 +1,10 @@
 ---
 name: tactic-follow-dependency
 description: Use when a document points somewhere else and you want to follow the lead to where the question was settled, rather than sampling more of the chart. Tells you which pointers are worth following and in what order, how far to follow one before abandoning it, how to avoid walking in a circle, and what following a lead cannot tell you about the rest of the chart. Pairs with but does not replace a broad sweep.
-slot: tactic
-precondition: "A source has been read that defers its own conclusion, names another source, or leaves a dependency unresolved."
 license: MIT
+metadata:
+  slot: tactic
+  precondition: "A source has been read that defers its own conclusion, names another source, or leaves a dependency unresolved."
 ---
 
 # Following one lead to where it ends

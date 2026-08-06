@@ -1,8 +1,9 @@
 ---
 name: thread-chasing
 description: Use when a document defers its own conclusion or a read comes back incomplete - a report says pending, stains pending, preliminary, deferred, to be dictated, see addendum, amended, additional sections, correlate clinically, or names an outside facility; a read_document result has truncated true; a search hits a report you have only partly read; or you are about to record a value taken from an interim line. Tells you what each marker obliges, the three places the resolving text lives and the order to try them, and what to record when the thread cannot be closed.
-slot: general
 license: MIT
+metadata:
+  slot: general
 ---
 
 # Chasing an unsettled thread to where it was settled

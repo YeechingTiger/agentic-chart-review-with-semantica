@@ -1,9 +1,10 @@
 ---
 name: tactic-counterevidence
 description: Use once you hold a candidate answer and before you submit it - spend a bounded effort trying to overturn it rather than to confirm it. Covers the five shapes an overturning source takes, why the search that would find one is not the search that found the candidate, and what to record when the attempt comes back empty. A move, called when a candidate exists.
-slot: tactic
-precondition: "A candidate answer exists and has not yet been submitted."
 license: MIT
+metadata:
+  slot: tactic
+  precondition: "A candidate answer exists and has not yet been submitted."
 ---
 
 # Trying to overturn what you have

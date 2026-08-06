@@ -158,9 +158,9 @@ MONOTONICITY_VS_LEDGER = (
 POLICIES = ("sample", "search", "read_all")
 POLICY_RANK = {p: i for i, p in enumerate(POLICIES)}
 
-#: A spec stratum policy -> the plan bucket it implies. Same table as `mcp_server`, and it
-#: has to stay the same table: two mappings from stratum policy to reading policy would give
-#: two different answers to "may the agent open this", one per front end.
+#: A spec stratum policy -> the plan bucket it implies. This was duplicated in the MCP server
+#: until 2026-08-05, and had to be kept identical: two mappings from stratum policy to reading
+#: policy would give two different answers to "may the agent open this", one per front end.
 POLICY_BUCKET = {
     "exhaustive": "read_all",
     "exhaustive_until_witness": "read_all",

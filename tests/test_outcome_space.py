@@ -139,22 +139,22 @@ def test_the_status_enum_offered_to_the_model_is_built_from_the_contract(chart):
 def test_every_runtime_binds_the_contract_to_the_toolbox_it_builds():
     """The omission this guards against is silent, which is the only reason it needs a test.
 
-    `Toolbox(spec=None)` is legitimate — `mcp_server` builds a scratch toolbox before a spec
-    is chosen — so forgetting `spec=` on the RUN path raises nothing. It falls back to the
-    default three, and the symptom is a contract whose new status the model never uses, which
-    reads as the model declining to use it.
+    `Toolbox(spec=None)` is legitimate — a caller may build a scratch toolbox before a spec is
+    chosen — so forgetting `spec=` on the RUN path raises nothing. It falls back to the default
+    three, and the symptom is a contract whose new status the model never uses, which reads as
+    the model declining to use it.
+
+    One runtime now, not two: the MCP server was removed on 2026-08-05. The property is unchanged
+    and still worth asserting — it was never about agreement between front ends, it was about the
+    run path binding the contract.
     """
     import inspect
 
     import acr.review.agent as A
-    import acr.review.mcp_server as M
 
     run = inspect.getsource(A)
     i = run.index("toolbox = Toolbox(")
     assert "spec=spec" in run[i:i + 300], "acr.review.agent builds its toolbox without the contract"
-    mcp = inspect.getsource(M)
-    j = mcp.index("toolbox = Toolbox(")
-    assert "spec=spec" in mcp[j:j + 300], "mcp_server builds its run toolbox without the contract"
 
 
 def test_the_answer_records_what_its_status_meant():
@@ -180,7 +180,7 @@ def test_the_answer_records_what_its_status_meant():
 
 
 def test_a_toolbox_built_without_a_spec_still_offers_the_default_three(chart):
-    """`mcp_server` builds a scratch toolbox before any spec is chosen."""
+    """A scratch toolbox, built before any spec is chosen, still offers the default space."""
     tb = Toolbox(chart, EvidenceLedger(), CoverageLedger(list(chart._docs.values()), []))
     submit = next(s for s in tb.schemas() if s["function"]["name"] == "submit_answer")
     assert submit["function"]["parameters"]["properties"]["status"]["enum"] == [

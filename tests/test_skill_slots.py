@@ -12,7 +12,6 @@ import re
 from pathlib import Path
 
 import pytest
-import yaml
 
 from acr.contract.skills import (
     SLOTS,
@@ -41,9 +40,8 @@ def _skill_names() -> list[str]:
 
 @pytest.mark.parametrize("name", _skill_names())
 def test_every_skill_declares_a_known_slot(name: str):
-    import yaml as _y
-    _fm = _y.safe_load(_FM.match((SKILLS_DIR / name / "SKILL.md").read_text(encoding="utf-8")).group(1))
-    if str(_fm.get("kind") or "prose") != "prose":
+    from acr.contract.skills import skill_meta
+    if str(skill_meta(name, "kind") or "prose") != "prose":
         pytest.skip("only prose skills are assembled into a prompt, so only they need a slot")
     slot = skill_slot(name)
     assert slot in SLOTS, f"{name}: slot {slot!r} not one of {SLOTS}"
@@ -51,13 +49,21 @@ def test_every_skill_declares_a_known_slot(name: str):
 
 @pytest.mark.parametrize("name", _skill_names())
 def test_declared_slot_matches_the_file(name: str):
-    """skill_slot reads exactly that one line in the file, not something inferred elsewhere."""
-    text = (SKILLS_DIR / name / "SKILL.md").read_text(encoding="utf-8")
-    fm = yaml.safe_load(_FM.match(text).group(1))
-    if str(fm.get("kind") or "prose") != "prose":
+    """`skill_slot` reports what DEEPAGENTS parsed out of the card, not a second reading of it.
+
+    This test used to open the file and compare against its own `yaml.safe_load`. That made it the
+    tree's second frontmatter parser, and a test that reimplements the thing it checks agrees with
+    itself for the wrong reasons. `discover()` is the middleware's own output, so the comparison is
+    now between one parse and the code that consumes it.
+    """
+    from acr.contract.skills import discover, skill_meta
+    if str(skill_meta(name, "kind") or "prose") != "prose":
         pytest.skip("a slot is where PROSE goes in a prompt; a script/llm/subagent skill is "
                     "invoked through contract/skill_invoke.py and never rendered")
-    assert fm["slot"] == skill_slot(name)
+    parsed = discover()[name]["metadata"]
+    assert parsed.get("slot") == skill_slot(name), (
+        "and it comes from `metadata`, which is where the Agent Skills spec puts a property the "
+        "standard itself does not define")
 
 
 def test_missing_slot_raises(tmp_path: Path):
@@ -73,7 +79,7 @@ def test_unknown_slot_raises(tmp_path: Path):
     d = tmp_path / "bad-slot"
     d.mkdir()
     (d / "SKILL.md").write_text(
-        "---\nname: bad-slot\ndescription: x\nslot: wherever\n---\n\nbody\n", encoding="utf-8")
+        "---\nname: bad-slot\ndescription: x\nmetadata:\n  slot: wherever\n---\n\nbody\n", encoding="utf-8")
     with pytest.raises(SkillError, match="unknown slot 'wherever'"):
         skill_slot("bad-slot", tmp_path)
 
@@ -103,7 +109,7 @@ def test_stack_rejects_an_eval_skill_in_the_chart_agent(tmp_path: Path):
     d = tmp_path / "eval-contrast-traces"
     d.mkdir()
     (d / "SKILL.md").write_text(
-        "---\nname: eval-contrast-traces\ndescription: x\nslot: eval\n---\n\nbody\n",
+        "---\nname: eval-contrast-traces\ndescription: x\nmetadata:\n  slot: eval\n---\n\nbody\n",
         encoding="utf-8")
     with pytest.raises(SkillError, match="slot 'eval'"):
         SkillStack(general=("eval-contrast-traces",)).validate(tmp_path)
@@ -452,7 +458,7 @@ def test_experience_appends_with_plus_like_the_other_list_slots(tmp_path: Path):
         d = tmp_path / n
         d.mkdir()
         (d / "SKILL.md").write_text(
-            f"---\nname: {n}\ndescription: x\nslot: experience\n---\n\nbody\n",
+            f"---\nname: {n}\ndescription: x\nmetadata:\n  slot: experience\n---\n\nbody\n",
             encoding="utf-8")
     base = parse_skill_stack("experience=prior-a", SkillStack(), tmp_path)
     assert parse_skill_stack("experience=+prior-b", base, tmp_path).experience == (

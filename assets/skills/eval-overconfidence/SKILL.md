@@ -1,9 +1,10 @@
 ---
 name: eval-overconfidence
 description: Use when a run submitted a definite answer that did not match the answer key, and you need to find what it treated as sufficient. Tells you how to read the evidence a run actually rested on, which evidence patterns precede confident errors, and how to separate a reasoning failure from a contract gap. Does not determine that the answer was wrong - ask the deterministic scorer.
-slot: eval
-judges: [evidence_sufficiency_reasoning, witness_standing, contract_gap]
 license: MIT
+metadata:
+  slot: eval
+  judges: evidence_sufficiency_reasoning witness_standing contract_gap
 ---
 
 # A confident answer that did not hold

@@ -8,7 +8,7 @@ import pytest
 
 from acr.chartstore.corpus import Corpus
 from acr.core import site
-from acr.core.local_artifacts import LocalArtifactError, LocalArtifactStore
+from acr.core.local_artifacts import LocalArtifactStore
 from acr.diagnosis import attribution as A
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,20 +29,6 @@ def packet(mode=A.BLIND, **overrides):
     }
     values.update(overrides)
     return A.AttributionPacket(**values)
-
-
-def test_local_store_refuses_missing_relative_repo_and_symlink_into_repo(tmp_path):
-    with pytest.raises(LocalArtifactError, match="required"):
-        LocalArtifactStore(None)
-    with pytest.raises(LocalArtifactError, match="absolute"):
-        LocalArtifactStore("relative")
-    with pytest.raises(LocalArtifactError, match="Git worktree"):
-        LocalArtifactStore(ROOT / "runs")
-
-    link = tmp_path / "back-into-repo"
-    link.symlink_to(ROOT, target_is_directory=True)
-    with pytest.raises(LocalArtifactError, match="Git worktree"):
-        LocalArtifactStore(link)
 
 
 def test_local_store_private_atomic_json_and_idempotent_jsonl(tmp_path):

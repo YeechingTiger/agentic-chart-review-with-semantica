@@ -124,7 +124,6 @@ def audit_run_payload(*, manifest: str, subject_id: str = "",
             provider_boundary=provider_boundary,
             declared_tools=declared,
             local_root=str(store.root),
-            git_root=str(store.git_root),
         ),
         rule_refs=tuple(rule),
     )

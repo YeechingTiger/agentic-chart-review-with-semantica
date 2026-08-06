@@ -4,9 +4,9 @@ intended by each.
 This is the EMISSION half of answer admissibility, and it is deliberately not the gate.
 `answer_gate` decides whether a submission may stand and returns a rejection the agent can
 recover from inside its own loop; the rules here RAISE, because they are reached after the
-loop is over and there is nobody left to tell. Three runtimes emit answers — `graph`,
-`deep_runner`, `mcp_server` — and a rule enforced in two of them makes the signal silently
-conditional on which runtime the operator happened to use.
+loop is over and there is nobody left to tell. Two runtimes emit answers — `graph` and
+`deep_runner` — and a rule enforced in one of them makes the signal silently conditional on
+which runtime the operator happened to use. (`mcp_server` was a third until 2026-08-05.)
 
 Both halves of the contract are here because they are one rule seen from two sides: an
 answer must carry exactly the proof its status claims, and no more. Splitting them would let
@@ -176,8 +176,8 @@ def assert_spec_gap_is_reported(ans: dict) -> None:
 def assert_answer_is_reportable(ans: dict, spec: ExtractionSpec | None = None) -> None:
     """Every obligation an answer owes at emission, in one call so no front end owes fewer.
 
-    Three runtimes emit answers (graph, deep_runner, mcp_server). A rule enforced in two of
-    them makes the signal silently conditional on which runtime the operator happened to use.
+    Two runtimes emit answers (graph, deep_runner). A rule enforced in one of them makes the
+    signal silently conditional on which runtime the operator happened to use.
 
     `spec` is optional and only widens what can be resolved: without it the outcome space is
     the default three, which is the right answer for a caller that has no contract.

@@ -1,9 +1,10 @@
 ---
 name: tactic-sample-unknown-types
 description: Use when a class of document is large or well-placed in time but its name does not tell you what it holds - open a few and find out, instead of ranking it on the name. Covers which classes are worth the sample, how to draw one so it is not all from one period, what to record about the class, and why a name is not a description. A move, called when the inventory contains classes you cannot interpret.
-slot: tactic
-precondition: "The inventory contains a document class whose name does not say what the class contains, and it is either numerous or covers a period that matters."
 license: MIT
+metadata:
+  slot: tactic
+  precondition: "The inventory contains a document class whose name does not say what the class contains, and it is either numerous or covers a period that matters."
 ---
 
 # Finding out what a class of document actually holds

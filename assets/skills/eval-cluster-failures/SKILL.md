@@ -1,9 +1,10 @@
 ---
 name: eval-cluster-failures
 description: Use when several runs across a cohort came out wrong and you must tell whether they share one cause or have several. Tells you which trace features to cluster on, why clustering on the wrong answer's value misleads, how many cases a cluster needs before it is worth reporting, and how to name a cluster so that a fix can be aimed at it. Does not decide which runs were wrong - ask the deterministic scorer for the list.
-slot: eval
-judges: [failure_grouping, shared_mechanism, cluster_support]
 license: MIT
+metadata:
+  slot: eval
+  judges: failure_grouping shared_mechanism cluster_support
 ---
 
 # Telling one problem from six

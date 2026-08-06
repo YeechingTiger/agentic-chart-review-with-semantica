@@ -161,9 +161,24 @@ def test_the_prose_plan_is_gone_and_the_coverage_plan_is_wired_in():
     import acr.review.agent as A
 
     src = inspect.getsource(A)
-    assert not re.search(r"^\w*PLAN_PROMPT\s*=", src, re.MULTILINE), (
-        "a second planning prompt has appeared. The REPLAN bug existed because there were two "
-        "plans and only one mattered; a second one is the bug returning")
+    # WHAT THIS GUARDS, restated 2026-08-05. The REPLAN bug was two RETRIEVAL plans where only one
+    # mattered: a prose planning prompt sitting beside the real `CoveragePlan`, consumed by nothing.
+    # The guard used to grep for the literal name `PLAN_PROMPT`, which would have been satisfied by
+    # renaming the offender — so it now asks the question it means. There must be exactly one object
+    # that says WHERE TO LOOK, and it must be the live `CoveragePlan`.
+    #
+    # `OPEN_GAPS_PROMPT` is deliberately NOT that object and does not trip this. It carries the
+    # other half of planning — which questions are still open and what would close each one — into
+    # `write_todos`, whose list is model-authored and lives in state. Two names for one retrieval
+    # plan is the bug; a retrieval prior and a gap ledger are two different questions.
+    assert "RETRIEVAL PLAN" not in src, (
+        "a second retrieval plan has appeared in the runtime. `CoveragePlan.render` is the one "
+        "place that says where to look; the REPLAN bug existed because there were two and only "
+        "one mattered")
+    assert "OPEN_GAPS_PROMPT" in src, (
+        "the gap ledger's text is gone. `write_todos` was bound on all 514 recorded runs and "
+        "called on zero of them because the library's default prompt tells the model not to "
+        "bother for few-step tasks; this override is what makes the tool reachable")
     for token in ("plan.render", "apply_revision"):
         assert token in src, f"the runtime must consult the coverage plan; {token!r} is absent"
     # `may_open` is deliberately NOT in this list any more. The runtime used to consult it to
@@ -652,37 +667,6 @@ def test_a_text_matched_marker_opens_a_thread_and_advises_without_blocking(spec,
     assert out.threads_resolved == [f"{nid}#stains pending"], "resolution still recorded"
 
 
-def test_a_computed_truncated_marker_still_blocks_the_answer(spec, chart, plan, budget):
-    """The one that survived, and the reason it is not the same kind of thing.
-
-    `truncated` is computed from the character counts of the run's own read against the length
-    that read reported. It is a fact about what this run did, not a guess about what a word
-    means; it cannot be wrong about the corpus; and the agent discharges it by reading to the
-    end.
-    """
-    from acr.review.coverage_planner import MARKER_TRUNCATED, marker_blocks_answer
-    assert marker_blocks_answer(MARKER_TRUNCATED)
-    assert not marker_blocks_answer("stains pending")
-    assert not marker_blocks_answer("addendum")
-
-    threads = OpenThreadLedger()
-    ev, cov = EvidenceLedger(), _ledger(spec, chart)
-    nid = _first_note_of_type(chart, "Surgical-Pathology-Document")
-    from acr.core.state import Evidence
-    ev.add(Evidence(nid, "Surgical-Pathology-Document", "2019-01-01", 0, 5, "xxxxx",
-                    "histology"))
-    submitted = {"status": "FOUND", "value": {"histology": "8046"}, "reasoning": "coded"}
-
-    threads.open_thread(note_id=nid, doc_type="Surgical-Pathology-Document",
-                        marker=MARKER_TRUNCATED, excerpt="read stopped 353 characters short",
-                        obligation="page to the end before reasoning about it", step=1)
-    assert check_threads(threads), "a computed marker still refuses"
-    verdict = gate_answer(spec, submitted, evidence=ev, coverage=cov, chart=chart,
-                          threads=threads, plan=plan)
-    assert verdict["accepted"] is False
-    assert any("unsettled thread" in m for m in verdict["missing"])
-
-
 def test_dismiss_threads_requires_a_reason_and_records_it(plan, budget, chart):
     threads = OpenThreadLedger()
     threads.open_thread(note_id="N1", doc_type="Surgical-Pathology-Document",
@@ -1044,28 +1028,6 @@ class _DuplicateTermLLM(LLMClient):
 
 
 
-def test_the_duplicate_refusal_reaches_the_model_in_the_loop_it_understands(spec, chart):
-    """A duplicate it is not told about is one it will send again, one slot at a time.
-
-    The refusal used to be rendered into the next reflect prompt. It is the `revise_plan` tool's
-    RETURN VALUE now, which is stronger: the model has it in hand by construction rather than by
-    a prompt someone remembered to write.
-    """
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent))
-    from hooks_harness import revise, revise_plan_tool
-
-    tool, ctx = revise_plan_tool(spec, chart)
-    assert "carcinoma" in ctx.plan.keywords, "fixture assumption: the spec already covers it"
-    before = list(ctx.plan.keywords)
-
-    r = revise(tool, add_terms=["CARCINOMA"])
-    told = " ".join(r["refused"])
-    assert REFUSED_REDUNDANT_TERM in told, "the refusal never reached the model"
-    assert "carcinoma" in told.lower(), "the refusal must name the covering term"
-    assert ctx.plan.keywords == before, "a redundant term must cost no budget and change nothing"
-
-
 # ------------------------------------------------------------------------------- helpers
 def _agent(spec, chart, llm=None):
     """The AUDIT MIDDLEWARE wired to real ledgers — where these rules live now.
@@ -1266,31 +1228,5 @@ class _NoOpRevisingLLM(_RevisingLLM):
                 "revision": {"add_terms": [],
                              "promote_types": [{"type": self.promote, "to": "search"}]}})
         return super().chat(messages, tools)
-
-
-
-def test_a_revision_that_moved_nothing_is_reported_as_a_request_not_as_silence(spec, chart):
-    """THE SYN0001 FIX. Every request asks for a promotion already in force.
-
-    The retrieval scope never moves — correctly — but the record must say, in the same block,
-    that the channel WAS used and that every use was a no-op. A reader who concludes "the model
-    ignores the replanning channel" has to be contradicted by the record.
-    """
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent))
-    from hooks_harness import revise, revise_plan_tool
-
-    tool, ctx = revise_plan_tool(spec, chart)
-    already = sorted(ctx.plan.read_all)[0]
-    for _ in range(3):
-        revise(tool, promote_types=[{"type": already, "to": "search"}])
-
-    assert len(ctx.revisions) == 3, "three asks must be three recorded asks"
-    assert all(not r["applied"] for r in ctx.revisions), (
-        "a promotion already in force moves nothing")
-    assert any(r["refused"] for r in ctx.revisions), (
-        "silence and a refusal are different facts; the record must carry the second")
-
-
 
 

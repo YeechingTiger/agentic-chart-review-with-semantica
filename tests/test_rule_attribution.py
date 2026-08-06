@@ -640,7 +640,7 @@ def test_the_agent_is_shown_the_identifiers_before_it_is_asked_to_cite_them(tmp_
 
 
 def test_attribution_never_changes_a_gate_verdict(tmp_path):
-    """Recording must be inert. `mcp_server` calls `gate_answer` with no tracer at all, and
+    """Recording must be inert. A caller may call `gate_answer` with no tracer at all, and
     the two front ends must not be able to reach different verdicts."""
     spec = _spec()
     led = _ledger(spec)

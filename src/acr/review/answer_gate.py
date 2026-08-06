@@ -4,8 +4,8 @@ rejection rather than raised.
 THERE IS EXACTLY ONE GATE, AND THIS IS IT
 -----------------------------------------
 These are module-level functions and not methods on `ChartReviewAgent` because three front
-ends must apply the SAME judgement: the langgraph loop (`graph.ChartReviewAgent._gate`), the
-MCP server (`mcp_server`), and the deepagents runtime (`deep_runner`). Two gate
+ends must apply the SAME judgement: the langgraph loop (`graph.ChartReviewAgent._gate`) and
+the deepagents runtime (`deep_runner`). An MCP server was a third until 2026-08-05. Two gate
 implementations that can disagree is the `state.py` two-ledger failure repeated one layer up:
 both would compute a verdict, neither would raise when they diverged, and you would be left
 with two answers and no way to choose. Nothing outside this module may decide validity for
@@ -402,8 +402,8 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
     the one place that writes it down. Three channels, recorded with their provenance marked
     (see `trace`): the checks that fired are deterministic, the admissibility of each citation
     is deterministic, and the rules the agent names are its own report. Every recording here
-    is tracer-guarded and side-effect-free — `mcp_server` calls this function with no tracer
-    at all, and attribution must never be able to change a verdict.
+    is tracer-guarded and side-effect-free: a caller may pass no tracer at all, and attribution
+    must never be able to change a verdict.
     """
     profile_asset, _ = resolve_runtime_policy(runtime_profile)
     status = submitted.get("status", "")
@@ -446,42 +446,16 @@ def gate_answer(spec: ExtractionSpec, submitted: dict, *, evidence: EvidenceLedg
     # never opened is the document that would have changed it) alike. SPEC_INSUFFICIENT is
     # exempt for the same reason it is exempt from coverage: it is a claim about the
     # specification, and no amount of chasing a pending stain can make a silent spec speak.
-    if kind in (OUTCOMES.KIND_VALUE, OUTCOMES.KIND_ABSTAIN_EVIDENCE):
-        open_threads = check_threads(threads)
-        if open_threads:
-            if tracer:
-                tracer.emit("open_threads_block_answer", severity="warning",
-                            n_open=len(open_threads),
-                            thread_ids=[t.thread_id for t in threads.unresolved()])
-            return {"accepted": False,
-                    "why": "a document in this chart deferred its own conclusion and the "
-                           "thread was never settled",
-                    "how_to_satisfy": ("chase it: page to the end of the same document, then "
-                                       "its section list, then later documents of the "
-                                       "addendum types. Then resolve_threads in your next "
-                                       "reflection, or dismiss_threads with a reason."),
-                    "missing": open_threads}
-    # THE FIELD-FORMAT REFUSAL IS GONE TOO, and it was the last enforcement in this function
-    # that judged the CONTENT of an answer rather than its provenance.
+    # THREADS ARE ADVISORY. This block refused a positive or an evidence-abstention while a
+    # blocking thread was unsettled. It went soft on 2026-08-06, and the reasoning is the arc this
+    # file already records: `BLOCKING_MARKERS` had gone from ~21 to `truncated` alone, and
+    # `truncated` is discharged AUTOMATICALLY by `OpenThreadLedger` the moment the document is read
+    # to its end. What the refusal actually caught was therefore a run that chose not to finish a
+    # document — and the answer to that is a recorded gap, not a refusal the agent must argue past
+    # with a tool built for the purpose.
     #
-    # It had the best measured record of any check here: 7 firings over every recorded trace, 0
-    # that refused a registry value, 6 that preceded the registry answer. But look at what it
-    # caught. Four of those six were `C34.9`, `C34.11` and `C34.2` -- the punctuated form ICD-O-3
-    # itself writes -- so the check was largely creating the round trips it then resolved. And
-    # the constraint it enforced is ALREADY IN THE PROMPT: `as_prompt_block` renders every
-    # field's `format` and `allowable_values`, and STORE.400's own field description reads "no
-    # decimal point". A model that writes `C34.9` against that instruction has not been
-    # under-informed; it has failed to follow an instruction, and that is a fact to measure
-    # rather than a hole to plug with a regex.
-    #
-    # `check_field_formats_detail` is NOT deleted. It moves to where a measurement belongs:
-    # `concordance` and `evals` score submitted answers against the declared shape after the
-    # run, which is how "the model does not follow the format instruction" becomes a number
-    # somebody can act on instead of a rejection nobody counts.
-    #
-    # What is left in this function is provenance, not content: is there evidence, was every
-    # quote re-read from disk at its offsets, is the patient in scope, is the budget spent, is a
-    # read still unfinished. None of those is a clinical judgement.
+    # The thread is still opened, still counted, still in the manifest, and still named in the
+    # prompt beside what it obliges. Only the refusal is gone.
     if kind in (OUTCOMES.KIND_VALUE, OUTCOMES.KIND_ABSTAIN_EVIDENCE) and tracer:
         # Recorded, never refused: the trace still carries which declared shapes the answer
         # missed, so the eval plane can count them without re-deriving the spec.

@@ -28,6 +28,15 @@ from ..contract.trace import rule_catalog
 from ..core.local_artifacts import LocalArtifactStore, content_hash
 from ..evaluation import evals
 
+#: Where the attribution agent's own method cards live, inside the backend it is given.
+#:
+#: A SEPARATE SOURCE FROM `assets/skills/`, deliberately. Those cards are assembled into the CHART
+#: agent's prompt by slot; these belong to a different agent with a different job, and deepagents
+#: takes one source list per agent precisely so the two do not have to share a namespace or a slot
+#: vocabulary. Nothing here declares a `slot`, because nothing here is assembled into a prompt —
+#: the model opens it with `read_file` when the method is what it needs.
+ATTRIBUTION_SKILLS_ROOT = "/skills/"
+
 ATTRIBUTION_SCHEMA = "acr.attribution_report/2"
 PACKET_SCHEMA = "acr.attribution_packet/1"
 REGISTRY_REFERENCE_SCHEMA = "acr.registry_reference/1"
@@ -1785,6 +1794,26 @@ def attribution_tools(ctx: AttributionRuntimeContext) -> list[Any]:
                  }}),
     ]
 
+def _attribution_skill_files() -> dict:
+    """The attribution method cards, shaped for `invoke(files=...)`.
+
+    `StateBackend` holds no filesystem, so its contents are whatever the caller seeds — which is
+    the documented way to give it skills and, here, also the fence: `read_file` cannot reach
+    anything this function did not put in.
+    """
+    from deepagents.backends.utils import create_file_data
+
+    from ..core.repo_paths import repo_root
+    src = repo_root() / "assets" / "attribution" / "skills"
+    out: dict[str, Any] = {}
+    for f in sorted(src.rglob("*")):
+        if f.is_file():
+            rel = f.relative_to(src).as_posix()
+            out[f"{ATTRIBUTION_SKILLS_ROOT}{rel}"] = create_file_data(
+                f.read_text(encoding="utf-8"))
+    return out
+
+
 def _attribution_system_prompt(
         packet: AttributionPacket, modules: Sequence[Any] = (),
         eval_skills_prompt: str = "") -> str:
@@ -1821,20 +1850,10 @@ You explain this run; you do not re-run extraction and you never edit a specific
 BOUNDARY
 {boundary}
 
-WORKFLOW
-1. List and select exactly one target event. This is the outcome you are explaining.
-2. Call inspect_trace before any chart access. Identify what the run actually searched, read,
-   cited, submitted, and why it stopped.
-3. Read exact rules with inspect_spec. Do not paraphrase a rule you have not opened.
-4. If the trace cannot distinguish rival causes, call open_attribution_probe with at least two
-   alternatives and a concrete discriminator. Chart tools are read-only and patient-scoped.
-5. For each cause, state relation_to_target. A genuine bug that would not change the selected
-   event is UNRELATED_DEFECT and cannot be primary.
-6. Record a bounded counterfactual test. LIKELY/CONFIRMED requires a SUPPORTED test for the
-   selected target; otherwise downgrade to POSSIBLE or UNRESOLVED.
-7. Perform a skeptic review. If it returns REVISE or UNRESOLVED, the report must be UNRESOLVED.
-8. Run one final challenge probe with confirmation=true. If it exposes a conflict, downgrade.
-9. Finish only with submit_attribution.
+METHOD
+The `attribution-method` skill holds the order to investigate in and why it is that order. Read it
+with read_file before your first tool call. It is the method; what is stated as a rule in this
+prompt is a rule, and a rule is not softened by a method.
 
 ACTIVE MODULES
 {module_instructions}{eval_block}
@@ -1993,9 +2012,9 @@ def run_attribution_agent(*, packet: AttributionPacket, chart: Any, model: Any,
     if max_chart_reads < 0:
         raise AttributionError("max_chart_reads must be >= 0")
 
+    from deepagents import FilesystemMiddleware, create_deep_agent
     from deepagents.backends import StateBackend
     from deepagents.middleware.summarization import SummarizationMiddleware
-    from langchain.agents import create_agent
     from langchain.agents.middleware import ModelCallLimitMiddleware, hook_config
     from langchain.agents.middleware.types import AgentMiddleware, ModelRequest
     from langchain_core.messages import SystemMessage
@@ -2073,15 +2092,28 @@ def run_attribution_agent(*, packet: AttributionPacket, chart: Any, model: Any,
         raise AttributionError(
             f"profile {attribution_profile!r} requests unknown tools {missing_tools}")
     tools = [available_tools[name] for name in sorted(requested_tools)]
+    # THE HARNESS IS THE LIBRARY'S. This used to be `create_agent` plus a middleware list that was
+    # a second copy of `review/agent.build_agent` — same summarization, same call limit, its own
+    # recursion arithmetic, its own no-tool-call recovery. `create_deep_agent` supplies the stack;
+    # what stays here is the part that is about attribution.
+    #
+    # `StateBackend` and the `read_file`-only allowlist together are what make the skill safe to
+    # expose. Progressive disclosure needs the model to be able to open `SKILL.md`, and a backend
+    # with no filesystem behind it means the only thing `read_file` can reach is what this function
+    # seeded into state — the skill, and nothing else on the machine.
+    backend = StateBackend()
     middleware = [
-        SummarizationMiddleware(model=model, backend=StateBackend(), keep=("messages", 20)),
+        FilesystemMiddleware(backend=backend, tools=["read_file", "ls"]),
+        SummarizationMiddleware(model=model, backend=backend, keep=("messages", 20)),
         ModelCallLimitMiddleware(
             thread_limit=investigator_call_limit, exit_behavior="end"),
         AttributionMiddleware(),
     ]
-    agent = create_agent(
-        model, tools,
+    agent = create_deep_agent(
+        model=model, tools=tools,
         system_prompt=_attribution_system_prompt(packet, modules, eval_skills_prompt),
+        skills=[ATTRIBUTION_SKILLS_ROOT],
+        backend=backend,
         middleware=middleware,
     )
     n_per_turn = sum(
@@ -2098,7 +2130,9 @@ def run_attribution_agent(*, packet: AttributionPacket, chart: Any, model: Any,
     }
     try:
         agent.invoke(
-            {"messages": [{"role": "user", "content": _tool_payload(prompt)}]},
+            {"messages": [{"role": "user", "content": _tool_payload(prompt)}],
+             # Seeds the skill into `StateBackend`; see `_attribution_skill_files`.
+             "files": _attribution_skill_files()},
             config={
                 "recursion_limit": (
                     investigator_call_limit * max(n_per_turn, 2) + 10)

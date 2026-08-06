@@ -1,9 +1,10 @@
 ---
 name: eval-contrast-traces
 description: Use when two runs of the same spec reached different answers, or one run matched the answer key and another did not, and you need to locate where their paths diverged. Tells you how to align two traces step by step, which differences are causal and which are noise, and how to state a divergence point as a claim someone could check. Does not settle which answer was right - ask the deterministic scorer for that.
-slot: eval
-judges: [search_behaviour, divergence_point, plan_adherence]
 license: MIT
+metadata:
+  slot: eval
+  judges: search_behaviour divergence_point plan_adherence
 ---
 
 # Putting two traces side by side

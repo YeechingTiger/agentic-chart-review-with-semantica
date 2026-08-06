@@ -268,7 +268,7 @@ def check_skill_frontmatter(owners) -> Check:
             si.skill_category(d.name, skills)
             if kind == "prose":
                 sk.skill_slot(d.name, skills)
-            elif kind == "script" and not si._skills._frontmatter(d.name, skills).get("entry"):
+            elif kind == "script" and not si._skills.skill_meta(d.name, "entry", skills):
                 c.fails(f"{d.name}: kind: script with no `entry`")
         except Exception as e:  # noqa: BLE001 — the loader's own error IS the finding
             c.fails(f"{d.name}: {type(e).__name__}: {e}")

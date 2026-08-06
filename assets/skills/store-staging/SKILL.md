@@ -1,8 +1,9 @@
 ---
 name: store-staging
 description: How to record AJCC 8th edition clinical and pathologic stage and SEER Summary Stage for a lung primary from a chart. Use when assigning cT/cN/cM, pT/pN/pM, a stage group or a summary stage - especially when the only stage statement sits in a resection synoptic report, when the record hedges with "at least T2a" or "pending", when imaging and pathology disagree, when neoadjuvant therapy came first, or when no stage is documented and 99, TX or NX look like the easy answer.
-slot: task
 license: MIT
+metadata:
+  slot: task
 ---
 
 # Recording AJCC stage and Summary Stage for a lung primary

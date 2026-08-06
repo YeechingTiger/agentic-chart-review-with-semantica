@@ -1,8 +1,9 @@
 ---
 name: policy-information-gain
 description: Use when deciding what to do NEXT rather than what shape the whole traversal should have - before each call, name what is still missing for this field and pick the action that would reduce it most. Tells you what counts as gain and what only feels like it, how to rank the available actions, when the highest-gain action is to stop, and why a locally best path can still fail to support an absence claim. Ranks actions by what they could change about the answer, not by how much of the chart they cover.
-slot: policy
 license: MIT
+metadata:
+  slot: policy
 ---
 
 # Choosing the next action by what it could change

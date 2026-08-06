@@ -1,8 +1,9 @@
 ---
 name: tool-contract
 description: Use on every run without exception - what the seven tools actually do, as opposed to what their names suggest. Covers how the search matches, what the per-term hit cap hides and in which direction, what a snippet is and is not, what a citation requires, and how one step is recorded as following from another. Facts about the instruments, not advice about how to use them.
-slot: general
 license: MIT
+metadata:
+  slot: general
 ---
 
 # What the tools actually do

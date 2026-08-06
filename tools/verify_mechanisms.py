@@ -383,7 +383,8 @@ def m5_audit_rules_can_fire(root: pathlib.Path) -> None:
 
     THIS CHECK EXECUTES THE RULES, and the first version did not. It compared string literals in
     each rule's body against the tool surface, and reported four rules as unable to fire when they
-    demonstrably do — `phi_provider_audit` produced this tree's four IRB findings. A checker with
+    demonstrably do — `phi_provider_audit` produced this tree's four IRB findings before it was
+    removed on 2026-08-05 with the rest of the PHI plane. A checker with
     four false positives is worse than none: it trains a reader to skip the section. The same lesson
     `tools/verify_structure.py` learned when its first finding was a card name in a docstring.
     """
@@ -433,7 +434,7 @@ def m5_audit_rules_can_fire(root: pathlib.Path) -> None:
             # and it is the second time in one sitting — the first was `artifact_refs=()`.
             declared_tools=tuple(sorted(
                 {(t.get("function") or {}).get("name", "") for t in TOOL_SCHEMAS} - {""})),
-            local_root="", git_root="",
+            local_root="",
         )
         n_runs += 1
         last_context = context

@@ -1,8 +1,9 @@
 ---
 name: non-concordance-triage
 description: How to explain why a patient was NON_CONCORDANT with a guideline recommendation, by sorting the case into one of four causes with four different owners - care gap (clinician), documentation gap (health information management), extraction error (us), justified exception (nobody, this is correct care). Use when triaging concordance failures, when deciding whether recommended care is missing from the chart or missing from the world, when a registry value disagrees with an extracted one, or when a documented refusal, poor performance status, comorbidity or trial enrolment might mean the recommendation never applied.
-slot: general
 license: MIT
+metadata:
+  slot: general
 ---
 
 # Triaging a non-concordant case into its actual cause

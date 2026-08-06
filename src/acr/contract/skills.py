@@ -40,9 +40,8 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
-
-import yaml
 
 from ..core import site
 from ..core.repo_paths import asset_dir
@@ -109,20 +108,67 @@ def load_skill_body(name: str, skills_dir: Path | str | None = None) -> str:
     return body
 
 
-def _frontmatter(name: str, skills_dir: Path | str | None = None) -> dict:
-    """One skill's frontmatter as a mapping. Raises for anything a loader would drop silently."""
+@lru_cache(maxsize=8)
+def _discovered(root: str) -> dict[str, dict]:
+    """`{name: SkillMetadata}` for every card under `root`, PARSED BY DEEPAGENTS.
+
+    We do not read a `SKILL.md` any more. `SkillsMiddleware` walks the source, applies the Agent
+    Skills specification, and returns `SkillMetadata` — `path`, `name`, `description`, `license`,
+    `compatibility`, `metadata`, `allowed_tools`. Everything this module used to extract with its
+    own regex and `yaml.safe_load` comes out of that call instead.
+
+    WHY THE MIDDLEWARE AND NOT A PARSER OF OUR OWN. Two readers of one file format disagree
+    eventually, and the disagreement is silent: a card the runtime loads and our manifest skips, or
+    the reverse, reads as a card that was simply not selected. The middleware is the one that
+    decides what the model sees at run time, so it has to be the one that decides what we record.
+    A directory it skips — `guideline-to-rules`, which has no `SKILL.md` — is absent here too, for
+    free, rather than by a second rule that has to be kept in step.
+
+    Cached per root because discovery walks every card directory, and `skill_slot` is called once
+    per card by the structure checks.
+    """
+    from deepagents.backends.filesystem import FilesystemBackend
+    from deepagents.middleware.skills import SkillsMiddleware
+    from langgraph.runtime import Runtime
+
+    r = Path(root)
+    middleware = SkillsMiddleware(backend=FilesystemBackend(root_dir=str(r.parent)),
+                                  sources=[f"/{r.name}/"])
+    runtime = Runtime(context=None, store=None, stream_writer=lambda *_: None, previous=None)
+    state = middleware.before_agent({"messages": []}, runtime, {}) or {}
+    return {s["name"]: dict(s) for s in state.get("skills_metadata") or []}
+
+
+def discover(skills_dir: Path | str | None = None) -> dict[str, dict]:
+    """Every card this tree offers, as deepagents parsed it."""
     roots = [Path(skills_dir)] if skills_dir else list(site.skill_roots())
-    path = next((r / name / "SKILL.md" for r in roots if (r / name / "SKILL.md").is_file()),
-                roots[0] / name / "SKILL.md")
-    if not path.is_file():
-        raise SkillError(f"no skill {name!r} at {path}")
-    m = _FRONTMATTER.match(path.read_text(encoding="utf-8"))
-    if not m:
-        raise SkillError(f"skill {name!r} has no frontmatter block at byte 0")
-    data = yaml.safe_load(m.group(1))
-    if not isinstance(data, dict):
-        raise SkillError(f"skill {name!r} frontmatter is not a mapping")
-    return data
+    out: dict[str, dict] = {}
+    for r in roots:                     # later roots win, which is the middleware's own rule
+        if r.is_dir():
+            out.update(_discovered(str(r)))
+    return out
+
+
+def skill_meta(name: str, key: str, skills_dir: Path | str | None = None, default=None):
+    """One of OUR additional properties, from deepagents' parse of the card.
+
+    The specification (agentskills.io) defines six frontmatter fields — `name`, `description`,
+    `license`, `compatibility`, `metadata`, `allowed-tools` — and reserves `metadata` for
+    *"arbitrary key-value pairs for additional properties"*. `slot`, `precondition`, `judges`,
+    `kind`, `entry` and `category` are ours, so `metadata` is where they live: a conformant reader
+    passes over them instead of meeting keys it does not know, and the cards load unchanged in any
+    harness that implements the standard.
+
+    `SkillMetadata["metadata"]` is typed `dict[str, str]`, so a value has already been flattened to
+    text by the time it arrives — which is why `judges` is stored space-separated rather than as a
+    YAML list, the same shape the specification itself uses for `allowed-tools`.
+    """
+    cards = discover(skills_dir)
+    if name not in cards:
+        raise SkillError(
+            f"no skill {name!r}. deepagents discovered: {sorted(cards) or '(none)'}. A directory "
+            f"with no `SKILL.md` is not a skill and is not listed here.")
+    return (cards[name].get("metadata") or {}).get(key, default)
 
 
 def skill_slot(name: str, skills_dir: Path | str | None = None) -> str:
@@ -133,13 +179,12 @@ def skill_slot(name: str, skills_dir: Path | str | None = None) -> str:
     policy the two would render together — which reads, in the manifest, exactly like one
     policy that happens to be long.
     """
-    fm = _frontmatter(name, skills_dir)
-    slot = fm.get("slot")
+    slot = skill_meta(name, "slot", skills_dir)
     if not slot:
         # A slot is WHERE prose goes in a prompt, so only prose needs one. A script, an llm call or
         # a subagent is invoked through `contract/skill_invoke.py` and never rendered, and demanding
         # a slot for it would mean picking an assembly position for something that is not assembled.
-        if str(fm.get("kind") or "prose") != "prose":
+        if str(skill_meta(name, "kind", skills_dir) or "prose") != "prose":
             return ""
         raise SkillError(
             f"skill {name!r} declares no `slot`. Add one of {list(SLOTS)} to its frontmatter; "
@@ -287,20 +332,19 @@ def eval_skill_judges(name: str, skills_dir: Path | str | None = None) -> tuple[
     behaviour is not thereby licensed to opine on correctness. Declaring the list is what makes
     an overstep checkable; without it, scope is whatever the prose happens to imply.
     """
-    fm = _frontmatter(name, skills_dir)
-    slot = fm.get("slot")
+    slot = skill_meta(name, "slot", skills_dir)
     if slot != "eval":
         raise SkillError(
             f"skill {name!r} has slot {slot!r}, so it has no `judges` scope to read; that key "
             f"belongs to eval skills only")
-    judges = fm.get("judges")
+    judges = skill_meta(name, "judges", skills_dir)
     if not judges:
         raise SkillError(
             f"eval skill {name!r} declares no `judges`. List the sub-questions it may form a "
             f"judgement about; an undeclared scope cannot be checked for overreach.")
-    if isinstance(judges, str):
-        judges = [judges]
-    return tuple(str(j) for j in judges)
+    # Space-separated, because `SkillMetadata["metadata"]` is `dict[str, str]` and a YAML list
+    # would arrive here as its own repr. The specification uses the same shape for `allowed-tools`.
+    return tuple(str(judges).split())
 
 
 def eval_skills_block(names: Sequence[str], skills_dir: Path | str | None = None) -> str:
@@ -378,7 +422,7 @@ def skills_block(stack: SkillStack, skills_dir: Path | str | None = None) -> str
         # and the whole reason tactics were split out of the policy slot is that a move
         # drawn on a record that does not meet its precondition is a move that gives no
         # guidance. The policy needs to know when each one applies in order not to call it.
-        pre = _frontmatter(n, skills_dir).get("precondition")
+        pre = skill_meta(n, "precondition", skills_dir)
         if pre:
             head += f"\n    CALL THIS WHEN: {pre}"
         parts += ["", head, "", load_skill_body(n, skills_dir)]

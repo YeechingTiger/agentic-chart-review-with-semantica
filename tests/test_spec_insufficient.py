@@ -501,84 +501,21 @@ def test_evidence_insufficient_still_needs_the_gate(shb, chart):
 
 
 # ======================================================== 3. every front end
-def test_the_mcp_surface_reports_it_too(shb, chart, tmp_path):
-    """The MCP path never crashed — it signed a bare status code, and on the forced path it
-    signed the caller's value with it. Different symptom, same missing channel."""
-    from acr.review.mcp_server import ChartReviewService
-
-    svc = ChartReviewService(str(CORPUS), str(site.specs_root()))
-    plan = svc.call("coverage.plan", {"patient": "SYN0002", "spec_id": shb.spec_id})
-    rid = plan["run_id"]
-
-    bad = svc.call("gate.check", {"run_id": rid,
-                                  "answer": dict(GOOD_SUBMIT, value={"primary_site": "C349"})})
-    assert bad["verdict"] == "FAIL" and bad["answer"] is None
-
-    ok = svc.call("gate.check", {"run_id": rid, "answer": dict(GOOD_SUBMIT)})
-    assert ok["verdict"] == "PASS", ok
-    gap = ok["answer"]["spec_gap"]
-    assert gap["spec_section"] == "decision_rule"
-    assert gap["uncovered_fields"] == ["primary_site"]
-    assert gap["agent_words"] == GOOD_SUBMIT["reasoning"]
-    assert "decision_rule.1" in gap["invoked_rules"]
-    assert "coverage_attested" not in ok["answer"]
-    assert ok["answer"]["remedy_class"] == AC.REMEDY_SPEC_DOES_NOT_COVER
-
-
-def test_the_mcp_surface_will_not_sign_a_caller_supplied_gap_block(shb):
-    """The block is ASSEMBLED by the server from inputs it validated. A caller-supplied one
-    would be a report whose quote nobody checked, which is precisely what the citation mask
-    downstream assumes has happened."""
-    from acr.review.mcp_server import ChartReviewService
-
-    svc = ChartReviewService(str(CORPUS), str(site.specs_root()))
-    rid = svc.call("coverage.plan", {"patient": "SYN0002",
-                                     "spec_id": shb.spec_id})["run_id"]
-    out = svc.call("gate.check", {"run_id": rid, "answer": dict(
-        GOOD_SUBMIT, spec_gap={"spec_section": "decision_rule", "routable": True,
-                               "agent_words": "trust me"})})
-    assert "spec_gap" in out["ignored_client_claims"]
-    assert out["answer"]["spec_gap"]["agent_words"] == GOOD_SUBMIT["reasoning"]
-
-
-def test_the_mcp_forced_path_also_strips_the_value(outside):
-    """The forced rewrite runs after the gate on this surface too, so the gate's refusal is
-    unavailable and the value has to be taken away at emission."""
-    from acr.review.mcp_server import ChartReviewService
-
-    svc = ChartReviewService(str(CORPUS), str(site.specs_root()))
-    rid = svc.call("coverage.plan", {"patient": "SYN0002",
-                                     "spec_id": outside.spec_id})["run_id"]
-    hits = svc.call("chart.search", {"patient": "SYN0002", "query": "carcinoma",
-                                     "max_hits": 1})["hits"]
-    out = svc.call("gate.check", {"run_id": rid, "answer": {
-        "status": "FOUND", "value": {"class_of_case": "10"},
-        "reasoning": "coded it anyway",
-        "evidence": [{"note_id": hits[0]["note_id"], "start": hits[0]["start"],
-                      "end": hits[0]["end"], "supports": "class_of_case"}]}})
-    assert out["verdict"] == "PASS", out
-    ans = out["answer"]
-    assert ans["status"] == "SPEC_INSUFFICIENT"
-    assert ans["value"] == {} and ans["value_withheld"] == ["class_of_case"]
-    assert ans["spec_gap"]["reported_by"] == "runtime"
-
-
 def test_both_front_ends_use_the_one_builder_and_the_one_assertion():
     """Structural, and the reason is in the bug: the same status meant three different things
     on three runtimes — a crash on the hand-written loop, a bare code on MCP, a bare code plus
     an unearned coverage ledger on deepagents. Nobody noticed, because each surface looked fine
     alone.
 
-    TWO front ends now, not three: the hand-written loop is gone and `agent.py` is the runtime.
-    The count is not the point — the point is that every surface which can emit an answer goes
-    through the same three calls. Assert on the shared call, not on the output shape: correct
-    copies today are copies free to drift tomorrow, and the drift is invisible from inside any
-    one of them.
+    ONE front end now: the hand-written loop went first, then the MCP server on 2026-08-05, and
+    `agent.py` is the runtime. The count is not the point — the point is that every surface which
+    can emit an answer goes through the same three calls. Assert on the shared call, not on the
+    output shape: correct copies today are copies free to drift tomorrow, and the drift is
+    invisible from inside any one of them.
     """
     import acr.review.agent as A
-    import acr.review.mcp_server as M
 
-    for mod in (A, M):
+    for mod in (A,):
         src = inspect.getsource(mod)
         assert "build_spec_gap" in src, f"{mod.__name__} cannot assemble a spec gap"
         assert "strip_value_from_spec_insufficient" in src, (
@@ -646,9 +583,7 @@ def test_every_front_end_offers_the_reporting_fields_to_the_model():
     for k in ("spec_section", "spec_quote", "uncovered_fields"):
         assert k in props, f"the toolbox cannot send {k}"
 
-    from acr.review.mcp_server import MCP_TOOLS
-    desc = next(t for t in MCP_TOOLS if t["name"] == "gate.check")["inputSchema"]
-    assert "spec_section" in json.dumps(desc), "the MCP caller is never told to send it"
+
 
 
 def test_the_toolbox_passes_the_fields_through_rather_than_dropping_them():

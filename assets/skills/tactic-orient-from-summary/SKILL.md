@@ -1,9 +1,10 @@
 ---
 name: tactic-orient-from-summary
 description: Use when deciding where to ENTER a record and which direction to move through it, rather than which terms to search. Tells you why the most recent summarising document is the cheapest entry point, why it is a pointer and not a witness, how the task's own time window excludes documents that match perfectly and answer nothing, and why a request for the FIRST occurrence makes the best-written document the wrong one. Navigation, not term selection.
-slot: tactic
-precondition: "The record contains a document written to summarise the case rather than to record a single event."
 license: MIT
+metadata:
+  slot: tactic
+  precondition: "The record contains a document written to summarise the case rather than to record a single event."
 ---
 
 # Entering late and reading upstream

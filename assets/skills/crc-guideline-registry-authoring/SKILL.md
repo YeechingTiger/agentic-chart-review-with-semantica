@@ -1,7 +1,8 @@
 ---
 name: crc-guideline-registry-authoring
 description: Compile colorectal cancer treatment and molecular-testing guidance into a version-bound source denominator, context-preserving candidate rules, one contract per canonical variable, STORE/NAACCR mappings, and registry-only versus agent-validation evidence coverage. Use when deciding which CRC guidelines belong in scope, extracting recommendations and executable branches, translating them into predicate ASTs, measuring how much of each rule the cancer registry can evaluate, mapping detailed agent outputs back to registry validation targets, checking extraction specs against this repository's conventions, or preparing a bundle for clinical/registrar review. Do not use candidates as clinical decision support until source binding and clinical sign-off are recorded.
-slot: task
+metadata:
+  slot: task
 ---
 
 # CRC guideline and registry authoring

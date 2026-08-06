@@ -715,7 +715,10 @@ def test_the_json_judge_model_is_public_and_the_old_name_still_resolves():
     """`cli_signal` needs the same JSON-mode adapter `acr judge panel` uses. A second one
     would be a second place for the parsing rules to drift."""
     from acr.commands import cli_judge
-    assert cli_judge._JsonModel is cli_judge.JsonJudgeModel
+    assert hasattr(cli_judge, "JsonJudgeModel"), (
+        "one JSON-mode adapter, one name. The `_JsonModel` alias was removed on 2026-08-06: a "
+        "second spelling kept for callers to pin to is the compatibility layer CLAUDE.md rule 1 "
+        "forbids, and both call sites were in this same file.")
 
 
 def test_the_agent_kind_gets_more_turns_than_acr_attribute_case_defaults_to():

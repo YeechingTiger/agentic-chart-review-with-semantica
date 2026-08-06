@@ -113,7 +113,7 @@ def test_a_contract_with_a_wider_outcome_space_gets_a_different_tool_hash(spec):
 
 
 def test_an_absent_tool_surface_is_recorded_as_absent_not_omitted(spec):
-    """`mcp_server` builds its own answer dict. An absent key and an unhashed surface are
+    """A front end may build its own answer dict. An absent key and an unhashed surface are
     different facts and must not share a shape."""
     assert prompt_asset_manifest(spec)["tool_surface"] is None
 

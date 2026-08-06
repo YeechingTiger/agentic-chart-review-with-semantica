@@ -54,7 +54,6 @@ PINS = {
 #:   lc_callback — resolved at runtime from a deployment directory (`site.AUDIT_DIR`) inside a
 #:                `try/except` that records WHY it failed. Not a package.
 #:   openpyxl   — used by a one-off script that ships inside an asset directory, not by the package.
-#:   mcp, anyio — only reachable from `mcp_server.main`, which is the `acr-mcp` console script.
 #:                Declared as an OPTIONAL extra so `pip install acr-chart-review` does not pull an
 #:                MCP stack for a user who only wants the CLI.
 #:
@@ -65,7 +64,7 @@ PINS = {
 #: a real file at `tools/_decision_inputs.py`, was reported as an unpinned requirement on every
 #: staging run.
 NOT_REQUIRED = {"scipy", "lc_callback", "openpyxl"}
-OPTIONAL_EXTRAS = {"acr-chart-review": {"mcp": ["mcp>=1.0", "anyio>=4.0"]}}
+OPTIONAL_EXTRAS: dict[str, dict[str, list[str]]] = {}
 
 #: THE MARKER. Every commit this script makes carries it, and each generated repository's CI fails
 #: when HEAD does not. That is the whole mechanism behind "do not commit here": the generator

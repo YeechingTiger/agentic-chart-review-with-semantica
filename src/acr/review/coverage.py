@@ -34,9 +34,6 @@ the inference that care happened somewhere else.
 """
 from __future__ import annotations
 
-import hashlib
-import hmac
-import os
 import random
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass, field
@@ -111,26 +108,6 @@ SEED_DOMAIN = b"acr.sample_seed/1"
 #: Recorded next to every derived seed so a reader can tell a derivation from a draw.
 SEED_DERIVED = "derived:hmac(patient,spec_id)"
 SEED_CALLER = "caller_supplied"
-
-def derive_sample_seed(patient_id: str, spec_id: str, secret: bytes | None = None) -> int:
-    """The sampling seed for one (patient, spec) question, derived rather than drawn.
-
-    `mcp_server` already worked this way and documented why: a caller that can supply a seed
-    — or a runtime that draws a fresh random one per invocation — can rerun the same question
-    until the validation draw looks convenient, which restores the exact circularity
-    `ForcedSampler` exists to prevent. Deriving from (patient, spec_id) means asking the same
-    question twice gets the same documents, so there is nothing to shop for.
-
-    The agent front end was drawing `random.randrange(2**31)` for every run that did not pass
-    `--seed` (graph.py:289 via ForcedSampler; `batch` and `consistency` never passed one), so
-    the same patient and spec sampled different documents on every invocation and no run was
-    reproducible. Same construction here as `ChartReviewService._seed_for`, in one place, so
-    the two front ends cannot drift apart.
-    """
-    key = secret if secret is not None else (
-        os.environ.get("ACR_SAMPLE_SEED_SECRET", "").encode() or SEED_DOMAIN)
-    mac = hmac.new(key, f"{patient_id}|{spec_id}".encode(), hashlib.sha256)
-    return int.from_bytes(mac.digest()[:4], "big") % (2**31)
 
 class ForcedSampler:
     """Draws validation samples. The agent never chooses these.

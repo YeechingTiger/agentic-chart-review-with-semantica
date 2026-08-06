@@ -542,7 +542,7 @@ def test_catalogs_are_physically_separated_and_loadable():
     modules = ModuleRegistry.from_directory(ROOT / "assets" / "module_catalog")
     pipelines = PipelineRegistry.from_directory(ROOT / "assets" / "pipeline_catalog")
     suites = CertificationRegistry.from_directory(ROOT / "assets" / "certification_catalog")
-    assert modules.resolve("phi-provider-audit").module_kind == "AUDIT_RULE"
+    assert modules.resolve("patient-boundary-audit").module_kind == "AUDIT_RULE"
     assert modules.resolve("gate-effectiveness").module_kind == "EVALUATOR"
     assert modules.resolve("causal-attribution").runner_type == "AGENT"
     profile = pipelines.resolve("chart-review-quality-v1")
@@ -705,12 +705,11 @@ def test_application_audit_detects_cross_patient_and_external_phi_without_truth(
     assert not hasattr(context, "truth")
     report = AuditRunner(builtin_audit_registry()).run(
         context,
-        ("patient-boundary-audit", "phi-provider-audit"),
+        ("patient-boundary-audit",),
     )
-    assert {row.kind for row in report.incidents} == {
-        "PATIENT_CROSSOVER",
-        "PHI_EXTERNAL_MODEL_BOUNDARY",
-    }
+    # `PHI_EXTERNAL_MODEL_BOUNDARY` was asserted here until 2026-08-05, when `phi_provider_audit`
+    # was removed with the rest of the PHI plane. Only the cross-patient rule remains.
+    assert {row.kind for row in report.incidents} == {"PATIENT_CROSSOVER"}
     assert secret not in str(report.to_dict())
 
 

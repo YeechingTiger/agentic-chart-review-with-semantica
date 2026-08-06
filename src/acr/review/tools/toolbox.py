@@ -246,9 +246,9 @@ def build_tool_schemas(spec=None) -> list[dict]:
     return [*_RETRIEVAL_TOOLS, _submit_answer_tool(spec)]
 
 
-#: The surface with no contract in hand: `mcp_server` builds a scratch toolbox before a spec
-#: is chosen, and several tests read the shape rather than a run's. Same seven tools, the
-#: three statuses `outcomes.DEFAULT_SPACE` declares.
+#: The surface with no contract in hand: several tests read the shape rather than a run's, and
+#: a caller may need a scratch toolbox before a spec is chosen. Same seven tools, the three
+#: statuses `outcomes.DEFAULT_SPACE` declares.
 TOOL_SCHEMAS: list[dict] = build_tool_schemas()
 
 

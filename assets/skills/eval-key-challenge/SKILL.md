@@ -1,9 +1,10 @@
 ---
 name: eval-key-challenge
 description: Use when a run's answer disagrees with the recorded answer key and you must establish whether the KEY is derivable from this chart, before anyone concludes the run was wrong. Tells you the three ways a disagreement arises, what evidence separates them, the cheap structural check to run first, and why naming a winner is not your job. Does not decide whether the run was correct - that comparison is the deterministic scorer's and is already done.
-slot: eval
-judges: [key_derivability, chart_support_for_key, disagreement_kind]
 license: MIT
+metadata:
+  slot: eval
+  judges: key_derivability chart_support_for_key disagreement_kind
 ---
 
 # When the answer key and the run disagree, the key is also a suspect

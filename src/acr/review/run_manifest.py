@@ -205,6 +205,16 @@ def experiment_config_hash(config: dict) -> str:
                       default=str)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
+def _open_gaps_text() -> str:
+    """The gap-ledger prompt and tool description as one string, for hashing.
+
+    Imported lazily: `run_manifest` is reachable from planes that must not import langchain, and
+    `agent` does at module scope.
+    """
+    from .agent import OPEN_GAPS_PROMPT, OPEN_GAPS_TOOL_DESCRIPTION
+    return OPEN_GAPS_PROMPT + "\n" + OPEN_GAPS_TOOL_DESCRIPTION
+
+
 def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None,
                           tool_schemas=None, retrieval_prior=None,
                           site_mapping=None, task_context: str = "",
@@ -212,9 +222,8 @@ def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None,
                           prompt_blocks: Mapping[str, int] | None = None) -> dict:
     """The identity of every prompt block whose content can change a run's answer.
 
-    Lives here rather than in `agent` because a manifest field belongs with the manifest, and
-    because `mcp_server` builds its own answer dict and will need the same block if it ever grows
-    a prompt.
+    Lives here rather than in `agent` because a manifest field belongs with the manifest, and so
+    that a second front end building its own answer dict can reach the same block.
 
     Every entry is content-hashed and every entry carries whether anybody has signed it off. Both
     are `False` today, and that is the honest state: the code tables were recalled by a model, the
@@ -295,8 +304,8 @@ def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None,
         # does differ between contracts and between arms. Nothing hashed it until 2026-08-03,
         # which is the same defect this block was added to fix, one entry further along.
         #
-        # `None`, not `{}`, when no surface was supplied: `mcp_server` builds its own answer
-        # dict and an absent surface is a different fact from an unhashed one.
+        # `None`, not `{}`, when no surface was supplied: a caller may build its own answer
+        # dict, and an absent surface is a different fact from an unhashed one.
         "tool_surface": _tool_surface(tool_schemas, bound_tool_names),
         # WHAT ELSE WENT INTO THE PROMPT, AND WHAT ELSE SHAPED THE PLAN. Both were switches on
         # `run_patient` that no manifest field recorded, so `experiment_config_hash` — the read
@@ -308,6 +317,15 @@ def prompt_asset_manifest(spec, runtime_profile_asset=None, skill_stack=None,
         # refinement arm. The hash, never the text: this is unbounded operator prose written into a
         # file that sits beside patient-derived output, and a manifest is not the place to copy it.
         "additional_task_context": _text_identity(task_context),
+        # THE OPEN-GAP LEDGER'S TEXT, which this repo now owns. `_tool_surface` below records
+        # `write_todos` as bound-but-not-schema-hashed, on the grounds that it "belongs to the
+        # library, whose version `code_sha` already covers". That was true while the text was the
+        # library's default and stopped being true on 2026-08-05, when `TodoListMiddleware` began
+        # taking `system_prompt=OPEN_GAPS_PROMPT`. It is prompt content that changes behaviour —
+        # the whole reason for overriding it is that the default produced zero calls in 514 runs —
+        # so two arms differing only in this text would otherwise hash identically, which is the
+        # measurement failure `blocks` above was split apart to avoid.
+        "open_gaps_prompt": _text_identity(_open_gaps_text()),
         # `site_mapping` reaches `CoverageLedger` and `plan_from_spec`, so it changes the
         # stratification, the plan and therefore the gate. `mapping_hash` has existed since the
         # mapping did and reached no manifest.

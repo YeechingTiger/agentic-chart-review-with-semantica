@@ -10,16 +10,33 @@ framework dependency, so it does not need to sit behind one.
 WHAT THE POLICY IS FOR. `create_deep_agent` injects nine tools nobody asked for: ls, glob,
 grep, read_file, write_file, edit_file, execute, task, write_todos. Four are read paths, and a
 read that does not go through `Toolbox.dispatch` is invisible to the `CoverageLedger` — the
-gate would still stamp `gate_validated: true` over a chart the ledger never saw read. Under the
-`FilesystemBackend(root_dir=".")` the skills path uses, `read` and `grep` reach ABSOLUTE paths
-outside root_dir, the answer key among them. No recorded run exercised that; an unexercised
-open door is still not a boundary.
+gate would still stamp `gate_validated: true` over a chart the ledger never saw read.
+
+THE POLICY EARNED ITS KEEP ON 2026-08-06. `build_agent` moved onto `create_deep_agent`, and this
+check refused the first three attempts: `task` survived twice because the harness profile that
+disables the general-purpose subagent is keyed on a provider string the library does not publish,
+so the registration silently missed. A blacklist of the nine would not have caught that; the
+whitelist named the tool and stopped the run at construction.
 """
 from __future__ import annotations
 
-#: The only tool the library is permitted to add. A set, not a count: a future version that
-#: swaps `write_todos` for two differently-named tools must fail loudly, not arithmetically.
-LIBRARY_TOOLS = frozenset({"write_todos"})
+#: What the library may add, each with the answer to the question this module exists to force:
+#: can it reach a chart document without `Toolbox.dispatch` seeing it?
+#:
+#:   write_todos           no — it writes the open-gap ledger into agent state, reads nothing.
+#:   read_file, ls         no, BECAUSE OF THE BACKEND, not because of the tool. `build_agent`
+#:                         passes `StateBackend`, which has no filesystem behind it: these reach
+#:                         only what the run seeded into state, and a chart document is never
+#:                         seeded there. They are on the surface so progressive disclosure can
+#:                         open a `SKILL.md`. Under a `FilesystemBackend` the same two tools would
+#:                         reach absolute paths outside the root — the answer key among them — so
+#:                         this entry is conditional on the backend and must be revisited if it
+#:                         ever changes.
+#:
+#: NOT here, deliberately: `task` (spawns work outside the ledger), `write_file`, `edit_file`,
+#: `delete`, `glob`, `grep`, `execute`. A set, not a count: a future version that swaps one name
+#: for two must fail loudly, not arithmetically.
+LIBRARY_TOOLS = frozenset({"write_todos", "read_file", "ls"})
 
 
 class ToolSurfaceError(AssertionError):

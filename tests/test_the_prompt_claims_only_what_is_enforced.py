@@ -31,7 +31,7 @@ sampling draws are un-inspected (`answer_gate.py` `_coverage_verdict`).
 
 ## And the surface the model can actually reach
 
-`prompt_assets.tool_surface` recorded seven tools. Nine are bound: `revise_plan` is added by
+`prompt_assets.tool_surface` recorded seven tools. Eight are bound: `write_todos` is added by
 `run_chart_review` and `write_todos` by `TodoListMiddleware`. A manifest that understates the
 reachable surface is read by `undeclared-tool-audit` and by anyone asking what this run could do.
 """
@@ -104,7 +104,7 @@ def test_the_strata_and_the_terms_are_still_there(rendered):
 # ------------------------------------------------------------------ the reachable tool surface
 
 def test_the_manifest_records_every_tool_the_model_can_reach(tmp_path):
-    """Nine bound, seven recorded. `revise_plan` comes from `run_chart_review` and `write_todos`
+    """Eight bound, seven recorded. `write_todos`
     from `TodoListMiddleware`; both reach the model and neither was in the manifest."""
     pytest.importorskip("deepagents")
     import pathlib
@@ -122,14 +122,14 @@ def test_the_manifest_records_every_tool_the_model_can_reach(tmp_path):
                     patient_id="SYN0001", out_dir=tmp_path, model=model,
                     max_model_calls=1, seed=7, run_id="surface")
     ts = m["prompt_assets"]["tool_surface"]
-    assert "revise_plan" in ts["names"], "the plan-revision tool is bound and was unrecorded"
+    assert "write_todos" in ts["names"], "the library plan tool is bound and was unrecorded"
     assert "write_todos" in ts["names"], "the library tool is bound and was unrecorded"
     assert ts["n_tools"] == len(ts["names"]) >= 9
 
 
 def test_the_manifest_says_which_tools_it_could_not_content_hash(tmp_path):
     """AN ADMITTED LIMIT, not a silent one. Only the seven from `build_tool_schemas` have schemas
-    here; `revise_plan`'s description is a module constant and `write_todos` belongs to the library,
+    here; `write_todos` belongs to the library,
     whose version is `code_sha`'s business. A reader has to be able to tell which names are hashed
     from which are merely listed — otherwise the hash looks like it covers nine."""
     pytest.importorskip("deepagents")
@@ -138,13 +138,13 @@ def test_the_manifest_says_which_tools_it_could_not_content_hash(tmp_path):
     spec = load_spec(SPEC)
     schemas = build_tool_schemas(spec)
     ts = prompt_asset_manifest(spec, tool_schemas=schemas,
-                               bound_tool_names={"revise_plan", "write_todos",
+                               bound_tool_names={"write_todos",
                                                  *(s["function"]["name"] for s in schemas)})
-    assert set(ts["tool_surface"]["not_schema_hashed"]) == {"revise_plan", "write_todos"}
+    assert set(ts["tool_surface"]["not_schema_hashed"]) == {"write_todos"}
     assert ts["tool_surface"]["n_schema_hashed"] == len(schemas)
 
 
 def test_an_absent_surface_is_still_an_explicit_absence():
-    """`mcp_server` builds its own answer dict; an absent surface and an unhashed one differ."""
+    """A front end may build its own answer dict; an absent surface and an unhashed one differ."""
     from acr.review.run_manifest import prompt_asset_manifest
     assert prompt_asset_manifest(load_spec(SPEC))["tool_surface"] is None

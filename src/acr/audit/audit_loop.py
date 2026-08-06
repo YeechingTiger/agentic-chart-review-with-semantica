@@ -10,7 +10,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import re
-import subprocess
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -54,13 +53,6 @@ _DOB = re.compile(
 )
 _URL = re.compile(r"https?://([^/\s:]+)")
 
-PHI_PATTERNS = {
-    "INSTITUTIONAL_PERSON_ID": _INSTITUTIONAL_PERSON,
-    "EMAIL": _EMAIL,
-    "PHONE": _PHONE,
-    "MRN": _MRN,
-    "DOB": _DOB,
-}
 OUTBOUND_TOOLS = frozenset({
     "web",
     "web_fetch",
@@ -133,7 +125,6 @@ class AuditContext:
     provider_boundary: str = "UNKNOWN"
     declared_tools: tuple[str, ...] = ()
     local_root: str = ""
-    git_root: str = ""
     runtime_evidence_refs: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -145,9 +136,8 @@ class AuditContext:
             )
         if len(set(self.declared_tools)) != len(self.declared_tools):
             raise AuditContractError("declared_tools contains duplicates")
-        for path in (self.local_root, self.git_root):
-            if path and not Path(path).is_absolute():
-                raise AuditContractError("audit boundary paths must be absolute")
+        if self.local_root and not Path(self.local_root).is_absolute():
+            raise AuditContractError("audit boundary paths must be absolute")
 
     @property
     def input_hash(self) -> str:
@@ -158,7 +148,6 @@ class AuditContext:
             "provider_boundary": self.provider_boundary,
             "declared_tools": self.declared_tools,
             "local_root": self.local_root,
-            "git_root": self.git_root,
             "runtime_evidence_refs": self.runtime_evidence_refs,
         })
 
@@ -509,154 +498,6 @@ def patient_boundary_audit(
         rationale="one or more tool calls crossed the declared patient boundary",
     ),)
 
-def phi_provider_audit(
-    asset: ModuleAsset, context: AuditContext
-) -> tuple[tuple[AuditFinding, ...], tuple[AuditIncident, ...]]:
-    findings: list[AuditFinding] = []
-    metadata: dict[str, dict[str, Any]] = {}
-    sources: list[tuple[str, Any, str, str]] = []
-    for index, event in enumerate(context.application_events):
-        kind = str(event.get("kind") or "").lower()
-        seq = event.get("seq", index)
-        locations = []
-        if kind == "tool":
-            if "args" in event:
-                locations.append((f"events[{seq}].args", event["args"], "TOOL_ARGUMENT"))
-            if "result" in event:
-                locations.append((f"events[{seq}].result", event["result"], "MODEL_INPUT"))
-        else:
-            role = str(event.get("role") or "").lower()
-            location = (
-                "MODEL_OUTPUT"
-                if kind == "model_output" or role == "assistant"
-                else "MODEL_INPUT"
-                if kind in {"llm", "model", "model_input"}
-                else "TRACE"
-            )
-            locations.append((f"events[{seq}]", event, location))
-        for root, value, location in locations:
-            sources.append((root, value, location, str(seq)))
-    sources.append((
-        "trajectory.output",
-        context.trajectory.output,
-        "MODEL_OUTPUT",
-        context.trajectory.trajectory_id,
-    ))
-    for index, artifact in enumerate(context.trajectory.artifact_refs):
-        sources.append((
-            f"artifacts[{index}].path",
-            artifact.path,
-            "ARTIFACT_PATH",
-            str(index),
-        ))
-
-    for root, value, location, source_id in sources:
-            for path, text in _walk(value, root):
-                for phi_type, pattern in PHI_PATTERNS.items():
-                    if pattern is None:
-                        # No identifier shape declared for this site, so this rule contributes
-                        # nothing. Skipped and NOT counted as clean — `inert_rules` on the report is
-                        # what says which rules could not look. The first time this plane was
-                        # reachable at all it crashed here on `NoneType.finditer`, because the
-                        # pattern was allowed to be None and the loop was not told.
-                        continue
-                    for match_index, match in enumerate(pattern.finditer(text), 1):
-                        locator = f"{path}#{phi_type}:{match_index}"
-                        finding_id = _finding_id(
-                            asset, context, f"PHI_{phi_type}", locator
-                        )
-                        evidence = {
-                            "source_type": (
-                                "ARTIFACT_REF"
-                                if location == "ARTIFACT_PATH"
-                                else "APPLICATION_EVENT"
-                            ),
-                            "source_id": source_id,
-                            "location": location,
-                            "path": path,
-                            "phi_type": phi_type,
-                            "fingerprint": _fingerprint(match.group(0)),
-                            "value_redacted": True,
-                        }
-                        findings.append(AuditFinding(
-                            finding_id=finding_id,
-                            rule_ref=asset.ref,
-                            trajectory_id=context.trajectory.trajectory_id,
-                            target_ref=_target(context),
-                            kind=f"PHI_{phi_type}",
-                            severity=(
-                                "IRB"
-                                if location in {
-                                    "MODEL_OUTPUT", "ARTIFACT_PATH"
-                                }
-                                else "WARN"
-                            ),
-                            message=(
-                                f"{phi_type} detected at {location}; value withheld"
-                            ),
-                            evidence=(evidence,),
-                        ))
-                        metadata[finding_id] = evidence
-
-    incidents: list[AuditIncident] = []
-    external = context.provider_boundary.upper() in {
-        "EXTERNAL",
-        "THIRD_PARTY",
-        "CROSS_TRUST_BOUNDARY",
-    }
-    model_findings = tuple(
-        row.finding_id
-        for row in findings
-        if metadata[row.finding_id]["location"]
-        in {"MODEL_INPUT", "MODEL_OUTPUT"}
-    )
-    if external and model_findings:
-        incidents.append(AuditIncident(
-            incident_id=_incident_id(
-                asset,
-                context,
-                "PHI_EXTERNAL_MODEL_BOUNDARY",
-                model_findings,
-            ),
-            rule_ref=asset.ref,
-            trajectory_id=context.trajectory.trajectory_id,
-            target_ref=_target(context),
-            kind="PHI_EXTERNAL_MODEL_BOUNDARY",
-            severity="IRB",
-            finding_ids=model_findings,
-            rationale=(
-                "PHI-bearing content crossed an external provider boundary; "
-                "matched values remain withheld"
-            ),
-        ))
-    for index, event in enumerate(context.application_events):
-        if str(event.get("kind") or "").lower() != "tool":
-            continue
-        if not _outbound_event(event):
-            continue
-        prefix = f"events[{event.get('seq', index)}]"
-        linked = tuple(
-            row.finding_id
-            for row in findings
-            if str(metadata[row.finding_id]["path"]).startswith(prefix)
-        )
-        if linked:
-            incidents.append(AuditIncident(
-                incident_id=_incident_id(
-                    asset, context, "PHI_OUTBOUND_ACTION", linked
-                ),
-                rule_ref=asset.ref,
-                trajectory_id=context.trajectory.trajectory_id,
-                target_ref=_target(context),
-                kind="PHI_OUTBOUND_ACTION",
-                severity="IRB",
-                finding_ids=linked,
-                rationale=(
-                    "PHI and an external destination occur in the same tool event"
-                ),
-            ))
-    return tuple(findings), tuple(incidents)
-
 def undeclared_tool_audit(
     asset: ModuleAsset, context: AuditContext
 ) -> tuple[tuple[AuditFinding, ...], tuple[AuditIncident, ...]]:
@@ -697,104 +538,6 @@ def undeclared_tool_audit(
             target_ref=row.target_ref,
             kind=row.kind,
             severity="CRITICAL",
-            finding_ids=(row.finding_id,),
-            rationale=row.message,
-        )
-        for row in findings
-    )
-    return tuple(findings), incidents
-
-def _is_run_output(path: Path, git_root: Path | None) -> bool:
-    """A run's own trace or manifest, written where run output goes and not committed.
-
-    Two conditions, and both matter. It must be under `runs/` inside the worktree, which is the
-    documented location — an artifact somewhere else inside the worktree is not run output, it is a
-    file in the source tree. And Git must not TRACK it, because a committed run record is precisely
-    the disclosure this plane exists to report, whatever directory it sits in.
-    """
-    if git_root is None:
-        return False
-    try:
-        rel = path.relative_to(git_root)
-    except ValueError:
-        return False
-    if not rel.parts or rel.parts[0] != "runs":
-        return False
-    try:
-        r = subprocess.run(["git", "ls-files", "--error-unmatch", str(path)],
-                           cwd=git_root, capture_output=True, text=True, check=False)
-    except OSError:
-        return False
-    return r.returncode != 0          # untracked => run output; tracked => the escape, report it
-
-
-def local_artifact_audit(
-    asset: ModuleAsset, context: AuditContext
-) -> tuple[tuple[AuditFinding, ...], tuple[AuditIncident, ...]]:
-    if not context.local_root:
-        return (), ()
-    local_root = Path(context.local_root).resolve()
-    git_root = Path(context.git_root).resolve() if context.git_root else None
-    findings = []
-    for index, artifact in enumerate(context.trajectory.artifact_refs):
-        path = Path(artifact.path).resolve(strict=False)
-
-        # RUN OUTPUT IS NOT AN ESCAPE. `runs/` is where a run writes its trace and its manifest —
-        # inside the worktree, ignored wholesale, never committed. The rule this file enforces is
-        # about DEVELOP artifacts, the curated patient-derived material the local store exists to
-        # keep away from Git. Applied to run output it fires on every run that has ever happened:
-        # the first time this plane was reachable at all it reported one IRB incident on a clean
-        # synthetic run, and it would have reported 508.
-        #
-        # The distinguishing property is the same one `local_artifacts.require_run_artifact` checks
-        # on the read side: run output is UNTRACKED. A tracked artifact inside the worktree IS the
-        # escape this rule is for, and that case still fires below.
-        if _is_run_output(path, git_root):
-            continue
-        try:
-            path.relative_to(local_root)
-            within_local = True
-        except ValueError:
-            within_local = False
-        within_git = False
-        if git_root is not None:
-            try:
-                path.relative_to(git_root)
-                within_git = True
-            except ValueError:
-                pass
-        if within_local and not within_git:
-            continue
-        locator = f"artifact:{index}"
-        findings.append(AuditFinding(
-            finding_id=_finding_id(
-                asset, context, "ARTIFACT_BOUNDARY", locator
-            ),
-            rule_ref=asset.ref,
-            trajectory_id=context.trajectory.trajectory_id,
-            target_ref=_target(context),
-            kind="ARTIFACT_BOUNDARY",
-            severity="IRB",
-            message="patient-derived artifact escaped the declared local store",
-            evidence=({
-                "source_type": "ARTIFACT_REF",
-                "source_id": str(index),
-                "path_fingerprint": _fingerprint(str(path)),
-                "within_local_root": within_local,
-                "within_git_root": within_git,
-                "value_redacted": True,
-            },),
-        ))
-    incidents = tuple(
-        AuditIncident(
-            incident_id=_incident_id(
-                asset, context, row.kind, (row.finding_id,)
-            ),
-            rule_ref=asset.ref,
-            trajectory_id=context.trajectory.trajectory_id,
-            target_ref=row.target_ref,
-            kind=row.kind,
-            severity="IRB",
             finding_ids=(row.finding_id,),
             rationale=row.message,
         )
@@ -940,27 +683,11 @@ def builtin_audit_registry() -> AuditRuleRegistry:
         ),
         (
             _audit_asset(
-                "phi-provider-audit",
-                "audit.phi_provider.v1",
-                "Detect PHI locations and correlated provider/outbound crossings.",
-            ),
-            phi_provider_audit,
-        ),
-        (
-            _audit_asset(
                 "undeclared-tool-audit",
                 "audit.undeclared_tool.v1",
                 "Detect tools outside the declared run bundle.",
             ),
             undeclared_tool_audit,
-        ),
-        (
-            _audit_asset(
-                "local-artifact-audit",
-                "audit.local_artifact.v1",
-                "Verify patient-derived artifacts remain in the local store.",
-            ),
-            local_artifact_audit,
         ),
         (
             _audit_asset(

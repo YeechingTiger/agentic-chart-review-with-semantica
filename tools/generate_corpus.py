@@ -174,11 +174,20 @@ class Blueprint:
     #: value -> why it loses, as a CODE from `REJECTION_CODES`. Prose cannot be compared across
     #: charts, and which KIND of rejection a reasoner gets wrong is the question worth asking.
     gold_rejections: dict = field(default_factory=dict)
-    #: WHICH CONFLICT RULES APPLIED, per a human reader, keyed spec_id -> rule_id. The denominator for
-    #: `rule_assessment`'s `not_considered` column: four rules over twenty-seven charts means most
-    #: rules genuinely do not apply to most charts, so that state is only a finding when gold says the
-    #: rule applied. Absent is NOT "inapplicable" — `rule_gold.missed_rules` counts positive claims
-    #: only, so an unannotated chart contributes to no denominator.
+    #: WHICH CONFLICT RULES APPLIED, per a human reader, keyed spec_id -> rule_id.
+    #:
+    #: THE READER WAS DELETED ON 2026-08-06 AND THIS SURVIVED IT. `rule_assessment.py` and
+    #: `rule_gold.py` were built to score a `not_considered` column against these annotations, and
+    #: nothing outside their own tests ever consumed them, so 717 lines went. The ANNOTATIONS are a
+    #: different thing from the code that read them: they are hand-authored clinical judgement about
+    #: which rule governs the SYN0001 / SYNX03 mirror pair and which fact the answer turns on, and
+    #: they were transcribed from what the corpus `why` fields already assert rather than invented.
+    #: `docs/CANDIDATE_LEDGER_REMOVED.md` set the precedent when it kept `gold_candidates` through
+    #: the same kind of deletion, calling them "hand-authored knowledge about which readings are
+    #: defensible and are the input any future approach needs".
+    #:
+    #: Absent is NOT "inapplicable": an unannotated chart asserts nothing, and any future reader
+    #: must count positive claims only or it will manufacture correct silences by the dozen.
     #:
     #: Declared HERE because this generator is the single source of `_ground_truth.json`. Annotating
     #: the JSON directly would have been wiped by the next regeneration, silently, which is the class

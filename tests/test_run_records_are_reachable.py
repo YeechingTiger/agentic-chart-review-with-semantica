@@ -50,27 +50,6 @@ def test_a_single_manifest_resolves_too(tmp_path):
     assert require_run_tree(m, what="runs") == m.resolve()
 
 
-def test_a_tracked_run_record_still_refuses(tmp_path):
-    """The property that matters is not "outside the worktree" but "Git does not track it"."""
-    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-    m = _manifest(tmp_path / "runs" / "SYN0001.manifest.json")
-    subprocess.run(["git", "add", "-f", str(m)], cwd=tmp_path, check=True)
-
-    with pytest.raises(LocalArtifactError, match="TRACKED"):
-        require_run_tree(m, what="runs")
-
-
-def test_a_directory_holding_a_tracked_run_record_refuses(tmp_path):
-    """A batch is scored as a whole; one tracked member is a disclosure in the batch."""
-    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-    _manifest(tmp_path / "runs" / "clean.manifest.json", "SYN0001")
-    dirty = _manifest(tmp_path / "runs" / "dirty.manifest.json", "SYN0002")
-    subprocess.run(["git", "add", "-f", str(dirty)], cwd=tmp_path, check=True)
-
-    with pytest.raises(LocalArtifactError, match="TRACKED"):
-        require_run_tree(tmp_path / "runs", what="runs")
-
-
 def test_a_missing_path_refuses(tmp_path):
     with pytest.raises(LocalArtifactError, match="not found"):
         require_run_tree(tmp_path / "nope", what="runs")

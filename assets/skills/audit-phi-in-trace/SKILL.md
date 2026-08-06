@@ -5,10 +5,11 @@ description: >-
   person ids, emails, phone numbers, MRN and DOB labels, outbound URLs — and report WHERE each
   one sits, because location decides severity. A script rather than advice; it reads files and
   prints JSON.
-category: audit
-kind: script
-entry: scan.py
 license: MIT
+metadata:
+  category: audit
+  kind: script
+  entry: scan.py
 ---
 
 # What a trace already written to disk is carrying

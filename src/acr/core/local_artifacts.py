@@ -1,21 +1,26 @@
-"""Hard storage boundary for patient-derived DEVELOP artifacts.
+"""A private on-disk store for patient-derived DEVELOP artifacts.
 
-`.gitignore` is not a security boundary.  A JSON file is not ignored by the repository's
-run-output rules, an ignored file can still be force-added, and a symlink can make a path that
-looks external resolve back into the worktree.  Every command handling registry references,
-case maps, chart-observable gold, traces, or attribution reports therefore comes through this
-module before it reads or writes anything.
+The store is a mode-0700 directory holding mode-0600 files, written atomically.  Every command
+handling registry references, case maps, chart-observable gold, traces, or attribution reports
+comes through this module, so that such a file has one resolution path and one permission policy
+rather than each caller inventing its own.
 
 The store is deliberately a directory, not a database or dataset registry.  Its contents may
 contain PHI even when case identifiers are pseudonymous; nothing here calls them de-identified
 or shareable.
+
+WHAT THIS NO LONGER DOES.  Until 2026-08-05 this module also enforced a Git boundary: the store
+root was refused if it resolved inside the worktree, and a run record was refused if Git tracked
+it.  That boundary was removed deliberately and nothing replaced it, so nothing here prevents
+patient-derived material from being committed.  `.gitignore` still covers `runs/` and
+`corpus_real/`, and `.gitignore` is not a security boundary: an ignored file can still be
+force-added.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import os
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -27,21 +32,6 @@ class LocalArtifactError(ValueError):
     """A sensitive artifact escaped (or could escape) the declared local root."""
 
 
-def _git_root() -> Path:
-    try:
-        raw = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
-            check=True, timeout=5,
-        ).stdout.strip()
-    except (OSError, subprocess.SubprocessError) as exc:
-        raise LocalArtifactError(
-            "cannot establish the Git worktree boundary; run inside the repository"
-        ) from exc
-    if not raw:
-        raise LocalArtifactError("git rev-parse returned an empty worktree root")
-    return Path(raw).resolve()
-
-
 def _within(path: Path, parent: Path) -> bool:
     try:
         path.relative_to(parent)
@@ -51,32 +41,23 @@ def _within(path: Path, parent: Path) -> bool:
 
 
 def require_run_artifact(value: str | Path, *, what: str = "run artifact") -> Path:
-    """An existing RUN RECORD — a manifest or a trace — which lives inside the worktree by design.
+    """An existing RUN RECORD — a manifest or a trace — resolved for reading.
 
-    WHY THIS EXISTS. Every command that reads a completed run used `LocalArtifactStore.require_input`,
-    which proves a path resolves UNDER the local root, and the local root is required to be outside
-    the Git worktree. But `runs/` is inside the worktree — deliberately, gitignored wholesale — so the
-    proof could never succeed and `acr audit run` could not be pointed at any of the 508 manifests on
-    disk. The plane looked unexercised; it was unreachable. An adversarial review named this as the
-    highest-value fix available, and running the chain end to end reproduced it independently.
+    WHY THIS EXISTS SEPARATELY FROM THE STORE. Every command that reads a completed run used
+    `LocalArtifactStore.require_input`, which proves a path resolves UNDER the local root. But
+    `runs/` is not under the local root — it sits in the worktree, gitignored wholesale — so the
+    proof could never succeed and `acr audit run` could not be pointed at any of the 508 manifests
+    on disk. The plane looked unexercised; it was unreachable. An adversarial review named this as
+    the highest-value fix available, and running the chain end to end reproduced it independently.
 
-    THE PROPERTY WORTH KEEPING IS NOT THE ONE THAT WAS CHECKED. The danger was never "reading a file
-    inside the worktree". It was patient-derived material being COMMITTED. So this asserts the thing
-    that actually matters: the file exists, and Git does not TRACK it. A tracked manifest is either
-    synthetic (fine, and the caller may pass `allow_tracked=True` for a fixture) or a disclosure that
-    has already happened, and reading it is not the moment to discover that — `tests/
-    test_no_phi_in_tree.py::test_no_run_output_is_tracked` is what holds the property, and this is the
-    same rule stated where a reader of one run will meet it.
+    It used to also refuse a record that Git TRACKED, on the grounds that a tracked run record is a
+    disclosure that has already happened. That check was removed with the rest of the Git boundary;
+    see the module docstring.
     """
     raw = Path(value).expanduser()
     resolved = (raw if raw.is_absolute() else Path.cwd() / raw).resolve(strict=False)
     if not resolved.is_file():
         raise LocalArtifactError(f"{what} not found: {resolved}")
-    if _is_git_tracked(resolved):
-        raise LocalArtifactError(
-            f"{what} is TRACKED by Git: {resolved}. Run output is never committed — `runs/` is "
-            f"ignored wholesale — so a tracked run record is either a fixture (pass it directly) or "
-            f"material that should not be in the tree at all.")
     return resolved
 
 
@@ -99,10 +80,6 @@ def require_run_tree(value: str | Path, *, what: str = "runs") -> Path:
     The single-file fix shipped for `acr audit run` and was wired nowhere else. Reachability is not
     a property one call site can hold.
 
-    THE CHECK THAT SURVIVES is the one that was always the point: Git must not TRACK the record. It
-    is applied to EVERY member of a directory, not to the directory itself — a batch is scored as a
-    whole, so one tracked member is a disclosure inside the thing being read.
-
     An EMPTY directory refuses. Returning it would let a mistyped path score zero runs and report a
     clean batch, which is the failure mode this codebase already names as inert-versus-satisfied.
     """
@@ -122,16 +99,6 @@ def require_run_tree(value: str | Path, *, what: str = "runs") -> Path:
     return resolved
 
 
-def _is_git_tracked(path: Path) -> bool:
-    """True when Git tracks this exact path. False when Git is unavailable or the path is outside."""
-    try:
-        r = subprocess.run(["git", "ls-files", "--error-unmatch", str(path)],
-                           cwd=path.parent, capture_output=True, text=True, check=False)
-    except OSError:
-        return False
-    return r.returncode == 0
-
-
 class LocalArtifactStore:
     """A mode-0700 directory outside Git, with mode-0600 atomic files."""
 
@@ -144,14 +111,7 @@ class LocalArtifactStore:
         raw = Path(supplied).expanduser()
         if not raw.is_absolute():
             raise LocalArtifactError(f"local artifact root must be absolute: {raw}")
-        resolved = raw.resolve(strict=False)
-        git = _git_root()
-        if resolved == git or _within(resolved, git):
-            raise LocalArtifactError(
-                f"local artifact root resolves inside the Git worktree: {resolved}"
-            )
-        self.root = resolved
-        self.git_root = git
+        self.root = raw.resolve(strict=False)
 
     def ensure(self) -> Path:
         """Create the already-validated root and enforce private directory permissions."""

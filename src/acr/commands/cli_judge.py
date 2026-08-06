@@ -93,11 +93,6 @@ class JsonJudgeModel:
         return out if isinstance(out, Mapping) else {}
 
 
-#: The old private name, kept so the two call sites below and anything pinned to them keep
-#: working. One class, two spellings, no second implementation.
-_JsonModel = JsonJudgeModel
-
-
 def _packet(path: str, keyed: bool):
     """Build the packet from a JSON file, letting `blind_packet`'s key scan do the refusing.
 
@@ -263,7 +258,7 @@ def panel(
         raise typer.BadParameter("--model is required for a real run; only --dry-run may go "
                                  "without one")
 
-    real = _JsonModel(cli_common.llm_client(model, api_base), model)
+    real = JsonJudgeModel(cli_common.llm_client(model, api_base), model)
     verdict = J.judge(dimension, pk, registry=evals.precedence_gate(), model=real)
     try:
         applied = J.apply_verdict(verdict, use)
@@ -350,7 +345,7 @@ def run_evaluator_cmd(
         raise typer.BadParameter("--model is required for a real run; only --dry-run may go "
                                  "without one")
 
-    real = _JsonModel(cli_common.llm_client(model, api_base), model)
+    real = JsonJudgeModel(cli_common.llm_client(model, api_base), model)
     try:
         verdict, rec = J.run_evaluator(spec, available, registry=gate, model=real,
                                        ledger=ledger, subject_id=subject_id)
