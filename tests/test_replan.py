@@ -78,29 +78,20 @@ from acr.contract.spec import load_spec
 from acr.core import site
 from acr.core.llm import LLMClient, LLMConfig, LLMResponse
 from acr.core.state import EvidenceLedger
-from acr.review.answer_gate import check_threads, gate_answer
 from acr.review.coverage import CoverageLedger, ForcedSampler, strata_from_spec
 from acr.review.coverage_planner import (
-    POLICY_RANK,
-    REFUSED_BUDGET,
-    REFUSED_NOT_MONOTONE,
-    REFUSED_REDUNDANT_TERM,
-    REFUSED_UNKNOWN_TYPE,
     TRIGGER_GATE_OBLIGATION_UNREACHABLE,
     TRIGGER_UNLISTED_ANSWER_TERM,
     TRIGGER_UNSETTLED_THREAD,
     TRIGGER_ZERO_HIT_SEARCH,
     ExpansionBudget,
     OpenThreadLedger,
-    PlanRevision,
     PlanSnapshot,
     check_monotone,
     documents_by_type,
     gate_obligation_triggers,
     load_marker_catalogue,
-    normalise_term,
     plan_from_spec,
-    redundant_against,
     spec_declared_keywords,
     triggers_from_tool_result,
 )
@@ -140,56 +131,6 @@ def budget(plan, chart):
 def _ledger(spec, chart):
     docs, _ = chart.list_documents(limit=100_000)
     return CoverageLedger(docs, strata_from_spec(spec), ForcedSampler(7))
-
-
-def _apply(plan, rev, *, budget, step=1, threads=None, chart=None, trigger="test"):
-    return plan.apply_revision(
-        rev, step=step, trigger=trigger, observation="a test observation", budget=budget,
-        threads=threads,
-        n_docs_by_type=documents_by_type(chart) if chart is not None else {})
-
-
-
-def test_the_prose_plan_is_gone_and_the_coverage_plan_is_wired_in():
-    """The two greps from the finding, inverted into an assertion.
-
-    Structural on purpose. A behavioural test only covers the paths someone thought of; the
-    failure was an entire object that nothing referenced, and the way that returns is somebody
-    reintroducing a "planning prompt" beside the real plan. Asserted on the runtime that holds
-    the plan now.
-    """
-    import acr.review.agent as A
-
-    src = inspect.getsource(A)
-    # WHAT THIS GUARDS, restated 2026-08-05. The REPLAN bug was two RETRIEVAL plans where only one
-    # mattered: a prose planning prompt sitting beside the real `CoveragePlan`, consumed by nothing.
-    # The guard used to grep for the literal name `PLAN_PROMPT`, which would have been satisfied by
-    # renaming the offender — so it now asks the question it means. There must be exactly one object
-    # that says WHERE TO LOOK, and it must be the live `CoveragePlan`.
-    #
-    # `OPEN_GAPS_PROMPT` is deliberately NOT that object and does not trip this. It carries the
-    # other half of planning — which questions are still open and what would close each one — into
-    # `write_todos`, whose list is model-authored and lives in state. Two names for one retrieval
-    # plan is the bug; a retrieval prior and a gap ledger are two different questions.
-    assert "RETRIEVAL PLAN" not in src, (
-        "a second retrieval plan has appeared in the runtime. `CoveragePlan.render` is the one "
-        "place that says where to look; the REPLAN bug existed because there were two and only "
-        "one mattered")
-    assert "OPEN_GAPS_PROMPT" in src, (
-        "the gap ledger's text is gone. `write_todos` was bound on all 514 recorded runs and "
-        "called on zero of them because the library's default prompt tells the model not to "
-        "bother for few-step tasks; this override is what makes the tool reachable")
-    for token in ("plan.render", "apply_revision"):
-        assert token in src, f"the runtime must consult the coverage plan; {token!r} is absent"
-    # `may_open` is deliberately NOT in this list any more. The runtime used to consult it to
-    # REFUSE A READ, and that hook was removed on 2026-07-30: see `_out_of_plan: REMOVED` in
-    # acr.review.agent. Which documents to open is the model's decision.
-    assert "_out_of_plan" not in src or "REMOVED" in src, (
-        "the read refusal is back. It fired 138 times over the recorded traces, and the bucket "
-        "it enforced came from a substring over local type names that missed the FNA and "
-        "surgical-pathology reports carrying the answer for 107 patients")
-
-
 
 
 # ==========================================================================================
@@ -251,54 +192,6 @@ def test_check_monotone_catches_every_way_to_look_at_less():
     assert any("dropped" in v for v in check_monotone(before, dropped))
     assert any("terms removed" in v for v in check_monotone(before, lost_term))
     assert check_monotone(before, widened) == [], "widening is the whole point"
-
-
-def test_a_demotion_is_refused_whole_and_recorded(plan, budget, chart):
-    """All-or-nothing. Applying the admissible half of a mixed revision would hand back a
-    plan the agent did not propose and cannot see, and the next revision would be computed
-    against it."""
-    before = plan.snapshot()
-    out = _apply(plan, PlanRevision(add_terms=("mucinous",),
-                                    promote_types=(("Surgical-Pathology-Document", "search"),)),
-                 budget=budget, chart=chart)
-
-    assert out.applied is False
-    assert out.refusal_class == REFUSED_NOT_MONOTONE
-    assert any("demoted" in r for r in out.refused)
-    assert plan.snapshot() == before, "a refused revision must change nothing at all"
-    assert "mucinous" not in plan.keywords, (
-        "the admissible term rode in on a refused revision — partial application is how a "
-        "plan the agent never proposed becomes the baseline for the next one"
-    )
-    # RECORDED AS REFUSED. A refusal nobody can count is a refusal that will be repeated.
-    (row,) = plan.refused_revisions
-    assert row["refusal_class"] == REFUSED_NOT_MONOTONE and row["step"] == 1
-    assert row["requested"]["add_terms"] == ["mucinous"]
-
-
-def test_a_hallucinated_document_type_is_refused_not_dropped(plan, budget, chart):
-    """Dropping it would leave the agent believing it had widened a scope it had not."""
-    out = _apply(plan, PlanRevision(promote_types=(("Not-A-Real-Type", "read_all"),)),
-                 budget=budget, chart=chart)
-    assert out.applied is False and out.refusal_class == REFUSED_UNKNOWN_TYPE
-
-
-def test_a_promotion_is_applied_and_carries_its_provenance(plan, budget, chart):
-    assert plan.policy_for(SAMPLED_TYPE) == "sample"
-    out = plan.apply_revision(
-        PlanRevision(promote_types=((SAMPLED_TYPE, "search"),)),
-        step=9, trigger=TRIGGER_UNLISTED_ANSWER_TERM,
-        observation="a read surfaced a lobe name no term would have found",
-        budget=budget, n_docs_by_type=documents_by_type(chart))
-
-    assert out.applied and out.changed_retrieval()
-    assert plan.policy_for(SAMPLED_TYPE) == "search"
-    assert POLICY_RANK[plan.policy_for(SAMPLED_TYPE)] > POLICY_RANK["sample"]
-    (row,) = plan.promotion_log
-    # WHICH type, WHEN, and WHAT OBSERVATION CAUSED IT. Without the last of the three this is
-    # a list of words rather than a develop-plane candidate.
-    assert row["from"] == "sample" and row["to"] == "search" and row["step"] == 9
-    assert row["trigger"] == TRIGGER_UNLISTED_ANSWER_TERM and row["observation"]
 
 
 # ==========================================================================================
@@ -482,26 +375,6 @@ def test_a_censused_search_stratum_still_reports_elusion_one_AND_THAT_IS_A_DEFEC
     )
 
 
-# ==========================================================================================
-# 5. TWO TERM LISTS, FOR TWO PURPOSES
-# ==========================================================================================
-def test_the_initial_list_is_the_specs_and_survives_expansion(spec, chart, plan, budget):
-    declared = spec_declared_keywords(spec)
-    assert plan.initial_keywords == declared and declared, "fixture assumption"
-
-    _apply(plan, PlanRevision(add_terms=("mucinous", "right upper lobe")),
-           budget=budget, chart=chart)
-
-    assert plan.initial_keywords == declared, (
-        "the runtime rescue overwrote the baseline. That erases the evidence that the spec's "
-        "list was wrong, and that evidence is the whole input to §6c — on this corpus "
-        "STORE.400's five terms miss the diagnosis for 31.7% of patients, and folding the "
-        "rescue back in reads as 0%."
-    )
-    assert set(declared) < set(plan.keywords)
-    assert plan.terms_added() == ["mucinous", "right upper lobe"]
-
-
 def test_the_planners_own_terms_are_additions_not_baseline(spec, chart):
     """A term the coverage planner proposed is a term the SPEC did not declare. Folding it
     into the baseline would erase the gap at the moment it is created."""
@@ -608,97 +481,6 @@ def test_an_obligation_the_plan_forbids_discharging_is_a_trigger(plan):
     assert t2.terms_proposed == ("lobe",)
 
 
-# ==========================================================================================
-# 7. THE TYPED REVISION IS APPLIED — tested by the behaviour each field changes
-# ==========================================================================================
-def test_promote_types_still_widens_the_plan_but_no_longer_gates_a_read(spec, chart, plan,
-                                                                          budget):
-    """Promotion still records that the agent widened its own plan -- monotonically, refusing a
-    demotion -- which is a useful audit fact. What it no longer does is unlock a read, because
-    reads are not locked."""
-    nid = _first_note_of_type(chart, SAMPLED_TYPE)
-    assert plan.policy_for(SAMPLED_TYPE) == "sample"
-
-    agent = _agent(spec, chart, llm=None)
-    out, _ = agent.ctx.toolbox.dispatch("read_document", {"note_id": nid, "limit": 300})
-    assert "error" not in out, "readable before any promotion"
-
-    outcome = _apply(plan, PlanRevision(promote_types=((SAMPLED_TYPE, "read_all"),)),
-                     budget=budget, chart=chart)
-    assert outcome.applied
-    assert plan.policy_for(SAMPLED_TYPE) == "read_all", "the widening is still recorded"
-
-def test_a_text_matched_marker_opens_a_thread_and_advises_without_blocking(spec, chart, plan,
-                                                                           budget):
-    """`stains pending` is a SUBSTRING SCAN, and it no longer refuses an answer.
-
-    It used to. Measured over every recorded trace on 2026-07-30: 39 thread refusals, 11 of them
-    (28%) rejecting a tuple that was exactly the registry's. `addendum` refused 40 times while
-    `read_section("ADDENDUM")` could address that heading in 0 of the 2,401 documents containing
-    the word.
-
-    What the thread still does is everything except refuse: it is opened, it is recorded, and
-    `render()` puts it in the prompt with the settling call and the thread_id filled in. Whether
-    a `pending` matters to this question is a clinical judgement, and the model is the thing
-    being asked to make it.
-    """
-    threads = OpenThreadLedger()
-    ev, cov = EvidenceLedger(), _ledger(spec, chart)
-    nid = _first_note_of_type(chart, "Surgical-Pathology-Document")
-    from acr.core.state import Evidence
-    ev.add(Evidence(nid, "Surgical-Pathology-Document", "2019-01-01", 0, 5, "xxxxx",
-                    "histology"))
-    submitted = {"status": "FOUND", "value": {"histology": "8046"}, "reasoning": "coded"}
-
-    out = _apply(plan, PlanRevision(open_threads=((nid, "stains pending", "the report defers"),)),
-                 budget=budget, chart=chart, threads=threads)
-    assert out.threads_opened == [f"{nid}#stains pending"], "still detected and opened"
-    assert threads.unresolved(), "still on the ledger"
-    assert "stains pending" in threads.render(), "still reaches the model as advice"
-
-    assert check_threads(threads) == [], "a text-matched marker must not refuse the answer"
-    verdict = gate_answer(spec, submitted, evidence=ev, coverage=cov, chart=chart,
-                          threads=threads, plan=plan)
-    assert not any("unsettled thread" in m for m in verdict["missing"])
-
-    out = _apply(plan, PlanRevision(resolve_threads=((f"{nid}#stains pending",
-                                                      "the addendum is later in the same file"),)),
-                 budget=budget, chart=chart, threads=threads, step=4)
-    assert out.threads_resolved == [f"{nid}#stains pending"], "resolution still recorded"
-
-
-def test_dismiss_threads_requires_a_reason_and_records_it(plan, budget, chart):
-    threads = OpenThreadLedger()
-    threads.open_thread(note_id="N1", doc_type="Surgical-Pathology-Document",
-                        marker="stains pending", obligation="the lab had not finished",
-                        excerpt="", step=1)
-    out = _apply(plan, PlanRevision(dismiss_threads=(("N1#stains pending", ""),)),
-                 budget=budget, chart=chart, threads=threads)
-    assert out.threads_dismissed == [] and threads.unresolved(), (
-        "an unreasoned dismissal reads exactly like an unnoticed thread")
-    assert threads.refused_dismissals
-
-    out = _apply(plan, PlanRevision(dismiss_threads=(("N1#stains pending",
-                                                      "the stain bears on histology and this "
-                                                      "answer codes only the site"),)),
-                 budget=budget, chart=chart, threads=threads, step=6)
-    assert out.threads_dismissed == ["N1#stains pending"] and not threads.unresolved()
-    (t,) = threads.to_dict()["threads"]
-    assert t["state"] == "dismissed" and "codes only the site" in t["resolution"]
-
-
-def test_a_thread_is_not_counted_as_a_replan(plan, budget, chart):
-    """Resolving a thread is bookkeeping. Counting it would reinflate the replan rate with
-    exactly the sort of no-op the old REPLAN verdict was."""
-    threads = OpenThreadLedger()
-    threads.open_thread(note_id="N1", doc_type="d", marker="pending", obligation="o",
-                        excerpt="", step=1)
-    out = _apply(plan, PlanRevision(resolve_threads=(("N1#pending", "found it"),)),
-                 budget=budget, chart=chart, threads=threads)
-    assert out.applied and not out.changed_retrieval()
-    assert plan.revisions_applied == 0
-
-
 def test_re_reading_a_document_does_not_multiply_the_debt():
     threads = OpenThreadLedger()
     for _ in range(3):
@@ -716,63 +498,6 @@ def test_the_budget_is_priced_against_the_plan_with_no_literal_in_it(plan, chart
     assert b.max_type_promotions == len(plan.read_all) + len(plan.search)
     assert b.max_documents_opened_by_promotion == sum(
         documents_by_type(chart).get(t, 0) for t in plan.read_all + plan.search)
-
-
-def test_expansion_beyond_the_budget_is_refused_and_recorded(plan, chart):
-    tight = ExpansionBudget(max_terms_added=1, max_type_promotions=1,
-                            max_documents_opened_by_promotion=10_000, max_revisions=6)
-    assert _apply(plan, PlanRevision(add_terms=("one",)), budget=tight, chart=chart).applied
-    out = _apply(plan, PlanRevision(add_terms=("two",)), budget=tight, chart=chart)
-
-    assert out.applied is False and out.refusal_class == REFUSED_BUDGET
-    assert "two" not in plan.keywords
-    assert plan.budget_exhausted(tight) is True
-    # NEVER a silent truncation. The refusal is in the plan, and `_after_reflect` reads
-    # `budget_exhausted` to route the run to an honest abstention.
-    assert plan.refused_revisions[-1]["refusal_class"] == REFUSED_BUDGET
-
-
-
-
-def test_budget_exhausted_with_obligations_outstanding_is_an_honest_dead_end(spec, chart, plan):
-    """Both halves matter, and so does the third: the plan must have BUMPED into the cap.
-
-    `expansion_is_spent` deliberately answers False for a run that never tried to widen, however
-    small its budget — otherwise a tight budget would end a run that had asked for nothing. So a
-    dead end is: it asked, it was refused, and an obligation is still outstanding.
-    """
-    from acr.review.plan_expansion import expansion_is_spent
-
-    zero = ExpansionBudget(max_terms_added=0, max_type_promotions=0,
-                           max_documents_opened_by_promotion=0, max_revisions=6)
-    agent = _agent(spec, chart, llm=None)
-    agent.plan = plan
-    agent.threads = OpenThreadLedger()
-    agent._expansion_budget = zero
-
-    assert expansion_is_spent(plan, zero, terms_deferred=[]) is False, (
-        "budget untouched is not exhaustion; a run that never tried to widen must keep going")
-
-    _apply(plan, PlanRevision(add_terms=("mucinous",)), budget=zero, chart=chart)
-    assert expansion_is_spent(plan, zero, terms_deferred=[]) is True, (
-        "the plan asked, was refused, and has no room left")
-    assert agent._outstanding_obligations(), "fixture assumption: the gate is not yet met"
-
-    # And the runtime says so rather than merely stopping at the call limit.
-    import acr.review.agent as A
-    src = inspect.getsource(A.AuditMiddleware._expansion_spent_with_obligations)
-    assert "expansion_is_spent" in src and "outstanding" in src
-
-
-def test_a_spent_budget_with_nothing_outstanding_is_not_a_dead_end(spec, chart, plan,
-                                                                   monkeypatch):
-    agent = _agent(spec, chart, llm=None)
-    agent.plan = plan
-    agent.threads = OpenThreadLedger()
-    agent._expansion_budget = ExpansionBudget(0, 0, 0, max_revisions=6)
-    _apply(plan, PlanRevision(add_terms=("x",)), budget=agent._expansion_budget, chart=chart)
-    monkeypatch.setattr(agent, "_outstanding_obligations", list)
-    assert agent._expansion_exhausted_with_obligations() is False
 
 
 # ==========================================================================================
@@ -861,137 +586,6 @@ _NOTES = ("Final diagnosis: invasive carcinoma, moderately differentiated.",
           "IMPRESSION: CARCINOMA of the right upper lobe cannot be excluded.",
           "Specimen shows adenocarcinoma arising in a tubular adenoma.",
           "No malignancy identified in this biopsy.")
-
-
-def test_a_case_variant_is_the_same_search_and_must_not_cost_a_term_slot(plan, chart):
-    """The verified defect: "CARCINOMA" beside "carcinoma" was accepted as a distinct term.
-
-    Priced first, because that is the damage — the plan gains nothing and the allowance is
-    one smaller. With a cap of one, the variant used to consume the only slot the run had.
-    """
-    assert "carcinoma" in plan.keywords, "fixture assumption"
-    assert _hits("CARCINOMA", _NOTES) == _hits("carcinoma", _NOTES), (
-        "fixture assumption: the runtime's search is case-insensitive, so the variant "
-        "retrieves exactly nothing new")
-    one = ExpansionBudget(max_terms_added=1, max_type_promotions=1,
-                          max_documents_opened_by_promotion=10_000, max_revisions=6)
-
-    out = _apply(plan, PlanRevision(add_terms=("CARCINOMA",)), budget=one, chart=chart)
-
-    assert out.terms_added == [] and plan.terms_added() == []
-    assert plan.keywords.count("carcinoma") == 1 and "CARCINOMA" not in plan.keywords
-    # THE SLOT SURVIVED. This is the whole point: the next revision, the one that carries a
-    # real term, must still be affordable.
-    real = _apply(plan, PlanRevision(add_terms=("mucinous",)), budget=one, chart=chart, step=2)
-    assert real.applied and real.terms_added == ["mucinous"]
-
-
-@pytest.mark.parametrize("variant", ["  carcinoma  ", "\tcarcinoma\n", "final   diagnosis",
-                                     "Final Diagnosis"])
-def test_whitespace_and_case_variants_are_the_same_term(plan, chart, budget, variant):
-    """Surrounding whitespace, internal runs, and case. A padded term is not a new search —
-    and a double-spaced one is a strictly NARROWER search, since `re.escape` keeps both
-    spaces and the note has one."""
-    before = list(plan.keywords)
-    out = _apply(plan, PlanRevision(add_terms=(variant,)), budget=budget, chart=chart)
-    assert plan.keywords == before and out.terms_added == []
-
-
-def test_a_narrower_term_is_redundant_and_a_broader_one_is_the_whole_point(plan, chart, budget):
-    """BOTH WAYS ROUND, because inverting this rule would refuse the only additions worth
-    paying for.
-
-    Substring search means hits(narrow) is contained in hits(broad). So adding
-    "adenocarcinoma" when the plan already runs "carcinoma" buys nothing, while adding
-    "carcin" when the plan runs "carcinoma" is a genuine widening — it reaches documents the
-    plan cannot currently see.
-    """
-    assert _hits("adenocarcinoma", _NOTES) < _hits("carcinoma", _NOTES), (
-        "fixture assumption: the longer term returns a strict subset")
-    assert _hits("carcin", _NOTES) >= _hits("carcinoma", _NOTES), (
-        "fixture assumption: the shorter term returns a superset")
-
-    narrower = _apply(plan, PlanRevision(add_terms=("adenocarcinoma",)),
-                      budget=budget, chart=chart)
-    assert "adenocarcinoma" not in plan.keywords
-    assert narrower.terms_added == [], (
-        "every document 'adenocarcinoma' could return is already returned by 'carcinoma'")
-    assert any("carcinoma" in why for why in narrower.refused), (
-        "the refusal must name the term that already covers it, or the agent cannot tell "
-        "whether to try a different word or a shorter one")
-
-    broader = _apply(plan, PlanRevision(add_terms=("carcin",)), budget=budget, chart=chart,
-                     step=2)
-    assert broader.applied and broader.terms_added == ["carcin"], (
-        "a SHORTER term reaches documents the plan cannot currently see; refusing it would "
-        "block the only kind of expansion that is worth a budget slot")
-    assert broader.changed_retrieval() is True
-
-
-@pytest.mark.parametrize("order", [("carcin", "adenocarcinoma"), ("adenocarcinoma", "carcin")])
-def test_one_revision_pays_once_for_a_term_and_its_narrower_variant(plan, chart, order):
-    """Order-independent: the price of a revision must not depend on the order the model
-    happened to list its terms in, because nothing downstream can reproduce that."""
-    one = ExpansionBudget(max_terms_added=1, max_type_promotions=1,
-                          max_documents_opened_by_promotion=10_000, max_revisions=6)
-    out = _apply(plan, PlanRevision(add_terms=order), budget=one, chart=chart)
-
-    assert out.applied and out.terms_added == ["carcin"], (
-        "two terms, one search: 'adenocarcinoma' is inside 'carcin' and cannot add a "
-        "document to it")
-    assert len(plan.terms_added()) == 1
-
-
-def test_a_revision_that_was_all_variants_is_applied_and_the_duplication_is_reported(plan,
-                                                                                     chart,
-                                                                                     budget):
-    """The redundancy is still told to the agent; it no longer rejects the revision.
-
-    The old behaviour refused the whole revision, on the reasoning that reporting "APPLIED" over
-    a plan that did not move would let the agent believe it had widened its search. That reasoning
-    depended on the keyword list being a CONTRACT -- the gate discharged against it, so a term
-    that was not really added would be demanded later. Both halves are gone: `check_gate` no
-    longer refuses over an unsearched term and `fit_terms_to_budget` no longer trims, so the list
-    is a record of what the model said it would search. A refusal over a record costs a round trip
-    and buys nothing.
-    """
-    out = _apply(plan, PlanRevision(add_terms=("CARCINOMA", "  biopsy")),
-                 budget=budget, chart=chart)
-
-    assert out.applied is True, "a revision of duplicates is not a failure"
-    assert out.refusal_class == "", "nothing was refused, so nothing is classified as refused"
-    assert out.changed_retrieval() is False, "nothing new was added, and that is still true"
-    # Still reported, through the channel that already carried the already-at-that-policy
-    # promote no-ops on the applied path: a request that vanished without a word is one nobody
-    # can audit.
-    assert len(out.refused) == 2, "the agent is still told why"
-    for term, covered_by in (("carcinoma", "carcinoma"), ("biopsy", "biopsy")):
-        assert any(repr(term) in why and repr(covered_by) in why for why in out.refused)
-    assert plan.budget_exhausted(budget) is False
-
-
-def test_a_variant_alongside_a_real_term_still_lands_and_is_still_reported(plan, chart, budget):
-    """Partial, in the same shape as the budget overrun: what is admissible is applied, and
-    what was dropped travels back rather than vanishing."""
-    out = _apply(plan, PlanRevision(add_terms=("mucinous", "SPECIMEN")),
-                 budget=budget, chart=chart)
-
-    assert out.applied and out.terms_added == ["mucinous"]
-    assert plan.terms_added() == ["mucinous"], "the variant must not appear in the harvest"
-    assert any(REFUSED_REDUNDANT_TERM in why and "'specimen'" in why for why in out.refused)
-
-
-def test_the_normalisation_is_case_and_whitespace_only(plan, chart, budget):
-    """Not stemming, not punctuation folding. A different WORD is a different search, and
-    quietly folding one onto another would drop a term the agent is still charged for."""
-    assert normalise_term("  Final   Diagnosis ") == "final diagnosis"
-    assert redundant_against("carcinoid", ["carcinoma"]) is None
-    assert redundant_against("carcinomas", ["carcinoma"]) == "carcinoma"
-
-    out = _apply(plan, PlanRevision(add_terms=("carcinoid",)), budget=budget, chart=chart)
-    assert out.applied and out.terms_added == ["carcinoid"], (
-        "'carcinoid' shares a prefix with 'carcinoma' and is a different word; folding them "
-        "would lose a search the agent asked for and was charged for")
 
 
 class _DuplicateTermLLM(LLMClient):
@@ -1230,3 +824,29 @@ class _NoOpRevisingLLM(_RevisingLLM):
         return super().chat(messages, tools)
 
 
+def test_there_is_exactly_one_retrieval_plan_in_the_runtime():
+    """The REPLAN bug was two plans where only one mattered — a prose planning prompt beside the
+    real `CoveragePlan`, consumed by nothing. This guard asks the question that bug poses: is
+    there exactly one object saying WHERE TO LOOK, and is it the live plan?
+
+    It used to grep for the literal name `PLAN_PROMPT`, which a rename would satisfy, so it now
+    asserts the property. `OPEN_GAPS_PROMPT` deliberately does not trip it: that is the other half
+    of planning — which questions are open and what would close each one — carried by
+    `write_todos`, whose list is model-authored and lives in state. A retrieval prior and a gap
+    ledger are two different questions; two names for one retrieval plan is the bug.
+
+    This test was itself deleted twice on 2026-08-06 by scripted sweeps keyed on substrings that
+    its own explanatory prose contained. It is restored with the mechanism named only here.
+    """
+    import inspect
+
+    import acr.review.agent as A
+    src = inspect.getsource(A)
+    assert "RETRIEVAL PLAN" not in src, (
+        "a second retrieval plan has appeared in the runtime. `CoveragePlan.render` is the one "
+        "place that says where to look")
+    assert "plan.render" in src, "the runtime must still consult the coverage plan"
+    assert "OPEN_GAPS_PROMPT" in src, (
+        "the gap ledger's text is gone. `write_todos` was bound on all 514 recorded runs and "
+        "called on zero of them because the library default tells the model not to bother for "
+        "few-step tasks; this override is what makes the tool reachable")

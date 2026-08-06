@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import replace as _dc_replace
 
-from .coverage_planner import CoveragePlan, ExpansionBudget, PlanRevision
+from .coverage_planner import CoveragePlan, ExpansionBudget
 
 
 def price_expansion_budget(plan: CoveragePlan, docs_by_type: dict[str, int], *,
@@ -65,47 +65,6 @@ def budget_report(plan: CoveragePlan, budget: ExpansionBudget, *, source: str,
             "headroom": headroom(plan, budget)}
 
 
-def fit_terms_to_budget(rev: PlanRevision, plan: CoveragePlan,
-                        budget: ExpansionBudget) -> tuple[PlanRevision, list[str]]:
-    """Trim `add_terms` to the remaining allowance, keeping the supervisor's own order.
-
-    WHY PARTIAL AND NOT ALL-OR-NOTHING. All-or-nothing is right for MONOTONICITY — a
-    revision that also demoted a type must be refused whole, because applying its
-    admissible half hands back a plan the agent did not propose. A budget overrun is a
-    different kind of failure: nothing about the requested terms is inadmissible, there
-    is simply not enough allowance for all of them, and every prefix of the list is a
-    plan the agent DID propose. Refusing the whole thing taught the agent nothing, marked
-    the plan exhausted forever, and ended the run — over one term.
-
-    The order is the model's own priority order, and the truncation is reported back by
-    name, so "you may have 5 of the 6" is a statement the agent can act on. Terms already
-    in the plan are kept and cost nothing: `apply_revision` prices only what is new.
-
-    NOTHING IS TRIMMED ANY MORE, and the docstring above is kept as the record of what was.
-    Measured over every recorded trace on 2026-07-30: this function deleted **103 search terms
-    the model had proposed for itself**, 32 distinct, including `lobe`, `bronchus`, `right
-    upper lobe`, `left lower lobe`, `pathology addendum` and `pleuropulmonary blastoma`.
-
-    Then the contradiction, which no single rule could show. On CASE009 of the planning ablation
-    this function deleted `lobe` and `bronchus` from the plan, and
-    `answer_checks.nos_requires_search` refused the answer because the run "never searched for
-    ['lobe', 'bronchus']". One rule punished the agent for not running a term another rule had
-    taken away. That run submitted the registry-correct C341 five times, was refused five
-    times, and shipped C349.
-
-    A cap on how many words the model may search for is not a cost control. The cost controls
-    are the model-call limit and the spend limit and both are still enforced. This was a cap on
-    the model's own retrieval vocabulary, which is precisely what it has a `search` tool to
-    decide.
-
-    The signature and the two-tuple stay because `agent` and `run_manifest` both record the
-    second element. It is now always empty, so `terms_deferred` is empty everywhere and
-    `expansion_is_spent`'s deferral arm can never arm. Removing the seam as well is a change to
-    the reflect loop and is not smuggled in here.
-    """
-    return rev, []
-
-
 def expansion_is_spent(plan: CoveragePlan, budget: ExpansionBudget, *,
                        terms_deferred: list[str]) -> bool:
     """Widening is over: the agent has BUMPED INTO the cap and nothing is left to widen.
@@ -140,31 +99,3 @@ def expansion_is_spent(plan: CoveragePlan, budget: ExpansionBudget, *,
 #: Every header the runtime writes ends the word with `:` or ` (`.
 PLAN_BLOCK_PREFIXES = ("PLAN:", "PLAN (")
 
-
-def install_plan_block(msgs: list[dict], body: str) -> list[dict]:
-    """Put the plan in the transcript ONCE, at the end, replacing any earlier copy.
-
-    THE PLAN IS STATE, NOT HISTORY, and appending it was the single largest line item in the
-    bill. Measured on a real 293-document chart: `plan.render()` is 6,310 characters, the run
-    appended it eleven times — six from the plan node, five from `reflect` announcing an
-    applied revision — and every copy was re-sent on all forty-nine subsequent calls. That is
-    ~425,000 of the run's 1,030,179 prompt tokens, 41%, spent re-reading ten stale copies of
-    a document whose current version was sitting at the bottom of the same prompt.
-
-    Only the CURRENT plan is a fact about the run. What changed between revisions is history
-    and stays in the transcript, as the one-line note `reflect` writes — a reader of the
-    thread can still see that the scope widened and why, without carrying the full listing
-    of every doc type and keyword for each step it was true.
-
-    Position matters as much as uniqueness: the block goes at the END, because the plan
-    governs the next tool call and a plan buried twenty messages up is a plan being recalled
-    rather than read.
-    """
-    kept = [m for m in msgs if not is_plan_block(m)]
-    return kept + [{"role": "user", "content": body}]
-
-
-def is_plan_block(m: dict) -> bool:
-    """A message the runtime wrote to carry the plan — never one the model wrote."""
-    return (m.get("role") == "user"
-            and str(m.get("content") or "").startswith(PLAN_BLOCK_PREFIXES))

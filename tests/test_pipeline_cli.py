@@ -741,36 +741,3 @@ def test_the_call_budget_reaches_the_run_and_lands_in_the_manifest(tmp_path, scr
 # forty-nine later calls — ~425,000 of that run's 1,030,179 prompt tokens, 41%, spent
 # re-reading ten stale copies of a plan whose current version sat at the bottom of the same
 # prompt. Uniqueness AND position are both load-bearing, so both are pinned.
-
-def test_only_one_plan_block_survives_and_it_is_the_last_message():
-    from acr.review.plan_expansion import install_plan_block, is_plan_block
-    msgs = [{"role": "system", "content": "sys"},
-            {"role": "user", "content": "PLAN:\nrevision zero"},
-            {"role": "assistant", "content": "read something"},
-            {"role": "user", "content": "PLAN (revision 1):\nrevision one"},
-            {"role": "tool", "content": "a result"}]
-    out = install_plan_block(msgs, "PLAN (revision 2):\nrevision two")
-    plans = [m for m in out if is_plan_block(m)]
-    assert len(plans) == 1, "a stale plan is not history, it is a second answer to one question"
-    assert out[-1] is plans[0], "the plan governs the next call; buried, it is recalled not read"
-    assert "revision two" in out[-1]["content"]
-
-
-def test_nothing_but_a_plan_block_is_dropped():
-    """The transcript either keeps the work or the run has amnesia.
-
-    The bare prefix "PLAN" matches "PLANNING the next read", so a marker chosen carelessly
-    deletes the agent's own words and presents as the model forgetting.
-    """
-    from acr.review.plan_expansion import install_plan_block
-    msgs = [{"role": "system", "content": "sys"},
-            {"role": "user", "content": "PLANNING my next move"},   # prose, not a block
-            {"role": "assistant", "content": "PLAN: I will read the path report"},
-            {"role": "tool", "content": "PLAN-shaped tool output"}]
-    out = install_plan_block(msgs, "PLAN:\nthe real one")
-    assert len(out) == len(msgs) + 1, "nothing here was a plan block; nothing may be dropped"
-    assert any(m["content"] == "PLANNING my next move" for m in out)
-    assert any(m["role"] == "assistant" and m["content"].startswith("PLAN:") for m in out)
-    assert any(m["role"] == "tool" for m in out)
-
-

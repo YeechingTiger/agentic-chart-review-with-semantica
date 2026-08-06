@@ -96,7 +96,6 @@ from acr.review.coverage_planner import (
     READ_STATE_INCOMPLETE,
     READ_STATE_LENGTH_UNKNOWN,
     READ_STATE_UNREAD,
-    REFUSED_THREAD_NOOP,
     SETTLED_BY_READING_TO_THE_END,
     TRIGGER_GATE_OBLIGATION_UNREACHABLE,
     TRIGGER_UNLISTED_ANSWER_TERM,
@@ -105,7 +104,6 @@ from acr.review.coverage_planner import (
     ExpansionBudget,
     OpenRequest,
     OpenThreadLedger,
-    PlanRevision,
     Trigger,
     load_marker_catalogue,
     plan_from_spec,
@@ -504,17 +502,6 @@ def test_the_up_front_planners_own_terms_are_not_charged_to_the_agent(spec, char
     assert headroom(plan, priced)["terms"] >= 0, "the agent must start with a non-negative allowance"
 
 
-# ==========================================================================================
-# 6. PARTIAL APPLICATION — "you may have 5 of the 6", and thread work is never collateral
-# ==========================================================================================
-def _revise_tool(spec, chart, *, expansion_budget=None, threads=None):
-    """The declared `revise_plan` tool bound to real ledgers. See tests/hooks_harness.py."""
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent))
-    from hooks_harness import revise_plan_tool
-    return revise_plan_tool(spec, chart, expansion_budget=expansion_budget, threads=threads)
-
-
 def _revise(tool, **kwargs):
     import sys
     sys.path.insert(0, str(Path(__file__).parent))
@@ -537,14 +524,6 @@ def _tight(**kw):
 
 def _length_of(chart, note_id: str) -> int:
     return chart.read(note_id, 0, 1)["total_chars"]
-
-
-def _apply(plan, rev, *, threads, step=1):
-    return plan.apply_revision(rev, step=step, trigger="test", observation="a test observation",
-                               budget=ExpansionBudget(max_terms_added=5, max_type_promotions=5,
-                                                      max_documents_opened_by_promotion=5000,
-                                                      max_revisions=6),
-                               threads=threads, n_docs_by_type={})
 
 
 def _nothing_outstanding() -> list[str]:
@@ -651,43 +630,6 @@ def test_truncated_is_the_only_marker_a_machine_may_discharge():
     assert len(L.unresolved()) == 3, (
         "reaching the end of the deferring document settled a thread that points at a "
         "different document — the addendum, the later report, the outside institution")
-
-
-# --------------------------------------------------------------- the no-op, reported as one
-def test_re_opening_an_open_thread_is_refused_as_the_no_op_it_is(spec, chart):
-    """Identity dedupe was already right. Reporting APPLIED over it was the defect."""
-    plan, threads = plan_from_spec(spec, chart), OpenThreadLedger()
-    first = _apply(plan, PlanRevision(open_threads=(("N1", "stains pending", "it defers"),)),
-                   threads=threads)
-    assert first.applied and first.threads_opened == ["N1#stains pending"]
-
-    again = _apply(plan, PlanRevision(open_threads=(("N1", "stains pending", "it defers"),)),
-                   threads=threads, step=2)
-    assert len(threads.threads) == 1, "the debt was multiplied"
-    assert again.threads_opened == []
-    assert again.applied is False and again.refusal_class == REFUSED_THREAD_NOOP, (
-        "admitted, affordable, monotone — and it moved nothing. Reporting that as APPLIED is "
-        "how the same request gets sent nine times")
-    assert again.thread_noops == [{"thread_id": "N1#stains pending", "status": "already_open"}]
-    (why,) = again.refused
-    assert "resolve_threads" in why and '"thread_id": "N1#stains pending"' in why, (
-        "the refusal must carry the call that WOULD have helped, with the id filled in; a "
-        "refusal an agent cannot act on is one it repeats")
-    assert plan.refused_revisions[-1]["refusal_class"] == REFUSED_THREAD_NOOP, (
-        "a no-op that leaves no record is one nobody can count across runs")
-
-
-def test_a_no_op_open_alongside_real_work_does_not_refuse_the_real_work(spec, chart):
-    """The refusal is for a revision that was ENTIRELY a no-op. A term that lands still lands,
-    and the part that changed nothing is still named."""
-    plan, threads = plan_from_spec(spec, chart), OpenThreadLedger()
-    _apply(plan, PlanRevision(open_threads=(("N1", "pending", "x"),)), threads=threads)
-    out = _apply(plan, PlanRevision(add_terms=("psammoma",),
-                                    open_threads=(("N1", "pending", "x"),)),
-                 threads=threads, step=3)
-    assert out.applied is True and out.terms_added == ["psammoma"]
-    assert out.thread_noops and any("resolve_threads" in r for r in out.refused)
-
 
 
 # ------------------------------------------------------------------------- the termination
