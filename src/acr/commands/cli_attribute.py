@@ -265,7 +265,12 @@ def attribute_case(
     corpus: str = CORPUS,
     model: str = MODEL,
     api_base: str = API_BASE,
-    max_model_calls: int = typer.Option(12, "--max-model-calls", min=1),
+    # 24, NOT 12. Measured 2026-08-06 attributing a real abstention (SYN0002, the corpus's
+    # "biopsy performed at outside hospital" case): at 12 the agent spent 11 calls and
+    # returned UNRESOLVED with "model-call limit reached without a gate-valid attribution";
+    # at 30 it converged in 17 on the right cause, EVIDENCE_GAP, and the independent skeptic
+    # passed it. A default that cannot reach a verdict reports the budget, not the run.
+    max_model_calls: int = typer.Option(24, "--max-model-calls", min=1),
     max_usd: float = typer.Option(1.0, "--max-usd", min=0.01),
     max_chart_reads: int = typer.Option(12, "--max-chart-reads", min=0),
     min_term_chars: int = typer.Option(..., "--min-term-chars", min=1),
@@ -306,7 +311,12 @@ def attribute_batch(
     corpus: str = CORPUS,
     model: str = MODEL,
     api_base: str = API_BASE,
-    max_model_calls: int = typer.Option(12, "--max-model-calls", min=1),
+    # 24, NOT 12. Measured 2026-08-06 attributing a real abstention (SYN0002, the corpus's
+    # "biopsy performed at outside hospital" case): at 12 the agent spent 11 calls and
+    # returned UNRESOLVED with "model-call limit reached without a gate-valid attribution";
+    # at 30 it converged in 17 on the right cause, EVIDENCE_GAP, and the independent skeptic
+    # passed it. A default that cannot reach a verdict reports the budget, not the run.
+    max_model_calls: int = typer.Option(24, "--max-model-calls", min=1),
     max_usd: float = typer.Option(1.0, "--max-usd", min=0.01),
     max_chart_reads: int = typer.Option(12, "--max-chart-reads", min=0),
     min_term_chars: int = typer.Option(..., "--min-term-chars", min=1),
