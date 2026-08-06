@@ -10,6 +10,7 @@ from acr.chartstore.corpus import Corpus
 from acr.core import site
 from acr.core.local_artifacts import LocalArtifactStore
 from acr.diagnosis import attribution as A
+from acr.diagnosis import meta_evaluation as ME
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -97,17 +98,17 @@ def test_primary_plus_contributing_causes_cluster_by_structure(tmp_path):
         termination_reason="closed", confirmation_performed=True,
         confirmation_new_conflict=False,
     )
-    library = A.ErrorCaseLibrary(LocalArtifactStore(tmp_path), "pilot")
-    library.add_case(A.ErrorCaseEvent(
+    library = ME.ErrorCaseLibrary(LocalArtifactStore(tmp_path), "pilot")
+    library.add_case(ME.ErrorCaseEvent(
         case_id="CASE001", event="SELECTED", lifecycle="OPEN",
         run_ref={"sha256": "m1"}, reasons=("registry_disagreement:histology",)))
     assert library.add_attribution(report, manifest_sha256="m1")
     assert not library.add_attribution(report, manifest_sha256="m1")
     assert library.rows("attributions.jsonl")[0]["manifest_sha256"] == "m1"
-    clusters = A.cluster_reports([report])
+    clusters = ME.cluster_reports([report])
     assert clusters[0].primary_cause == "ANSWER_CHECK_OR_GATE"
     assert clusters[0].contributing_tags == ("SPEC_FORM",)
-    summary = A.summarize_library(library)
+    summary = ME.summarize_library(library)
     assert summary["n_attributions"] == 1
     assert summary["signal_clusters"] == [{
         "signal": "registry_disagreement:histology",
@@ -368,7 +369,17 @@ def test_independent_skeptic_conflict_downgrades_primary_to_unresolved():
     assert downgraded.skeptic_review.reviewer == "INDEPENDENT_MODEL"
 
 
-def test_attribution_meta_evaluation_is_owned_by_attribution_module():
+def test_meta_evaluation_is_owned_by_the_meta_evaluation_module():
+    """Renamed on 2026-08-06 when the code moved, because the old name asserted the opposite.
+
+    It was `..._is_owned_by_attribution_module` and it kept passing after `meta_evaluate_attributions`
+    left `attribution.py` — the substitution repointed the call and the name went on claiming
+    ownership that had moved. A test name is read far more often than a test body.
+
+    The boundary it now guards is the plane, not the topic: `attribution.py` is one agent explaining
+    one run; this reads many finished attributions and the human decisions taken on them, and asks
+    whether the attributor agrees with the humans often enough to be trusted.
+    """
     predictions = [
         {
             "case_id": "CASE-1",
@@ -393,7 +404,7 @@ def test_attribution_meta_evaluation_is_owned_by_attribution_module():
         {"case_id": "CASE-1", "primary_cause": "RUNTIME_OR_PROVIDER"},
         {"case_id": "CASE-2", "primary_cause": "ANSWER_CHECK_OR_GATE"},
     ]
-    report = A.meta_evaluate_attributions(
+    report = ME.meta_evaluate_attributions(
         predictions,
         adjudications,
         min_cases=2,

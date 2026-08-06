@@ -28,6 +28,7 @@ from ..core.local_artifacts import (
     require_run_tree,
 )
 from ..diagnosis import attribution as A
+from ..diagnosis import meta_evaluation as ME
 from ..evaluation import evals
 
 attribute_app = typer.Typer(add_completion=False, help=(
@@ -224,9 +225,9 @@ def attribute_case_payload(*, run: str, spec: str, case_id: str,
     if not patient_id:
         raise typer.BadParameter(
             f"{case_id}: cannot resolve patient; provide --case-map")
-    library = A.ErrorCaseLibrary(store, library_id)
+    library = ME.ErrorCaseLibrary(store, library_id)
     reasons = A.selection_reasons(packet) or ("manual_single_case_request",)
-    library.add_case(A.ErrorCaseEvent(
+    library.add_case(ME.ErrorCaseEvent(
         case_id=case_id, event="SELECTED", lifecycle="OPEN",
         run_ref=packet.manifest_ref.to_dict(), reasons=reasons,
         detail={"mode": resolved_mode, "semantic_patch_allowed": resolved_mode == A.GOLD},
@@ -362,7 +363,7 @@ def attribute_batch(
                 "token_band": token_band, "turn_band": turn_band,
             }))
     behavior = A.batch_behavior_conflicts(packets)
-    library = A.ErrorCaseLibrary(store, library_id)
+    library = ME.ErrorCaseLibrary(store, library_id)
     existing = {
         (str(row.get("case_id") or ""), str(row.get("manifest_sha256") or ""))
         for row in library.rows("attributions.jsonl")
@@ -373,7 +374,7 @@ def attribute_batch(
         if not reasons:
             continue
         selected.append((packet, reasons))
-        library.add_case(A.ErrorCaseEvent(
+        library.add_case(ME.ErrorCaseEvent(
             case_id=packet.case_id, event="SELECTED", lifecycle="OPEN",
             run_ref=packet.manifest_ref.to_dict(), reasons=reasons,
             detail={"mode": mode, "semantic_patch_allowed": mode == A.GOLD},
@@ -410,12 +411,12 @@ def cluster(
     local_root: str | None = LOCAL_ROOT,
 ):
     """Build deterministic clusters and append their current signatures to clusters.jsonl."""
-    library = A.ErrorCaseLibrary(_store(local_root), library_id)
+    library = ME.ErrorCaseLibrary(_store(local_root), library_id)
     reports = [
         A.AttributionReport.from_dict(row)
         for row in library.rows("attributions.jsonl")
     ]
-    clusters = A.cluster_reports(reports)
+    clusters = ME.cluster_reports(reports)
     for row in clusters:
         library.add_cluster(row)
     con.print_json(json.dumps(
@@ -430,8 +431,8 @@ def summarize(
     local_root: str | None = LOCAL_ROOT,
 ):
     """Print the folded local library; writes no non-JSONL summary artifact."""
-    library = A.ErrorCaseLibrary(_store(local_root), library_id)
-    con.print_json(json.dumps(A.summarize_library(library), ensure_ascii=False))
+    library = ME.ErrorCaseLibrary(_store(local_root), library_id)
+    con.print_json(json.dumps(ME.summarize_library(library), ensure_ascii=False))
 
 
 @attribute_app.command("adjudicate")
@@ -455,9 +456,9 @@ def adjudicate(
     because `WONT_FIX` and `OUTSIDE_CHART` are decisions about what to DO, not root-cause labels;
     `meta-certify` now says so explicitly when rows exist and none carries one.
     """
-    library = A.ErrorCaseLibrary(_store(local_root), library_id)
+    library = ME.ErrorCaseLibrary(_store(local_root), library_id)
     try:
-        event = A.AdjudicationEvent(
+        event = ME.AdjudicationEvent(
             case_id=case_id, decision=decision, actor=actor,
             actor_role=actor_role, rationale=rationale, primary_cause=primary_cause)
     except A.AttributionError as exc:
@@ -480,7 +481,7 @@ def meta_certify(
     min_macro_f1: float = typer.Option(0.80, "--min-macro-f1", min=0, max=1),
 ):
     """Calibrate causal attribution against accountable human root-cause labels."""
-    report = A.meta_evaluate_attributions(
+    report = ME.meta_evaluate_attributions(
         _json_or_jsonl(predictions),
         _json_or_jsonl(adjudications),
         min_cases=min_cases,
