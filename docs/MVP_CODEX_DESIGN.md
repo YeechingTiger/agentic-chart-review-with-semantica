@@ -40,10 +40,11 @@ Layer2 运行日志          Layer1 权威轨迹 (JSONL, append-only)
 | 文件 | 干什么 | 行数预算 |
 |---|---|---|
 | `mvp/toolserver.py` | stdio MCP server：`list_documents / search / read / record_evidence / submit_answer`。search/read 带**可选** `objective` 字符串参数（模型自述在解决哪个问题——落轨迹，不强制）。submit 时执行**仅三条**拒绝：状态未声明、FOUND 无证据、未列文档就主张缺席。每次调用把 `{ts, run_id, seq, tool, args, result}` 全量追加进 Layer1 | 400 |
-| `mvp/run.py` | 逐患者驱动：`spec.as_prompt_block()` 渲染 → 起 `codex exec --json`（config.toml 指向 OpenRouter，模型 `gpt-5.6-luna`，沙箱只读、网络关、approvals 关；**具体键名对着新开源的 codex 仓库文档核一遍——TO-VERIFY**）→ codex 事件流原样存 Layer2 | 250 |
+| `mvp/runner.py` | 逐患者驱动：`spec.as_prompt_block()` 渲染 → 起 `codex exec --json`（config.toml 指向 Responses 端点，沙箱只读、approvals 关）→ codex 事件流原样存 Layer2。**config 已对 codex-cli 0.149.1 实测核定**：`wire_api = "responses"`（chat 已被移除）；`[mcp_servers.chart] default_tools_approval_mode = "approve"`（默认 `auto` 把无注解工具当写操作，配合 `approval_policy = "never"` 会把每次调用无声拒掉）；MCP 工具在请求里以 namespace 条目出现（`mcp__chart`），function_call 需带独立 `namespace` 字段 | 250 |
+| `mvp/fake_model.py` | 本地 Responses-API 假模型：SSE 三帧（created / output_item.done / completed），按脚本回放工具调用轨迹。测试与本沙箱（真实模型端点被出口代理拦截）共用 | 140 |
 | `mvp/score.py` | exact 对 `_ground_truth.json`；gate 结果；**镜像过程检查**：从 Layer1 判定"是否有一次 search/read 触及了 discriminating fact 的范围"（用 `rule_gold.discriminating_fact_truth` 现有字段，**不改名不迁 schema**）。计分**只读 Layer1**——用"删掉 Layer2 后照常出分"来证明 | 250 |
 | `mvp/ledger.py` | `ReviewLedger` 协议（record_evidence / record_judgment / record_result / chain）+ `SemanticaLedger` + `NullLedger`。semantica==0.6.6 锁版本，进程内 Python API，**不开 REST/MCP/Explorer**。write-behind：账本故障不影响运行结果（用 NullLedger 对照测试钉死） | 250 |
-| `mvp/cli.py` | 三个命令：`compile`（加载合同并拒绝坏的——现有链）、`run`（一个或全部患者）、`score` | 100 |
+| `mvp/cli.py` | 命令：`compile`（加载合同并拒绝坏的——现有链）、`run`（一个患者）、`ingest`、`chain`；`score` 待 score.py 落地后加入 | 100 |
 
 ## 3 · 观测（"trace 怎么做"的答案）
 

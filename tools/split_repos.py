@@ -60,7 +60,7 @@ REPOS: dict[str, dict] = {
     "acr-chart-review": {
         "purpose": "Run one declarative contract over one document corpus, leave a record that "
                    "distinguishes a correct answer from a lucky one, and compare arms over it.",
-        "src": ["src/acr/review/", "src/acr/core/", "src/acr/chartstore/",
+        "src": ["src/acr/review/", "src/acr/mvp/", "src/acr/core/", "src/acr/chartstore/",
                 *[f"src/acr/contract/{m}.py" for m in CONTRACT_SHARED],
                 "src/acr/commands/cli_chart.py", "src/acr/commands/cli.py"],
         "assets": ["assets/skills/", "assets/specs/", "assets/codes/", "assets/pricing/",

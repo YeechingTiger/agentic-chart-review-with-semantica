@@ -83,6 +83,10 @@ LAYERS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
     (0, "chartstore", ()),
     (1, "contract", ()),
     (2, "review", ()),
+    # The codex-harness MVP path (docs/MVP_CODEX_DESIGN.md): same rank as review because it is
+    # the same kind of thing — a plane that produces an answer — living beside the old runtime
+    # until the MVP is green and the removal doc retires review/.
+    (2, "mvp", ()),
     (3, "audit", ()),
     (3, "evaluation", ()),
     (3, "diagnosis", ()),
@@ -113,7 +117,7 @@ SHARED_LAYERS = ("core", "chartstore", "contract")
 
 #: The work planes. They may meet each other **only** through the types of SHARED_LAYERS and
 #: through artifacts written to disk.
-WORK_LAYERS = ("review", "audit", "evaluation", "diagnosis", "improvement", "authoring",
+WORK_LAYERS = ("review", "mvp", "audit", "evaluation", "diagnosis", "improvement", "authoring",
                "usecase")
 
 #: The direct couplings that still exist today, and the action that deletes each one. The key is
