@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -73,6 +74,25 @@ def cmd_precipitate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_reconstruct(args: argparse.Namespace) -> int:
+    """Read a finished run back as a decision tree, into the ledger.
+
+    The extractor is a model, so this prints the reading's own health first — how much of it
+    the run actually said versus how much was inferred, which quotes did not hold up, and
+    which stretches of the run no point accounts for. Believe the tree only as far as those
+    numbers let you."""
+    from semantica.llms import LiteLLM
+
+    from acr.mvp.reconstruct import reconstruct_run, render
+    llm = LiteLLM(model=args.model, api_key=os.environ.get(args.api_key_env),
+                  temperature=args.temperature,
+                  **({"api_base": args.base_url} if args.base_url else {}))
+    summary = reconstruct_run(Path(args.run_dir), _ledger(Path(args.ledger)), llm,
+                              passes=args.passes)
+    print(json.dumps(summary, ensure_ascii=False, indent=2) if args.json else render(summary))
+    return 0
+
+
 def cmd_decisions(args: argparse.Namespace) -> int:
     ledger = _ledger(Path(args.ledger))
     prefix = f"{args.level or 'big'}:{args.type}" if args.type else args.prefix
@@ -126,6 +146,22 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--level", default=None, choices=["big", "small"])
     pr.add_argument("--ledger", default="runs/mvp/ledger.json")
     pr.set_defaults(fn=cmd_precipitate)
+
+    rc = sub.add_parser("reconstruct",
+                        help="read a finished run back as a typed decision tree (needs an LLM)")
+    rc.add_argument("run_dir")
+    rc.add_argument("--ledger", default="runs/mvp/ledger.json")
+    rc.add_argument("--model", default=os.environ.get("ACR_RECONSTRUCT_MODEL",
+                                                      "openrouter/anthropic/claude-sonnet-4.5"),
+                    help="a LiteLLM model id, e.g. openrouter/anthropic/claude-sonnet-4.5")
+    rc.add_argument("--api-key-env", default="OPENROUTER_API_KEY")
+    rc.add_argument("--base-url", default=None)
+    rc.add_argument("--temperature", type=float, default=0.0)
+    rc.add_argument("--passes", type=int, default=1,
+                    help="extract this many times and report how far the readings drift; "
+                         "only the first is stored")
+    rc.add_argument("--json", action="store_true")
+    rc.set_defaults(fn=cmd_reconstruct)
 
     d = sub.add_parser("decisions",
                        help="compare: decision points across runs, filtered by type or case")

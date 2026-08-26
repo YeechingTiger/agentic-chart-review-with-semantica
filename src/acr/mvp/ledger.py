@@ -37,6 +37,7 @@ dependency installed.
 from __future__ import annotations
 
 import json
+from collections import defaultdict
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -46,11 +47,13 @@ class ReviewLedger(Protocol):
     def record_evidence(self, run_id: str, index: int, ev: dict[str, Any]) -> str: ...
     def record_judgment(self, run_id: str, *, category: str, scenario: str, reasoning: str,
                         outcome: str, decision_maker: str,
+                        entities: list[str] | None = None,
                         metadata: dict[str, Any] | None = None) -> str: ...
     def link_caused(self, source_id: str, target_id: str) -> None: ...
     def link_influenced(self, source_id: str, target_id: str) -> None: ...
+    def link_part_of(self, child_id: str, parent_id: str) -> None: ...
     def link_uses(self, judgment_id: str, evidence_id: str) -> None: ...
-    def set_case_result(self, case_id: str, result_decision_id: str) -> None: ...
+    def result_node(self, case_id: str) -> str | None: ...
     def chain(self, case_id: str) -> list[dict[str, Any]]: ...
     def decisions(self, *, category_prefix: str | None = None,
                   case_id: str | None = None) -> list[dict[str, Any]]: ...
@@ -63,7 +66,6 @@ class NullLedger:
 
     def __init__(self) -> None:
         self.counts = {"evidence": 0, "judgments": 0, "edges": 0}
-        self._results: dict[str, str] = {}
 
     def record_evidence(self, run_id: str, index: int, ev: dict[str, Any]) -> str:
         self.counts["evidence"] += 1
@@ -79,11 +81,14 @@ class NullLedger:
     def link_influenced(self, source_id: str, target_id: str) -> None:
         self.counts["edges"] += 1
 
+    def link_part_of(self, child_id: str, parent_id: str) -> None:
+        self.counts["edges"] += 1
+
     def link_uses(self, judgment_id: str, evidence_id: str) -> None:
         self.counts["edges"] += 1
 
-    def set_case_result(self, case_id: str, result_decision_id: str) -> None:
-        self._results[case_id] = result_decision_id
+    def result_node(self, case_id: str) -> str | None:
+        return None
 
     def chain(self, case_id: str) -> list[dict[str, Any]]:
         return []
@@ -102,8 +107,13 @@ class NullLedger:
 class SemanticaLedger:
     """semantica 0.6.6's ContextGraph as the account book, JSON-persisted at `path`.
 
-    The case→result index is a sidecar JSON beside the graph file rather than a graph query:
-    it is the one lookup the audit verb starts from, and a plain dict cannot drift.
+    We keep NO parallel store. `save_to_file` writes only nodes, edges and links, so after a
+    reload semantica's own decision registry (`_decisions`, and the category and entity
+    indexes over it) is empty and every decision-side API — `find_precedents_by_scenario`,
+    `get_decision_insights` — answers as though nothing was ever recorded. The fix is to give
+    those APIs their data back rather than to hand-roll replacements for them: `_rehydrate`
+    replays the persisted decision nodes, and the `involves` edges that carry their entities,
+    into semantica's registry at construction. Everything downstream is then semantica's.
     """
 
     def __init__(self, path: Path) -> None:
@@ -116,16 +126,48 @@ class SemanticaLedger:
                 "uv pip install rdflib networkx numpy scipy python-dateutil"
             ) from e
         self.path = Path(path)
-        self.index_path = self.path.with_suffix(".index.json")
         self.graph = ContextGraph(
             extract_entities=False, extract_relationships=False, advanced_analytics=False,
             centrality_analysis=False, community_detection=False, node_embeddings=False,
         )
         if self.path.exists():
             self.graph.load_from_file(str(self.path))
-        self._index: dict[str, str] = (
-            json.loads(self.index_path.read_text()) if self.index_path.exists() else {}
-        )
+            self._rehydrate()
+
+    def _rehydrate(self) -> None:
+        """Put the persisted decisions back into semantica's own registry.
+
+        Reconstructed from what the file DOES keep: each decision node's metadata carries the
+        four fields plus whatever we attached, and its `involves` edges name the entities it
+        was recorded against. Timestamps come back from the node, so precedent ordering and
+        `as_of` filtering survive a reload too."""
+        # semantica creates its registry lazily, on the first record_decision; a ledger that
+        # is only ever read (an audit over yesterday's runs) would otherwise never have one.
+        if not hasattr(self.graph, "_decisions"):
+            self.graph._decisions = {}
+            self.graph._decision_index = defaultdict(set)
+            self.graph._entity_index = defaultdict(set)
+            self.graph._temporal_index = []
+        entities: dict[str, list[str]] = {}
+        for edge in self.graph.edges:
+            e = edge.to_dict()
+            if e.get("type") == "involves":
+                entities.setdefault(e["source_id"], []).append(e["target_id"])
+        for node in self.graph.find_nodes(node_type="decision"):
+            meta = dict(node.get("metadata") or {})
+            known = ("category", "scenario", "reasoning", "outcome", "confidence",
+                     "decision_maker", "timestamp", "valid_from", "valid_until")
+            record = {"id": node["id"],
+                      **{k: meta.get(k) for k in known},
+                      "entities": sorted(entities.get(node["id"], [])),
+                      "recorded_at": meta.get("recorded_at"),
+                      "metadata": {k: v for k, v in meta.items() if k not in known}}
+            self.graph._decisions[node["id"]] = record
+            self.graph._decision_index[record["category"]].add(node["id"])
+            for entity in record["entities"]:
+                self.graph._entity_index[entity].add(node["id"])
+            self.graph._temporal_index.append((node["id"], record["timestamp"] or 0))
+        self.graph._temporal_index.sort(key=lambda x: x[1], reverse=True)
 
     def record_evidence(self, run_id: str, index: int, ev: dict[str, Any]) -> str:
         node_id = f"ev:{run_id}:{index}"
@@ -138,6 +180,7 @@ class SemanticaLedger:
 
     def record_judgment(self, run_id: str, *, category: str, scenario: str, reasoning: str,
                         outcome: str, decision_maker: str,
+                        entities: list[str] | None = None,
                         metadata: dict[str, Any] | None = None) -> str:
         # semantica refuses empty strings; a judgment with no stated reasoning is still a
         # judgment, and "(none given)" keeps that fact readable instead of failing ingestion.
@@ -145,6 +188,7 @@ class SemanticaLedger:
             category=category, scenario=(scenario or "(none given)")[:500],
             reasoning=(reasoning or "(none given)")[:500],
             outcome=outcome, confidence=1.0, decision_maker=decision_maker,
+            entities=entities or None,
             metadata={"run_id": run_id, **(metadata or {})},
         )
 
@@ -157,11 +201,57 @@ class SemanticaLedger:
         # determines the result.
         self.graph.add_causal_relationship(source_id, target_id, "INFLUENCED")
 
+    def link_part_of(self, child_id: str, parent_id: str) -> None:
+        # Composition, not causation. `get_causal_chain` walks only CAUSED / INFLUENCED /
+        # PRECEDENT_FOR, so a small point hangs off its big point without appearing on the
+        # audit chain — which is what makes the chain readable: it shows the conclusions, and
+        # the steps that reached each one are one query away rather than in the way.
+        self.graph.add_edge(source_id=child_id, target_id=parent_id, edge_type="PART_OF")
+
     def link_uses(self, judgment_id: str, evidence_id: str) -> None:
         self.graph.add_edge(source_id=judgment_id, target_id=evidence_id, edge_type="uses")
 
-    def set_case_result(self, case_id: str, result_decision_id: str) -> None:
-        self._index[case_id] = result_decision_id
+    def result_node(self, case_id: str) -> str | None:
+        """The audit anchor: this case's result judgment, found by walking the graph rather
+        than a sidecar index — the case is an entity, and the category says which node it is."""
+        return next((n["id"] for n in self.graph.find_nodes(node_type="decision")
+                     if str((n.get("metadata") or {}).get("category", "")).startswith("result:")
+                     and (n.get("metadata") or {}).get("case_id") == case_id), None)
+
+    def parts_of(self, parent_id: str) -> list[dict[str, Any]]:
+        """The small points that made up one big point, in the order they happened."""
+        ids = [e.to_dict()["source_id"] for e in self.graph.edges
+               if e.to_dict().get("type") == "PART_OF"
+               and e.to_dict()["target_id"] == parent_id]
+        rows = [r for r in self.decisions() if r["decision_id"] in set(ids)]
+        return sorted(rows, key=lambda r: r.get("seq") or 0)
+
+    #: semantica scores a precedent `0.7 * content + 0.3 * structural`, and the structural
+    #: half needs `advanced_analytics`, which stays off here for the PHI posture. So the score
+    #: is capped at 0.7 and its own 0.5 default is unreachable: two decisions facing the
+    #: IDENTICAL situation measure 0.467 on content (its similarity mixes `reasoning` and the
+    #: entity list into the text, and reasoning is precisely the field meant to differ between
+    #: two decisions facing the same situation), which lands at 0.327 combined and is
+    #: rejected. `min_content` below is therefore stated as a floor on CONTENT similarity and
+    #: converted; measured on real ledgers, an unrelated situation scores ~0.07 and an
+    #: identical one ~0.47, so 0.3 separates them with room on both sides.
+    _STRUCTURAL_UNAVAILABLE = 0.7
+
+    def precedents(self, scenario: str, *, category: str | None = None,
+                   entities: list[str] | None = None, limit: int = 10,
+                   min_content: float = 0.3) -> list[dict[str, Any]]:
+        """semantica's own precedent search, which answers here because `_rehydrate` gave it
+        back its data. This is the runtime lookup — "how was this situation decided before".
+
+        `precipitate` deliberately does NOT use it: that verb reports to a human, and it
+        clusters on `scenario` alone so that two runs which faced the same situation and
+        reasoned differently land in the same group instead of being split by the very field
+        whose disagreement is the finding."""
+        kw: dict[str, Any] = {"category": category, "limit": limit,
+                              "similarity_threshold": min_content * self._STRUCTURAL_UNAVAILABLE}
+        if entities:
+            kw["entities"] = entities
+        return self.graph.find_precedents_by_scenario(scenario, **kw)
 
     def decisions(self, *, category_prefix: str | None = None,
                   case_id: str | None = None) -> list[dict[str, Any]]:
@@ -192,7 +282,7 @@ class SemanticaLedger:
         The anchor comes from `find_node` because `get_causal_chain` returns only the nodes
         upstream OF the anchor, never the anchor itself — an audit that omitted the verdict
         being audited would read as a chain to nowhere."""
-        result_id = self._index.get(case_id)
+        result_id = self.result_node(case_id)
         if result_id is None:
             return []
         keys = ("decision_id", "category", "scenario", "outcome", "decision_maker")
@@ -215,10 +305,15 @@ class SemanticaLedger:
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.graph.save_to_file(str(self.path))
-        self.index_path.write_text(json.dumps(self._index, indent=2), encoding="utf-8")
 
     def stats(self) -> dict[str, Any]:
-        return {**self.graph.stats(), "cases": len(self._index)}
+        insights = self.graph.get_decision_insights()
+        cases = {str((n.get("metadata") or {}).get("case_id"))
+                 for n in self.graph.find_nodes(node_type="decision")
+                 if (n.get("metadata") or {}).get("case_id")}
+        return {**self.graph.stats(), "cases": len(cases),
+                "total_decisions": insights.get("total_decisions", 0),
+                "categories": insights.get("categories", {})}
 
 
 # ------------------------------------------------------------------- the one decomposition
@@ -240,6 +335,13 @@ class RunRecorder:
 
     def _common_meta(self, seq: Any) -> dict[str, Any]:
         return {"spec_id": self.spec_id, "case_id": self.case_id, "seq": seq}
+
+    def _entities(self, *extra: str) -> list[str]:
+        """What this judgment is ABOUT, in semantica's own entity vocabulary. These become
+        entity nodes with `involves` edges, so "every decision touching this case" and "every
+        decision that cited this rule" are graph queries rather than a sidecar we maintain."""
+        return [f"case:{self.case_id}", f"spec:{self.spec_id}",
+                *dict.fromkeys(e for e in extra if e)]
 
     def on_evidence(self, args: dict[str, Any], quote: str) -> None:
         self.evidence_ids.append(self.ledger.record_evidence(
@@ -267,6 +369,7 @@ class RunRecorder:
             scenario=str(args.get("facing") or ""),
             reasoning=str(args.get("because") or ""),
             outcome=str(args.get("decision") or ""), decision_maker="model",
+            entities=self._entities(*refs[:20]),
             metadata={**self._common_meta(seq), "options": args.get("options"),
                       "context": context, "grounding": grounding or [],
                       "used": refs[:20], "used_unverified": unverified[:20]})
@@ -281,6 +384,7 @@ class RunRecorder:
             scenario=f"case {self.case_id}, submission {self.n_submissions}",
             reasoning=str(args.get("reasoning") or ""),
             outcome=str(args.get("status")), decision_maker="model",
+            entities=self._entities(),
             metadata={**self._common_meta(seq), "value": args.get("value")})
         for ev_id in self.evidence_ids:
             self.ledger.link_uses(submission, ev_id)
@@ -292,7 +396,7 @@ class RunRecorder:
             scenario=f"case {self.case_id}, submission {self.n_submissions}",
             reasoning=str(verdict.get("why") or ""),
             outcome=outcome, decision_maker="rule_engine",
-            metadata=self._common_meta(seq))
+            entities=self._entities(), metadata=self._common_meta(seq))
         self.ledger.link_caused(submission, gate)
         self.last_gate_id = gate
 
@@ -303,10 +407,10 @@ class RunRecorder:
             outcome=str(final.get("status", "NO_ANSWER")),
             decision_maker="deterministic_runtime",
             metadata={"spec_id": self.spec_id, "case_id": self.case_id,
-                      "value": final.get("value")})
+                      "value": final.get("value")},
+            entities=self._entities())
         if self.last_gate_id is not None:
             self.ledger.link_caused(self.last_gate_id, result_node)
-        self.ledger.set_case_result(self.case_id, result_node)
         return result_node
 
     def summary(self, final_status: str) -> dict[str, Any]:

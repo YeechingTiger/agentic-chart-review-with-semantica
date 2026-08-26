@@ -130,11 +130,23 @@ def test_semantica_chain_walks_result_gate_submission(tmp_path: Path):
     # The false warrant survives into the ledger as a false warrant, not as a fact.
     assert rows[0]["used_unverified"] == ["note:Surgical-Pathology-Document_2023-04-12"]
 
-    # Persistence: a fresh ledger over the same files answers the same audit.
-    assert ledger_path.exists() and ledger_path.with_suffix(".index.json").exists()
+    # Persistence: a fresh ledger over the same files answers the same audit — from ONE file,
+    # with no sidecar index, because the case is an entity in the graph.
+    assert ledger_path.exists()
+    assert not ledger_path.with_suffix(".index.json").exists()
     reloaded = SemanticaLedger(ledger_path)
     assert reloaded.chain("SYN0001"), "the chain did not survive save/load"
     assert reloaded.stats()["cases"] == 1
+
+    # semantica's own decision APIs answer after a reload, which they do not do out of the
+    # box: save_to_file writes nodes and edges only, so the registry they read is empty until
+    # _rehydrate replays it. This is the assertion that pins that fix.
+    assert reloaded.stats()["total_decisions"] == 7
+    assert reloaded.stats()["categories"]["step"] == 2
+    hits = reloaded.precedents("refused: a value answer owes recorded evidence",
+                               category="step", entities=["case:SYN0001"])
+    assert hits, "semantica's precedent search went blind after a reload"
+    assert hits[0]["decision"]["outcome"] == "record the pathology span, then resubmit"
 
 
 def test_live_recording_equals_replaying_the_trace(tmp_path: Path):

@@ -41,7 +41,8 @@ from typing import Any
 from acr.chartstore.corpus import PatientChart
 from acr.contract.outcomes import declared_statuses, submittable_statuses
 from acr.contract.spec import load_spec
-from acr.mvp.warrants import GROUNDING_KINDS, INPUT_KINDS, normalize_grounding
+from acr.mvp.warrants import (GROUNDING_KINDS, INPUT_KINDS, RunFacts,
+                              normalize_grounding)
 
 PROTOCOL_VERSION_FALLBACK = "2025-06-18"
 
@@ -69,6 +70,11 @@ class ToolState:
         self.documents_read: list[str] = []
         self.documents_seen: set[str] = set()
         self.searches_run: list[str] = []
+
+    def facts(self) -> RunFacts:
+        """What this run has observed, in the shape the citation check reads."""
+        return RunFacts(list(self.documents_read), set(self.documents_seen),
+                        list(self.searches_run), len(self.evidence))
 
     def snapshot(self) -> dict[str, Any]:
         """Server-side facts at this moment — the context a decision point gets for free,
@@ -389,40 +395,10 @@ class ChartToolServer:
         return out
 
     def _resolve_used(self, used: Any) -> list[dict[str, Any]]:
-        """Each claimed input, checked against what this run actually observed.
-
-        Never refuses — an unverifiable citation is recorded as unverifiable, which is the
-        useful outcome: a decision resting on a document this run never opened is a Warrant
-        that cannot stand, and code can say so without reading a word of the reasoning.
-        """
-        resolved: list[dict[str, Any]] = []
-        for raw in (used if isinstance(used, list) else []):
-            kind, _, target = str(raw).partition(":")
-            kind, target = kind.strip().lower(), target.strip()
-            row: dict[str, Any] = {"ref": str(raw), "kind": kind if kind in INPUT_KINDS
-                                   else "unrecognised"}
-            if kind == "note":
-                if target in self.state.documents_read:
-                    row |= {"verified": True, "depth": "read"}
-                elif target in self.state.documents_seen:
-                    row |= {"verified": True, "depth": "seen_in_results"}
-                else:
-                    row |= {"verified": False, "why": "this run never read or surfaced it"}
-            elif kind == "search":
-                row |= ({"verified": True} if target in self.state.searches_run
-                        else {"verified": False, "why": "no search with this query was run"})
-            elif kind == "evidence":
-                ok = target.isdigit() and 1 <= int(target) <= len(self.state.evidence)
-                row |= ({"verified": True} if ok
-                        else {"verified": False, "why": "no evidence span with this index"})
-            elif kind in ("rule", "decision"):
-                # A contract rule is not the server's to check; a prior decision is the
-                # model's own, and the trace already carries it in order.
-                row |= {"verified": None, "why": "recorded as claimed"}
-            else:
-                row |= {"verified": False, "why": f"unrecognised reference kind {kind!r}"}
-            resolved.append(row)
-        return resolved
+        """Each claimed input, checked against what this run actually observed — by the same
+        `RunFacts` the read-back path uses, so a warrant cannot count as false in the run and
+        true in the report."""
+        return self.state.facts().resolve_all(used)
 
     def _t_record_evidence(self, note_id, start, end, supports, field=None) -> dict[str, Any]:
         start, end = int(start), int(end)

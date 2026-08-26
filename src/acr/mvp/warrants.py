@@ -18,6 +18,10 @@ decoupling, stated so a test can check it.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import Any
+
 #: Where the reasoning came from. The first four are checked against what this run actually
 #: had; `own_knowledge` cannot be checked, and an honest self-report of it is the most
 #: valuable single fact this instrument collects — so it is never penalised.
@@ -60,3 +64,85 @@ def grounding_lines() -> str:
 
 def input_prompt_lines() -> str:
     return "\n".join(f"  - {kind}:<...> — {what}" for kind, what in INPUT_KINDS.items())
+
+
+@dataclass(slots=True)
+class RunFacts:
+    """What one run actually observed — the set of things a decision may legitimately cite.
+
+    ONE implementation of "does this citation stand", built either from the live `ToolState`
+    while a run happens or from a finished trace while it is read back. Two implementations
+    that disagreed would be the worst failure this instrument can have: a warrant would count
+    as false in the run and true in the report, or the reverse, and no reader could tell which
+    number to believe.
+    """
+
+    documents_read: list[str]
+    documents_seen: set[str]
+    searches_run: list[str]
+    n_evidence: int
+
+    @classmethod
+    def from_trace(cls, events: Iterable[dict[str, Any]]) -> RunFacts:
+        """Replay a Layer-1 trace into the same facts the server held at the end of the run.
+
+        Reads only what the SERVER recorded — the tool called and what came back — never what
+        the model said about it, which is the whole point: this is the ruler, not the claim.
+        """
+        read: list[str] = []
+        seen: set[str] = set()
+        searches: list[str] = []
+        n_evidence = 0
+        for e in events:
+            if e.get("kind") != "tool_call" or not e.get("ok"):
+                continue
+            tool, args = e.get("tool"), e.get("args") or {}
+            result = e.get("result") or {}
+            if tool == "read":
+                note_id = args.get("note_id")
+                if note_id:
+                    if note_id not in read:
+                        read.append(note_id)
+                    seen.add(note_id)
+            elif tool == "search":
+                searches.append(args.get("query"))
+                seen.update(h.get("note_id") for h in result.get("hits") or [])
+            elif tool == "list_documents":
+                seen.update(d.get("note_id") for d in result.get("documents") or [])
+            elif tool == "record_evidence" and result.get("recorded"):
+                n_evidence += 1
+        return cls(read, {s for s in seen if s}, [q for q in searches if q], n_evidence)
+
+    def resolve(self, raw: object) -> dict[str, Any]:
+        """One claimed input, checked. Never refuses — an unverifiable citation is recorded as
+        unverifiable, which is the useful outcome: a decision resting on a document the run
+        never opened is a Warrant that cannot stand, and code can say so without reading a
+        word of the reasoning."""
+        kind, _, target = str(raw).partition(":")
+        kind, target = kind.strip().lower(), target.strip()
+        row: dict[str, Any] = {"ref": str(raw),
+                               "kind": kind if kind in INPUT_KINDS else "unrecognised"}
+        if kind == "note":
+            if target in self.documents_read:
+                row |= {"verified": True, "depth": "read"}
+            elif target in self.documents_seen:
+                row |= {"verified": True, "depth": "seen_in_results"}
+            else:
+                row |= {"verified": False, "why": "this run never read or surfaced it"}
+        elif kind == "search":
+            row |= ({"verified": True} if target in self.searches_run
+                    else {"verified": False, "why": "no search with this query was run"})
+        elif kind == "evidence":
+            ok = target.isdigit() and 1 <= int(target) <= self.n_evidence
+            row |= ({"verified": True} if ok
+                    else {"verified": False, "why": "no evidence span with this index"})
+        elif kind in ("rule", "decision"):
+            # A contract rule is not the server's to check; a prior decision is the model's
+            # own, and the trace already carries it in order.
+            row |= {"verified": None, "why": "recorded as claimed"}
+        else:
+            row |= {"verified": False, "why": f"unrecognised reference kind {kind!r}"}
+        return row
+
+    def resolve_all(self, used: object) -> list[dict[str, Any]]:
+        return [self.resolve(r) for r in (used if isinstance(used, list) else [])]
