@@ -57,8 +57,33 @@ ledger.py          semantica as the account book (no parallel store, see §6)
 
 ## 3. Run it
 
+### Install (two commands, and the second one has a reason)
+
 ```bash
-uv venv && uv pip install -e .            # plus the semantica pin, see pyproject
+git clone https://github.com/YeechingTiger/agentic-chart-review.git
+cd agentic-chart-review
+git checkout claude/read-side-identity-ia9rur
+
+uv venv --python 3.12
+uv pip install -e ".[ledger,dev]"
+uv pip install --no-deps semantica==0.6.6      # <- --no-deps is not optional
+```
+
+semantica declares **124 dependencies** — torch, spacy, transformers, opencv, faiss, librosa —
+for features this repo switches off at construction (no embeddings, no entity extraction, no
+analytics, no Explorer). We use its `ContextGraph`, which needs five packages, and those are
+the `[ledger]` extra. Installing it normally works but drags in several GB for nothing.
+
+Verified from a clean venv: with `[ledger,dev]` plus that `--no-deps` line, all 41 MVP tests
+pass. If you see `ModuleNotFoundError: yaml` you installed semantica without the project.
+
+`codex` must be on PATH for the `run` verb (the reviews themselves); everything downstream —
+`trace`, `ingest`, `reconstruct`, `chain`, `precipitate` — works on a finished run directory
+and needs no codex.
+
+### Run
+
+```bash
 export $(grep -v '^#' .env | xargs)       # ACR_MODEL / ACR_API_BASE / ACR_API_KEY
 
 # 1. one review, with the ledger recording live

@@ -23,6 +23,25 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8.3", "pytest-cov>=6.0", "ruff>=0.8"]
 reports = ["openpyxl>=3.1"]
+# THE JUDGMENT LEDGER. semantica itself is deliberately NOT listed here, because it cannot be
+# installed from this file: it declares 124 dependencies — torch, spacy, transformers, opencv,
+# faiss, librosa — for features we switch off at construction (no embeddings, no entity
+# extraction, no analytics, no Explorer). We use its ContextGraph, and that needs the five
+# packages below. So the install is two commands, and the second one is why:
+#
+#   uv pip install -e ".[ledger]"
+#   uv pip install --no-deps semantica==0.6.6
+#
+# Pinned exactly, not floored: this is a young library and the ledger reaches into its
+# decision registry to rehydrate it after a load (see SemanticaLedger._rehydrate), which is
+# private API. A version bump is a change to review, not one to pick up silently.
+ledger = [
+    "rdflib>=6.2",
+    "networkx>=2.8",
+    "numpy>=2.0.2",
+    "scipy>=1.13.1",
+    "python-dateutil>=2.9",
+]
 
 [project.scripts]
 acr = "acr.commands.cli:app"
