@@ -102,7 +102,8 @@ def decision_trace(run_dir: Path) -> dict[str, Any]:
             add("decision", 1, seq, decision_type=result.get("decision_type")
                 or args.get("decision_type"), facing=args.get("facing"),
                 decision=args.get("decision"), because=args.get("because"),
-                options=args.get("options"), context=result.get("context"))
+                options=args.get("options"), context=result.get("context"),
+                used=result.get("used") or [{"ref": r} for r in (args.get("used") or [])])
         elif tool in _ACTIONS:
             shown = {a: v for a, v in args.items() if a != "objective" and v is not None}
             add("action", 1, seq, tool=tool, objective=args.get("objective"),
@@ -149,6 +150,16 @@ def render(trace: dict[str, Any]) -> str:
             out.append(f"{head}{dtype}facing: {s['facing']}")
             out.append(f"{pad}decided: {s['decision']}")
             out.append(f"{pad}because: {s['because']}")
+            if s.get("used"):
+                # An unverified citation is marked here rather than dropped: the claim IS
+                # the finding, and hiding it would hide the falsest kind of warrant.
+                marks = []
+                for u in s["used"]:
+                    v = u.get("verified")
+                    tag = ("" if v is True else " (UNVERIFIED)" if v is False else " (claimed)")
+                    depth = f" [{u['depth']}]" if u.get("depth") else ""
+                    marks.append(f"{u.get('ref')}{depth}{tag}")
+                out.append(f"{pad}used: {', '.join(marks)}")
             if s.get("options"):
                 out.append(f"{pad}set aside: {'; '.join(s['options'])}")
             if s.get("context"):

@@ -24,8 +24,13 @@ def _write_layers(run_dir: Path, with_layer2: bool = True) -> None:
          "args": {"decision_type": "source_selection",
                   "facing": "cytology 04-12 vs biopsy 04-27", "decision": "read the cytology",
                   "because": "earlier document governs if unambiguous",
+                  "used": ["search:adenocarcinoma", "note:SPD_2023-04-12"],
                   "options": ["date by the biopsy unread"]},
          "result": {"noted": True, "n_decisions": 1, "decision_type": "source_selection",
+                    "used": [{"ref": "search:adenocarcinoma", "kind": "search",
+                              "verified": True},
+                             {"ref": "note:SPD_2023-04-12", "kind": "note", "verified": False,
+                              "why": "this run never read or surfaced it"}],
                     "context": {"n_searches": 1, "n_evidence": 0}}, "ok": True},
         {"seq": 4, "ts": "t", "kind": "tool_call", "tool": "record_evidence",
          "args": {"note_id": "SPD_2023-04-12", "start": 310, "end": 324, "supports": "histology"},
@@ -90,6 +95,8 @@ def test_thoughts_interleave_before_the_calls_they_preceded(tmp_path: Path):
     assert decision["options"] == ["date by the biopsy unread"]
     assert decision["decision_type"] == "source_selection"
     assert decision["context"] == {"n_searches": 1, "n_evidence": 0}
+    assert [u["ref"] for u in decision["used"]] == ["search:adenocarcinoma",
+                                                    "note:SPD_2023-04-12"]
     action = next(s for s in trace["steps"] if s["kind"] == "action")
     assert action["objective"] == "find the diagnosing pathology"
     assert action["observed"] == "2 hit(s)"
@@ -115,3 +122,5 @@ def test_render_reads_top_to_bottom_and_tags_self_report(tmp_path: Path):
     assert text.index("Pathology is the strongest source") < text.index("adenocarcinoma")
     assert "facing: cytology 04-12 vs biopsy 04-27" in text
     assert "ACCEPTED" in text and "FOUND" in text
+    # The false citation is shown as false, not quietly dropped.
+    assert "note:SPD_2023-04-12 (UNVERIFIED)" in text

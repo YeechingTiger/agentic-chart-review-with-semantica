@@ -41,7 +41,7 @@ from typing import Any
 from acr.chartstore.corpus import PatientChart
 from acr.contract.outcomes import declared_statuses, submittable_statuses
 from acr.contract.spec import load_spec
-from acr.mvp.decision_types import DECISION_TYPES, normalize_type
+from acr.mvp.decision_types import DECISION_TYPES, INPUT_KINDS, normalize_type
 
 PROTOCOL_VERSION_FALLBACK = "2025-06-18"
 
@@ -61,6 +61,14 @@ class ToolState:
         self.n_searches = 0
         self.n_reads = 0
         self.n_listings = 0
+        #: What this run has actually observed, which is what a claimed input is checked
+        #: against. Read and merely-surfaced are kept apart on purpose: "cited a document it
+        #: read in full" and "cited a document it only saw as a search snippet" are different
+        #: warrants, and a guideline about how much reading an answer owes needs to tell them
+        #: apart.
+        self.documents_read: list[str] = []
+        self.documents_seen: set[str] = set()
+        self.searches_run: list[str] = []
 
     def snapshot(self) -> dict[str, Any]:
         """Server-side facts at this moment — the context a decision point gets for free,
@@ -70,6 +78,8 @@ class ToolState:
         return {"n_searches": self.n_searches, "n_reads": self.n_reads,
                 "n_listings": self.n_listings, "n_evidence": len(self.evidence),
                 "unfiltered_listing_done": self.listed_documents,
+                "documents_read": self.documents_read[-10:],
+                "searches_run": self.searches_run[-10:],
                 "evidence_notes": sorted({e["note_id"] for e in self.evidence})[:15]}
 
 
@@ -137,7 +147,8 @@ class ChartToolServer:
             if name == "record_evidence":
                 recorder.on_evidence(args, payload.get("quote", ""))
             elif name == "note_decision":
-                recorder.on_step(args, seq, context=payload.get("context"))
+                recorder.on_step(args, seq, context=payload.get("context"),
+                                 used=payload.get("used"))
             else:
                 recorder.on_submission(args, payload, seq)
             recorder.ledger.save()
@@ -232,8 +243,17 @@ class ChartToolServer:
                             "items": {"type": "string"},
                             "description": "the alternatives you considered and set aside",
                         },
+                        "used": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "the information this decision rests on, each as a "
+                            "reference the record can check: "
+                            + "; ".join(f"{k}:<...> ({v.split(' — ')[0]})"
+                                        for k, v in INPUT_KINDS.items())
+                            + ". Cite what you actually used, not what you could have.",
+                        },
                     },
-                    "required": ["decision_type", "facing", "decision", "because"],
+                    "required": ["decision_type", "facing", "decision", "because", "used"],
                 },
             },
             {
@@ -320,6 +340,7 @@ class ChartToolServer:
             doc_type_contains=doc_type_contains, date_from=date_from, date_to=date_to,
             limit=int(limit), offset=int(offset))
         self.state.n_listings += 1
+        self.state.documents_seen.update(d.note_id for d in page)
         if not any([doc_type_contains, date_from, date_to]) and int(offset) == 0:
             self.state.listed_documents = True
         return {"documents": [d.to_dict() for d in page], "total": total,
@@ -329,32 +350,74 @@ class ChartToolServer:
                   objective=None) -> dict[str, Any]:
         del objective  # recorded in the trace via args; not used server-side
         self.state.n_searches += 1
+        self.state.searches_run.append(query)
         hits = self.chart.search(query, doc_type_contains=doc_type_contains,
                                  date_from=date_from, date_to=date_to)
+        self.state.documents_seen.update(h.note_id for h in hits)
         return {"hits": [vars(h) for h in hits], "n": len(hits)}
 
     def _t_read(self, note_id, offset=0, limit=4000, objective=None) -> dict[str, Any]:
         del objective
         self.state.n_reads += 1
         try:
-            return self.chart.read(note_id, int(offset), int(limit))
+            page = self.chart.read(note_id, int(offset), int(limit))
         except KeyError:
             return {"error": f"unknown note_id {note_id!r}"}
+        if note_id not in self.state.documents_read:
+            self.state.documents_read.append(note_id)
+        self.state.documents_seen.add(note_id)
+        return page
 
     def _t_note_decision(self, decision_type, facing, decision, because,
-                         options=None) -> dict[str, Any]:
+                         used=None, options=None) -> dict[str, Any]:
         # Self-reported content on the deterministic channel: WHAT was said is the model's
-        # claim, but that it was said, when, in what order, and against which server-side
-        # state is recorded fact. The context snapshot rides in the result, so it lands in
-        # the trace and the ledger without trusting the model's narration of its own state.
+        # claim, but that it was said, when, in what order, against which server-side state,
+        # and whether the information it cites was ever actually observed, are recorded fact.
         del facing, decision, because, options
         self.state.n_decisions += 1
         dtype, claimed = normalize_type(decision_type)
         out: dict[str, Any] = {"noted": True, "n_decisions": self.state.n_decisions,
-                               "decision_type": dtype, "context": self.state.snapshot()}
+                               "decision_type": dtype, "used": self._resolve_used(used),
+                               "context": self.state.snapshot()}
         if claimed:
             out["note"] = f"unknown decision_type {claimed!r} recorded as 'other'"
         return out
+
+    def _resolve_used(self, used: Any) -> list[dict[str, Any]]:
+        """Each claimed input, checked against what this run actually observed.
+
+        Never refuses — an unverifiable citation is recorded as unverifiable, which is the
+        useful outcome: a decision resting on a document this run never opened is a Warrant
+        that cannot stand, and code can say so without reading a word of the reasoning.
+        """
+        resolved: list[dict[str, Any]] = []
+        for raw in (used if isinstance(used, list) else []):
+            kind, _, target = str(raw).partition(":")
+            kind, target = kind.strip().lower(), target.strip()
+            row: dict[str, Any] = {"ref": str(raw), "kind": kind if kind in INPUT_KINDS
+                                   else "unrecognised"}
+            if kind == "note":
+                if target in self.state.documents_read:
+                    row |= {"verified": True, "depth": "read"}
+                elif target in self.state.documents_seen:
+                    row |= {"verified": True, "depth": "seen_in_results"}
+                else:
+                    row |= {"verified": False, "why": "this run never read or surfaced it"}
+            elif kind == "search":
+                row |= ({"verified": True} if target in self.state.searches_run
+                        else {"verified": False, "why": "no search with this query was run"})
+            elif kind == "evidence":
+                ok = target.isdigit() and 1 <= int(target) <= len(self.state.evidence)
+                row |= ({"verified": True} if ok
+                        else {"verified": False, "why": "no evidence span with this index"})
+            elif kind in ("rule", "decision"):
+                # A contract rule is not the server's to check; a prior decision is the
+                # model's own, and the trace already carries it in order.
+                row |= {"verified": None, "why": "recorded as claimed"}
+            else:
+                row |= {"verified": False, "why": f"unrecognised reference kind {kind!r}"}
+            resolved.append(row)
+        return resolved
 
     def _t_record_evidence(self, note_id, start, end, supports, field=None) -> dict[str, Any]:
         start, end = int(start), int(end)

@@ -24,8 +24,12 @@ def _write_run(run_dir: Path) -> None:
          "spec_hash": "h", "patient_id": "SYN0001", "submittable": ["FOUND"]},
         {"seq": 2, "ts": "t", "kind": "tool_call", "tool": "note_decision",
          "args": {"decision_type": "stopping", "facing": "no evidence gathered yet",
-                  "decision": "submit from memory", "because": "overconfidence"},
+                  "decision": "submit from memory", "because": "overconfidence",
+                  "used": ["note:Surgical-Pathology-Document_2023-04-12"]},
          "result": {"noted": True, "n_decisions": 1, "decision_type": "stopping",
+                    "used": [{"ref": "note:Surgical-Pathology-Document_2023-04-12",
+                              "kind": "note", "verified": False,
+                              "why": "this run never read or surfaced it"}],
                     "context": {"n_searches": 0, "n_evidence": 0}}, "ok": True},
         {"seq": 3, "ts": "t", "kind": "tool_call", "tool": "submit_answer",
          "args": {"status": "FOUND", "value": {"date_of_initial_diagnosis": "20230412"}},
@@ -35,8 +39,11 @@ def _write_run(run_dir: Path) -> None:
                   "facing": "refused: a value answer owes recorded evidence",
                   "decision": "record the pathology span, then resubmit",
                   "because": "the gate names the missing obligation",
+                  "used": ["rule:evidence_rules"],
                   "options": ["abstain instead"]},
          "result": {"noted": True, "n_decisions": 2, "decision_type": "sufficiency",
+                    "used": [{"ref": "rule:evidence_rules", "kind": "rule",
+                              "verified": None, "why": "recorded as claimed"}],
                     "context": {"n_searches": 0, "n_evidence": 0}}, "ok": True},
         {"seq": 5, "ts": "t", "kind": "tool_call", "tool": "record_evidence",
          "args": {"note_id": "Surgical-Pathology-Document_2023-04-12", "start": 310, "end": 324,
@@ -119,7 +126,12 @@ def test_semantica_chain_walks_result_gate_submission(tmp_path: Path):
     assert by_type[0]["outcome"] == "record the pathology span, then resubmit"
     assert by_type[0]["case_id"] == "SYN0001"
     assert by_type[0]["context"] == {"n_searches": 0, "n_evidence": 0}
+    assert by_type[0]["used"] == ["rule:evidence_rules"]
     assert ledger.decisions(category_prefix="step:coverage") == []
+
+    # The false warrant survives into the ledger as a false warrant, not as a fact.
+    stopping = ledger.decisions(category_prefix="step:stopping")[0]
+    assert stopping["used_unverified"] == ["note:Surgical-Pathology-Document_2023-04-12"]
 
     # Persistence: a fresh ledger over the same files answers the same audit.
     assert ledger_path.exists() and ledger_path.with_suffix(".index.json").exists()
@@ -145,7 +157,8 @@ def test_live_recording_equals_replaying_the_trace(tmp_path: Path):
     # MCP handshake past the model's first calls.
     assert server._recorder is None and not live_path.exists()
     server.call("note_decision", {"decision_type": "search_strategy", "facing": "f",
-                                  "decision": "search pathology terms", "because": "b"})
+                                  "decision": "search pathology terms", "because": "b",
+                                  "used": ["rule:field_definition"]})
     hit = json.loads(json.dumps(server.call("search", {"query": "adenocarcinoma"})[0]))["hits"][0]
     server.call("record_evidence", {"note_id": hit["note_id"], "start": hit["start"],
                                     "end": hit["end"], "supports": "s"})

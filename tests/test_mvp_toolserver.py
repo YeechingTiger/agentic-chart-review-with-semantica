@@ -120,6 +120,7 @@ def test_note_decision_is_recorded_in_order_and_never_refused(server: ChartToolS
         "facing": "two pathology documents, three weeks apart",
         "decision": "read the earlier one first",
         "because": "the earlier document governs if unambiguous",
+        "used": ["rule:conflict_rule.1"],
         "options": ["date by the later biopsy unread"]})
     assert not is_error and payload["noted"] and payload["n_decisions"] == 1
     assert payload["decision_type"] == "source_selection"
@@ -127,7 +128,8 @@ def test_note_decision_is_recorded_in_order_and_never_refused(server: ChartToolS
     payload, is_error = server.call("note_decision", {
         "decision_type": "search_strategy",
         "facing": "cytology is ambiguous", "decision": "look for a clinical impression",
-        "because": "conflict_rule needs the impression fact"})
+        "because": "conflict_rule needs the impression fact",
+        "used": ["search:adenocarcinoma"]})
     assert not is_error and payload["n_decisions"] == 2
 
     events = [e for e in _trace(server) if e.get("kind") == "tool_call"]
@@ -144,7 +146,8 @@ def test_note_decision_carries_a_server_context_snapshot(server: ChartToolServer
     server.call("record_evidence", {"note_id": hit["note_id"], "start": hit["start"],
                                     "end": hit["end"], "supports": "s"})
     payload, _ = server.call("note_decision", {
-        "decision_type": "sufficiency", "facing": "f", "decision": "d", "because": "b"})
+        "decision_type": "sufficiency", "facing": "f", "decision": "d", "because": "b",
+        "used": ["evidence:1"]})
     ctx = payload["context"]
     assert ctx["n_searches"] == 2
     assert ctx["n_evidence"] == 1
@@ -154,9 +157,47 @@ def test_note_decision_carries_a_server_context_snapshot(server: ChartToolServer
 
 def test_an_unknown_decision_type_is_kept_as_other_not_refused(server: ChartToolServer):
     payload, is_error = server.call("note_decision", {
-        "decision_type": "vibes", "facing": "f", "decision": "d", "because": "b"})
+        "decision_type": "vibes", "facing": "f", "decision": "d", "because": "b",
+        "used": []})
     assert not is_error and payload["decision_type"] == "other"
     assert "vibes" in payload["note"]
+
+
+def test_claimed_inputs_are_checked_against_what_the_run_actually_observed(
+        server: ChartToolServer):
+    """A Warrant can be articulate and false — so every cited input is resolved, and the
+    unresolvable ones are recorded as such rather than refused."""
+    hit = _find_span(server)                                   # one search, hits surfaced
+    server.call("read", {"note_id": hit["note_id"]})           # one document read in full
+    payload, is_error = server.call("note_decision", {
+        "decision_type": "standing", "facing": "f", "decision": "d", "because": "b",
+        "used": [f"note:{hit['note_id']}", "search:adenocarcinoma",
+                 "note:Onc-Med-MD-OP-Progress-Note_2023-04-12",   # surfaced by no search
+                 "search:never ran this", "evidence:1", "rule:conflict_rule.1", "vibes"]})
+    assert not is_error   # a note is never refused
+    by_ref = {u["ref"]: u for u in payload["used"]}
+
+    assert by_ref[f"note:{hit['note_id']}"] == {
+        "ref": f"note:{hit['note_id']}", "kind": "note", "verified": True, "depth": "read"}
+    assert by_ref["search:adenocarcinoma"]["verified"] is True
+    assert by_ref["note:Onc-Med-MD-OP-Progress-Note_2023-04-12"]["verified"] is False
+    assert by_ref["search:never ran this"]["verified"] is False
+    assert by_ref["evidence:1"]["verified"] is False           # nothing recorded yet
+    assert by_ref["rule:conflict_rule.1"]["verified"] is None  # not the server's to check
+    assert by_ref["vibes"]["kind"] == "unrecognised"
+
+
+def test_a_document_seen_only_in_search_results_is_marked_as_such(server: ChartToolServer):
+    """Citing a snippet and citing a document you read are different warrants."""
+    hit = _find_span(server)
+    payload, _ = server.call("note_decision", {
+        "decision_type": "source_selection", "facing": "f", "decision": "d", "because": "b",
+        "used": [f"note:{hit['note_id']}"]})
+    assert payload["used"][0] == {"ref": f"note:{hit['note_id']}", "kind": "note",
+                                  "verified": True, "depth": "seen_in_results"}
+    ctx = payload["context"]
+    assert ctx["searches_run"] == ["adenocarcinoma"]
+    assert ctx["documents_read"] == []
 
 
 def test_stdio_transport_end_to_end(tmp_path: Path):

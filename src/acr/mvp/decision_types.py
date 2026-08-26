@@ -16,10 +16,13 @@ from __future__ import annotations
 
 #: type -> what a decision of this type settles
 DECISION_TYPES: dict[str, str] = {
-    "search_strategy": "what to look for next, and with which query or filter",
-    "coverage": "whether the looking done so far suffices, and what remains unexamined",
+    "search_strategy": "what to look for next: which query or filter, and whether to broaden, "
+                       "narrow or abandon the current terms",
+    "coverage": "whether the looking done so far suffices for an absence to stand, and what "
+                "remains unexamined",
     "source_selection": "which document to read or rely on among candidates",
-    "credibility": "how much weight one source carries (document type, author, ambiguity)",
+    "standing": "what one document is worth for this field — can establish it, merely mentions "
+                "it, or neither",
     "corroboration": "whether independent pieces of evidence reinforce one claim",
     "arbitration": "which of two conflicting candidate answers governs, and by what rule",
     "dedup_ordering": "whether two mentions are one event, and which date orders them",
@@ -30,6 +33,20 @@ DECISION_TYPES: dict[str, str] = {
     "scope": "whether the case or question falls inside this contract at all",
     "stopping": "ending the review: submit, abstain, or keep looking",
     "other": "a decision point the taxonomy does not name yet",
+}
+
+
+#: How a decision point names the information it used. A **Warrant** can be articulate and false
+#: — CONTEXT.md's example is a run stating a Discriminating Fact is absent having never searched
+#: for it — so every claimed input is written in a form the server can check against what this
+#: run actually observed. `rule:` and anything unrecognised are recorded as claimed, never
+#: refused: the record says "unverified", and that is itself the finding.
+INPUT_KINDS: dict[str, str] = {
+    "note": "a document, by note_id — checked against what this run read or saw in results",
+    "search": "the results of a search, by its exact query string",
+    "evidence": "a recorded evidence span, by its 1-based index",
+    "rule": "a Decision Rule or Conflict Rule of the contract, by number or name",
+    "decision": "an earlier decision point of this run, by its seq",
 }
 
 
@@ -44,3 +61,7 @@ def normalize_type(claimed: str | None) -> tuple[str, str | None]:
 def as_prompt_lines() -> str:
     return "\n".join(f"  - {name}: {what}" for name, what in DECISION_TYPES.items()
                      if name != "other")
+
+
+def input_prompt_lines() -> str:
+    return "\n".join(f"  - {kind}:<...> — {what}" for kind, what in INPUT_KINDS.items())

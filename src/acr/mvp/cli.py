@@ -1,10 +1,13 @@
-"""The MVP's whole command surface: compile, run, trace, ingest, chain.
+"""The MVP's whole command surface: compile, run, trace, ingest, and the three read verbs.
 
-Five verbs and no more (the design doc's answer to "29 CLIs"). `compile` is the existing
-contract loading chain — loading IS validation, so a spec that loads is a spec that compiled.
-`run` drives one patient through the codex harness. `trace` renders a finished run as a
-decision trace a person reads top to bottom. `ingest` distills the run into the judgment
-ledger, and `chain` is the audit verb reading it back. Scoring joins when score.py lands.
+`compile` is the existing contract loading chain — loading IS validation, so a spec that loads
+is a spec that compiled. `run` drives one patient through the codex harness. `trace` renders a
+finished run as a decision trace a person reads top to bottom. `ingest` distills a run into the
+judgment ledger (runs with `--ledger` record themselves live and need no ingest).
+
+Then the three verbs of the decision-precipitation design, in the order they are used:
+`chain` audits one case, `decisions` compares a class across runs, and `precipitate` asks what
+that class has settled and where it still diverges. Scoring joins when score.py lands.
 """
 from __future__ import annotations
 
@@ -62,6 +65,14 @@ def cmd_chain(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_precipitate(args: argparse.Namespace) -> int:
+    from acr.mvp.precipitate import render, survey
+    report = survey(_ledger(Path(args.ledger)), decision_type=args.type,
+                    settled_min=args.settled_min)
+    print(json.dumps(report, ensure_ascii=False, indent=2) if args.json else render(report))
+    return 0
+
+
 def cmd_decisions(args: argparse.Namespace) -> int:
     ledger = _ledger(Path(args.ledger))
     prefix = f"step:{args.type}" if args.type else args.prefix
@@ -104,6 +115,16 @@ def main(argv: list[str] | None = None) -> int:
     ch.add_argument("case_id")
     ch.add_argument("--ledger", default="runs/mvp/ledger.json")
     ch.set_defaults(fn=cmd_chain)
+
+    pr = sub.add_parser("precipitate",
+                        help="guideline material: which decision points have settled, which "
+                             "diverge, and what kind of rule each gap wants")
+    pr.add_argument("--type", default=None, help="restrict to one decision type")
+    pr.add_argument("--settled-min", type=int, default=3,
+                    help="how many like decisions make a practice rather than an anecdote")
+    pr.add_argument("--json", action="store_true")
+    pr.add_argument("--ledger", default="runs/mvp/ledger.json")
+    pr.set_defaults(fn=cmd_precipitate)
 
     d = sub.add_parser("decisions",
                        help="compare: decision points across runs, filtered by type or case")

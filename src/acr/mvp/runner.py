@@ -27,7 +27,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from acr.contract.spec import load_spec
-from acr.mvp.decision_types import as_prompt_lines
+from acr.mvp.decision_types import as_prompt_lines, input_prompt_lines
 
 DISABLED_FEATURES = (
     "shell_tool", "unified_exec", "browser_use", "computer_use", "view_image", "apps",
@@ -38,16 +38,28 @@ You can only act through the `chart` tools. Record the evidence that establishes
 with record_evidence BEFORE submitting; finish by calling submit_answer. If the submission is
 refused, the verdict names what is missing — fix it and submit again.
 
-Make your reasoning auditable as you go:
-- At every decision point — choosing what to look for next, deciding which document governs,
-  judging whether the evidence suffices, deciding to stop — call note_decision FIRST, stating
-  the situation you face, what you decided, why, and the alternatives you set aside. Name the
-  kind of decision with `decision_type`:
+Think out loud as you work. At every decision point — choosing what to look for next, judging
+whether a document can establish the answer, deciding whether you have searched enough,
+weighing two candidate answers against each other, deciding to stop — call note_decision
+BEFORE acting on it, and say four things:
+
+  decision_type — which kind of decision this is:
 {decision_types}
-- On every search, read and list_documents call, fill the `objective` field with the open
-  question that call is meant to resolve.
-Notes and objectives are recorded, never judged: write what you actually think, including
-doubts. An auditor must be able to follow your decision points in order from the record alone.
+  facing        — the situation: what is open, what you know so far
+  decision      — what you decided
+  because       — why, naming the rule or the evidence it rests on
+  used          — the information this decision rests on, each as a checkable reference:
+{input_kinds}
+  options       — the alternatives you set aside (optional, and the most useful field you have)
+
+Cite in `used` what you actually used, not everything you could have: the record checks each
+reference against what this run really read or surfaced, and a decision resting on a document
+you never opened is worth knowing about. On every search, read and list_documents call, fill
+`objective` with the open question that call is meant to resolve.
+
+None of this is judged and none of it can be refused — write what you actually think, doubts
+included. An auditor must be able to follow your decision points, in order, from the record
+alone, and see for each one what you knew when you made it.
 """
 
 
@@ -123,7 +135,9 @@ def run_patient(
     workdir = run_dir / "workdir"
     workdir.mkdir()
 
-    prompt = TASK_PREAMBLE.format(decision_types=as_prompt_lines()) + "\n" + spec.as_prompt_block()
+    prompt = (TASK_PREAMBLE.format(decision_types=as_prompt_lines(),
+                                   input_kinds=input_prompt_lines())
+              + "\n" + spec.as_prompt_block())
     (run_dir / "prompt.txt").write_text(prompt, encoding="utf-8")
 
     cmd = [codex_bin, "exec", "--json", "--skip-git-repo-check", "--ephemeral",

@@ -45,6 +45,7 @@ def scripted_steps() -> list[dict]:
             "facing": "cytology and biopsy both name the histology",
             "decision": "cite the cytology and date the case there",
             "because": "it is the earlier document and carries the same histology",
+            "used": ["search:adenocarcinoma", f"note:{hit.note_id}"],
             "options": ["date by the later biopsy"]}},
         {"tool": "record_evidence", "args": {
             "note_id": hit.note_id, "start": hit.start, "end": hit.end,

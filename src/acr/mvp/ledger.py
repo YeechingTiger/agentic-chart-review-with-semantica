@@ -179,7 +179,7 @@ class SemanticaLedger:
                          **{k: meta.get(k) for k in
                             ("category", "scenario", "outcome", "decision_maker", "reasoning",
                              "case_id", "spec_id", "seq", "run_id", "options", "context",
-                             "claimed_type")}})
+                             "claimed_type", "used", "used_unverified")}})
         # Same seq = same tool call (a submission and its gate verdict): break the tie by
         # causal rank, so two ledgers of the same run list identically regardless of uuids.
         rank = {"step": 0, "submit": 1, "gate": 2, "result": 3}
@@ -247,19 +247,27 @@ class RunRecorder:
             self.run_id, len(self.evidence_ids), {**args, "quote": quote}))
 
     def on_step(self, args: dict[str, Any], seq: Any,
-                context: dict[str, Any] | None = None) -> None:
+                context: dict[str, Any] | None = None,
+                used: list[dict[str, Any]] | None = None) -> None:
         """A note_decision: the semantica frame verbatim (facing = scenario, because =
         reasoning, decision = outcome), categorized by DECISION TYPE — the identity that
-        makes 'the same decision point, different runs' a query instead of a reading job."""
+        makes 'the same decision point, different runs' a query instead of a reading job.
+
+        The inputs ride along resolved, which is what lets two divergent decisions be told
+        apart later: same information and a different call is a judgement the contract has
+        not settled; different information is a retrieval or coverage failure."""
         self.n_steps += 1
         dtype, claimed = normalize_type(args.get("decision_type"))
+        refs = [str(u.get("ref")) for u in (used or [])]
+        unverified = [str(u.get("ref")) for u in (used or []) if u.get("verified") is False]
         step = self.ledger.record_judgment(
             self.run_id, category=f"step:{dtype}",
             scenario=str(args.get("facing") or ""),
             reasoning=str(args.get("because") or ""),
             outcome=str(args.get("decision") or ""), decision_maker="model",
             metadata={**self._common_meta(seq), "options": args.get("options"),
-                      "context": context, "claimed_type": claimed})
+                      "context": context, "claimed_type": claimed,
+                      "used": refs[:20], "used_unverified": unverified[:20]})
         if self.prev_step_id is not None:
             self.ledger.link_influenced(self.prev_step_id, step)
         self.prev_step_id = step
@@ -325,7 +333,8 @@ def ingest_run(run_dir: Path, ledger: ReviewLedger) -> dict[str, Any]:
         if tool == "record_evidence" and e.get("ok"):
             rec.on_evidence(args, result.get("quote", ""))
         elif tool == "note_decision" and e.get("ok"):
-            rec.on_step(args, e.get("seq"), context=result.get("context"))
+            rec.on_step(args, e.get("seq"), context=result.get("context"),
+                        used=result.get("used"))
         elif tool == "submit_answer":
             rec.on_submission(args, result, e.get("seq"))
 
