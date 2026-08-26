@@ -21,12 +21,12 @@ def _write_layers(run_dir: Path, with_layer2: bool = True) -> None:
          "args": {"query": "adenocarcinoma", "objective": "find the diagnosing pathology"},
          "result": {"hits": [], "n": 2}, "ok": True},
         {"seq": 3, "ts": "t", "kind": "tool_call", "tool": "note_decision",
-         "args": {"decision_type": "source_selection",
+         "args": {"decision_type": "where_to_look",
                   "facing": "cytology 04-12 vs biopsy 04-27", "decision": "read the cytology",
                   "because": "earlier document governs if unambiguous",
                   "used": ["search:adenocarcinoma", "note:SPD_2023-04-12"],
                   "options": ["date by the biopsy unread"]},
-         "result": {"noted": True, "n_decisions": 1, "decision_type": "source_selection",
+         "result": {"noted": True, "n_decisions": 1, "decision_type": "where_to_look",
                     "used": [{"ref": "search:adenocarcinoma", "kind": "search",
                               "verified": True},
                              {"ref": "note:SPD_2023-04-12", "kind": "note", "verified": False,
@@ -93,7 +93,7 @@ def test_thoughts_interleave_before_the_calls_they_preceded(tmp_path: Path):
     decision = next(s for s in trace["steps"] if s["kind"] == "decision")
     assert decision["facing"] == "cytology 04-12 vs biopsy 04-27"
     assert decision["options"] == ["date by the biopsy unread"]
-    assert decision["decision_type"] == "source_selection"
+    assert decision["decision_type"] == "where_to_look"
     assert decision["context"] == {"n_searches": 1, "n_evidence": 0}
     assert [u["ref"] for u in decision["used"]] == ["search:adenocarcinoma",
                                                     "note:SPD_2023-04-12"]

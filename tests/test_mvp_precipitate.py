@@ -45,13 +45,13 @@ def test_same_information_different_call_is_a_judgement_divergence():
     facing = "ambiguous cytology and a later confirmatory biopsy both date the case"
     shared = ["note:cytology_2022-02-14", "note:biopsy_2022-03-09"]
     ledger = FakeLedger([
-        _d("arbitration", "A", facing, "the biopsy dates the case", shared),
-        _d("arbitration", "B", facing, "the biopsy dates the case", shared),
-        _d("arbitration", "C", facing, "the cytology dates the case", shared),
+        _d("which_wins", "A", facing, "the biopsy dates the case", shared),
+        _d("which_wins", "B", facing, "the biopsy dates the case", shared),
+        _d("which_wins", "C", facing, "the cytology dates the case", shared),
     ])
     report = survey(ledger)
     section = report["sections"][0]
-    assert section["decision_type"] == "arbitration"
+    assert section["decision_type"] == "which_wins"
     situation = section["situations"][0]
     assert situation["status"] == "divergent"
     assert situation["divergence"]["kind"] == "judgement"
@@ -65,11 +65,11 @@ def test_different_information_different_call_is_an_information_divergence():
     the remedy is upstream of the judgement."""
     facing = "ambiguous cytology and a later confirmatory biopsy both date the case"
     ledger = FakeLedger([
-        _d("arbitration", "A", facing, "the cytology dates the case",
+        _d("which_wins", "A", facing, "the cytology dates the case",
            ["note:cytology_2023-04-12", "note:onc_impression_2023-04-12"]),
-        _d("arbitration", "B", facing, "the cytology dates the case",
+        _d("which_wins", "B", facing, "the cytology dates the case",
            ["note:cytology_2023-04-12", "note:onc_impression_2023-04-12"]),
-        _d("arbitration", "C", facing, "the biopsy dates the case",
+        _d("which_wins", "C", facing, "the biopsy dates the case",
            ["note:biopsy_2023-04-27"]),
     ])
     situation = survey(ledger)["sections"][0]["situations"][0]
@@ -85,7 +85,7 @@ def test_different_information_different_call_is_an_information_divergence():
 def test_a_repeated_agreement_is_reported_as_settled():
     facing = "an absence claim is about to rest on two targeted searches"
     ledger = FakeLedger([
-        _d("coverage", c, facing, "do an unfiltered listing before claiming absence",
+        _d("enough", c, facing, "do an unfiltered listing before claiming absence",
            ["search:impression"], seq=i)
         for i, c in enumerate(["A", "B", "C", "D"], start=1)
     ])
@@ -99,8 +99,8 @@ def test_a_repeated_agreement_is_reported_as_settled():
 def test_too_few_alike_decisions_are_thin_not_settled():
     facing = "an absence claim is about to rest on two targeted searches"
     ledger = FakeLedger([
-        _d("coverage", "A", facing, "list everything first", ["search:x"], seq=1),
-        _d("coverage", "B", facing, "list everything first", ["search:x"], seq=2),
+        _d("enough", "A", facing, "list everything first", ["search:x"], seq=1),
+        _d("enough", "B", facing, "list everything first", ["search:x"], seq=2),
     ])
     situation = survey(ledger)["sections"][0]["situations"][0]
     assert situation["status"] == "thin"
@@ -111,9 +111,9 @@ def test_too_few_alike_decisions_are_thin_not_settled():
 
 def test_unlike_situations_do_not_collapse_into_one():
     ledger = FakeLedger([
-        _d("search_strategy", "A", "nothing examined yet; where does a diagnosis date live",
+        _d("where_to_look", "A", "nothing examined yet; where does a diagnosis date live",
            "start from pathology terms", ["rule:field"]),
-        _d("search_strategy", "B", "pathology searched and empty; broaden or stop",
+        _d("where_to_look", "B", "pathology searched and empty; broaden or stop",
            "broaden to clinician impressions", ["search:carcinoma"]),
     ])
     situations = survey(ledger)["sections"][0]["situations"]
@@ -122,7 +122,7 @@ def test_unlike_situations_do_not_collapse_into_one():
 
 def test_unverified_warrants_are_surfaced_per_type():
     ledger = FakeLedger([
-        _d("stopping", "A", "ready to submit", "submit FOUND", ["note:never_opened"],
+        _d("enough", "A", "ready to submit", "submit FOUND", ["note:never_opened"],
            unverified=["note:never_opened"]),
     ])
     section = survey(ledger)["sections"][0]
@@ -133,11 +133,11 @@ def test_unverified_warrants_are_surfaced_per_type():
 
 def test_filtering_by_type_and_the_empty_ledger():
     ledger = FakeLedger([
-        _d("coverage", "A", "f1", "o1", ["search:x"]),
-        _d("arbitration", "A", "f2", "o2", ["search:y"]),
+        _d("enough", "A", "f1", "o1", ["search:x"]),
+        _d("which_wins", "A", "f2", "o2", ["search:y"]),
     ])
-    only = survey(ledger, decision_type="coverage")
-    assert [s["decision_type"] for s in only["sections"]] == ["coverage"]
+    only = survey(ledger, decision_type="enough")
+    assert [s["decision_type"] for s in only["sections"]] == ["enough"]
     empty = survey(FakeLedger([]))
     assert empty["sections"] == [] and empty["n_decisions"] == 0
     assert "nothing recorded yet" in render(empty)
@@ -147,14 +147,14 @@ def test_render_puts_the_gap_and_its_remedy_in_front_of_the_reader():
     facing = "ambiguous cytology and a later confirmatory biopsy both date the case"
     shared = ["note:cytology", "note:biopsy"]
     ledger = FakeLedger([
-        _d("arbitration", "A", facing, "the biopsy dates the case", shared,
+        _d("which_wins", "A", facing, "the biopsy dates the case", shared,
            reasoning="no impression accompanies the cytology"),
-        _d("arbitration", "B", facing, "the biopsy dates the case", shared),
-        _d("arbitration", "C", facing, "the cytology dates the case", shared,
+        _d("which_wins", "B", facing, "the biopsy dates the case", shared),
+        _d("which_wins", "C", facing, "the cytology dates the case", shared,
            options=["date by the biopsy"]),
     ])
     text = render(survey(ledger))
-    assert "## arbitration" in text
+    assert "## which_wins" in text
     assert "[DIVERGENT]" in text
     assert "JUDGEMENT divergence" in text
     assert "no impression accompanies the cytology" in text

@@ -116,17 +116,17 @@ def test_objective_strings_land_in_the_trace_without_being_enforced(server: Char
 
 def test_note_decision_is_recorded_in_order_and_never_refused(server: ChartToolServer):
     payload, is_error = server.call("note_decision", {
-        "decision_type": "source_selection",
+        "decision_type": "where_to_look",
         "facing": "two pathology documents, three weeks apart",
         "decision": "read the earlier one first",
         "because": "the earlier document governs if unambiguous",
         "used": ["rule:conflict_rule.1"],
         "options": ["date by the later biopsy unread"]})
     assert not is_error and payload["noted"] and payload["n_decisions"] == 1
-    assert payload["decision_type"] == "source_selection"
+    assert payload["decision_type"] == "where_to_look"
     server.call("search", {"query": "adenocarcinoma"})
     payload, is_error = server.call("note_decision", {
-        "decision_type": "search_strategy",
+        "decision_type": "where_to_look",
         "facing": "cytology is ambiguous", "decision": "look for a clinical impression",
         "because": "conflict_rule needs the impression fact",
         "used": ["search:adenocarcinoma"]})
@@ -146,7 +146,7 @@ def test_note_decision_carries_a_server_context_snapshot(server: ChartToolServer
     server.call("record_evidence", {"note_id": hit["note_id"], "start": hit["start"],
                                     "end": hit["end"], "supports": "s"})
     payload, _ = server.call("note_decision", {
-        "decision_type": "sufficiency", "facing": "f", "decision": "d", "because": "b",
+        "decision_type": "enough", "facing": "f", "decision": "d", "because": "b",
         "used": ["evidence:1"]})
     ctx = payload["context"]
     assert ctx["n_searches"] == 2
@@ -191,7 +191,7 @@ def test_a_document_seen_only_in_search_results_is_marked_as_such(server: ChartT
     """Citing a snippet and citing a document you read are different warrants."""
     hit = _find_span(server)
     payload, _ = server.call("note_decision", {
-        "decision_type": "source_selection", "facing": "f", "decision": "d", "because": "b",
+        "decision_type": "where_to_look", "facing": "f", "decision": "d", "because": "b",
         "used": [f"note:{hit['note_id']}"]})
     assert payload["used"][0] == {"ref": f"note:{hit['note_id']}", "kind": "note",
                                   "verified": True, "depth": "seen_in_results"}

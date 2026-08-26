@@ -23,10 +23,10 @@ def _write_run(run_dir: Path) -> None:
         {"seq": 1, "ts": "t", "kind": "run_meta", "spec_id": "STORE.390.date_of_initial_diagnosis",
          "spec_hash": "h", "patient_id": "SYN0001", "submittable": ["FOUND"]},
         {"seq": 2, "ts": "t", "kind": "tool_call", "tool": "note_decision",
-         "args": {"decision_type": "stopping", "facing": "no evidence gathered yet",
+         "args": {"decision_type": "enough", "facing": "no evidence gathered yet",
                   "decision": "submit from memory", "because": "overconfidence",
                   "used": ["note:Surgical-Pathology-Document_2023-04-12"]},
-         "result": {"noted": True, "n_decisions": 1, "decision_type": "stopping",
+         "result": {"noted": True, "n_decisions": 1, "decision_type": "enough",
                     "used": [{"ref": "note:Surgical-Pathology-Document_2023-04-12",
                               "kind": "note", "verified": False,
                               "why": "this run never read or surfaced it"}],
@@ -35,13 +35,13 @@ def _write_run(run_dir: Path) -> None:
          "args": {"status": "FOUND", "value": {"date_of_initial_diagnosis": "20230412"}},
          "result": {"accepted": False, "why": "a value answer owes recorded evidence"}, "ok": True},
         {"seq": 4, "ts": "t", "kind": "tool_call", "tool": "note_decision",
-         "args": {"decision_type": "sufficiency",
+         "args": {"decision_type": "where_to_look",
                   "facing": "refused: a value answer owes recorded evidence",
                   "decision": "record the pathology span, then resubmit",
                   "because": "the gate names the missing obligation",
                   "used": ["rule:evidence_rules"],
                   "options": ["abstain instead"]},
-         "result": {"noted": True, "n_decisions": 2, "decision_type": "sufficiency",
+         "result": {"noted": True, "n_decisions": 2, "decision_type": "where_to_look",
                     "used": [{"ref": "rule:evidence_rules", "kind": "rule",
                               "verified": None, "why": "recorded as claimed"}],
                     "context": {"n_searches": 0, "n_evidence": 0}}, "ok": True},
@@ -116,22 +116,22 @@ def test_semantica_chain_walks_result_gate_submission(tmp_path: Path):
     steps = [row for row in chain if row["category"].startswith("step:")]
     assert [s["outcome"] for s in steps] == [
         "record the pathology span, then resubmit", "submit from memory"]  # nearest first
-    assert [s["category"] for s in steps] == ["step:sufficiency", "step:stopping"]
+    assert [s["category"] for s in steps] == ["step:where_to_look", "step:enough"]
     assert all(row.get("distance") is not None for row in chain)
 
     # The compare verb: decision points selected by TYPE, across everything ingested,
     # each carrying its server-recorded context snapshot.
-    by_type = ledger.decisions(category_prefix="step:sufficiency")
+    by_type = ledger.decisions(category_prefix="step:where_to_look")
     assert len(by_type) == 1
     assert by_type[0]["outcome"] == "record the pathology span, then resubmit"
     assert by_type[0]["case_id"] == "SYN0001"
     assert by_type[0]["context"] == {"n_searches": 0, "n_evidence": 0}
     assert by_type[0]["used"] == ["rule:evidence_rules"]
-    assert ledger.decisions(category_prefix="step:coverage") == []
+    assert ledger.decisions(category_prefix="step:which_wins") == []
 
     # The false warrant survives into the ledger as a false warrant, not as a fact.
-    stopping = ledger.decisions(category_prefix="step:stopping")[0]
-    assert stopping["used_unverified"] == ["note:Surgical-Pathology-Document_2023-04-12"]
+    enough = ledger.decisions(category_prefix="step:enough")[0]
+    assert enough["used_unverified"] == ["note:Surgical-Pathology-Document_2023-04-12"]
 
     # Persistence: a fresh ledger over the same files answers the same audit.
     assert ledger_path.exists() and ledger_path.with_suffix(".index.json").exists()
@@ -156,7 +156,7 @@ def test_live_recording_equals_replaying_the_trace(tmp_path: Path):
     # Lazy by design: the ledger must not exist yet — constructing it here would delay the
     # MCP handshake past the model's first calls.
     assert server._recorder is None and not live_path.exists()
-    server.call("note_decision", {"decision_type": "search_strategy", "facing": "f",
+    server.call("note_decision", {"decision_type": "where_to_look", "facing": "f",
                                   "decision": "search pathology terms", "because": "b",
                                   "used": ["rule:field_definition"]})
     hit = json.loads(json.dumps(server.call("search", {"query": "adenocarcinoma"})[0]))["hits"][0]

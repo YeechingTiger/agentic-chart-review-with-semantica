@@ -41,7 +41,7 @@ def scripted_steps() -> list[dict]:
         {"tool": "search", "args": {"query": "adenocarcinoma",
                                     "objective": "establish the histologic diagnosis"}},
         {"tool": "note_decision", "args": {
-            "decision_type": "arbitration",
+            "decision_type": "which_wins",
             "facing": "cytology and biopsy both name the histology",
             "decision": "cite the cytology and date the case there",
             "because": "it is the earlier document and carries the same histology",
@@ -98,7 +98,7 @@ def test_codex_drives_the_toolserver_end_to_end(tmp_path: Path, scripted_steps: 
     assert kinds.index("thought") < kinds.index("action")
     decision = next(s for s in steps if s["kind"] == "decision")
     assert decision["decision"] == "cite the cytology and date the case there"
-    assert decision["decision_type"] == "arbitration"
+    assert decision["decision_type"] == "which_wins"
     assert decision["context"]["n_searches"] == 1   # server state at the moment of deciding
     thought = next(s for s in steps if s["kind"] == "thought")
     assert thought["channel"] == "self_reported"
