@@ -10,6 +10,10 @@ The graph per run, walking upstream from the result:
 
     result  ◄─CAUSED─  gate verdict  ◄─CAUSED─  submission  ─uses─►  evidence spans
     (deterministic_runtime)  (rule_engine)        (model)
+                                                      ▲
+                                    step_N  ─INFLUENCED─┘
+                                      ▲
+              step_1 ─INFLUENCED─ ... ┘        (the model's note_decision points, in order)
 
 Refused submissions are judgments too — they enter the chain the same way, which is what makes
 "the gate refused twice before accepting" a readable fact rather than a vanished one.
@@ -33,6 +37,7 @@ class ReviewLedger(Protocol):
                         outcome: str, decision_maker: str,
                         metadata: dict[str, Any] | None = None) -> str: ...
     def link_caused(self, source_id: str, target_id: str) -> None: ...
+    def link_influenced(self, source_id: str, target_id: str) -> None: ...
     def link_uses(self, judgment_id: str, evidence_id: str) -> None: ...
     def set_case_result(self, case_id: str, result_decision_id: str) -> None: ...
     def chain(self, case_id: str) -> list[dict[str, Any]]: ...
@@ -56,6 +61,9 @@ class NullLedger:
         return f"j:{run_id}:{self.counts['judgments']}"
 
     def link_caused(self, source_id: str, target_id: str) -> None:
+        self.counts["edges"] += 1
+
+    def link_influenced(self, source_id: str, target_id: str) -> None:
         self.counts["edges"] += 1
 
     def link_uses(self, judgment_id: str, evidence_id: str) -> None:
@@ -126,6 +134,12 @@ class SemanticaLedger:
     def link_caused(self, source_id: str, target_id: str) -> None:
         self.graph.add_causal_relationship(source_id, target_id, "CAUSED")
 
+    def link_influenced(self, source_id: str, target_id: str) -> None:
+        # The weaker causal verb, for the model's own decision points: step N shaped step N+1
+        # and the eventual submission, but did not determine them the way the gate's verdict
+        # determines the result.
+        self.graph.add_causal_relationship(source_id, target_id, "INFLUENCED")
+
     def link_uses(self, judgment_id: str, evidence_id: str) -> None:
         self.graph.add_edge(source_id=judgment_id, target_id=evidence_id, edge_type="uses")
 
@@ -146,11 +160,16 @@ class SemanticaLedger:
         anchor = self.graph.find_node(result_id)
         if anchor:
             meta = anchor.get("metadata") or {}
-            rows.append({"decision_id": anchor.get("id"),
+            rows.append({"decision_id": anchor.get("id"), "distance": 0,
                          **{k: meta.get(k) for k in keys[1:]}})
-        for d in self.graph.get_causal_chain(result_id, direction="upstream", max_depth=10):
+        # Depth 50, not 10: with note_decision steps chained by INFLUENCED, a fine-grained run
+        # is result <- gate <- submission <- step_N <- ... <- step_1, one hop per step.
+        for d in self.graph.get_causal_chain(result_id, direction="upstream", max_depth=50):
             row = d if isinstance(d, dict) else getattr(d, "__dict__", {"repr": repr(d)})
-            rows.append({k: row.get(k) for k in keys})
+            meta = row.get("metadata") or {}
+            rows.append({**{k: row.get(k) for k in keys},
+                         "distance": meta.get("causal_distance"), "seq": meta.get("seq")})
+        rows.sort(key=lambda r: (r.get("distance") or 0, -(r.get("seq") or 0)))
         return rows
 
     def save(self) -> None:
@@ -177,7 +196,8 @@ def ingest_run(run_dir: Path, ledger: ReviewLedger) -> dict[str, Any]:
 
     evidence_ids: list[str] = []
     last_gate_id: str | None = None
-    n_submissions = 0
+    prev_step_id: str | None = None
+    n_submissions = n_steps = 0
     for e in events:
         if e.get("kind") != "tool_call":
             continue
@@ -186,6 +206,20 @@ def ingest_run(run_dir: Path, ledger: ReviewLedger) -> dict[str, Any]:
             evidence_ids.append(ledger.record_evidence(
                 run_id, len(evidence_ids),
                 {**args, "quote": result.get("quote", "")}))
+        elif tool == "note_decision" and e.get("ok"):
+            # The model's own decision points, in the semantica frame verbatim:
+            # facing = scenario, because = reasoning, decision = outcome. Chained by
+            # INFLUENCED in trace order so the audit can walk the run step by step.
+            n_steps += 1
+            step = ledger.record_judgment(
+                run_id, category=f"step:{spec_id}",
+                scenario=str(args.get("facing") or ""),
+                reasoning=str(args.get("because") or ""),
+                outcome=str(args.get("decision") or ""), decision_maker="model",
+                metadata={"seq": e.get("seq"), "options": args.get("options")})
+            if prev_step_id is not None:
+                ledger.link_influenced(prev_step_id, step)
+            prev_step_id = step
         elif tool == "submit_answer":
             n_submissions += 1
             submission = ledger.record_judgment(
@@ -193,15 +227,18 @@ def ingest_run(run_dir: Path, ledger: ReviewLedger) -> dict[str, Any]:
                 scenario=f"case {case_id}, submission {n_submissions}",
                 reasoning=str(args.get("reasoning") or ""),
                 outcome=str(args.get("status")), decision_maker="model",
-                metadata={"value": args.get("value")})
+                metadata={"value": args.get("value"), "seq": e.get("seq")})
             for ev_id in evidence_ids:
                 ledger.link_uses(submission, ev_id)
+            if prev_step_id is not None:
+                ledger.link_influenced(prev_step_id, submission)
             verdict = "accepted" if result.get("accepted") else f"refused: {result.get('why')}"
             gate = ledger.record_judgment(
                 run_id, category=f"gate:{spec_id}",
                 scenario=f"case {case_id}, submission {n_submissions}",
                 reasoning=str(result.get("why") or ""),
-                outcome=verdict, decision_maker="rule_engine")
+                outcome=verdict, decision_maker="rule_engine",
+                metadata={"seq": e.get("seq")})
             ledger.link_caused(submission, gate)
             last_gate_id = gate
 
@@ -217,4 +254,5 @@ def ingest_run(run_dir: Path, ledger: ReviewLedger) -> dict[str, Any]:
     ledger.set_case_result(case_id, result_node)
     ledger.save()
     return {"run_id": run_id, "case_id": case_id, "n_evidence": len(evidence_ids),
-            "n_submissions": n_submissions, "result": final.get("status", "NO_ANSWER")}
+            "n_steps": n_steps, "n_submissions": n_submissions,
+            "result": final.get("status", "NO_ANSWER")}

@@ -52,6 +52,7 @@ class ToolState:
         self.evidence: list[dict[str, Any]] = []
         self.listed_documents = False
         self.accepted: dict[str, Any] | None = None
+        self.n_decisions = 0
 
 
 class ChartToolServer:
@@ -100,6 +101,7 @@ class ChartToolServer:
                         "date_to": opt_str,
                         "limit": {"type": "integer"},
                         "offset": {"type": "integer"},
+                        "objective": objective,
                     },
                 },
             },
@@ -131,6 +133,37 @@ class ChartToolServer:
                         "objective": objective,
                     },
                     "required": ["note_id"],
+                },
+            },
+            {
+                "name": "note_decision",
+                "description": "Note a decision point BEFORE acting on it: the situation you "
+                "face, what you decided, and why. Call it whenever you choose between "
+                "alternatives — what to look for next, which document governs, whether the "
+                "evidence suffices, whether to stop. Notes are recorded, never judged, and "
+                "never refused; they are how your reasoning stays auditable.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "facing": {
+                            "type": "string",
+                            "description": "the situation: what question is open, what you know",
+                        },
+                        "decision": {
+                            "type": "string",
+                            "description": "what you decided to do or conclude",
+                        },
+                        "because": {
+                            "type": "string",
+                            "description": "the rationale, naming the evidence or rule it rests on",
+                        },
+                        "options": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "the alternatives you considered and set aside",
+                        },
+                    },
+                    "required": ["facing", "decision", "because"],
                 },
             },
             {
@@ -201,7 +234,8 @@ class ChartToolServer:
 
     # ------------------------------------------------------------------ handlers
     def _t_list_documents(self, doc_type_contains=None, date_from=None, date_to=None,
-                          limit=200, offset=0) -> dict[str, Any]:
+                          limit=200, offset=0, objective=None) -> dict[str, Any]:
+        del objective  # recorded in the trace via args; not used server-side
         page, total = self.chart.list_documents(
             doc_type_contains=doc_type_contains, date_from=date_from, date_to=date_to,
             limit=int(limit), offset=int(offset))
@@ -223,6 +257,14 @@ class ChartToolServer:
             return self.chart.read(note_id, int(offset), int(limit))
         except KeyError:
             return {"error": f"unknown note_id {note_id!r}"}
+
+    def _t_note_decision(self, facing, decision, because, options=None) -> dict[str, Any]:
+        # Self-reported content on the deterministic channel: WHAT was said is the model's
+        # claim, but that it was said, when, and in what order is server-recorded fact. The
+        # full text is already in the trace via the call's args; nothing to add here.
+        del facing, decision, because, options
+        self.state.n_decisions += 1
+        return {"noted": True, "n_decisions": self.state.n_decisions}
 
     def _t_record_evidence(self, note_id, start, end, supports, field=None) -> dict[str, Any]:
         start, end = int(start), int(end)

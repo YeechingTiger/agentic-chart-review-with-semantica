@@ -1,10 +1,10 @@
-"""The MVP's whole command surface: compile, run, ingest, chain.
+"""The MVP's whole command surface: compile, run, trace, ingest, chain.
 
-Four verbs and no more (the design doc's answer to "29 CLIs"). `compile` is the existing
+Five verbs and no more (the design doc's answer to "29 CLIs"). `compile` is the existing
 contract loading chain — loading IS validation, so a spec that loads is a spec that compiled.
-`run` drives one patient through the codex harness. `ingest` distills a finished run's Layer-1
-trace into the judgment ledger, and `chain` is the audit verb reading it back. Scoring joins
-as a fifth verb when score.py lands.
+`run` drives one patient through the codex harness. `trace` renders a finished run as a
+decision trace a person reads top to bottom. `ingest` distills the run into the judgment
+ledger, and `chain` is the audit verb reading it back. Scoring joins when score.py lands.
 """
 from __future__ import annotations
 
@@ -40,6 +40,13 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_trace(args: argparse.Namespace) -> int:
+    from acr.mvp.observe import decision_trace, render
+    trace = decision_trace(Path(args.run_dir))
+    print(json.dumps(trace, ensure_ascii=False, indent=2) if args.json else render(trace))
+    return 0
+
+
 def cmd_ingest(args: argparse.Namespace) -> int:
     from acr.mvp.ledger import ingest_run
     ledger = _ledger(Path(args.ledger))
@@ -71,6 +78,11 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--timeout", type=int, default=900)
     r.add_argument("--codex-bin", default="codex")
     r.set_defaults(fn=cmd_run)
+
+    t = sub.add_parser("trace", help="render a run as an ordered decision trace")
+    t.add_argument("run_dir")
+    t.add_argument("--json", action="store_true", help="emit the trace as JSON instead of text")
+    t.set_defaults(fn=cmd_trace)
 
     i = sub.add_parser("ingest", help="distill a run's Layer-1 trace into the ledger")
     i.add_argument("run_dir")

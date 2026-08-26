@@ -54,8 +54,14 @@ Layer2 运行日志          Layer1 权威轨迹 (JSONL, append-only)
 
 - **Layer1（权威）**：MCP 边界的 JSONL。模型做过的每件"算数的事"必然经过工具，所以这一层
   按构造完整。DETERMINISTIC 通道。**计分只准读它。**
-- **Layer2（免费）**：codex `--json` 事件流原样落盘——思考摘要、内置 plan 工具的更新、token 计数。
-  相当于旧系统的缺口台账 + 运行统计，**零行代码白得**。SELF_REPORTED 通道，只供调试，永不计分。
+  细粒度决策点也在这层：`note_decision` 工具（facing/decision/because/options，semantica 的
+  局面/凭据/定论框架原样）——**说了什么**是自报内容，但**何时、以什么顺序说的**是服务端事实，
+  所以决策点与动作在 seq 上严格穿插可排。永不被闸门拒（拒了就是在测按钮）。
+- **Layer2（免费）**：codex `--json` 事件流原样落盘——思考摘要（reasoning item，每回合先于
+  该回合的工具调用出现）、token 计数。SELF_REPORTED 通道，只供调试与阅读，永不计分。
+  `observe.decision_trace` 把两层合成一条"想→决→做→看→交→判"的可顺读轨迹（`cli trace`），
+  对齐靠位置而非时钟：Layer2 的第 k 个 mcp_tool_call 就是 Layer1 的第 k 个 tool_call。
+  删掉 Layer2，轨迹只失去 thought 行——其余每步原样（观测独立性照旧）。
 - **Layer3（账本）**：从 Layer1 蒸馏出判断（证据记录、提交+闸门判决、终局）写进 semantica：
   evidence 节点 → judgment 节点 → result 节点，因果边相连。三个动词的 MVP 版本——
   审计 = `chain(case)` 一跳到底；对比 = 同 chart 两次 run 的节点 diff；沉淀 = 以后。

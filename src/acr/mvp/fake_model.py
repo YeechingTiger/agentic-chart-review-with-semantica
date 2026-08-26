@@ -30,6 +30,10 @@ function entries first and then each namespace's members.
 The script is a JSON list of steps, each either
     {"tool": "search", "args": {...}}          -> one function_call turn
 or  {"message": "text"}                        -> a final assistant message turn.
+Either kind may carry {"thought": "..."} — emitted as a `reasoning` item (summary_text; the
+shape codex's ResponseItem::Reasoning deserializes, `encrypted_content` present-but-null)
+BEFORE the call/message in the same response, the way a live reasoning model interleaves
+thinking with actions. It lands in Layer 2 only.
 Every request body is appended to requests.jsonl beside the script, so a failing handshake
 is diagnosable from disk.
 """
@@ -96,30 +100,39 @@ class _Handler(BaseHTTPRequestHandler):
         offered = [t for t in req.get("tools", []) if isinstance(t, dict)]
         step = self.state.next_step()
         n = self.state.cursor
+        items: list[dict[str, Any]] = []
+        if step.get("thought"):
+            items.append({
+                "type": "reasoning",
+                "summary": [{"type": "summary_text", "text": step["thought"]}],
+                "encrypted_content": None,
+            })
         if "tool" in step:
             name, namespace = _resolve_tool(step["tool"], offered)
-            item: dict[str, Any] = {
+            call: dict[str, Any] = {
                 "type": "function_call",
                 "name": name,
                 "arguments": json.dumps(step.get("args") or {}),
                 "call_id": f"call_{n}",
             }
             if namespace is not None:
-                item["namespace"] = namespace
+                call["namespace"] = namespace
+            items.append(call)
         else:
-            item = {
+            items.append({
                 "type": "message",
                 "role": "assistant",
                 "content": [{"type": "output_text", "text": step.get("message", "done")}],
-            }
+            })
 
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
         self.wfile.write(_sse("response.created", {"type": "response.created", "response": {}}))
-        self.wfile.write(_sse("response.output_item.done",
-                              {"type": "response.output_item.done", "item": item}))
+        for item in items:
+            self.wfile.write(_sse("response.output_item.done",
+                                  {"type": "response.output_item.done", "item": item}))
         self.wfile.write(_sse("response.completed",
                               {"type": "response.completed", "response": {"id": f"resp_{n}"}}))
         self.wfile.flush()

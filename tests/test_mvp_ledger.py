@@ -16,24 +16,35 @@ from acr.mvp.ledger import NullLedger, ingest_run
 
 
 def _write_run(run_dir: Path) -> None:
-    """A minimal but honest run: one evidence span, one refused submission, one accepted."""
+    """A minimal but honest run: two decision points, one evidence span, one refused
+    submission, one accepted."""
     run_dir.mkdir(parents=True)
     events = [
         {"seq": 1, "ts": "t", "kind": "run_meta", "spec_id": "STORE.390.date_of_initial_diagnosis",
          "spec_hash": "h", "patient_id": "SYN0001", "submittable": ["FOUND"]},
-        {"seq": 2, "ts": "t", "kind": "tool_call", "tool": "submit_answer",
+        {"seq": 2, "ts": "t", "kind": "tool_call", "tool": "note_decision",
+         "args": {"facing": "no evidence gathered yet", "decision": "submit from memory",
+                  "because": "overconfidence"},
+         "result": {"noted": True, "n_decisions": 1}, "ok": True},
+        {"seq": 3, "ts": "t", "kind": "tool_call", "tool": "submit_answer",
          "args": {"status": "FOUND", "value": {"date_of_initial_diagnosis": "20230412"}},
          "result": {"accepted": False, "why": "a value answer owes recorded evidence"}, "ok": True},
-        {"seq": 3, "ts": "t", "kind": "tool_call", "tool": "record_evidence",
+        {"seq": 4, "ts": "t", "kind": "tool_call", "tool": "note_decision",
+         "args": {"facing": "refused: a value answer owes recorded evidence",
+                  "decision": "record the pathology span, then resubmit",
+                  "because": "the gate names the missing obligation",
+                  "options": ["abstain instead"]},
+         "result": {"noted": True, "n_decisions": 2}, "ok": True},
+        {"seq": 5, "ts": "t", "kind": "tool_call", "tool": "record_evidence",
          "args": {"note_id": "Surgical-Pathology-Document_2023-04-12", "start": 310, "end": 324,
                   "supports": "histology named"},
          "result": {"recorded": True, "n_evidence": 1, "quote": "adenocarcinoma"}, "ok": True},
-        {"seq": 4, "ts": "t", "kind": "tool_call", "tool": "submit_answer",
+        {"seq": 6, "ts": "t", "kind": "tool_call", "tool": "submit_answer",
          "args": {"status": "FOUND", "value": {"date_of_initial_diagnosis": "20230412"},
                   "reasoning": "FNA pathology"},
          "result": {"accepted": True, "why": "obligations for this status are discharged"},
          "ok": True},
-        {"seq": 5, "ts": "t", "kind": "answer_accepted", "status": "FOUND"},
+        {"seq": 7, "ts": "t", "kind": "answer_accepted", "status": "FOUND"},
     ]
     (run_dir / "trace.jsonl").write_text(
         "\n".join(json.dumps(e) for e in events) + "\n", encoding="utf-8")
@@ -49,13 +60,14 @@ def test_ingestion_summary_and_the_null_ledger(tmp_path: Path):
     ledger = NullLedger()
     summary = ingest_run(run_dir, ledger)
     assert summary == {"run_id": run_dir.name, "case_id": "SYN0001", "n_evidence": 1,
-                       "n_submissions": 2, "result": "FOUND"}
-    # 1 evidence; 2 submissions + 2 gate verdicts + 1 result = 5 judgments;
-    # uses(submission1->ev0 does not exist: evidence came after) — the refused submission had
-    # no evidence yet, the accepted one links 1; plus 2 CAUSED (sub->gate) + 1 (gate->result).
+                       "n_steps": 2, "n_submissions": 2, "result": "FOUND"}
+    # 1 evidence; 2 steps + 2 submissions + 2 gate verdicts + 1 result = 7 judgments.
+    # Edges: INFLUENCED step1->step2, step1->submission1, step2->submission2 (3);
+    # uses only on the accepted submission — the refused one preceded the evidence (1);
+    # CAUSED submission->gate twice and last-gate->result once (3). Total 7.
     assert ledger.counts["evidence"] == 1
-    assert ledger.counts["judgments"] == 5
-    assert ledger.counts["edges"] == 4
+    assert ledger.counts["judgments"] == 7
+    assert ledger.counts["edges"] == 7
 
 
 def test_a_run_that_never_answered_still_ingests(tmp_path: Path):
@@ -67,6 +79,7 @@ def test_a_run_that_never_answered_still_ingests(tmp_path: Path):
     summary = ingest_run(run_dir, NullLedger())   # no result.json: the honest NO_ANSWER
     assert summary["result"] == "NO_ANSWER"
     assert summary["n_submissions"] == 0
+    assert summary["n_steps"] == 0
 
 
 def test_semantica_chain_walks_result_gate_submission(tmp_path: Path):
@@ -85,6 +98,15 @@ def test_semantica_chain_walks_result_gate_submission(tmp_path: Path):
     makers = {row.get("decision_maker") for row in chain}
     assert "deterministic_runtime" in makers          # the result node itself
     assert {"rule_engine", "model"} & makers          # at least one upstream judgment
+
+    # The model's decision points are ON the chain, ordered: the walk reaches back through
+    # the accepted submission to step 2 and from there to step 1.
+    cats = [row["category"].split(":")[0] for row in chain]
+    assert cats[0] == "result"
+    steps = [row for row in chain if row["category"].startswith("step:")]
+    assert [s["outcome"] for s in steps] == [
+        "record the pathology span, then resubmit", "submit from memory"]  # nearest first
+    assert all(row.get("distance") is not None for row in chain)
 
     # Persistence: a fresh ledger over the same files answers the same audit.
     assert ledger_path.exists() and ledger_path.with_suffix(".index.json").exists()

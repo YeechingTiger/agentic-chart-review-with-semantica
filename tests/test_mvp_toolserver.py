@@ -114,6 +114,26 @@ def test_objective_strings_land_in_the_trace_without_being_enforced(server: Char
     assert calls[0]["args"]["objective"] == "establish histology"
 
 
+def test_note_decision_is_recorded_in_order_and_never_refused(server: ChartToolServer):
+    payload, is_error = server.call("note_decision", {
+        "facing": "two pathology documents, three weeks apart",
+        "decision": "read the earlier one first",
+        "because": "the earlier document governs if unambiguous",
+        "options": ["date by the later biopsy unread"]})
+    assert not is_error and payload == {"noted": True, "n_decisions": 1}
+    server.call("search", {"query": "adenocarcinoma"})
+    payload, is_error = server.call("note_decision", {
+        "facing": "cytology is ambiguous", "decision": "look for a clinical impression",
+        "because": "conflict_rule needs the impression fact"})
+    assert not is_error and payload["n_decisions"] == 2
+
+    events = [e for e in _trace(server) if e.get("kind") == "tool_call"]
+    assert [e["tool"] for e in events] == ["note_decision", "search", "note_decision"]
+    assert events[0]["seq"] < events[1]["seq"] < events[2]["seq"]
+    assert events[0]["args"]["facing"] == "two pathology documents, three weeks apart"
+    assert events[2]["args"].get("options") is None  # optional stays optional
+
+
 def test_stdio_transport_end_to_end(tmp_path: Path):
     """The same review through the JSON-RPC framing codex uses: initialize -> tools/list ->
     tools/call. One subprocess conversation, scripted requests, answers read back by id."""
@@ -140,7 +160,8 @@ def test_stdio_transport_end_to_end(tmp_path: Path):
 
     assert by_id[1]["result"]["protocolVersion"] == "2025-06-18"
     names = {t["name"] for t in by_id[2]["result"]["tools"]}
-    assert names == {"list_documents", "search", "read", "record_evidence", "submit_answer"}
+    assert names == {"list_documents", "search", "read", "note_decision",
+                     "record_evidence", "submit_answer"}
     search = json.loads(by_id[3]["result"]["content"][0]["text"])
     assert search["n"] > 0 and by_id[3]["result"]["isError"] is False
     verdict = json.loads(by_id[4]["result"]["content"][0]["text"])

@@ -36,9 +36,15 @@ def scripted_steps() -> list[dict]:
     """A competent reviewer's trajectory, with the evidence span taken from the live chart."""
     hit = PatientChart(PATIENT).search("adenocarcinoma")[0]
     return [
-        {"tool": "list_documents", "args": {}},
+        {"thought": "Survey the chart before searching.",
+         "tool": "list_documents", "args": {}},
         {"tool": "search", "args": {"query": "adenocarcinoma",
                                     "objective": "establish the histologic diagnosis"}},
+        {"tool": "note_decision", "args": {
+            "facing": "cytology and biopsy both name the histology",
+            "decision": "cite the cytology and date the case there",
+            "because": "it is the earlier document and carries the same histology",
+            "options": ["date by the later biopsy"]}},
         {"tool": "record_evidence", "args": {
             "note_id": hit.note_id, "start": hit.start, "end": hit.end,
             "supports": "pathology names the histology",
@@ -74,14 +80,28 @@ def test_codex_drives_the_toolserver_end_to_end(tmp_path: Path, scripted_steps: 
     events = [json.loads(ln) for ln in
               (run_dir / "trace.jsonl").read_text(encoding="utf-8").splitlines()]
     tools = [e["tool"] for e in events if e["kind"] == "tool_call"]
-    assert tools == ["list_documents", "search", "record_evidence", "submit_answer"]
+    assert tools == ["list_documents", "search", "note_decision",
+                     "record_evidence", "submit_answer"]
     search_call = next(e for e in events if e.get("tool") == "search")
     assert search_call["args"]["objective"] == "establish the histologic diagnosis"
 
     # Layer 2 was archived; Layer 1 never depends on it.
     assert (run_dir / "layer2_codex.jsonl").stat().st_size > 0
 
+    # The decision trace reads in order: the scripted thought (Layer 2, self-reported)
+    # lands before the survey it preceded, and the decision point sits where it was made.
+    from acr.mvp.observe import decision_trace
+    steps = decision_trace(run_dir)["steps"]
+    kinds = [s["kind"] for s in steps]
+    assert kinds.index("thought") < kinds.index("action")
+    decision = next(s for s in steps if s["kind"] == "decision")
+    assert decision["decision"] == "cite the cytology and date the case there"
+    thought = next(s for s in steps if s["kind"] == "thought")
+    assert thought["channel"] == "self_reported"
+    assert thought["text"] == "Survey the chart before searching."
+
     # Acceptance 3 in miniature: the finished run distills into a ledger.
     summary = ingest_run(run_dir, NullLedger())
     assert summary["result"] == "FOUND"
     assert summary["n_evidence"] == 1 and summary["n_submissions"] == 1
+    assert summary["n_steps"] == 1

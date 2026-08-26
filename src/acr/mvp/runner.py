@@ -36,6 +36,15 @@ TASK_PREAMBLE = """You are performing a chart review for one patient against the
 You can only act through the `chart` tools. Record the evidence that establishes your answer
 with record_evidence BEFORE submitting; finish by calling submit_answer. If the submission is
 refused, the verdict names what is missing — fix it and submit again.
+
+Make your reasoning auditable as you go:
+- At every decision point — choosing what to look for next, deciding which document governs,
+  judging whether the evidence suffices, deciding to stop — call note_decision FIRST, stating
+  the situation you face, what you decided, why, and the alternatives you set aside.
+- On every search, read and list_documents call, fill the `objective` field with the open
+  question that call is meant to resolve.
+Notes and objectives are recorded, never judged: write what you actually think, including
+doubts. An auditor must be able to follow your decision points in order from the record alone.
 """
 
 
