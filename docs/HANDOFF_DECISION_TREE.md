@@ -62,7 +62,7 @@ uv venv && uv pip install -e .            # plus the semantica pin, see pyprojec
 export $(grep -v '^#' .env | xargs)       # ACR_MODEL / ACR_API_BASE / ACR_API_KEY
 
 # 1. one review, with the ledger recording live
-python -m acr.mvp.review assets/specs/STORE.390.date_of_initial_diagnosis.yaml \
+python -m acr.mvp.cli run assets/specs/STORE.390.date_of_initial_diagnosis.yaml \
        corpus/patients/SYN0001 --out runs/mvp --ledger runs/mvp/ledger.json
 
 # 2. read the run top to bottom
