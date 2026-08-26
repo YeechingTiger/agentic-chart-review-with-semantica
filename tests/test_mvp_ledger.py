@@ -23,18 +23,21 @@ def _write_run(run_dir: Path) -> None:
         {"seq": 1, "ts": "t", "kind": "run_meta", "spec_id": "STORE.390.date_of_initial_diagnosis",
          "spec_hash": "h", "patient_id": "SYN0001", "submittable": ["FOUND"]},
         {"seq": 2, "ts": "t", "kind": "tool_call", "tool": "note_decision",
-         "args": {"facing": "no evidence gathered yet", "decision": "submit from memory",
-                  "because": "overconfidence"},
-         "result": {"noted": True, "n_decisions": 1}, "ok": True},
+         "args": {"decision_type": "stopping", "facing": "no evidence gathered yet",
+                  "decision": "submit from memory", "because": "overconfidence"},
+         "result": {"noted": True, "n_decisions": 1, "decision_type": "stopping",
+                    "context": {"n_searches": 0, "n_evidence": 0}}, "ok": True},
         {"seq": 3, "ts": "t", "kind": "tool_call", "tool": "submit_answer",
          "args": {"status": "FOUND", "value": {"date_of_initial_diagnosis": "20230412"}},
          "result": {"accepted": False, "why": "a value answer owes recorded evidence"}, "ok": True},
         {"seq": 4, "ts": "t", "kind": "tool_call", "tool": "note_decision",
-         "args": {"facing": "refused: a value answer owes recorded evidence",
+         "args": {"decision_type": "sufficiency",
+                  "facing": "refused: a value answer owes recorded evidence",
                   "decision": "record the pathology span, then resubmit",
                   "because": "the gate names the missing obligation",
                   "options": ["abstain instead"]},
-         "result": {"noted": True, "n_decisions": 2}, "ok": True},
+         "result": {"noted": True, "n_decisions": 2, "decision_type": "sufficiency",
+                    "context": {"n_searches": 0, "n_evidence": 0}}, "ok": True},
         {"seq": 5, "ts": "t", "kind": "tool_call", "tool": "record_evidence",
          "args": {"note_id": "Surgical-Pathology-Document_2023-04-12", "start": 310, "end": 324,
                   "supports": "histology named"},
@@ -106,10 +109,63 @@ def test_semantica_chain_walks_result_gate_submission(tmp_path: Path):
     steps = [row for row in chain if row["category"].startswith("step:")]
     assert [s["outcome"] for s in steps] == [
         "record the pathology span, then resubmit", "submit from memory"]  # nearest first
+    assert [s["category"] for s in steps] == ["step:sufficiency", "step:stopping"]
     assert all(row.get("distance") is not None for row in chain)
+
+    # The compare verb: decision points selected by TYPE, across everything ingested,
+    # each carrying its server-recorded context snapshot.
+    by_type = ledger.decisions(category_prefix="step:sufficiency")
+    assert len(by_type) == 1
+    assert by_type[0]["outcome"] == "record the pathology span, then resubmit"
+    assert by_type[0]["case_id"] == "SYN0001"
+    assert by_type[0]["context"] == {"n_searches": 0, "n_evidence": 0}
+    assert ledger.decisions(category_prefix="step:coverage") == []
 
     # Persistence: a fresh ledger over the same files answers the same audit.
     assert ledger_path.exists() and ledger_path.with_suffix(".index.json").exists()
     reloaded = SemanticaLedger(ledger_path)
     assert reloaded.chain("SYN0001"), "the chain did not survive save/load"
     assert reloaded.stats()["cases"] == 1
+
+
+def test_live_recording_equals_replaying_the_trace(tmp_path: Path):
+    """Semantica's own usage pattern — record at decision time — and our rebuild path must
+    produce the same books. Drive the real toolserver with a live ledger, then replay its
+    trace into a fresh one, and compare what each recorded (ids are uuids; content isn't)."""
+    pytest.importorskip("semantica")
+    from acr.mvp.ledger import SemanticaLedger
+    from acr.mvp.toolserver import ChartToolServer
+
+    root = Path(__file__).resolve().parents[1]
+    live_path = tmp_path / "live.json"
+    server = ChartToolServer(root / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml",
+                             root / "corpus" / "patients" / "SYN0001",
+                             tmp_path / "run", ledger_path=live_path)
+    # Lazy by design: the ledger must not exist yet — constructing it here would delay the
+    # MCP handshake past the model's first calls.
+    assert server._recorder is None and not live_path.exists()
+    server.call("note_decision", {"decision_type": "search_strategy", "facing": "f",
+                                  "decision": "search pathology terms", "because": "b"})
+    hit = json.loads(json.dumps(server.call("search", {"query": "adenocarcinoma"})[0]))["hits"][0]
+    server.call("record_evidence", {"note_id": hit["note_id"], "start": hit["start"],
+                                    "end": hit["end"], "supports": "s"})
+    server.call("submit_answer", {"status": "FOUND",
+                                  "value": {"date_of_initial_diagnosis": "20230412"},
+                                  "reasoning": "r"})
+
+    replayed = SemanticaLedger(tmp_path / "replayed.json")
+    summary = ingest_run(tmp_path / "run", replayed)
+    assert summary["result"] == "FOUND" and summary["n_steps"] == 1
+
+    live = SemanticaLedger(live_path)   # reload from disk: what the sync path persisted
+
+    def content(ledger):
+        return [(r["category"], r["outcome"], r["decision_maker"], r["seq"], r["context"])
+                for r in ledger.decisions()]
+
+    assert content(live) == content(replayed)
+    assert [r["outcome"] for r in live.chain("SYN0001")] == \
+           [r["outcome"] for r in replayed.chain("SYN0001")]
+    live_stats, replay_stats = live.stats(), replayed.stats()
+    assert live_stats["node_count"] == replay_stats["node_count"]
+    assert live_stats["edge_count"] == replay_stats["edge_count"]

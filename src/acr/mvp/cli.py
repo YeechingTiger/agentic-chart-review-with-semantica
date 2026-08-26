@@ -33,6 +33,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         Path(args.spec), Path(args.patient_dir), Path(args.out),
         model=args.model, base_url=args.base_url, timeout_s=args.timeout,
         codex_bin=args.codex_bin,
+        ledger_path=Path(args.ledger) if args.ledger else None,
     )
     result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
     print(json.dumps({"run_dir": str(run_dir), "status": result.get("status"),
@@ -61,6 +62,14 @@ def cmd_chain(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_decisions(args: argparse.Namespace) -> int:
+    ledger = _ledger(Path(args.ledger))
+    prefix = f"step:{args.type}" if args.type else args.prefix
+    rows = ledger.decisions(category_prefix=prefix, case_id=args.case)
+    print(json.dumps(rows, ensure_ascii=False, indent=2))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="acr-mvp", description=__doc__)
     sub = p.add_subparsers(dest="command", required=True)
@@ -77,6 +86,8 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--base-url", default=None)
     r.add_argument("--timeout", type=int, default=900)
     r.add_argument("--codex-bin", default="codex")
+    r.add_argument("--ledger", default=None,
+                   help="record judgments into this semantica ledger LIVE during the run")
     r.set_defaults(fn=cmd_run)
 
     t = sub.add_parser("trace", help="render a run as an ordered decision trace")
@@ -93,6 +104,15 @@ def main(argv: list[str] | None = None) -> int:
     ch.add_argument("case_id")
     ch.add_argument("--ledger", default="runs/mvp/ledger.json")
     ch.set_defaults(fn=cmd_chain)
+
+    d = sub.add_parser("decisions",
+                       help="compare: decision points across runs, filtered by type or case")
+    d.add_argument("--type", default=None, help="a decision type, e.g. coverage, arbitration")
+    d.add_argument("--prefix", default=None,
+                   help="raw category prefix (step:, submit:, gate:, result:)")
+    d.add_argument("--case", default=None, help="filter to one case id")
+    d.add_argument("--ledger", default="runs/mvp/ledger.json")
+    d.set_defaults(fn=cmd_decisions)
 
     args = p.parse_args(argv)
     return args.fn(args)

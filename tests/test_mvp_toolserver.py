@@ -116,13 +116,16 @@ def test_objective_strings_land_in_the_trace_without_being_enforced(server: Char
 
 def test_note_decision_is_recorded_in_order_and_never_refused(server: ChartToolServer):
     payload, is_error = server.call("note_decision", {
+        "decision_type": "source_selection",
         "facing": "two pathology documents, three weeks apart",
         "decision": "read the earlier one first",
         "because": "the earlier document governs if unambiguous",
         "options": ["date by the later biopsy unread"]})
-    assert not is_error and payload == {"noted": True, "n_decisions": 1}
+    assert not is_error and payload["noted"] and payload["n_decisions"] == 1
+    assert payload["decision_type"] == "source_selection"
     server.call("search", {"query": "adenocarcinoma"})
     payload, is_error = server.call("note_decision", {
+        "decision_type": "search_strategy",
         "facing": "cytology is ambiguous", "decision": "look for a clinical impression",
         "because": "conflict_rule needs the impression fact"})
     assert not is_error and payload["n_decisions"] == 2
@@ -132,6 +135,28 @@ def test_note_decision_is_recorded_in_order_and_never_refused(server: ChartToolS
     assert events[0]["seq"] < events[1]["seq"] < events[2]["seq"]
     assert events[0]["args"]["facing"] == "two pathology documents, three weeks apart"
     assert events[2]["args"].get("options") is None  # optional stays optional
+
+
+def test_note_decision_carries_a_server_context_snapshot(server: ChartToolServer):
+    """The decision is self-reported; the state it was made against is server fact."""
+    server.call("search", {"query": "adenocarcinoma"})
+    hit = _find_span(server)   # a second search
+    server.call("record_evidence", {"note_id": hit["note_id"], "start": hit["start"],
+                                    "end": hit["end"], "supports": "s"})
+    payload, _ = server.call("note_decision", {
+        "decision_type": "sufficiency", "facing": "f", "decision": "d", "because": "b"})
+    ctx = payload["context"]
+    assert ctx["n_searches"] == 2
+    assert ctx["n_evidence"] == 1
+    assert ctx["unfiltered_listing_done"] is False
+    assert ctx["evidence_notes"] == [hit["note_id"]]
+
+
+def test_an_unknown_decision_type_is_kept_as_other_not_refused(server: ChartToolServer):
+    payload, is_error = server.call("note_decision", {
+        "decision_type": "vibes", "facing": "f", "decision": "d", "because": "b"})
+    assert not is_error and payload["decision_type"] == "other"
+    assert "vibes" in payload["note"]
 
 
 def test_stdio_transport_end_to_end(tmp_path: Path):

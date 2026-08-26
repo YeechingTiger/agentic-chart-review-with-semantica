@@ -21,6 +21,10 @@ This process serves ONE patient against ONE contract, configured by environment:
   ACR_MVP_SPEC          path to the contract YAML
   ACR_MVP_PATIENT_DIR   path to the patient's document directory
   ACR_MVP_RUN_DIR       where trace.jsonl and result.json are written
+  ACR_MVP_LEDGER        optional: a semantica ledger to record judgments into LIVE, at the
+                        moment each happens. Best-effort by construction — a ledger failure
+                        is a stderr line and the run proceeds; the trace can always rebuild
+                        the ledger (ingest_run), never the other way around.
 
 stdout speaks JSON-RPC only (the MCP stdio transport); diagnostics go to stderr.
 """
@@ -37,6 +41,7 @@ from typing import Any
 from acr.chartstore.corpus import PatientChart
 from acr.contract.outcomes import declared_statuses, submittable_statuses
 from acr.contract.spec import load_spec
+from acr.mvp.decision_types import DECISION_TYPES, normalize_type
 
 PROTOCOL_VERSION_FALLBACK = "2025-06-18"
 
@@ -53,10 +58,24 @@ class ToolState:
         self.listed_documents = False
         self.accepted: dict[str, Any] | None = None
         self.n_decisions = 0
+        self.n_searches = 0
+        self.n_reads = 0
+        self.n_listings = 0
+
+    def snapshot(self) -> dict[str, Any]:
+        """Server-side facts at this moment — the context a decision point gets for free,
+        so 'clean decision, rich context' does not depend on the model narrating well."""
+        # Capped: semantica bounds a metadata value at 1000 chars, and the snapshot must
+        # stay small enough to ride along on every decision node.
+        return {"n_searches": self.n_searches, "n_reads": self.n_reads,
+                "n_listings": self.n_listings, "n_evidence": len(self.evidence),
+                "unfiltered_listing_done": self.listed_documents,
+                "evidence_notes": sorted({e["note_id"] for e in self.evidence})[:15]}
 
 
 class ChartToolServer:
-    def __init__(self, spec_path: Path, patient_dir: Path, run_dir: Path) -> None:
+    def __init__(self, spec_path: Path, patient_dir: Path, run_dir: Path,
+                 ledger_path: Path | None = None) -> None:
         self.spec = load_spec(spec_path)
         self.chart = PatientChart(patient_dir)
         self.patient_id = patient_dir.name
@@ -66,20 +85,65 @@ class ChartToolServer:
         self.state = ToolState()
         self._acceptance_pending = False
         self._seq = 0
+        # The ledger is constructed LAZILY, at the first event worth recording — semantica's
+        # import costs ~2s, and paying it here would delay the MCP initialize handshake past
+        # the model's first tool calls (codex starts the turn without waiting for late
+        # registrations; the calls bounce as "unsupported" and the review starts blind).
+        self._ledger_path = Path(ledger_path) if ledger_path else None
+        self._recorder: Any = None
         self._emit(
             "run_meta",
             spec_id=self.spec.spec_id,
             spec_hash=self.spec.spec_hash,
             patient_id=self.patient_id,
             submittable=list(submittable_statuses(self.spec)),
+            live_ledger=str(ledger_path) if ledger_path else None,
         )
 
+    def _live_recorder(self):
+        """Synchronous recording, best-effort: judgments reach the ledger at the moment they
+        happen. Any failure here degrades to trace-only — never to a failed run."""
+        if self._recorder is None and self._ledger_path is not None:
+            try:
+                from acr.mvp.ledger import RunRecorder, SemanticaLedger
+                self._recorder = RunRecorder(SemanticaLedger(self._ledger_path),
+                                             run_id=self.run_dir.name,
+                                             spec_id=self.spec.spec_id,
+                                             case_id=self.patient_id)
+            except Exception as e:  # noqa: BLE001 - survive anything here
+                print(f"acr-chart toolserver: live ledger disabled ({e})", file=sys.stderr)
+                self._ledger_path = None
+        return self._recorder
+
     # ------------------------------------------------------------------ trace (Layer 1)
-    def _emit(self, kind: str, **payload: Any) -> None:
+    def _emit(self, kind: str, **payload: Any) -> int:
         self._seq += 1
         rec = {"seq": self._seq, "ts": _now(), "kind": kind, **payload}
         with self.trace_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        return self._seq
+
+    def _record_live(self, name: str, args: dict[str, Any], payload: dict[str, Any],
+                     ok: bool, seq: int) -> None:
+        """Drive the same RunRecorder the replay path drives, one event at a time."""
+        recordable = ((name in ("record_evidence", "note_decision") and ok)
+                      or (name == "submit_answer" and "accepted" in payload))
+        if not recordable:
+            return
+        recorder = self._live_recorder()
+        if recorder is None:
+            return
+        try:
+            if name == "record_evidence":
+                recorder.on_evidence(args, payload.get("quote", ""))
+            elif name == "note_decision":
+                recorder.on_step(args, seq, context=payload.get("context"))
+            else:
+                recorder.on_submission(args, payload, seq)
+            recorder.ledger.save()
+        except Exception as e:  # noqa: BLE001 - bookkeeping must never fail the run
+            print(f"acr-chart toolserver: live ledger write failed ({e})", file=sys.stderr)
+            self._recorder, self._ledger_path = None, None
 
     # ------------------------------------------------------------------ tool surface
     def schemas(self) -> list[dict[str, Any]]:
@@ -145,6 +209,12 @@ class ChartToolServer:
                 "inputSchema": {
                     "type": "object",
                     "properties": {
+                        "decision_type": {
+                            "type": "string",
+                            "enum": list(DECISION_TYPES),
+                            "description": "what KIND of decision this is: "
+                            + "; ".join(f"{k} = {v}" for k, v in DECISION_TYPES.items()),
+                        },
                         "facing": {
                             "type": "string",
                             "description": "the situation: what question is open, what you know",
@@ -163,7 +233,7 @@ class ChartToolServer:
                             "description": "the alternatives you considered and set aside",
                         },
                     },
-                    "required": ["facing", "decision", "because"],
+                    "required": ["decision_type", "facing", "decision", "because"],
                 },
             },
             {
@@ -224,12 +294,22 @@ class ChartToolServer:
         except KeyError as e:  # unknown note_id from PatientChart internals
             payload = {"error": f"unknown note_id {e}"}
             ok = False
-        self._emit("tool_call", tool=name, args=args, result=payload, ok=ok)
+        seq = self._emit("tool_call", tool=name, args=args, result=payload, ok=ok)
+        self._record_live(name, args, payload, ok, seq)
         if name == "submit_answer" and self._acceptance_pending:
             # Emitted here, after the tool_call record, so the trace reads in causal order.
             self._acceptance_pending = False
             self._emit("answer_accepted", status=self.state.accepted["status"],
                        value=self.state.accepted["value"])
+            recorder = self._live_recorder()
+            if recorder is not None:
+                try:
+                    recorder.on_result(self.state.accepted)
+                    recorder.ledger.save()
+                except Exception as e:  # noqa: BLE001
+                    print(f"acr-chart toolserver: live ledger write failed ({e})",
+                          file=sys.stderr)
+                    self._recorder, self._ledger_path = None, None
         return payload, not ok
 
     # ------------------------------------------------------------------ handlers
@@ -239,6 +319,7 @@ class ChartToolServer:
         page, total = self.chart.list_documents(
             doc_type_contains=doc_type_contains, date_from=date_from, date_to=date_to,
             limit=int(limit), offset=int(offset))
+        self.state.n_listings += 1
         if not any([doc_type_contains, date_from, date_to]) and int(offset) == 0:
             self.state.listed_documents = True
         return {"documents": [d.to_dict() for d in page], "total": total,
@@ -247,24 +328,33 @@ class ChartToolServer:
     def _t_search(self, query, doc_type_contains=None, date_from=None, date_to=None,
                   objective=None) -> dict[str, Any]:
         del objective  # recorded in the trace via args; not used server-side
+        self.state.n_searches += 1
         hits = self.chart.search(query, doc_type_contains=doc_type_contains,
                                  date_from=date_from, date_to=date_to)
         return {"hits": [vars(h) for h in hits], "n": len(hits)}
 
     def _t_read(self, note_id, offset=0, limit=4000, objective=None) -> dict[str, Any]:
         del objective
+        self.state.n_reads += 1
         try:
             return self.chart.read(note_id, int(offset), int(limit))
         except KeyError:
             return {"error": f"unknown note_id {note_id!r}"}
 
-    def _t_note_decision(self, facing, decision, because, options=None) -> dict[str, Any]:
+    def _t_note_decision(self, decision_type, facing, decision, because,
+                         options=None) -> dict[str, Any]:
         # Self-reported content on the deterministic channel: WHAT was said is the model's
-        # claim, but that it was said, when, and in what order is server-recorded fact. The
-        # full text is already in the trace via the call's args; nothing to add here.
+        # claim, but that it was said, when, in what order, and against which server-side
+        # state is recorded fact. The context snapshot rides in the result, so it lands in
+        # the trace and the ledger without trusting the model's narration of its own state.
         del facing, decision, because, options
         self.state.n_decisions += 1
-        return {"noted": True, "n_decisions": self.state.n_decisions}
+        dtype, claimed = normalize_type(decision_type)
+        out: dict[str, Any] = {"noted": True, "n_decisions": self.state.n_decisions,
+                               "decision_type": dtype, "context": self.state.snapshot()}
+        if claimed:
+            out["note"] = f"unknown decision_type {claimed!r} recorded as 'other'"
+        return out
 
     def _t_record_evidence(self, note_id, start, end, supports, field=None) -> dict[str, Any]:
         start, end = int(start), int(end)
@@ -371,7 +461,9 @@ def main() -> None:
     spec_path = Path(os.environ["ACR_MVP_SPEC"])
     patient_dir = Path(os.environ["ACR_MVP_PATIENT_DIR"])
     run_dir = Path(os.environ["ACR_MVP_RUN_DIR"])
-    server = ChartToolServer(spec_path, patient_dir, run_dir)
+    ledger = os.environ.get("ACR_MVP_LEDGER")
+    server = ChartToolServer(spec_path, patient_dir, run_dir,
+                             ledger_path=Path(ledger) if ledger else None)
     print(f"acr-chart toolserver: {patient_dir.name} / {server.spec.spec_id}", file=sys.stderr)
     serve(server)
     # The harness closes stdin when the session ends; nothing to finalize here — result.json

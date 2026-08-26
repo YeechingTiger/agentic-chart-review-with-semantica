@@ -99,8 +99,10 @@ def decision_trace(run_dir: Path) -> dict[str, Any]:
         tool, args, result = e.get("tool"), e.get("args") or {}, e.get("result") or {}
         seq = e.get("seq")
         if tool == "note_decision":
-            add("decision", 1, seq, facing=args.get("facing"), decision=args.get("decision"),
-                because=args.get("because"), options=args.get("options"))
+            add("decision", 1, seq, decision_type=result.get("decision_type")
+                or args.get("decision_type"), facing=args.get("facing"),
+                decision=args.get("decision"), because=args.get("because"),
+                options=args.get("options"), context=result.get("context"))
         elif tool in _ACTIONS:
             shown = {a: v for a, v in args.items() if a != "objective" and v is not None}
             add("action", 1, seq, tool=tool, objective=args.get("objective"),
@@ -143,11 +145,14 @@ def render(trace: dict[str, Any]) -> str:
         if s["kind"] in ("thought", "remark"):
             out.append(f"{head}{s['text']}{tag}")
         elif s["kind"] == "decision":
-            out.append(f"{head}facing: {s['facing']}")
+            dtype = f"<{s['decision_type']}> " if s.get("decision_type") else ""
+            out.append(f"{head}{dtype}facing: {s['facing']}")
             out.append(f"{pad}decided: {s['decision']}")
             out.append(f"{pad}because: {s['because']}")
             if s.get("options"):
                 out.append(f"{pad}set aside: {'; '.join(s['options'])}")
+            if s.get("context"):
+                out.append(f"{pad}server state: {json.dumps(s['context'], ensure_ascii=False)}")
         elif s["kind"] == "action":
             obj = f' objective="{s["objective"]}"' if s.get("objective") else ""
             out.append(f"{head}{s['tool']} {json.dumps(s['args'], ensure_ascii=False)}{obj}"

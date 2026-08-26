@@ -27,6 +27,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from acr.contract.spec import load_spec
+from acr.mvp.decision_types import as_prompt_lines
 
 DISABLED_FEATURES = (
     "shell_tool", "unified_exec", "browser_use", "computer_use", "view_image", "apps",
@@ -40,7 +41,9 @@ refused, the verdict names what is missing — fix it and submit again.
 Make your reasoning auditable as you go:
 - At every decision point — choosing what to look for next, deciding which document governs,
   judging whether the evidence suffices, deciding to stop — call note_decision FIRST, stating
-  the situation you face, what you decided, why, and the alternatives you set aside.
+  the situation you face, what you decided, why, and the alternatives you set aside. Name the
+  kind of decision with `decision_type`:
+{decision_types}
 - On every search, read and list_documents call, fill the `objective` field with the open
   question that call is meant to resolve.
 Notes and objectives are recorded, never judged: write what you actually think, including
@@ -83,6 +86,7 @@ def run_patient(
     api_key: str | None = None,
     timeout_s: int = 900,
     codex_bin: str = "codex",
+    ledger_path: Path | None = None,
 ) -> Path:
     """One review, one run directory. Returns the run directory."""
     spec = load_spec(spec_path)
@@ -109,6 +113,8 @@ def run_patient(
         "PYTHONPATH": pythonpath,
         "PATH": os.environ.get("PATH", ""),
     }
+    if ledger_path is not None:
+        server_env["ACR_MVP_LEDGER"] = str(Path(ledger_path).resolve())
     (codex_home / "config.toml").write_text(
         _config_toml(model, base_url, "ACR_API_KEY", python, server_env), encoding="utf-8")
 
@@ -117,7 +123,7 @@ def run_patient(
     workdir = run_dir / "workdir"
     workdir.mkdir()
 
-    prompt = TASK_PREAMBLE + "\n" + spec.as_prompt_block()
+    prompt = TASK_PREAMBLE.format(decision_types=as_prompt_lines()) + "\n" + spec.as_prompt_block()
     (run_dir / "prompt.txt").write_text(prompt, encoding="utf-8")
 
     cmd = [codex_bin, "exec", "--json", "--skip-git-repo-check", "--ephemeral",

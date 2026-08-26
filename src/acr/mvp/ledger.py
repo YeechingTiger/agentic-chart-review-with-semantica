@@ -2,9 +2,19 @@
 
 Three verbs, from the decision-precipitation design: **audit** (read one judgment's chain),
 **compare** (read a class of judgments), **precipitate** (promote a class — later). The ledger
-records; it never decides, never runs the review, never gates anything. Ingestion is post-hoc
-from the Layer-1 trace, which makes write-behind true by construction: a run is complete and
-scoreable before the ledger has heard of it, and a ledger failure can only ever lose bookkeeping.
+records; it never decides, never runs the review, never gates anything.
+
+Two recording paths, ONE decomposition. `RunRecorder` is the decomposition — what counts as a
+judgment, which edges connect them — and both paths drive it:
+
+  * live: the toolserver records each judgment at the moment it happens (semantica's own
+    intended usage), best-effort — a ledger failure is a stderr line, never a failed run;
+  * replay: `ingest_run` replays a finished trace.jsonl through the same recorder, for runs
+    that had no live ledger or for rebuilding a lost one. Replay a run into a FRESH ledger:
+    replaying into one that already heard the run live records everything twice.
+
+Either way the Layer-1 trace stays the authority: the ledger can always be rebuilt from it,
+and never the other way around.
 
 The graph per run, walking upstream from the result:
 
@@ -30,6 +40,8 @@ import json
 from pathlib import Path
 from typing import Any, Protocol
 
+from acr.mvp.decision_types import normalize_type
+
 
 class ReviewLedger(Protocol):
     def record_evidence(self, run_id: str, index: int, ev: dict[str, Any]) -> str: ...
@@ -41,6 +53,8 @@ class ReviewLedger(Protocol):
     def link_uses(self, judgment_id: str, evidence_id: str) -> None: ...
     def set_case_result(self, case_id: str, result_decision_id: str) -> None: ...
     def chain(self, case_id: str) -> list[dict[str, Any]]: ...
+    def decisions(self, *, category_prefix: str | None = None,
+                  case_id: str | None = None) -> list[dict[str, Any]]: ...
     def save(self) -> None: ...
     def stats(self) -> dict[str, Any]: ...
 
@@ -73,6 +87,10 @@ class NullLedger:
         self._results[case_id] = result_decision_id
 
     def chain(self, case_id: str) -> list[dict[str, Any]]:
+        return []
+
+    def decisions(self, *, category_prefix: str | None = None,
+                  case_id: str | None = None) -> list[dict[str, Any]]:
         return []
 
     def save(self) -> None:
@@ -146,6 +164,29 @@ class SemanticaLedger:
     def set_case_result(self, case_id: str, result_decision_id: str) -> None:
         self._index[case_id] = result_decision_id
 
+    def decisions(self, *, category_prefix: str | None = None,
+                  case_id: str | None = None) -> list[dict[str, Any]]:
+        """The compare verb's raw material: every decision node matching the filters, e.g.
+        category_prefix="step:coverage" for all coverage decisions across every run."""
+        rows = []
+        for n in self.graph.find_nodes(node_type="decision"):
+            meta = n.get("metadata") or {}
+            if category_prefix and not str(meta.get("category", "")).startswith(category_prefix):
+                continue
+            if case_id and meta.get("case_id") != case_id and case_id not in str(meta.get("scenario", "")):
+                continue
+            rows.append({"decision_id": n["id"],
+                         **{k: meta.get(k) for k in
+                            ("category", "scenario", "outcome", "decision_maker", "reasoning",
+                             "case_id", "spec_id", "seq", "run_id", "options", "context",
+                             "claimed_type")}})
+        # Same seq = same tool call (a submission and its gate verdict): break the tie by
+        # causal rank, so two ledgers of the same run list identically regardless of uuids.
+        rank = {"step": 0, "submit": 1, "gate": 2, "result": 3}
+        rows.sort(key=lambda r: (str(r.get("run_id")), r.get("seq") or 0,
+                                 rank.get(str(r.get("category", "")).split(":")[0], 9)))
+        return rows
+
     def chain(self, case_id: str) -> list[dict[str, Any]]:
         """The audit verb: result ← gate ← submission(s), upstream from the case's result.
 
@@ -181,78 +222,115 @@ class SemanticaLedger:
         return {**self.graph.stats(), "cases": len(self._index)}
 
 
-# ---------------------------------------------------------------------------- ingestion
+# ------------------------------------------------------------------- the one decomposition
+class RunRecorder:
+    """What counts as a judgment and which edges connect them — stated once, driven twice.
+
+    The toolserver drives it live, one call per event as the review happens; `ingest_run`
+    drives it by replaying a finished trace. Both produce the identical graph, which is what
+    lets the trace stay authoritative while the ledger hears things at decision time."""
+
+    def __init__(self, ledger: ReviewLedger, *, run_id: str, spec_id: str, case_id: str) -> None:
+        self.ledger = ledger
+        self.run_id, self.spec_id, self.case_id = run_id, spec_id, case_id
+        self.evidence_ids: list[str] = []
+        self.prev_step_id: str | None = None
+        self.last_gate_id: str | None = None
+        self.n_submissions = 0
+        self.n_steps = 0
+
+    def _common_meta(self, seq: Any) -> dict[str, Any]:
+        return {"spec_id": self.spec_id, "case_id": self.case_id, "seq": seq}
+
+    def on_evidence(self, args: dict[str, Any], quote: str) -> None:
+        self.evidence_ids.append(self.ledger.record_evidence(
+            self.run_id, len(self.evidence_ids), {**args, "quote": quote}))
+
+    def on_step(self, args: dict[str, Any], seq: Any,
+                context: dict[str, Any] | None = None) -> None:
+        """A note_decision: the semantica frame verbatim (facing = scenario, because =
+        reasoning, decision = outcome), categorized by DECISION TYPE — the identity that
+        makes 'the same decision point, different runs' a query instead of a reading job."""
+        self.n_steps += 1
+        dtype, claimed = normalize_type(args.get("decision_type"))
+        step = self.ledger.record_judgment(
+            self.run_id, category=f"step:{dtype}",
+            scenario=str(args.get("facing") or ""),
+            reasoning=str(args.get("because") or ""),
+            outcome=str(args.get("decision") or ""), decision_maker="model",
+            metadata={**self._common_meta(seq), "options": args.get("options"),
+                      "context": context, "claimed_type": claimed})
+        if self.prev_step_id is not None:
+            self.ledger.link_influenced(self.prev_step_id, step)
+        self.prev_step_id = step
+
+    def on_submission(self, args: dict[str, Any], verdict: dict[str, Any], seq: Any) -> None:
+        self.n_submissions += 1
+        submission = self.ledger.record_judgment(
+            self.run_id, category=f"submit:{self.spec_id}",
+            scenario=f"case {self.case_id}, submission {self.n_submissions}",
+            reasoning=str(args.get("reasoning") or ""),
+            outcome=str(args.get("status")), decision_maker="model",
+            metadata={**self._common_meta(seq), "value": args.get("value")})
+        for ev_id in self.evidence_ids:
+            self.ledger.link_uses(submission, ev_id)
+        if self.prev_step_id is not None:
+            self.ledger.link_influenced(self.prev_step_id, submission)
+        outcome = "accepted" if verdict.get("accepted") else f"refused: {verdict.get('why')}"
+        gate = self.ledger.record_judgment(
+            self.run_id, category=f"gate:{self.spec_id}",
+            scenario=f"case {self.case_id}, submission {self.n_submissions}",
+            reasoning=str(verdict.get("why") or ""),
+            outcome=outcome, decision_maker="rule_engine",
+            metadata=self._common_meta(seq))
+        self.ledger.link_caused(submission, gate)
+        self.last_gate_id = gate
+
+    def on_result(self, final: dict[str, Any]) -> str:
+        result_node = self.ledger.record_judgment(
+            self.run_id, category=f"result:{self.spec_id}", scenario=f"case {self.case_id}",
+            reasoning=str(final.get("reasoning") or final.get("why") or ""),
+            outcome=str(final.get("status", "NO_ANSWER")),
+            decision_maker="deterministic_runtime",
+            metadata={"spec_id": self.spec_id, "case_id": self.case_id,
+                      "value": final.get("value")})
+        if self.last_gate_id is not None:
+            self.ledger.link_caused(self.last_gate_id, result_node)
+        self.ledger.set_case_result(self.case_id, result_node)
+        return result_node
+
+    def summary(self, final_status: str) -> dict[str, Any]:
+        return {"run_id": self.run_id, "case_id": self.case_id,
+                "n_evidence": len(self.evidence_ids), "n_steps": self.n_steps,
+                "n_submissions": self.n_submissions, "result": final_status}
+
+
+# ---------------------------------------------------------------------------- replay path
 def ingest_run(run_dir: Path, ledger: ReviewLedger) -> dict[str, Any]:
-    """Distill one run's Layer-1 trace into the ledger. Idempotence is the caller's concern
-    (ingest a run once); the run directory name is the run identity."""
+    """Replay one finished run's Layer-1 trace through the recorder. For runs that had no
+    live ledger, or to rebuild one — replay into a FRESH ledger, not one that already heard
+    this run live. The run directory name is the run identity."""
     run_dir = Path(run_dir)
     run_id = run_dir.name
-    trace_path = run_dir / "trace.jsonl"
-    events = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines()
+    events = [json.loads(line)
+              for line in (run_dir / "trace.jsonl").read_text(encoding="utf-8").splitlines()
               if line.strip()]
     meta = next((e for e in events if e.get("kind") == "run_meta"), {})
-    spec_id = meta.get("spec_id", "unknown")
-    case_id = meta.get("patient_id", run_id)
-
-    evidence_ids: list[str] = []
-    last_gate_id: str | None = None
-    prev_step_id: str | None = None
-    n_submissions = n_steps = 0
+    rec = RunRecorder(ledger, run_id=run_id, spec_id=meta.get("spec_id", "unknown"),
+                      case_id=meta.get("patient_id", run_id))
     for e in events:
         if e.get("kind") != "tool_call":
             continue
         tool, args, result = e.get("tool"), e.get("args") or {}, e.get("result") or {}
         if tool == "record_evidence" and e.get("ok"):
-            evidence_ids.append(ledger.record_evidence(
-                run_id, len(evidence_ids),
-                {**args, "quote": result.get("quote", "")}))
+            rec.on_evidence(args, result.get("quote", ""))
         elif tool == "note_decision" and e.get("ok"):
-            # The model's own decision points, in the semantica frame verbatim:
-            # facing = scenario, because = reasoning, decision = outcome. Chained by
-            # INFLUENCED in trace order so the audit can walk the run step by step.
-            n_steps += 1
-            step = ledger.record_judgment(
-                run_id, category=f"step:{spec_id}",
-                scenario=str(args.get("facing") or ""),
-                reasoning=str(args.get("because") or ""),
-                outcome=str(args.get("decision") or ""), decision_maker="model",
-                metadata={"seq": e.get("seq"), "options": args.get("options")})
-            if prev_step_id is not None:
-                ledger.link_influenced(prev_step_id, step)
-            prev_step_id = step
+            rec.on_step(args, e.get("seq"), context=result.get("context"))
         elif tool == "submit_answer":
-            n_submissions += 1
-            submission = ledger.record_judgment(
-                run_id, category=f"submit:{spec_id}",
-                scenario=f"case {case_id}, submission {n_submissions}",
-                reasoning=str(args.get("reasoning") or ""),
-                outcome=str(args.get("status")), decision_maker="model",
-                metadata={"value": args.get("value"), "seq": e.get("seq")})
-            for ev_id in evidence_ids:
-                ledger.link_uses(submission, ev_id)
-            if prev_step_id is not None:
-                ledger.link_influenced(prev_step_id, submission)
-            verdict = "accepted" if result.get("accepted") else f"refused: {result.get('why')}"
-            gate = ledger.record_judgment(
-                run_id, category=f"gate:{spec_id}",
-                scenario=f"case {case_id}, submission {n_submissions}",
-                reasoning=str(result.get("why") or ""),
-                outcome=verdict, decision_maker="rule_engine",
-                metadata={"seq": e.get("seq")})
-            ledger.link_caused(submission, gate)
-            last_gate_id = gate
+            rec.on_submission(args, result, e.get("seq"))
 
     result_path = run_dir / "result.json"
     final = json.loads(result_path.read_text(encoding="utf-8")) if result_path.exists() else {}
-    result_node = ledger.record_judgment(
-        run_id, category=f"result:{spec_id}", scenario=f"case {case_id}",
-        reasoning=str(final.get("reasoning") or final.get("why") or ""),
-        outcome=str(final.get("status", "NO_ANSWER")), decision_maker="deterministic_runtime",
-        metadata={"value": final.get("value")})
-    if last_gate_id is not None:
-        ledger.link_caused(last_gate_id, result_node)
-    ledger.set_case_result(case_id, result_node)
+    rec.on_result(final)
     ledger.save()
-    return {"run_id": run_id, "case_id": case_id, "n_evidence": len(evidence_ids),
-            "n_steps": n_steps, "n_submissions": n_submissions,
-            "result": final.get("status", "NO_ANSWER")}
+    return rec.summary(final.get("status", "NO_ANSWER"))

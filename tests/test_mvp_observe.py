@@ -21,10 +21,12 @@ def _write_layers(run_dir: Path, with_layer2: bool = True) -> None:
          "args": {"query": "adenocarcinoma", "objective": "find the diagnosing pathology"},
          "result": {"hits": [], "n": 2}, "ok": True},
         {"seq": 3, "ts": "t", "kind": "tool_call", "tool": "note_decision",
-         "args": {"facing": "cytology 04-12 vs biopsy 04-27", "decision": "read the cytology",
+         "args": {"decision_type": "source_selection",
+                  "facing": "cytology 04-12 vs biopsy 04-27", "decision": "read the cytology",
                   "because": "earlier document governs if unambiguous",
                   "options": ["date by the biopsy unread"]},
-         "result": {"noted": True, "n_decisions": 1}, "ok": True},
+         "result": {"noted": True, "n_decisions": 1, "decision_type": "source_selection",
+                    "context": {"n_searches": 1, "n_evidence": 0}}, "ok": True},
         {"seq": 4, "ts": "t", "kind": "tool_call", "tool": "record_evidence",
          "args": {"note_id": "SPD_2023-04-12", "start": 310, "end": 324, "supports": "histology"},
          "result": {"recorded": True, "n_evidence": 1, "quote": "adenocarcinoma"}, "ok": True},
@@ -86,6 +88,8 @@ def test_thoughts_interleave_before_the_calls_they_preceded(tmp_path: Path):
     decision = next(s for s in trace["steps"] if s["kind"] == "decision")
     assert decision["facing"] == "cytology 04-12 vs biopsy 04-27"
     assert decision["options"] == ["date by the biopsy unread"]
+    assert decision["decision_type"] == "source_selection"
+    assert decision["context"] == {"n_searches": 1, "n_evidence": 0}
     action = next(s for s in trace["steps"] if s["kind"] == "action")
     assert action["objective"] == "find the diagnosing pathology"
     assert action["observed"] == "2 hit(s)"
