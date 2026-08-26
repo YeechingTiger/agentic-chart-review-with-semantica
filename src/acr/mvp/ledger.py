@@ -40,7 +40,6 @@ import json
 from pathlib import Path
 from typing import Any, Protocol
 
-from acr.mvp.decision_types import normalize_type
 
 
 class ReviewLedger(Protocol):
@@ -182,7 +181,7 @@ class SemanticaLedger:
                              "claimed_type", "used", "used_unverified")}})
         # Same seq = same tool call (a submission and its gate verdict): break the tie by
         # causal rank, so two ledgers of the same run list identically regardless of uuids.
-        rank = {"step": 0, "submit": 1, "gate": 2, "result": 3}
+        rank = {"small": 0, "step": 1, "big": 2, "submit": 3, "gate": 4, "result": 5}
         rows.sort(key=lambda r: (str(r.get("run_id")), r.get("seq") or 0,
                                  rank.get(str(r.get("category", "")).split(":")[0], 9)))
         return rows
@@ -248,25 +247,28 @@ class RunRecorder:
 
     def on_step(self, args: dict[str, Any], seq: Any,
                 context: dict[str, Any] | None = None,
-                used: list[dict[str, Any]] | None = None) -> None:
+                used: list[dict[str, Any]] | None = None,
+                grounding: list[str] | None = None) -> None:
         """A note_decision: the semantica frame verbatim (facing = scenario, because =
-        reasoning, decision = outcome), categorized by DECISION TYPE — the identity that
-        makes 'the same decision point, different runs' a query instead of a reading job.
+        reasoning, decision = outcome). Deliberately UNCLASSIFIED — the category is the bare
+        `step`, because what KIND of judgment this was is decided afterwards, by
+        `acr.mvp.reconstruct`, against a taxonomy still being grown from real runs.
 
-        The inputs ride along resolved, which is what lets two divergent decisions be told
-        apart later: same information and a different call is a judgement the contract has
-        not settled; different information is a retrieval or coverage failure."""
+        The inputs ride along resolved, and the grounding as the model reported it. Those two
+        are collected here and nowhere else: a later reader can see which documents a run
+        opened, so it would mark every citation verified and every judgment contract-grounded.
+        Only the model can say it leaned on a document it never read, or on its own clinical
+        knowledge."""
         self.n_steps += 1
-        dtype, claimed = normalize_type(args.get("decision_type"))
         refs = [str(u.get("ref")) for u in (used or [])]
         unverified = [str(u.get("ref")) for u in (used or []) if u.get("verified") is False]
         step = self.ledger.record_judgment(
-            self.run_id, category=f"step:{dtype}",
+            self.run_id, category="step",
             scenario=str(args.get("facing") or ""),
             reasoning=str(args.get("because") or ""),
             outcome=str(args.get("decision") or ""), decision_maker="model",
             metadata={**self._common_meta(seq), "options": args.get("options"),
-                      "context": context, "claimed_type": claimed,
+                      "context": context, "grounding": grounding or [],
                       "used": refs[:20], "used_unverified": unverified[:20]})
         if self.prev_step_id is not None:
             self.ledger.link_influenced(self.prev_step_id, step)
@@ -334,7 +336,7 @@ def ingest_run(run_dir: Path, ledger: ReviewLedger) -> dict[str, Any]:
             rec.on_evidence(args, result.get("quote", ""))
         elif tool == "note_decision" and e.get("ok"):
             rec.on_step(args, e.get("seq"), context=result.get("context"),
-                        used=result.get("used"))
+                        used=result.get("used"), grounding=result.get("grounding"))
         elif tool == "submit_answer":
             rec.on_submission(args, result, e.get("seq"))
 

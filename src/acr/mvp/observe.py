@@ -15,7 +15,8 @@ audit's reading view.
 
 Step kinds:
     thought     (L2, self-reported)  a reasoning summary the model emitted
-    decision    (L1) a note_decision call: facing / decision / because / options
+    decision    (L1) a note_decision call: facing / decision / because /
+                     used / grounding / options — UNCLASSIFIED, by design
     action      (L1) search / read / list_documents, with objective and a result digest
     evidence    (L1) a recorded span, with the server-resolved quote
     submission  (L1) a submit_answer call
@@ -99,15 +100,15 @@ def decision_trace(run_dir: Path) -> dict[str, Any]:
         tool, args, result = e.get("tool"), e.get("args") or {}, e.get("result") or {}
         seq = e.get("seq")
         if tool == "note_decision":
-            add("decision", 1, seq, decision_type=result.get("decision_type")
-                or args.get("decision_type"), facing=args.get("facing"),
+            add("decision", 1, seq, facing=args.get("facing"),
                 decision=args.get("decision"), because=args.get("because"),
                 options=args.get("options"), context=result.get("context"),
+                grounding=result.get("grounding") or args.get("grounding") or [],
                 used=result.get("used") or [{"ref": r} for r in (args.get("used") or [])])
         elif tool in _ACTIONS:
             shown = {a: v for a, v in args.items() if a != "objective" and v is not None}
             add("action", 1, seq, tool=tool, objective=args.get("objective"),
-                args=shown, observed=_digest(tool, result))
+                args=shown, observed=_digest(tool, result), context=result.get("context"))
         elif tool == "record_evidence":
             add("evidence", 1, seq, note_id=args.get("note_id"),
                 span=[args.get("start"), args.get("end")], quote=result.get("quote"),
@@ -146,10 +147,11 @@ def render(trace: dict[str, Any]) -> str:
         if s["kind"] in ("thought", "remark"):
             out.append(f"{head}{s['text']}{tag}")
         elif s["kind"] == "decision":
-            dtype = f"<{s['decision_type']}> " if s.get("decision_type") else ""
-            out.append(f"{head}{dtype}facing: {s['facing']}")
+            out.append(f"{head}facing: {s['facing']}")
             out.append(f"{pad}decided: {s['decision']}")
             out.append(f"{pad}because: {s['because']}")
+            if s.get("grounding"):
+                out.append(f"{pad}grounding: {', '.join(s['grounding'])}")
             if s.get("used"):
                 # An unverified citation is marked here rather than dropped: the claim IS
                 # the finding, and hiding it would hide the falsest kind of warrant.

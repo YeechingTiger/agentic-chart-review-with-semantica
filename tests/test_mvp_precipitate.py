@@ -33,7 +33,9 @@ def _d(dtype: str, case: str, facing: str, outcome: str, used: list[str],
        reasoning: str = "because", run: str | None = None, seq: int = 1,
        n_searches: int = 2, options: list[str] | None = None,
        unverified: list[str] | None = None) -> dict[str, Any]:
-    return {"decision_id": f"{case}-{dtype}-{seq}", "category": f"step:{dtype}",
+    from acr.mvp.decision_types import level_of
+    lvl = level_of(dtype, on_action=True)
+    return {"decision_id": f"{case}-{dtype}-{seq}", "category": f"{lvl}:{dtype}",
             "scenario": facing, "outcome": outcome, "reasoning": reasoning,
             "decision_maker": "model", "case_id": case, "run_id": run or f"run-{case}",
             "seq": seq, "used": used, "used_unverified": unverified or [],
@@ -138,6 +140,7 @@ def test_filtering_by_type_and_the_empty_ledger():
     ])
     only = survey(ledger, decision_type="enough")
     assert [s["decision_type"] for s in only["sections"]] == ["enough"]
+    assert [s["level"] for s in only["sections"]] == ["big"]
     empty = survey(FakeLedger([]))
     assert empty["sections"] == [] and empty["n_decisions"] == 0
     assert "nothing recorded yet" in render(empty)
@@ -154,7 +157,7 @@ def test_render_puts_the_gap_and_its_remedy_in_front_of_the_reader():
            options=["date by the biopsy"]),
     ])
     text = render(survey(ledger))
-    assert "## which_wins" in text
+    assert "## [big] which_wins" in text
     assert "[DIVERGENT]" in text
     assert "JUDGEMENT divergence" in text
     assert "no impression accompanies the cytology" in text

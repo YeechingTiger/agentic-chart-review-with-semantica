@@ -38,6 +38,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from acr.mvp.decision_types import BIG, SMALL
+
 #: Words carrying no situational content. Short and blunt on purpose: a long curated stoplist
 #: is a hidden model of the domain, and this module is supposed to have none.
 _STOP = frozenset("""
@@ -143,18 +145,33 @@ def _context_span(members: list[dict[str, Any]], key: str) -> dict[str, Any] | N
     return {"min": vals[0], "median": vals[len(vals) // 2], "max": vals[-1]}
 
 
-def survey(ledger: Any, *, decision_type: str | None = None,
+def survey(ledger: Any, *, decision_type: str | None = None, level: str | None = None,
            settled_min: int = _SETTLED_MIN) -> dict[str, Any]:
-    """The guideline material in the ledger, one section per decision type."""
-    prefix = f"step:{decision_type}" if decision_type else "step:"
-    rows = ledger.decisions(category_prefix=prefix)
+    """The guideline material in the ledger, one section per level and decision type.
+
+    Reads CLASSIFIED decision points — the `big:` and `small:` categories that
+    `acr.mvp.reconstruct` writes. Bare `step` rows, which is what a run records live, carry no
+    type and so have nothing to be compared across; reconstruct a run before surveying it.
+
+    Big and small are sectioned apart because a divergence in each means a different thing: a
+    small point splitting is two runs taking different routes to the same place, which costs
+    time; a big point splitting changed what the case concluded. Big sections come first.
+    """
+    levels = [level] if level else [BIG, SMALL]
+    rows = [r for lv in levels for r in ledger.decisions(category_prefix=f"{lv}:")]
+    if decision_type:
+        rows = [r for r in rows if str(r.get("category", "")).split(":", 1)[-1] == decision_type]
 
     by_type: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
-        by_type.setdefault(str(row.get("category", "step:?")).split(":", 1)[-1], []).append(row)
+        by_type.setdefault(str(row.get("category", "?:?")), []).append(row)
 
     sections = []
-    for dtype, drows in sorted(by_type.items(), key=lambda kv: (-len(kv[1]), kv[0])):
+    order = {BIG: 0, SMALL: 1}
+    for category, drows in sorted(by_type.items(),
+                                  key=lambda kv: (order.get(kv[0].split(":")[0], 9),
+                                                  -len(kv[1]), kv[0])):
+        lvl, _, dtype = category.partition(":")
         situations = []
         for members in _cluster(drows):
             groups = _outcome_groups(members)
@@ -194,6 +211,7 @@ def survey(ledger: Any, *, decision_type: str | None = None,
                       for r in drows if r.get("used_unverified")]
         sections.append({
             "decision_type": dtype,
+            "level": lvl,
             "n_decisions": len(drows),
             "n_cases": len({str(r.get("case_id")) for r in drows if r.get("case_id")}),
             "n_runs": len({str(r.get("run_id")) for r in drows if r.get("run_id")}),
@@ -214,7 +232,8 @@ def render(report: dict[str, Any]) -> str:
 
     for sec in report["sections"]:
         out.append("")
-        out.append(f"## {sec['decision_type']} — {sec['n_decisions']} decision(s), "
+        out.append(f"## [{sec['level']}] {sec['decision_type']} — "
+                   f"{sec['n_decisions']} decision(s), "
                    f"{sec['n_cases']} case(s), {sec['n_runs']} run(s)")
         for s in sec["situations"]:
             mark = {"divergent": "DIVERGENT", "settled": "SETTLED  ", "thin": "thin     "}

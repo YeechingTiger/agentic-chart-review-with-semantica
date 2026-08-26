@@ -41,7 +41,7 @@ from typing import Any
 from acr.chartstore.corpus import PatientChart
 from acr.contract.outcomes import declared_statuses, submittable_statuses
 from acr.contract.spec import load_spec
-from acr.mvp.decision_types import DECISION_TYPES, INPUT_KINDS, normalize_type
+from acr.mvp.warrants import GROUNDING_KINDS, INPUT_KINDS, normalize_grounding
 
 PROTOCOL_VERSION_FALLBACK = "2025-06-18"
 
@@ -148,7 +148,8 @@ class ChartToolServer:
                 recorder.on_evidence(args, payload.get("quote", ""))
             elif name == "note_decision":
                 recorder.on_step(args, seq, context=payload.get("context"),
-                                 used=payload.get("used"))
+                                 used=payload.get("used"),
+                                 grounding=payload.get("grounding"))
             else:
                 recorder.on_submission(args, payload, seq)
             recorder.ledger.save()
@@ -216,16 +217,11 @@ class ChartToolServer:
                 "face, what you decided, and why. Call it whenever you choose between "
                 "alternatives — what to look for next, which document governs, whether the "
                 "evidence suffices, whether to stop. Notes are recorded, never judged, and "
-                "never refused; they are how your reasoning stays auditable.",
+                "never refused; they are how your reasoning stays auditable. You are not "
+                "asked to classify the decision — that is done later, by a reader.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "decision_type": {
-                            "type": "string",
-                            "enum": list(DECISION_TYPES),
-                            "description": "what KIND of decision this is: "
-                            + "; ".join(f"{k} = {v}" for k, v in DECISION_TYPES.items()),
-                        },
                         "facing": {
                             "type": "string",
                             "description": "the situation: what question is open, what you know",
@@ -252,8 +248,17 @@ class ChartToolServer:
                                         for k, v in INPUT_KINDS.items())
                             + ". Cite what you actually used, not what you could have.",
                         },
+                        "grounding": {
+                            "type": "array",
+                            "items": {"type": "string", "enum": list(GROUNDING_KINDS)},
+                            "description": "where this reasoning came from — the one thing "
+                            "nobody can reconstruct afterwards, so only you can report it: "
+                            + "; ".join(f"{k} = {v}" for k, v in GROUNDING_KINDS.items())
+                            + ". `own_knowledge` is never held against you; recording it "
+                            "falsely as `contract` is the failure worth avoiding.",
+                        },
                     },
-                    "required": ["decision_type", "facing", "decision", "because", "used"],
+                    "required": ["facing", "decision", "because"],
                 },
             },
             {
@@ -335,7 +340,6 @@ class ChartToolServer:
     # ------------------------------------------------------------------ handlers
     def _t_list_documents(self, doc_type_contains=None, date_from=None, date_to=None,
                           limit=200, offset=0, objective=None) -> dict[str, Any]:
-        del objective  # recorded in the trace via args; not used server-side
         page, total = self.chart.list_documents(
             doc_type_contains=doc_type_contains, date_from=date_from, date_to=date_to,
             limit=int(limit), offset=int(offset))
@@ -344,20 +348,20 @@ class ChartToolServer:
         if not any([doc_type_contains, date_from, date_to]) and int(offset) == 0:
             self.state.listed_documents = True
         return {"documents": [d.to_dict() for d in page], "total": total,
-                "types": self.chart.type_summary()}
+                "types": self.chart.type_summary(), "objective": objective,
+                "context": self.state.snapshot()}
 
     def _t_search(self, query, doc_type_contains=None, date_from=None, date_to=None,
                   objective=None) -> dict[str, Any]:
-        del objective  # recorded in the trace via args; not used server-side
         self.state.n_searches += 1
         self.state.searches_run.append(query)
         hits = self.chart.search(query, doc_type_contains=doc_type_contains,
                                  date_from=date_from, date_to=date_to)
         self.state.documents_seen.update(h.note_id for h in hits)
-        return {"hits": [vars(h) for h in hits], "n": len(hits)}
+        return {"hits": [vars(h) for h in hits], "n": len(hits), "objective": objective,
+                "context": self.state.snapshot()}
 
     def _t_read(self, note_id, offset=0, limit=4000, objective=None) -> dict[str, Any]:
-        del objective
         self.state.n_reads += 1
         try:
             page = self.chart.read(note_id, int(offset), int(limit))
@@ -366,21 +370,22 @@ class ChartToolServer:
         if note_id not in self.state.documents_read:
             self.state.documents_read.append(note_id)
         self.state.documents_seen.add(note_id)
-        return page
+        return {**page, "objective": objective, "context": self.state.snapshot()}
 
-    def _t_note_decision(self, decision_type, facing, decision, because,
-                         used=None, options=None) -> dict[str, Any]:
+    def _t_note_decision(self, facing, decision, because,
+                         used=None, options=None, grounding=None) -> dict[str, Any]:
         # Self-reported content on the deterministic channel: WHAT was said is the model's
         # claim, but that it was said, when, in what order, against which server-side state,
         # and whether the information it cites was ever actually observed, are recorded fact.
         del facing, decision, because, options
         self.state.n_decisions += 1
-        dtype, claimed = normalize_type(decision_type)
+        kinds, unrecognised = normalize_grounding(grounding)
         out: dict[str, Any] = {"noted": True, "n_decisions": self.state.n_decisions,
-                               "decision_type": dtype, "used": self._resolve_used(used),
+                               "used": self._resolve_used(used), "grounding": kinds,
                                "context": self.state.snapshot()}
-        if claimed:
-            out["note"] = f"unknown decision_type {claimed!r} recorded as 'other'"
+        if unrecognised:
+            out["note"] = f"unrecognised grounding {unrecognised!r} recorded as claimed"
+            out["grounding_claimed"] = unrecognised
         return out
 
     def _resolve_used(self, used: Any) -> list[dict[str, Any]]:

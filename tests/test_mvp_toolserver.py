@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from acr.mvp.warrants import GROUNDING_KINDS
 from acr.mvp.toolserver import ChartToolServer
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -109,24 +110,27 @@ def test_the_trace_records_every_call_including_refusals_in_order(server: ChartT
 
 
 def test_objective_strings_land_in_the_trace_without_being_enforced(server: ChartToolServer):
-    server.call("search", {"query": "adenocarcinoma", "objective": "establish histology"})
+    payload, _ = server.call("search", {"query": "adenocarcinoma",
+                                        "objective": "establish histology"})
     calls = [e for e in _trace(server) if e.get("tool") == "search"]
     assert calls[0]["args"]["objective"] == "establish histology"
+    # It rides back out in the result too, so a run's actions carry their own stated purpose
+    # wherever the result is read — and every action gets the server state it ran against.
+    assert payload["objective"] == "establish histology"
+    assert calls[0]["result"]["context"]["n_searches"] == 1
 
 
 def test_note_decision_is_recorded_in_order_and_never_refused(server: ChartToolServer):
     payload, is_error = server.call("note_decision", {
-        "decision_type": "where_to_look",
         "facing": "two pathology documents, three weeks apart",
         "decision": "read the earlier one first",
         "because": "the earlier document governs if unambiguous",
         "used": ["rule:conflict_rule.1"],
         "options": ["date by the later biopsy unread"]})
     assert not is_error and payload["noted"] and payload["n_decisions"] == 1
-    assert payload["decision_type"] == "where_to_look"
+    assert "decision_type" not in payload   # classifying is a later reader's job
     server.call("search", {"query": "adenocarcinoma"})
     payload, is_error = server.call("note_decision", {
-        "decision_type": "where_to_look",
         "facing": "cytology is ambiguous", "decision": "look for a clinical impression",
         "because": "conflict_rule needs the impression fact",
         "used": ["search:adenocarcinoma"]})
@@ -145,8 +149,7 @@ def test_note_decision_carries_a_server_context_snapshot(server: ChartToolServer
     hit = _find_span(server)   # a second search
     server.call("record_evidence", {"note_id": hit["note_id"], "start": hit["start"],
                                     "end": hit["end"], "supports": "s"})
-    payload, _ = server.call("note_decision", {
-        "decision_type": "enough", "facing": "f", "decision": "d", "because": "b",
+    payload, _ = server.call("note_decision", { "facing": "f", "decision": "d", "because": "b",
         "used": ["evidence:1"]})
     ctx = payload["context"]
     assert ctx["n_searches"] == 2
@@ -155,12 +158,40 @@ def test_note_decision_carries_a_server_context_snapshot(server: ChartToolServer
     assert ctx["evidence_notes"] == [hit["note_id"]]
 
 
-def test_an_unknown_decision_type_is_kept_as_other_not_refused(server: ChartToolServer):
+def test_grounding_is_recorded_and_an_unrecognised_one_is_kept_not_refused(
+        server: ChartToolServer):
+    """Where the reasoning came from is the one thing no later reader can recover, so it is
+    collected here — and an off-vocabulary claim is still the model telling us something."""
     payload, is_error = server.call("note_decision", {
-        "decision_type": "vibes", "facing": "f", "decision": "d", "because": "b",
-        "used": []})
-    assert not is_error and payload["decision_type"] == "other"
-    assert "vibes" in payload["note"]
+        "facing": "f", "decision": "d", "because": "b",
+        "grounding": ["own_knowledge", "a hunch"]})
+    assert not is_error
+    assert payload["grounding"] == ["own_knowledge"]
+    assert payload["grounding_claimed"] == ["a hunch"]
+    assert "a hunch" in payload["note"]
+
+
+def test_a_decision_needs_no_grounding_and_no_used(server: ChartToolServer):
+    """Both are optional by design: a required field gets filled with filler, and filler in
+    the one channel a later reader cannot check is worse than a gap it can see."""
+    payload, is_error = server.call("note_decision", {
+        "facing": "f", "decision": "d", "because": "b"})
+    assert not is_error and payload["noted"]
+    assert payload["used"] == [] and payload["grounding"] == []
+
+
+def test_the_runtime_does_not_know_the_taxonomy(server: ChartToolServer):
+    """The decoupling, stated so it cannot rot: the tool surface offers no decision_type, and
+    the module that serves it never imports the vocabulary that would supply one. The taxonomy
+    is applied afterwards, where changing it costs a re-extraction and not a re-run."""
+    import acr.mvp.toolserver as ts
+    source = Path(ts.__file__).read_text(encoding="utf-8")
+    assert "decision_types" not in source
+    schema = next(t for t in server.schemas() if t["name"] == "note_decision")
+    props = schema["inputSchema"]["properties"]
+    assert "decision_type" not in props
+    assert set(schema["inputSchema"]["required"]) == {"facing", "decision", "because"}
+    assert set(props["grounding"]["items"]["enum"]) == set(GROUNDING_KINDS)
 
 
 def test_claimed_inputs_are_checked_against_what_the_run_actually_observed(
@@ -169,8 +200,7 @@ def test_claimed_inputs_are_checked_against_what_the_run_actually_observed(
     unresolvable ones are recorded as such rather than refused."""
     hit = _find_span(server)                                   # one search, hits surfaced
     server.call("read", {"note_id": hit["note_id"]})           # one document read in full
-    payload, is_error = server.call("note_decision", {
-        "decision_type": "standing", "facing": "f", "decision": "d", "because": "b",
+    payload, is_error = server.call("note_decision", { "facing": "f", "decision": "d", "because": "b",
         "used": [f"note:{hit['note_id']}", "search:adenocarcinoma",
                  "note:Onc-Med-MD-OP-Progress-Note_2023-04-12",   # surfaced by no search
                  "search:never ran this", "evidence:1", "rule:conflict_rule.1", "vibes"]})
@@ -190,8 +220,7 @@ def test_claimed_inputs_are_checked_against_what_the_run_actually_observed(
 def test_a_document_seen_only_in_search_results_is_marked_as_such(server: ChartToolServer):
     """Citing a snippet and citing a document you read are different warrants."""
     hit = _find_span(server)
-    payload, _ = server.call("note_decision", {
-        "decision_type": "where_to_look", "facing": "f", "decision": "d", "because": "b",
+    payload, _ = server.call("note_decision", { "facing": "f", "decision": "d", "because": "b",
         "used": [f"note:{hit['note_id']}"]})
     assert payload["used"][0] == {"ref": f"note:{hit['note_id']}", "kind": "note",
                                   "verified": True, "depth": "seen_in_results"}

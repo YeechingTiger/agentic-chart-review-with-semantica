@@ -1,7 +1,13 @@
-"""The vocabulary a run narrates itself in: what kind of decision, and what it rested on.
+"""The taxonomy a finished run is read back through: what KIND of judgment each point was.
 
-Three closed vocabularies, and the reasoning behind each is in
-[`docs/DECISION_POINTS_DESIGN.md`](../../../docs/DECISION_POINTS_DESIGN.md):
+This vocabulary is applied **after** a run, by `acr.mvp.reconstruct`, never during one. The
+reason is that it is the one part of this system still being grown from real data: asking a
+model to classify against an unsettled vocabulary at the moment it acts would force every
+judgment that fits nothing into `other` — or worse, into a type that merely looks close — and
+the trace would keep only the forced choice. Applied afterwards, a changed taxonomy costs one
+re-extraction instead of a re-run. What the runtime *does* collect is in
+[`warrants`](warrants.py): what a decision used and where it knew it from, both facts about
+the model's state that no reconstruction can recover.
 
   * `DECISION_TYPES` — thirteen kinds of judgment, in three groups. The list merges two
     sources that each cover half the ground. The perception half is the decision-precipitation
@@ -11,14 +17,10 @@ Three closed vocabularies, and the reasoning behind each is in
     document assumes the retrieval operators are deterministic. Here they are not — they are
     judgments. Taking either source alone drops half the review.
 
-  * `OUTCOMES` — what a decision of each kind may conclude. Six kinds are naturally closed
+  * `outcomes` — what a decision of each kind may conclude. Six kinds are naturally closed
     (`standing`'s three values are CONTEXT.md's own domain language; `is_it_absent`'s are the
     contract's two abstentions plus "found"), which is what makes divergence computable before
     any situation vocabulary has settled. The rest conclude from this run's candidate set.
-
-  * `GROUNDING_KINDS` — where the reasoning came from. Four are server-verifiable; the fifth,
-    `own_knowledge`, is not, and that is the point: a judgment resting on the model's own
-    clinical knowledge happened somewhere the contract does not cover and nobody approved.
 
 The GRANULARITY RULE, because it is what keeps this list from growing: **two types split when
 their divergences go to different people and change different things.** Routing is the only
@@ -107,30 +109,6 @@ DECISION_TYPES: dict[str, DecisionType] = {
 #: term for this one call" is small. Every other type's level follows from its group.
 BOTH_LEVELS = frozenset({"where_to_look"})
 
-#: What a decision may say it rested on. The first four are checked against what this run
-#: actually had; `own_knowledge` cannot be checked, and an honest self-report of it is the most
-#: valuable single fact this instrument collects — so it is never penalised.
-GROUNDING_KINDS: dict[str, str] = {
-    "contract": "合同明写的条款——必须在 used 里给出 rule:<id>",
-    "card": "提示里的方法卡片或任务前言——used 里给 card:<name>",
-    "chart": "纯粹是病历里读到的事实——used 里给 note:/evidence:",
-    "precedent": "检索到的先例——used 里给 precedent:<id>",
-    "own_knowledge": "你自带的临床或常识知识，我们给的材料里没有",
-}
-
-#: How a decision names the information it used. A **Warrant** can be articulate and false —
-#: CONTEXT.md's example is a run stating a Discriminating Fact is absent having never searched
-#: for it — so every claimed input is written in a form the server can check.
-INPUT_KINDS: dict[str, str] = {
-    "note": "一份文档，按 note_id——对照本次真正读过或浮现过的",
-    "search": "一次搜索的结果，按它的查询串原文",
-    "evidence": "一条已记录的证据，按 1 起的序号",
-    "rule": "合同的一条规则，按编号或名字",
-    "card": "提示里的一张方法卡片，按名字",
-    "precedent": "本次检索返回过的一条先例，按 id",
-    "decision": "本次更早的一个决策点，按 seq",
-}
-
 STANDING_VALUES = DECISION_TYPES["standing"].outcomes or ()
 
 
@@ -167,23 +145,8 @@ def normalize_type(claimed: str | None) -> tuple[str, str | None]:
     return "other", (t or None)
 
 
-def normalize_grounding(claimed: object) -> tuple[list[str], list[str]]:
-    """(recognised kinds, preserved unrecognised claims). Never refuses."""
-    items = claimed if isinstance(claimed, list) else ([claimed] if claimed else [])
-    good, bad = [], []
-    for raw in items:
-        s = str(raw).strip()
-        (good if s in GROUNDING_KINDS else bad).append(s)
-    return good, bad
-
-
 def _lines(pairs) -> str:
     return "\n".join(f"  - {k}: {v}" for k, v in pairs)
-
-
-def as_prompt_lines() -> str:
-    """Every type, flat. What a single narration tool shows a model that may claim any of them."""
-    return _lines((n, t.about) for n, t in DECISION_TYPES.items() if n != "other")
 
 
 def action_type_lines() -> str:
@@ -192,11 +155,3 @@ def action_type_lines() -> str:
 
 def note_type_lines() -> str:
     return _lines((n, DECISION_TYPES[n].about) for n in types_for(BIG) if n != "other")
-
-
-def grounding_lines() -> str:
-    return _lines(GROUNDING_KINDS.items())
-
-
-def input_prompt_lines() -> str:
-    return "\n".join(f"  - {kind}:<...> — {what}" for kind, what in INPUT_KINDS.items())

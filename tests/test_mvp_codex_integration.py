@@ -41,11 +41,11 @@ def scripted_steps() -> list[dict]:
         {"tool": "search", "args": {"query": "adenocarcinoma",
                                     "objective": "establish the histologic diagnosis"}},
         {"tool": "note_decision", "args": {
-            "decision_type": "which_wins",
             "facing": "cytology and biopsy both name the histology",
             "decision": "cite the cytology and date the case there",
             "because": "it is the earlier document and carries the same histology",
             "used": ["search:adenocarcinoma", f"note:{hit.note_id}"],
+            "grounding": ["contract", "chart"],
             "options": ["date by the later biopsy"]}},
         {"tool": "record_evidence", "args": {
             "note_id": hit.note_id, "start": hit.start, "end": hit.end,
@@ -98,7 +98,7 @@ def test_codex_drives_the_toolserver_end_to_end(tmp_path: Path, scripted_steps: 
     assert kinds.index("thought") < kinds.index("action")
     decision = next(s for s in steps if s["kind"] == "decision")
     assert decision["decision"] == "cite the cytology and date the case there"
-    assert decision["decision_type"] == "which_wins"
+    assert decision["grounding"] == ["contract", "chart"]
     assert decision["context"]["n_searches"] == 1   # server state at the moment of deciding
     thought = next(s for s in steps if s["kind"] == "thought")
     assert thought["channel"] == "self_reported"

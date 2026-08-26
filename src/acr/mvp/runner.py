@@ -27,7 +27,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from acr.contract.spec import load_spec
-from acr.mvp.decision_types import as_prompt_lines, input_prompt_lines
+from acr.mvp.warrants import grounding_lines, input_prompt_lines
 
 DISABLED_FEATURES = (
     "shell_tool", "unified_exec", "browser_use", "computer_use", "view_image", "apps",
@@ -38,24 +38,36 @@ You can only act through the `chart` tools. Record the evidence that establishes
 with record_evidence BEFORE submitting; finish by calling submit_answer. If the submission is
 refused, the verdict names what is missing — fix it and submit again.
 
-Think out loud as you work. At every decision point — choosing what to look for next, judging
-whether a document can establish the answer, deciding whether you have searched enough,
-weighing two candidate answers against each other, deciding to stop — call note_decision
-BEFORE acting on it, and say four things:
+Think out loud as you work. Whenever you choose between alternatives — what to look for next,
+whether a document can establish the answer, which of two sources governs, whether you have
+looked enough, whether to stop — call note_decision BEFORE acting on it:
 
-  decision_type — which kind of decision this is:
-{decision_types}
   facing        — the situation: what is open, what you know so far
   decision      — what you decided
-  because       — why, naming the rule or the evidence it rests on
+  because       — why
   used          — the information this decision rests on, each as a checkable reference:
 {input_kinds}
-  options       — the alternatives you set aside (optional, and the most useful field you have)
+  grounding     — where the reasoning came from (optional, and the single most useful thing
+                  you can tell us, because nobody can work it out afterwards):
+{grounding}
+  options       — the alternatives you set aside (optional)
 
-Cite in `used` what you actually used, not everything you could have: the record checks each
-reference against what this run really read or surfaced, and a decision resting on a document
-you never opened is worth knowing about. On every search, read and list_documents call, fill
-`objective` with the open question that call is meant to resolve.
+You are NOT asked to classify your decisions. Say what you decided in your own words; sorting
+them into kinds is somebody else's job, later.
+
+Two things are worth being exact about, because they are the only facts here that cannot be
+recovered from the record afterwards:
+
+  * cite in `used` what you ACTUALLY used, not everything you could have. The record checks
+    each reference against what this run really read or surfaced, and a decision resting on a
+    document you never opened is worth knowing about.
+  * if a judgment came from your own clinical knowledge rather than from the contract, say
+    `own_knowledge`. That is never held against you — it tells us the contract has a gap
+    there, which is exactly what we are trying to find. Recording it as `contract` when no
+    clause says it is the one failure that costs us something.
+
+On every search, read and list_documents call, fill `objective` with the open question that
+call is meant to resolve.
 
 None of this is judged and none of it can be refused — write what you actually think, doubts
 included. An auditor must be able to follow your decision points, in order, from the record
@@ -135,7 +147,7 @@ def run_patient(
     workdir = run_dir / "workdir"
     workdir.mkdir()
 
-    prompt = (TASK_PREAMBLE.format(decision_types=as_prompt_lines(),
+    prompt = (TASK_PREAMBLE.format(grounding=grounding_lines(),
                                    input_kinds=input_prompt_lines())
               + "\n" + spec.as_prompt_block())
     (run_dir / "prompt.txt").write_text(prompt, encoding="utf-8")

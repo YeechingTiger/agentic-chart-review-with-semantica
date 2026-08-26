@@ -67,7 +67,7 @@ def cmd_chain(args: argparse.Namespace) -> int:
 
 def cmd_precipitate(args: argparse.Namespace) -> int:
     from acr.mvp.precipitate import render, survey
-    report = survey(_ledger(Path(args.ledger)), decision_type=args.type,
+    report = survey(_ledger(Path(args.ledger)), decision_type=args.type, level=args.level,
                     settled_min=args.settled_min)
     print(json.dumps(report, ensure_ascii=False, indent=2) if args.json else render(report))
     return 0
@@ -75,7 +75,7 @@ def cmd_precipitate(args: argparse.Namespace) -> int:
 
 def cmd_decisions(args: argparse.Namespace) -> int:
     ledger = _ledger(Path(args.ledger))
-    prefix = f"step:{args.type}" if args.type else args.prefix
+    prefix = f"{args.level or 'big'}:{args.type}" if args.type else args.prefix
     rows = ledger.decisions(category_prefix=prefix, case_id=args.case)
     print(json.dumps(rows, ensure_ascii=False, indent=2))
     return 0
@@ -123,14 +123,17 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--settled-min", type=int, default=3,
                     help="how many like decisions make a practice rather than an anecdote")
     pr.add_argument("--json", action="store_true")
+    pr.add_argument("--level", default=None, choices=["big", "small"])
     pr.add_argument("--ledger", default="runs/mvp/ledger.json")
     pr.set_defaults(fn=cmd_precipitate)
 
     d = sub.add_parser("decisions",
                        help="compare: decision points across runs, filtered by type or case")
-    d.add_argument("--type", default=None, help="a decision type, e.g. coverage, arbitration")
+    d.add_argument("--type", default=None, help="a decision type, e.g. enough, which_wins")
+    d.add_argument("--level", default=None, choices=["big", "small"],
+                   help="which level --type refers to (default big)")
     d.add_argument("--prefix", default=None,
-                   help="raw category prefix (step:, submit:, gate:, result:)")
+                   help="raw category prefix (big:, small:, step, submit:, gate:, result:)")
     d.add_argument("--case", default=None, help="filter to one case id")
     d.add_argument("--ledger", default="runs/mvp/ledger.json")
     d.set_defaults(fn=cmd_decisions)
