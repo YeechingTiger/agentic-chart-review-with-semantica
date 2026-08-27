@@ -114,28 +114,28 @@ artifact, or screenshot.
 
 Run them in order:
 
-1. [01 — Run chart-review experiments](notebooks/01_run_chart_review_experiments.ipynb)
-   runs or reuses a case × task-arm × model cohort, reconstructs it, and summarizes answers,
-   synthetic gold, event/cycle/episode counts, and direct Policy bindings.
-2. [02 — Trace to Decision Chain](notebooks/02_trace_to_decision_chain.ipynb)
-   walks one real run from 158 Codex protocol records through Langtrace and ReAct replay to eight
-   human-auditable choices, drills a flagged step back to raw evidence, and compares task-only with
-   policy-bundle behavior.
-3. [03 — Semantica Decision Intelligence](notebooks/03_semantica_decision_intelligence.ipynb)
-   demonstrates same-scenario outcome divergence, native similar-case retrieval, evidenced causal
-   chains, candidate impact analysis, Policy revision impact, provenance integrity, scoped
-   insights, and an optional W3C PROV export experiment.
+1. [01 — Run chart-review agent (checked output)](notebooks/01_run_chart_review_experiments.executed.ipynb)
+   explains the ReAct-style chart agent and its seven tools, runs or reuses the small cohort, and
+   shows only the returned answer beside synthetic gold. [Runnable source](notebooks/01_run_chart_review_experiments.ipynb).
+2. [02 — Trace to Decision Chain (checked output)](notebooks/02_trace_to_decision_chain.executed.ipynb)
+   treats the raw trace as a long receipt, then walks one real case through eight human-auditable
+   questions. It shows why search coverage—not the final date comparison—is the main review point.
+   [Runnable source](notebooks/02_trace_to_decision_chain.ipynb).
+3. [03 — Semantica Decision Intelligence (checked output)](notebooks/03_semantica_decision_intelligence.executed.ipynb)
+   treats ContextGraph as an indexed decision-card box. It shows one readable card, similar-card
+   retrieval, a true same-evidence disagreement, and the re-audit queue for a changed Policy.
+   [Runnable source](notebooks/03_semantica_decision_intelligence.ipynb).
 
 Each source notebook is accompanied by an `.executed.ipynb` produced from persisted real
-OpenRouter Luna/Terra runs. Those checked outputs make the walkthrough readable without another
-paid call. Run data itself stays under `runs/` and never enters Git.
+OpenRouter Luna/Terra runs. The executed companion is a compact reading copy: it keeps the saved
+outputs and source-cell hashes but omits implementation text; use the source notebook to inspect or
+rerun code. Run data itself stays under `runs/` and never enters Git.
 
 Notebook 1 defaults to `reuse` when the local checked cohort exists. To generate a new cohort:
 
 ```bash
 export ACR_TUTORIAL_MODE=live
-export ACR_TUTORIAL_PROFILE=pilot  # 2 cases × 2 task arms × Luna
-# ACR_TUTORIAL_PROFILE=full also uses Terra as an acting review model
+# 2 paired cases × 2 instruction sets × Luna
 ```
 
 Two Luna reconstruction passes must agree on episode alignment before the notebook selects an
@@ -192,6 +192,7 @@ for nb in 01_run_chart_review_experiments 02_trace_to_decision_chain 03_semantic
     --output "${nb}.executed.ipynb" --output-dir notebooks \
     --ExecutePreprocessor.timeout=900
 done
+.venv/bin/python tools/prepare_executed_notebooks.py
 ```
 
 The ordinary test suite uses fixed traces and stub extractors so it can test verifier behavior

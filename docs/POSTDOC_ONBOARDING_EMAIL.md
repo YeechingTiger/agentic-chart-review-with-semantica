@@ -110,15 +110,13 @@ key。
 
 请按以下顺序：
 
-1. `01_run_chart_review_experiments.ipynb`：运行或复用 case × task condition × model
-   实验，比较 task-only 与 policy-bundle，并汇总答案、trace、ReAct cycle、Decision
-   Episode 和 Policy binding。
-2. `02_trace_to_decision_chain.ipynb`：选择一个真实 run，从 Codex protocol records、
-   Langtrace raw events 和 ReAct cycles，逐层走到 human-auditable Decision Chain，并能从
-   可疑 Decision 回到原始 evidence。
-3. `03_semantica_decision_intelligence.ipynb`：展示相同 scenario 的 outcome 分歧、similar
-   decision retrieval、evidenced causal chain、impact、Policy revision re-audit queue 和
-   provenance integrity。
+1. `01_run_chart_review_experiments.ipynb`：先理解 ReAct-style chart agent 和 7 个工具，
+   再运行或复用小型 cohort；默认只看 agent answer 与 synthetic gold。
+2. `02_trace_to_decision_chain.ipynb`：把一个真实 run 的 raw trace 当作“长收据”，再跟着
+   8 个可以逐一判断对错的问题走到最终答案，并下钻真正值得审核的搜索覆盖步骤。
+3. `03_semantica_decision_intelligence.ipynb`：把 ContextGraph 当作“有索引的决策卡片盒”，
+   只看一张可读 Decision、similar decisions、同一 evidence 的真实分歧，以及 Policy
+   变更后的 re-audit queue。
 
 每本 source notebook 都有对应的 `.executed.ipynb`，其中保留了已经完成的真实
 OpenRouter Luna/Terra 运行结果。请先阅读 executed notebooks；只阅读它们不会产生新的模型
@@ -128,17 +126,10 @@ OpenRouter Luna/Terra 运行结果。请先阅读 executed notebooks；只阅读
 
 ```bash
 export ACR_TUTORIAL_MODE=live
-export ACR_TUTORIAL_PROFILE=pilot
 .venv/bin/jupyter lab notebooks/
 ```
 
-`pilot` 是 2 cases × 2 task arms × Luna。如需同时测试 Terra 作为 chart-review agent：
-
-```bash
-export ACR_TUTORIAL_PROFILE=full
-```
-
-建议先阅读 executed notebooks，再运行 `pilot`；只有确认需要比较 Terra 时才运行 `full`。
+live walkthrough 是 2 cases × 2 task arms × Luna。建议先阅读 executed notebooks，再运行；
 请在 OpenRouter 设置合理的 spending limit 并检查 usage dashboard。Luna reconstruction 默认
 运行两次，以检查 Decision Episode alignment 是否稳定，因此一次 chart-review run 可能对应
 多次模型请求。

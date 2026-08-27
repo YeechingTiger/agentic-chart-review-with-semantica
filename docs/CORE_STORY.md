@@ -55,7 +55,9 @@ reconstruction passes.
 ### 3. Semantica is the reusable decision layer
 
 Verified episodes become native `ContextGraph` decisions. Their structured scenario describes the
-pre-decision situation; outcome records the choice. Explicit dependencies use Semantica's
+pre-decision question in readable, de-identified language; outcome records the choice. A separate
+metadata fingerprint preserves stable structural indexing without replacing the human scenario.
+Explicit dependencies use Semantica's
 `CAUSED`, `INFLUENCED`, or `PRECEDENT_FOR` relationships. Task clauses become independently
 versioned native Policies, and `APPLIED_POLICY` is created only when runtime evidence actually
 cited or checked the clause.
@@ -84,9 +86,10 @@ it does not delete the source evidence.
 
 ### Compare repeated runs
 
-Semantica searches native decision scenarios within a category. ACR then limits candidates to the
-intended cohort, different runs, and the same atomic subject. A near-neighbour with a different
-outcome is a divergence candidate.
+Semantica searches native, human-readable decision scenarios within a category. ACR then limits
+candidates to the intended cohort and different runs. A true same-point comparison additionally
+requires the same case evidence and atomic question; a coarse structural match alone is never
+called an exact disagreement.
 
 If both choices relied on `own_knowledge` and neither applied a Policy, the system routes the pair
 as `UNGROUNDED_OUTCOME_DIVERGENCE`. That tells a guideline author where ungoverned judgment was
@@ -120,17 +123,16 @@ shown as missing rather than filled with a plausible story.
 The postdoc walkthrough is executable and checked against persisted real OpenRouter Luna/Terra
 runs:
 
-1. [Experiment notebook](../notebooks/01_run_chart_review_experiments.executed.ipynb) indexes six
-   completed runs. The four task-only SYN0001 runs split evenly between `20230427` and `20230412`;
-   the policy-guided SYN0001 and SYNX03 runs match their synthetic designer gold. This is a small
-   mechanism cohort, not an estimate of policy effect.
+1. [Experiment notebook](../notebooks/01_run_chart_review_experiments.executed.ipynb) explains the
+   chart-only agent and shows the answers from six available historical runs. The set is not
+   presented as a balanced accuracy experiment.
 2. [Audit notebook](../notebooks/02_trace_to_decision_chain.executed.ipynb) reduces one real run
    from 158 harness records / 22 canonical events / 21 cycles to eight chronological Decision
-   Episodes, while preserving exact cycle accounting and raw drill-down on all eight.
-3. [Semantica notebook](../notebooks/03_semantica_decision_intelligence.executed.ipynb) finds an
-   identical structured `standing/evidence_item` scenario with two ungrounded outcomes, executes
-   native similar-decision retrieval, traverses evidenced causal assertions, constructs a direct
-   Policy-binding re-audit queue, and verifies native provenance integrity.
+   Episodes. It identifies retrieval coverage as the main review question while preserving exact
+   cycle accounting and raw drill-down on all eight.
+3. [Semantica notebook](../notebooks/03_semantica_decision_intelligence.executed.ipynb) shows one
+   readable native Decision, retrieves similar decisions, finds a true same-note task-only
+   disagreement, and constructs a direct Policy-binding re-audit queue.
 
 These are system-mechanism checks. A clinical expert is still needed to adjudicate correctness, a
 paired rerun is needed to test a policy revision counterfactually, and a human study is still

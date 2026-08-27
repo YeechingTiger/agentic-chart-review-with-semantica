@@ -189,6 +189,24 @@ def test_projection_uses_the_analytics_profile_and_keeps_nondecisions_ordinary(t
     assert {row["metadata"]["confidence_semantics"] for row in decisions} == {
         "RECONSTRUCTION_STABILITY"}
     assert {row["metadata"]["confidence"] for row in decisions} == {0.92}
+    first = next(row for row in decisions
+                 if row["metadata"]["acr_episode_id"].endswith(":episode:1"))
+    assert first["metadata"]["projection_schema"] == "acr.semantica_projection.v3"
+    assert first["metadata"]["scenario"] == "Where should qualifying evidence be sought?"
+    assert first["metadata"]["reasoning"] == (
+        "The selected route can surface qualifying evidence. Basis used: chart evidence."
+    )
+    assert first["metadata"]["situation_signature"]["candidate_shape"] == "single"
+    assert first["metadata"]["atomic_decision_identity"] == {
+        "schema": "acr.atomic_decision_identity.v1",
+        "identity_basis": "EXACT_QUESTION_AND_EVIDENCE",
+        "decision_function": "where_to_look",
+        "decision_subject": "retrieval_query_batch",
+        "question_hash": first["metadata"]["atomic_decision_identity"]["question_hash"],
+        "evidence_hash": first["metadata"]["atomic_decision_identity"]["evidence_hash"],
+        "evidence_anchor_count": 1,
+        "decision_point_hash": first["metadata"]["decision_point_hash"],
+    }
     assert ledger.graph.find_nodes(node_type="ReActCycle")
     assert ledger.graph.find_nodes(node_type="DecisionTestimony")
     assert ledger.graph.find_nodes(node_type="Submission")
@@ -614,14 +632,33 @@ def test_projection_rejects_a_recorded_finding_hidden_in_a_support_cycle(tmp_pat
 
 
 def test_core_projection_is_sanitized_and_causal_edges_have_assertion_provenance(tmp_path: Path):
+    artifact = _artifact()
+    artifact["episodes"][0]["material_question"] = (
+        "Can patient SYN0001's NOTE_007 from 2023-04-12 establish the diagnosis date?"
+    )
+    artifact["episodes"][0]["decision_rationale"] = (
+        "NOTE_007 on 2023-04-12 explicitly documents the new diagnosis for SYN0001."
+    )
+    artifact["analysis_artifact_hash"] = content_hash({
+        key: value for key, value in artifact.items()
+        if key not in {"analysis_artifact_hash", "artifact_ref"}
+    })
     ledger = SemanticaLedger(tmp_path / "ledger.json")
-    ledger.project_analysis(_artifact())
+    ledger.project_analysis(artifact)
     assert ledger.validate_export() == []
-    dump = " ".join(
-        str(node["metadata"].get(key, ""))
-        for node in ledger.graph.find_nodes(node_type="decision")
-        for key in ("scenario", "reasoning", "outcome"))
+    first = next(row for row in ledger.graph.find_nodes(node_type="decision")
+                 if row["metadata"]["acr_episode_id"].endswith(":episode:1"))
+    assert first["metadata"]["scenario"] == (
+        "Can patient [patient]'s [note] from [date] establish the diagnosis date?"
+    )
+    assert first["metadata"]["reasoning"] == (
+        "[note] on [date] explicitly documents the new diagnosis for [patient]. "
+        "Basis used: chart evidence."
+    )
+    dump = " ".join(str(first["metadata"].get(key, ""))
+                    for key in ("scenario", "reasoning", "outcome"))
     assert "SYN0001" not in dump and "20230412" not in dump and "N1_2023" not in dump
+    assert "NOTE_007" not in dump and "2023-04-12" not in dump
 
     edges = [edge.to_dict() for edge in ledger.graph.edges]
     assert len([edge for edge in edges if edge.get("type") == "INFLUENCED"]) == 1
@@ -694,8 +731,11 @@ def test_native_semantica_similarity_finds_the_same_situation_across_cases_not_i
     candidate = result["candidates"][0]
     assert candidate["similarity"] >= 0.3
     assert candidate["same_situation_signature"] is True
+    assert candidate["same_decision_point"] is False
     assert candidate["decision"]["metadata"]["situation_signature_hash"] == \
         result["query"]["situation_signature_hash"]
+    assert candidate["decision"]["metadata"]["decision_point_hash"] != \
+        result["query"]["decision_point_hash"]
     core = " ".join(str(candidate["decision"].get(key) or "")
                     for key in ("scenario", "reasoning", "outcome"))
     assert "SYN9999" not in core and "20251103" not in core
@@ -825,19 +865,29 @@ def test_task_only_projection_does_not_invent_a_clinical_policy_binding(tmp_path
 def test_semantica_similarity_finds_cross_run_ungrounded_outcome_divergence(tmp_path: Path):
     cohort = []
     ledger = SemanticaLedger(tmp_path / "ledger.json")
-    for model, run_id, analysis_id, decision in (
-            ("openai/gpt-5.6-luna", "run-luna", "analysis-luna", "can_establish"),
-            ("openai/gpt-5.6-terra", "run-terra", "analysis-terra", "merely_mentions")):
+    for model, run_id, analysis_id, decision, facing, span in (
+            ("openai/gpt-5.6-luna", "run-luna", "analysis-luna", "can_establish",
+             "Does the physician assessment establish the requested diagnosis date?", (358, 523)),
+            ("openai/gpt-5.6-terra", "run-terra", "analysis-terra", "merely_mentions",
+             "This note was read; what standing does it have for this field?", (264, 432))):
         artifact = _artifact(analysis_id, run_id=run_id, function="standing", causal=False)
         artifact["task_arm"] = "task_only"
         artifact["review_model"] = model
         artifact["episodes"][0]["candidate_set"] = ["can_establish", "merely_mentions"]
         artifact["episodes"][0]["decision"] = decision
-        artifact["cycles"][0]["actions"][0]["args"] = {
+        artifact["cycles"][0]["actions"][0] = {
+            "event_ref": "layer1:2", "tool": "record_finding", "ok": True,
+            "args": {
+            "note_id": "Onc-Med-MD-OP-Progress-Note_2023-04-12",
+            "field": "date_of_initial_diagnosis", "source_start": span[0],
+            "source_end": span[1], "assertion_class": (
+                "clinical_diagnosis" if decision == "can_establish"
+                else "suspected_or_clinical_malignancy"),
+            "standing": decision, "facing": facing,
             "basis_sources": ["chart", "own_knowledge"],
             "cited_refs": [], "checked_discriminating_fact_refs": [],
             "rule_coverage_claim": "NO_APPLICABLE_RULE",
-        }
+            }}
         artifact["analysis_artifact_hash"] = content_hash({
             key: value for key, value in artifact.items()
             if key not in {"analysis_artifact_hash", "artifact_ref"}
@@ -853,6 +903,13 @@ def test_semantica_similarity_finds_cross_run_ungrounded_outcome_divergence(tmp_
     assert len(report["divergences"]) == 1
     divergence = report["divergences"][0]
     assert divergence["decision_function"] == "standing"
+    assert divergence["same_decision_point"] is True
+    assert len({row["decision_point_hash"] for row in divergence["members"]}) == 1
+    projected = [ledger.graph.find_node(row["decision_id"])["metadata"]
+                 for row in divergence["members"]]
+    assert {row["atomic_decision_identity"]["identity_basis"] for row in projected} == {
+        "EXACT_EVIDENCE_AND_SEMANTIC_QUESTION"}
+    assert len({row["scenario"] for row in projected}) == 2
     assert divergence["grounding_status"] == "UNGROUNDED_OUTCOME_DIVERGENCE"
     assert divergence["outcome_distribution"] == {
         "CAN_ESTABLISH": 1, "MERELY_MENTIONS": 1}

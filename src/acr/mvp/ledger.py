@@ -32,13 +32,34 @@ def _json_ready(value: Any) -> Any:
 
 CAUSAL_TYPES = {"CAUSED", "INFLUENCED", "PRECEDENT_FOR"}
 CONFIDENCE_SEMANTICS = "RECONSTRUCTION_STABILITY"
-PROJECTION_SCHEMA = "acr.semantica_projection.v2"
+PROJECTION_SCHEMA = "acr.semantica_projection.v3"
+ATOMIC_DECISION_IDENTITY_SCHEMA = "acr.atomic_decision_identity.v1"
 _SAFE_ENTITY = re.compile(
     r"^(?:DecisionFunction|DecisionSubject|Field|Standing|EvidenceRole|ConflictShape|CandidateShape):"
     r"[a-z0-9_.-]+$")
+_PATIENT_LOCATOR = re.compile(r"\bSYN[A-Za-z0-9_-]*\b", re.IGNORECASE)
+_NOTE_LOCATOR = re.compile(
+    r"\b(?:NOTE[_:-][A-Za-z0-9][A-Za-z0-9_.:-]*|"
+    r"[A-Za-z][A-Za-z0-9-]*_(?:19|20)\d{2}-\d{2}-\d{2})\b",
+    re.IGNORECASE,
+)
+_DATE_LOCATOR = re.compile(
+    r"\b(?:(?:19|20)\d{2}[-/]\d{2}[-/]\d{2}|(?:19|20)\d{6})\b",
+    re.IGNORECASE,
+)
 _FORBIDDEN_CORE = re.compile(
-    r"(?:\bSYN[A-Za-z0-9_-]*\b|\b(?:19|20)\d{2}[-/]?\d{2}[-/]?\d{2}\b|"
-    r"\b[A-Za-z][A-Za-z0-9-]*_(?:19|20)\d{2}-\d{2}-\d{2}\b)", re.IGNORECASE)
+    rf"(?:{_PATIENT_LOCATOR.pattern}|{_NOTE_LOCATOR.pattern}|{_DATE_LOCATOR.pattern})",
+    re.IGNORECASE,
+)
+
+_BASIS_LABELS = {
+    "task_contract": "the supplied task contract",
+    "method_card": "the supplied method card",
+    "operational_instruction": "the run instructions",
+    "precedent": "an earlier decision",
+    "chart": "chart evidence",
+    "own_knowledge": "the model's own judgment",
+}
 
 
 class DecisionIntelligence(Protocol):
@@ -279,21 +300,196 @@ class SemanticaLedger:
             "standings": standings or ["none"],
         }
 
-    def _safe_scenario(self, artifact: dict[str, Any], episode: dict[str, Any]) -> str:
-        signature = self._situation_signature(artifact, episode)
-        return "predecision " + " ".join(
-            f"{key}={','.join(value) if isinstance(value, list) else value}"
-            for key, value in signature.items() if key != "schema")
+    def _runtime_decision_args(self, artifact: dict[str, Any],
+                               episode: dict[str, Any]) -> dict[str, Any]:
+        """Return the testimony attached to the atomic choice, when one exists."""
+        rows = [
+            action.get("args") or {}
+            for cycle in self._cycles_for_episode(artifact, episode)
+            for action in cycle.get("actions") or []
+            if action.get("tool") in {"note_decision", "record_finding"}
+        ]
+        return dict(rows[-1]) if rows else {}
 
-    def _safe_reasoning(self, artifact: dict[str, Any], episode: dict[str, Any]) -> str:
-        allowed_basis = {"task_contract", "method_card", "operational_instruction",
-                         "precedent", "chart", "own_knowledge"}
-        basis = sorted({str(value) for value in episode.get("claimed_basis_summary") or []
-                        if str(value) in allowed_basis})
-        return (f"reconstructed_function={_slug(episode.get('decision_function'))}; "
-                f"subject={_slug(episode.get('decision_subject'))}; "
-                f"cycles={len(episode.get('source_cycle_ids') or [])}; "
-                f"basis={','.join(basis) or 'unresolved'}")
+    def _known_note_locators(self, artifact: dict[str, Any],
+                             episode: dict[str, Any]) -> set[str]:
+        """Collect structured note locators so readable core text can redact them exactly."""
+        locators: set[str] = set()
+        for cycle in self._cycles_for_episode(artifact, episode):
+            for state_name in ("state_before", "state_after"):
+                state = cycle.get(state_name) or {}
+                observed = state.get("observed_state") or {}
+                locators.update(str(value) for key in ("surfaced_notes", "read_notes")
+                                for value in observed.get(key) or [] if value)
+                declared = state.get("declared_state") or {}
+                locators.update(str(row["note_id"])
+                                for row in declared.get("findings") or []
+                                if row.get("note_id"))
+            for action in cycle.get("actions") or []:
+                note_id = (action.get("args") or {}).get("note_id")
+                if note_id:
+                    locators.add(str(note_id))
+        return locators
+
+    def _deidentify_core_text(self, artifact: dict[str, Any], episode: dict[str, Any],
+                              value: Any) -> str:
+        """Redact structured chart locators while retaining a readable clinical question."""
+        text = " ".join(str(value or "").split())
+        for locator in sorted(self._known_note_locators(artifact, episode),
+                              key=len, reverse=True):
+            text = re.sub(re.escape(locator), "[note]", text, flags=re.IGNORECASE)
+        text = _NOTE_LOCATOR.sub("[note]", text)
+        text = _PATIENT_LOCATOR.sub("[patient]", text)
+        text = _DATE_LOCATOR.sub("[date]", text)
+        return " ".join(text.split())
+
+    @staticmethod
+    def _join_labels(values: list[str]) -> str:
+        if len(values) < 2:
+            return values[0] if values else ""
+        if len(values) == 2:
+            return f"{values[0]} and {values[1]}"
+        return f"{', '.join(values[:-1])}, and {values[-1]}"
+
+    def _human_scenario(self, artifact: dict[str, Any], episode: dict[str, Any]) -> str:
+        testimony = self._runtime_decision_args(artifact, episode)
+        scenario = (testimony.get("facing") or episode.get("material_question")
+                    or episode.get("scenario"))
+        if not scenario:
+            scenario = {
+                "where_to_look": "Which chart evidence should be reviewed next?",
+                "is_this_it": "Does the current evidence describe the requested concept?",
+                "what_it_asserts": "What does the current evidence actually assert?",
+                "when_it_happened": "Which time does the current evidence establish?",
+                "standing": "Can the current evidence establish the requested field?",
+                "same_or_ordered": "Are these evidence items the same event, and which came first?",
+                "corroborate": "Do these evidence items independently reinforce one another?",
+                "which_wins": "Which conflicting evidence should control the answer?",
+                "scope": "Is this case and time period within scope?",
+                "infer": "Does the available evidence support this case-level inference?",
+                "is_it_absent": "What does the unsuccessful search establish?",
+                "enough": "Is there enough evidence to stop reviewing?",
+                "what_to_answer": "What result should be submitted?",
+            }.get(str(episode.get("decision_function") or ""),
+                  "What material choice should be made here?")
+        return self._deidentify_core_text(artifact, episode, scenario)
+
+    def _human_reasoning(self, artifact: dict[str, Any], episode: dict[str, Any]) -> str:
+        testimony = self._runtime_decision_args(artifact, episode)
+        rationale = (testimony.get("because") or episode.get("decision_rationale")
+                     or episode.get("model_interpretation"))
+        text = self._deidentify_core_text(artifact, episode, rationale)
+        if not text:
+            text = "No explicit rationale was recorded"
+        if text[-1] not in ".!?":
+            text += "."
+
+        basis = [str(value) for value in testimony.get("basis_sources") or []]
+        if not basis:
+            basis = [str(value) for value in episode.get("claimed_basis_summary") or []]
+        labels = [_BASIS_LABELS[value] for value in dict.fromkeys(basis)
+                  if value in _BASIS_LABELS]
+        if labels:
+            text += f" Basis used: {self._join_labels(labels)}."
+        return text
+
+    @staticmethod
+    def _identity_text(value: Any) -> str:
+        """Normalize exact-match text without turning paraphrases into false identity."""
+        return " ".join(str(value or "").casefold().split())
+
+    def _atomic_decision_identity(self, artifact: dict[str, Any],
+                                  episode: dict[str, Any]) -> dict[str, Any]:
+        """Identify one exact question over one exact evidence set, excluding its outcome.
+
+        The hashes deliberately omit run, analysis, model and chosen outcome. Repeated runs that
+        considered the same evidence and answered the same material question therefore share a
+        decision point even when they disagree. Coarse state *shape* remains a separate retrieval
+        feature and is never evidence of exact identity.
+        """
+        testimony = self._runtime_decision_args(artifact, episode)
+        question = (testimony.get("facing") or episode.get("material_question")
+                    or episode.get("scenario") or "")
+        anchors: set[tuple[str, str]] = set()
+        direct_evidence_items: set[tuple[str, str]] = set()
+        decision_function = _slug(episode.get("decision_function"))
+        decision_subject = _slug(episode.get("decision_subject"))
+
+        # The reconstructed scenario and exact pre-choice chart state describe what was
+        # actually in view. Candidate options are deliberately excluded: they are part of the
+        # reconstructed choice, not the evidence, and may differ when two runs disagree.
+        if episode.get("scenario"):
+            anchors.add(("scenario_context", self._identity_text(episode["scenario"])))
+        cycles = self._cycles_for_episode(artifact, episode)
+        choice_before = (cycles[0].get("state_before") if cycles else {}) or {}
+        observed = choice_before.get("observed_state") or {}
+        for state_key, anchor_kind in (
+                ("surfaced_notes", "surfaced_note"), ("read_notes", "read_note")):
+            for note_id in observed.get(state_key) or []:
+                anchors.add((anchor_kind, self._identity_text(note_id)))
+        declared = choice_before.get("declared_state") or {}
+        for finding in declared.get("findings") or []:
+            material = {key: finding.get(key) for key in (
+                "note_id", "field", "event_time", "source_start", "source_end",
+                "assertion_class",
+            ) if finding.get(key) is not None}
+            anchors.add(("finding", content_hash(material)))
+        for cycle in cycles:
+            for action in cycle.get("actions") or []:
+                args = action.get("args") or {}
+                if args.get("note_id"):
+                    direct_evidence_items.add((self._identity_text(args["note_id"]),
+                                               self._identity_text(args.get("field"))))
+                material = {key: args.get(key) for key in (
+                    "note_id", "field", "event_time", "source_start", "source_end",
+                    "assertion_class",
+                ) if args.get(key) is not None}
+                if material:
+                    anchors.add(("evidence_item", content_hash(material)))
+                for ref in args.get("cited_refs") or []:
+                    normalized = self._identity_text(ref)
+                    if normalized.startswith(("note:", "evidence:", "finding:")):
+                        anchors.add(("evidence_ref", normalized))
+
+        if decision_subject == "evidence_item" and direct_evidence_items:
+            # For a note-level judgment, the stable question is the taxonomy function applied
+            # to one exact note+field. Free-form ``facing`` wording, cited span boundaries and
+            # assertion class are deliberately excluded: repeated agents can phrase or locate
+            # the same audit question differently, and assertion class may itself be disputed.
+            identity_basis = "EXACT_EVIDENCE_AND_SEMANTIC_QUESTION"
+            question_hash = content_hash({
+                "decision_function": decision_function,
+                "decision_subject": decision_subject,
+                "fields": sorted({field for _, field in direct_evidence_items}),
+            })
+            evidence_hash = content_hash([
+                {"note_locator_hash": content_hash(note_id), "field": field}
+                for note_id, field in sorted(direct_evidence_items)
+            ])
+            evidence_anchor_count = len(direct_evidence_items)
+        else:
+            identity_basis = "EXACT_QUESTION_AND_EVIDENCE"
+            question_hash = content_hash(self._identity_text(question))
+            evidence_hash = content_hash(sorted(anchors))
+            evidence_anchor_count = len(anchors)
+        identity_material = {
+            "schema": ATOMIC_DECISION_IDENTITY_SCHEMA,
+            "identity_basis": identity_basis,
+            "decision_function": decision_function,
+            "decision_subject": decision_subject,
+            "question_hash": question_hash,
+            "evidence_hash": evidence_hash,
+        }
+        return {
+            "schema": ATOMIC_DECISION_IDENTITY_SCHEMA,
+            "identity_basis": identity_basis,
+            "decision_function": identity_material["decision_function"],
+            "decision_subject": identity_material["decision_subject"],
+            "question_hash": question_hash,
+            "evidence_hash": evidence_hash,
+            "evidence_anchor_count": evidence_anchor_count,
+            "decision_point_hash": content_hash(identity_material),
+        }
 
     def _safe_outcome(self, artifact: dict[str, Any], episode: dict[str, Any]) -> str:
         function = str(episode.get("decision_function") or "other")
@@ -326,16 +522,19 @@ class SemanticaLedger:
                     "analysis_id": artifact["analysis_id"],
                     "episode_id": episode["episode_id"]}
         core = {"category": str(episode["decision_function"]),
-                "scenario": self._safe_scenario(artifact, episode),
-                "reasoning": self._safe_reasoning(artifact, episode),
+                "scenario": self._human_scenario(artifact, episode),
+                "reasoning": self._human_reasoning(artifact, episode),
                 "outcome": self._safe_outcome(artifact, episode),
                 "confidence": float(episode.get("reconstruction_stability",
                                                  artifact.get("reconstruction_stability", 0.0))),
                 "entities": self._controlled_entities(artifact, episode)}
         signature = self._situation_signature(artifact, episode)
+        atomic_identity = self._atomic_decision_identity(artifact, episode)
         return {"acr_node_key": content_hash({**identity, **core}), **identity, **core,
                 "situation_signature": signature,
-                "situation_signature_hash": content_hash(signature)}
+                "situation_signature_hash": content_hash(signature),
+                "atomic_decision_identity": atomic_identity,
+                "decision_point_hash": atomic_identity["decision_point_hash"]}
 
     def _desired_projection_hash(self, artifact: dict[str, Any]) -> str:
         episodes = [self._episode_projection(artifact, episode)
@@ -789,6 +988,9 @@ class SemanticaLedger:
                         "projection_payload_hash": content_hash(projection),
                         "situation_signature": projection["situation_signature"],
                         "situation_signature_hash": projection["situation_signature_hash"],
+                        "atomic_decision_identity": projection[
+                            "atomic_decision_identity"],
+                        "decision_point_hash": projection["decision_point_hash"],
                         "analysis_artifact_hash": supplied_hash,
                         "artifact_ref": artifact.get("artifact_ref"),
                         "task_presentation_hash": artifact.get("task_presentation_hash"),
@@ -1076,6 +1278,7 @@ class SemanticaLedger:
                 "run_id": run_id, "analysis_id": analysis_id,
                 "decision_function": meta.get("category"), "scenario": meta.get("scenario"),
                 "reasoning": meta.get("reasoning"), "outcome": meta.get("outcome"),
+                "decision_point_hash": meta.get("decision_point_hash"),
                 "reconstruction_stability": meta.get("confidence"),
                 "confidence_semantics": meta.get("confidence_semantics"),
                 "source_seq_start": meta.get("source_seq_start"),
@@ -1152,12 +1355,12 @@ class SemanticaLedger:
         decision_id = self._decision_id_for_episode(episode_id)
         node = self.graph.find_node(decision_id) or {}
         meta = node.get("metadata") or {}
-        same_run_count = len(self._find_nodes("decision", run_id=str(meta.get("run_id") or "")))
+        decision_count = len(self.graph.find_nodes(node_type="decision"))
         native_rows = self.graph.find_similar_decisions(
             str(meta.get("scenario") or ""), category=str(meta.get("category") or ""),
-            max_results=max_results + same_run_count,
-            min_similarity=min_similarity)
+            max_results=decision_count, min_similarity=0.0)
         query_signature = str(meta.get("situation_signature_hash") or "")
+        query_decision_point = str(meta.get("decision_point_hash") or "")
         rows: list[dict[str, Any]] = []
         for row in native_rows:
             decision = row.get("decision") or {}
@@ -1166,10 +1369,24 @@ class SemanticaLedger:
                 continue
             if cross_run_only and candidate_meta.get("run_id") == meta.get("run_id"):
                 continue
+            candidate_decision_point = str(
+                candidate_meta.get("decision_point_hash") or "")
+            same_decision_point = (
+                candidate_decision_point == query_decision_point
+                if query_decision_point and candidate_decision_point else None)
+            # Semantica includes outcome in content similarity. Exact repeated audit points
+            # must remain visible precisely when their outcomes differ, even if that lowers
+            # the native score below the near-neighbour threshold.
+            if float(row.get("similarity") or 0.0) < min_similarity \
+                    and same_decision_point is not True:
+                continue
             rows.append({
                 **row,
                 "same_situation_signature": bool(query_signature) and
                     candidate_meta.get("situation_signature_hash") == query_signature,
+                # ``None`` preserves honest reads of legacy v2 projections, which did not
+                # carry an exact question+evidence identity.
+                "same_decision_point": same_decision_point,
             })
             if len(rows) == max_results:
                 break
@@ -1180,6 +1397,7 @@ class SemanticaLedger:
                     "category": meta.get("category"),
                     "scenario": meta.get("scenario"),
                     "situation_signature_hash": query_signature,
+                    "decision_point_hash": query_decision_point or None,
                     "cross_run_only": cross_run_only,
                     "min_similarity": min_similarity,
                 },
@@ -1237,6 +1455,7 @@ class SemanticaLedger:
                     "outcome": str(meta.get("outcome") or ""),
                     "situation_signature_hash": str(
                         meta.get("situation_signature_hash") or ""),
+                    "decision_point_hash": str(meta.get("decision_point_hash") or ""),
                     "review_model": str(artifact.get("review_model") or "UNKNOWN"),
                     "task_arm": str(artifact.get("task_arm") or "UNKNOWN"),
                     "basis_sources": tuple(sorted(basis)),
@@ -1251,7 +1470,7 @@ class SemanticaLedger:
         for decision_id, member in sorted(members.items()):
             native_rows = self.graph.find_similar_decisions(
                 member["scenario"], category=member["decision_function"],
-                max_results=len(members), min_similarity=min_similarity)
+                max_results=len(members), min_similarity=0.0)
             for native in native_rows:
                 candidate = native.get("decision") or {}
                 candidate_id = str(candidate.get("id") or "")
@@ -1264,6 +1483,14 @@ class SemanticaLedger:
                 if member["decision_subject"] != other["decision_subject"]:
                     continue
                 if member["outcome"] == other["outcome"]:
+                    continue
+                same_decision_point = (
+                    member["decision_point_hash"] == other["decision_point_hash"]
+                    if member["decision_point_hash"] and other["decision_point_hash"]
+                    else None
+                )
+                if float(native.get("similarity") or 0.0) < min_similarity \
+                        and same_decision_point is not True:
                     continue
                 seen_pairs.add(pair)
                 pair_members = [member, other]
@@ -1293,6 +1520,7 @@ class SemanticaLedger:
                         bool(member["situation_signature_hash"])
                         and member["situation_signature_hash"]
                         == other["situation_signature_hash"]),
+                    "same_decision_point": same_decision_point,
                     "outcome_distribution": dict(sorted(outcomes.items())),
                     "review_model_distribution": dict(sorted(models.items())),
                     "task_arm_distribution": dict(sorted(arms.items())),

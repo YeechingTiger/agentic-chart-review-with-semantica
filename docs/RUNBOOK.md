@@ -67,16 +67,19 @@ Run in order:
 
 1. [01_run_chart_review_experiments.ipynb](../notebooks/01_run_chart_review_experiments.ipynb)
    creates or reuses the multi-run cohort. Existing real-provider evidence is reused by default.
-   Set `ACR_TUTORIAL_MODE=live` to make new paid calls. `pilot` runs two cases × two arms × Luna;
-   `full` additionally uses Terra as an acting review model.
+   Set `ACR_TUTORIAL_MODE=live` to make new paid calls. The live walkthrough runs two cases × two
+   instruction sets × Luna and displays only the returned answers.
 2. [02_trace_to_decision_chain.ipynb](../notebooks/02_trace_to_decision_chain.ipynb) reads one
-   explicitly selected analysis from protocol records through Langtrace, ReAct cycles, and the
-   human Decision Chain. Override its input with `ACR_AUDIT_LEDGER` and `ACR_AUDIT_RUN_ID`.
+   explicitly selected SYNX03 analysis as a compact raw receipt and eight human review questions.
+   Override its input with `ACR_AUDIT_LEDGER` and `ACR_AUDIT_RUN_ID`.
 3. [03_semantica_decision_intelligence.ipynb](../notebooks/03_semantica_decision_intelligence.ipynb)
-   performs cross-run Semantica queries. Override its graph with `ACR_INTELLIGENCE_LEDGER`.
+   shows readable Decision cards, similar decisions, true same-evidence disagreement, and direct
+   Policy-change re-audit candidates. Override its graph with `ACR_INTELLIGENCE_LEDGER`.
 
 The `.executed.ipynb` companions are checked walkthroughs from persisted Luna/Terra runs. They make
-no claim that the convenience cohort is a powered evaluation.
+no claim that the convenience cohort is a powered evaluation. They are static reading copies with
+saved outputs and source-cell hashes but no implementation text; rerun the corresponding source
+notebook when code inspection is needed.
 
 ## 5. Run the closed loop from the CLI
 
@@ -151,6 +154,7 @@ status proves that the reference existed; it does not prove that the rule entail
 for notebook in notebooks/0*.ipynb; do
   .venv/bin/python -m json.tool "$notebook" >/dev/null
 done
+.venv/bin/python tools/prepare_executed_notebooks.py
 
 acr --help
 ```
