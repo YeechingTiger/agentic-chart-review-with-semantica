@@ -847,19 +847,69 @@ NB3 = notebook(
             Similarity is useful because a reviewer can inspect a small set of prior judgments
             instead of searching every trace. It proposes comparison candidates; it does not say
             that either judgment is correct.
+
+            **Semantica—not ACR—calculates the similarity.** First we ask its native API for
+            neighbours:
+
+            ```python
+            similar = graph.find_similar_decisions(
+                "Can suspicious cytology alone establish the diagnosis date?",
+                category="standing",
+                max_results=5,
+            )
+            ```
+
+            Semantica's raw list can contain the query card itself and cards from the same run.
+            We show that raw result first. Then ACR turns it into an audit list by removing the
+            query, limiting comparison to other runs, and marking exact decision points. It never
+            recalculates Semantica's score.
             """
         ),
         code(
             r"""
+            native_similar = ledger.graph.find_similar_decisions(
+                query_meta["scenario"],
+                category=query_meta["category"],
+                max_results=5,
+                min_similarity=0.0,
+            )
+            native_rows = []
+            for candidate in native_similar:
+                node = candidate["decision"]
+                meta = node.get("metadata") or {}
+                if str(node.get("id") or "") == str(query_node.get("id") or ""):
+                    scope = "Query card itself"
+                elif meta.get("run_id") == query_meta.get("run_id"):
+                    scope = "Another card in same run"
+                else:
+                    scope = "Card from another run"
+                native_rows.append({
+                    "scope": scope,
+                    "scenario": node.get("scenario") or meta.get("scenario"),
+                    "outcome": node.get("outcome") or meta.get("outcome"),
+                    "similarity": f"{float(candidate.get('similarity') or 0):.2f}",
+                })
+
+            display(Markdown("**A. Raw neighbours returned by Semantica**"))
+            display(Markdown(table(native_rows, [
+                ("scope", "What kind of match?"), ("scenario", "Comparable question"),
+                ("outcome", "Outcome"), ("similarity", "Semantica score"),
+            ])))
+            display(Markdown(
+                "The query itself appears first. Its score need not be 1.0 because this is a "
+                "composite retrieval score, not an identity check or probability."
+            ))
+
             query_episode = query_meta["acr_episode_id"]
-            similar = ledger.similar_candidates(
+            audit_candidates = ledger.similar_candidates(
                 query_episode, max_results=6, min_similarity=0.05, cross_run_only=True
             )
             seen_runs = set()
             similar_rows = []
-            for candidate in similar["candidates"]:
+            for candidate in audit_candidates["candidates"]:
                 node = candidate["decision"]
                 meta = node.get("metadata") or {}
+                # Presentation-only thinning: one example card per run.
                 if meta.get("run_id") in seen_runs:
                     continue
                 seen_runs.add(meta.get("run_id"))
@@ -878,15 +928,20 @@ NB3 = notebook(
                 if len(similar_rows) == 3:
                     break
 
-            display(Markdown(f"**Query card:** {query_meta['scenario']}"))
+            display(Markdown(
+                f"**B. Cross-run audit list prepared by ACR**\n\n"
+                f"**Query card:** {query_meta['scenario']}"
+            ))
             display(Markdown(table(similar_rows, [
                 ("context", "Run context"), ("scenario", "Comparable question"),
                 ("outcome", "Outcome"),
                 ("similarity", "Similarity")
             ])))
             display(Markdown(
-                "**So what?** These are good cards to compare for consistency. A similarity score "
-                "closer to 1 means more alike; it is not an accuracy score."
+                "**What happened?** Semantica retrieved the neighbours and supplied every "
+                "similarity score. ACR removed self/same-run matches and added audit context; this "
+                "table then shows one card per run for readability. A score closer to 1 means "
+                "more alike; it is not an accuracy score."
             ))
             """
         ),
@@ -896,6 +951,10 @@ NB3 = notebook(
 
             “Similar” is broad. A stronger audit signal is **the same case, the same evidence note,
             and the same atomic question**, but a different outcome.
+
+            This comparison still begins with Semantica's native `find_similar_decisions()`
+            candidates. ACR then checks exact evidence identity and keeps pairs whose outcomes
+            differ; it does not provide a second similarity engine.
 
             The stored runs contain exactly that pattern for one `SYN0001` oncology note. In the
             task-only arm, no clinical policy was provided, so the models had to use their own

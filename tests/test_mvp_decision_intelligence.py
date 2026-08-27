@@ -707,8 +707,7 @@ def test_projection_is_idempotent_and_queries_survive_save_reload(tmp_path: Path
         == "RECONSTRUCTION_STABILITY"
 
 
-def test_native_semantica_similarity_finds_the_same_situation_across_cases_not_itself(
-        tmp_path: Path):
+def test_semantica_similarity_then_acr_cross_run_identity_guards(tmp_path: Path):
     ledger = SemanticaLedger(tmp_path / "ledger.json")
     first = _artifact("analysis-a", run_id="run-1", causal=False)
     second = _artifact("analysis-b", run_id="run-2", causal=False)
@@ -722,6 +721,16 @@ def test_native_semantica_similarity_finds_the_same_situation_across_cases_not_i
     })
     ledger.project_analysis(first)
     ledger.project_analysis(second)
+
+    decisions = ledger.graph.find_nodes(node_type="decision")
+    query = next(node for node in decisions
+                 if (node.get("metadata") or {}).get("run_id") == "run-1")
+    query_meta = query["metadata"]
+    native = ledger.graph.find_similar_decisions(
+        query_meta["scenario"], category=query_meta["category"],
+        max_results=len(decisions), min_similarity=0.0,
+    )
+    assert query["id"] in {row["decision"]["id"] for row in native}
 
     result = ledger.similar_candidates(first["episodes"][0]["episode_id"], max_results=5)
 

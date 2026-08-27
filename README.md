@@ -122,8 +122,9 @@ Run them in order:
    questions. It shows why search coverage—not the final date comparison—is the main review point.
    [Runnable source](notebooks/02_trace_to_decision_chain.ipynb).
 3. [03 — Semantica Decision Intelligence (checked output)](notebooks/03_semantica_decision_intelligence.executed.ipynb)
-   treats ContextGraph as an indexed decision-card box. It shows one readable card, similar-card
-   retrieval, a true same-evidence disagreement, and the re-audit queue for a changed Policy.
+   treats ContextGraph as an indexed decision-card box. It directly calls Semantica's native
+   `ContextGraph.find_similar_decisions()`, then shows ACR's separate cross-run audit guards, a true
+   same-evidence disagreement, and the re-audit queue for a changed Policy.
    [Runnable source](notebooks/03_semantica_decision_intelligence.ipynb).
 
 Each source notebook is accompanied by an `.executed.ipynb` produced from persisted real

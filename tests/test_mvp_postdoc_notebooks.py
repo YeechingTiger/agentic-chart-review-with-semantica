@@ -45,8 +45,16 @@ def test_each_walkthrough_has_one_small_teaching_job():
     intelligence_text = _visible_source(intelligence)
     assert "decision card box with an index" in intelligence_text
     assert "Find similar decisions" in intelligence_text
+    assert "Semantica—not ACR—calculates the similarity" in intelligence_text
+    assert "graph.find_similar_decisions" in intelligence_text
     assert "same question with different answers" in intelligence_text
     assert "policy changes" in intelligence_text
+
+    intelligence_source = "\n".join(cell.source for cell in intelligence.cells)
+    native_call = intelligence_source.index("ledger.graph.find_similar_decisions(")
+    acr_guard = intelligence_source.index("ledger.similar_candidates(")
+    assert native_call < acr_guard
+    assert "Presentation-only thinning" in intelligence_source
 
 
 def test_default_notebook_surface_hides_machine_index_and_noncore_analytics():
