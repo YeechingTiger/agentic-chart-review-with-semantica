@@ -1,6 +1,6 @@
 # Email to students / postdocs
 
-**Subject:** Agentic Chart Review：安装与三本 Notebook 上手说明
+**Subject:** Agentic Chart Review with Semantica：安装与三本 Notebook 上手说明
 
 各位好，
 
@@ -24,12 +24,12 @@ human review / cross-run comparison / policy-impact analysis
 
 ## 1. Clone `main` 并安装
 
-需要 Python 3.12、`uv`、Node/npm 和 Docker Compose。这个 GitHub 仓库是 private；如果
-clone 失败，请先确认自己的 GitHub 账号已经获得访问权限。
+需要 Python 3.12、`uv`、Node/npm 和 Docker Compose。这个 GitHub 仓库是 public，可以
+直接 clone。
 
 ```bash
-git clone --branch main --single-branch https://github.com/YeechingTiger/agentic-chart-review.git
-cd agentic-chart-review
+git clone --branch main --single-branch https://github.com/YeechingTiger/agentic-chart-review-with-semantica.git
+cd agentic-chart-review-with-semantica
 
 uv venv --python 3.12
 uv pip install -e ".[ledger,ledger-ui,dev,notebook]"
@@ -66,7 +66,7 @@ project ID 和 API key。不要对仍需保留的数据运行 `docker compose do
 然后回到项目目录：
 
 ```bash
-cd ../agentic-chart-review
+cd ../agentic-chart-review-with-semantica
 ```
 
 ## 3. 配置环境变量

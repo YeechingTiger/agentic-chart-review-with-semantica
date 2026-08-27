@@ -1,5 +1,5 @@
 [project]
-name = "agentic-chart-review"
+name = "agentic-chart-review-with-semantica"
 version = "0.1.0"
 description = "Auditable chart review with the Codex harness, Langtrace, and Semantica decision intelligence."
 readme = "README.md"

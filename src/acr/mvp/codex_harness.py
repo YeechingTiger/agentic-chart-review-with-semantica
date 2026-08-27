@@ -104,7 +104,7 @@ class AppServerCodexHarness:
             config_overrides=tuple(f"features.{name}=false"
                                    for name in self.disabled_features),
             client_name="acr_chart_review",
-            client_title="Agentic Chart Review",
+            client_title="Agentic Chart Review with Semantica",
         )
         result = HarnessResult(returncode=1)
         client: Any = None

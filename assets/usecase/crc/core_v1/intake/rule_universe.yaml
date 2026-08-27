@@ -1,6 +1,6 @@
 schema_version: 1
 artifact_id: crc_core_v1_rule_universe
-repository_scope: agentic-chart-review
+repository_scope: agentic-chart-review-with-semantica
 as_of_date: '2026-07-27'
 candidate_count_expected: 280
 field_notes:

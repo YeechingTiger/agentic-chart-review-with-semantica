@@ -1,4 +1,4 @@
-# Agentic Chart Review
+# Agentic Chart Review with Semantica
 
 This repository helps a human audit a chart-review agent at the level where the work can actually
 be improved: which evidence it looked for, which notes it opened, how it judged each finding, how
@@ -53,8 +53,8 @@ Requirements:
 Clone the project, then install the lean graph/notebook profile:
 
 ```bash
-git clone --branch main --single-branch https://github.com/YeechingTiger/agentic-chart-review.git
-cd agentic-chart-review
+git clone --branch main --single-branch https://github.com/YeechingTiger/agentic-chart-review-with-semantica.git
+cd agentic-chart-review-with-semantica
 
 uv venv --python 3.12
 uv pip install -e ".[ledger,ledger-ui,dev,notebook]"

@@ -1,6 +1,6 @@
 schema_version: 1
 artifact_id: crc_core_v1_source_denominator
-repository_scope: agentic-chart-review
+repository_scope: agentic-chart-review-with-semantica
 as_of_date: '2026-07-27'
 scope:
   disease: colorectal_cancer
