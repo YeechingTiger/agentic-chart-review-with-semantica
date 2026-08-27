@@ -19,19 +19,27 @@ decoupling, stated so a test can check it.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
-#: Where the reasoning came from. The first four are checked against what this run actually
-#: had; `own_knowledge` cannot be checked, and an honest self-report of it is the most
-#: valuable single fact this instrument collects — so it is never penalised.
-GROUNDING_KINDS: dict[str, str] = {
-    "contract": "a clause the contract states — name it in `used` as rule:<id>",
-    "card": "a method card or preamble from the prompt — name it as card:<name>",
-    "chart": "purely a fact read in this chart — name it as note:/evidence:",
-    "precedent": "a precedent that was retrieved for you — name it as precedent:<id>",
-    "own_knowledge": "your own clinical or general knowledge; not in the material we gave you",
+#: Orthogonal to rule coverage: this says where the agent claims its rationale came from.
+BASIS_SOURCES: dict[str, str] = {
+    "task_contract": "an exact clause in this run's Task Presentation",
+    "method_card": "a named method card included in this run's Task Presentation",
+    "operational_instruction": "a harness or chart-tool operating instruction",
+    "precedent": "a precedent explicitly returned in this run",
+    "chart": "a fact surfaced or read in this chart",
+    "own_knowledge": "clinical or general knowledge outside the supplied material",
 }
+
+RULE_COVERAGE_CLAIMS = (
+    "DIRECTLY_COVERED",
+    "COVERED_WITH_INTERPRETATION",
+    "NO_APPLICABLE_RULE",
+    "AMBIGUOUS_RULE",
+    "CONFLICTING_RULES",
+    "OPERATIONAL_DISCRETION",
+)
 
 #: How a decision names the information it used. A **Warrant** can be articulate and false —
 #: CONTEXT.md's example is a run stating a Discriminating Fact is absent having never searched
@@ -40,26 +48,39 @@ INPUT_KINDS: dict[str, str] = {
     "note": "one document, by note_id — checked against what this run read or surfaced",
     "search": "one search's results, by its query string verbatim",
     "evidence": "a recorded evidence span, by its 1-based index",
+    "finding": "an earlier structured note finding, by its 1-based index",
     "rule": "a clause of the contract, by number or name",
     "card": "a method card from the prompt, by name",
     "precedent": "a precedent returned to you in this run, by id",
     "decision": "an earlier decision point of this run, by seq",
+    "instruction": "an operational instruction from this run's Task Presentation",
 }
 
 
-def normalize_grounding(claimed: object) -> tuple[list[str], list[str]]:
+def normalize_basis_sources(claimed: object) -> tuple[list[str], list[str]]:
     """(recognised kinds, preserved unrecognised claims). Never refuses — an unrecognised
     grounding claim is still the model telling us something about where it got this."""
     items = claimed if isinstance(claimed, list) else ([claimed] if claimed else [])
     good, bad = [], []
     for raw in items:
         s = str(raw).strip()
-        (good if s in GROUNDING_KINDS else bad).append(s)
+        (good if s in BASIS_SOURCES else bad).append(s)
     return good, bad
 
 
-def grounding_lines() -> str:
-    return "\n".join(f"  - {k}: {v}" for k, v in GROUNDING_KINDS.items())
+def basis_source_lines() -> str:
+    return "\n".join(f"  - {k}: {v}" for k, v in BASIS_SOURCES.items())
+
+
+def rule_coverage_lines() -> str:
+    return "\n".join(f"  - {name}" for name in RULE_COVERAGE_CLAIMS)
+
+
+# Old traces are still readable, but new runtime schemas never expose these names.  The aliases
+# live only at the parsing seam so pre-upgrade audit artifacts do not become unreadable.
+GROUNDING_KINDS = BASIS_SOURCES
+normalize_grounding = normalize_basis_sources
+grounding_lines = basis_source_lines
 
 
 def input_prompt_lines() -> str:
@@ -81,6 +102,8 @@ class RunFacts:
     documents_seen: set[str]
     searches_run: list[str]
     n_evidence: int
+    finding_refs: set[str] = field(default_factory=set)
+    decision_refs: set[str] = field(default_factory=set)
 
     @classmethod
     def from_trace(cls, events: Iterable[dict[str, Any]]) -> RunFacts:
@@ -93,6 +116,8 @@ class RunFacts:
         seen: set[str] = set()
         searches: list[str] = []
         n_evidence = 0
+        finding_refs: set[str] = set()
+        decision_refs: set[str] = set()
         for e in events:
             if e.get("kind") != "tool_call" or not e.get("ok"):
                 continue
@@ -111,7 +136,16 @@ class RunFacts:
                 seen.update(d.get("note_id") for d in result.get("documents") or [])
             elif tool == "record_evidence" and result.get("recorded"):
                 n_evidence += 1
-        return cls(read, {s for s in seen if s}, [q for q in searches if q], n_evidence)
+            if tool in {"note_decision", "record_finding"}:
+                testimony_ref = result.get("testimony_ref")
+                if testimony_ref:
+                    decision_refs.add(str(testimony_ref))
+            if tool == "record_finding" and result.get("recorded"):
+                finding_ref = result.get("finding_ref")
+                if finding_ref:
+                    finding_refs.add(str(finding_ref))
+        return cls(read, {s for s in seen if s}, [q for q in searches if q], n_evidence,
+                   finding_refs, decision_refs)
 
     def resolve(self, raw: object) -> dict[str, Any]:
         """One claimed input, checked. Never refuses — an unverifiable citation is recorded as
@@ -136,9 +170,17 @@ class RunFacts:
             ok = target.isdigit() and 1 <= int(target) <= self.n_evidence
             row |= ({"verified": True} if ok
                     else {"verified": False, "why": "no evidence span with this index"})
-        elif kind in ("rule", "decision"):
-            # A contract rule is not the server's to check; a prior decision is the model's
-            # own, and the trace already carries it in order.
+        elif kind == "finding":
+            ref = f"finding:{target}"
+            row |= ({"verified": True} if ref in self.finding_refs
+                    else {"verified": False, "why": "no earlier finding with this reference"})
+        elif kind == "decision":
+            ref = f"decision:{target}"
+            row |= ({"verified": True} if ref in self.decision_refs
+                    else {"verified": False, "why": "no earlier decision with this reference"})
+        elif kind == "rule":
+            # Rule availability is resolved against the immutable Task Presentation by the
+            # tool server before a reference reaches this fallback resolver.
             row |= {"verified": None, "why": "recorded as claimed"}
         else:
             row |= {"verified": False, "why": f"unrecognised reference kind {kind!r}"}

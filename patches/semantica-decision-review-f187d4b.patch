@@ -1,0 +1,1125 @@
+diff --git a/explorer/src/App.tsx b/explorer/src/App.tsx
+index 8f94d47..dc41f81 100644
+--- a/explorer/src/App.tsx
++++ b/explorer/src/App.tsx
+@@ -33,6 +33,14 @@ const OntologySummaryTab = lazy(() => import('./workspaces/ManageWorkspace/Ontol
+ const OntologyWorkspace = lazy(() => import('./workspaces/OntologyWorkspace').then((module) => ({ default: module.OntologyWorkspace })));
+
+ type WorkspaceId = 'welcome' | 'explore' | 'analyze' | 'decisions' | 'enrich' | 'manage' | 'ontology-hub';
++
++function initialWorkspace(): WorkspaceId {
++  const requested = new URLSearchParams(window.location.search).get('workspace');
++  const known: WorkspaceId[] = [
++    'welcome', 'explore', 'analyze', 'decisions', 'enrich', 'manage', 'ontology-hub',
++  ];
++  return known.includes(requested as WorkspaceId) ? requested as WorkspaceId : 'welcome';
++}
+ type ExploreView = 'graph' | 'vocabulary';
+ type AnalyzeView = 'sparql' | 'reasoning';
+ type EnrichView = 'import' | 'merge' | 'registry' | 'resolve';
+@@ -1773,7 +1781,7 @@ function WelcomeScreen({
+ }
+
+ export default function App() {
+-  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('welcome');
++  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>(initialWorkspace);
+   const [exploreView, setExploreView] = useState<ExploreView>('graph');
+   const [analyzeView, setAnalyzeView] = useState<AnalyzeView>('reasoning');
+   const [enrichView, setEnrichView] = useState<EnrichView>('import');
+diff --git a/explorer/src/workspaces/DecisionWorkspace/DecisionWorkspace.tsx b/explorer/src/workspaces/DecisionWorkspace/DecisionWorkspace.tsx
+index 78790f3..648d9ca 100644
+--- a/explorer/src/workspaces/DecisionWorkspace/DecisionWorkspace.tsx
++++ b/explorer/src/workspaces/DecisionWorkspace/DecisionWorkspace.tsx
+@@ -1,5 +1,6 @@
+ import { useState, useEffect, useMemo, useRef } from "react";
+ import { Scale, Search, ArrowRight, Info } from "lucide-react";
++import { DecisionNarrativeWorkspace, type ApiRequest } from "./DecisionNarrativeWorkspace";
+
+ type OutcomeKind = "approved" | "rejected" | "deferred" | "pending" | string;
+
+@@ -85,7 +86,7 @@ function CausalFlow({ chain, loading }: { chain: ChainStep[]; loading: boolean }
+   );
+ }
+
+-export function DecisionWorkspace() {
++function GenericDecisionWorkspace({ request }: { request: ApiRequest }) {
+   const [decisions, setDecisions] = useState<{ decision_id: string; category?: string; outcome?: string }[]>([]);
+   const [selected, setSelected] = useState<{ decision_id: string; category?: string; outcome?: string } | null>(null);
+   const [chain, setChain] = useState<ChainStep[]>([]);
+@@ -101,7 +102,7 @@ export function DecisionWorkspace() {
+     const ctrl = new AbortController();
+     setListLoading(true);
+     setError("");
+-    fetch("/api/decisions", { signal: ctrl.signal })
++    request("/api/decisions", { signal: ctrl.signal })
+       .then(async (r) => {
+         if (!r.ok) throw new Error(`HTTP ${r.status}`);
+         const data = await r.json();
+@@ -123,7 +124,7 @@ export function DecisionWorkspace() {
+       });
+     return () => ctrl.abort();
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+-  }, []);
++  }, [request]);
+
+   // Cancel any in-flight chain request when the workspace unmounts.
+   useEffect(() => () => { chainCtrlRef.current?.abort(); }, []);
+@@ -138,7 +139,7 @@ export function DecisionWorkspace() {
+     setChain([]);
+     setError("");
+     try {
+-      const res = await fetch(`/api/decisions/${encodeURIComponent(d.decision_id)}/chain`, { signal: ctrl.signal });
++      const res = await request(`/api/decisions/${encodeURIComponent(d.decision_id)}/chain`, { signal: ctrl.signal });
+       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+       const data = await res.json();
+       if (res.status === 207 && !ctrl.signal.aborted) {
+@@ -277,3 +278,8 @@ export function DecisionWorkspace() {
+     </div>
+   );
+ }
++
++export function DecisionWorkspace() {
++  return <DecisionNarrativeWorkspace fallback={(request) =>
++    <GenericDecisionWorkspace request={request} />} />;
++}
+diff --git a/semantica/explorer/app.py b/semantica/explorer/app.py
+index bd9ab04..4dec9d2 100644
+--- a/semantica/explorer/app.py
++++ b/semantica/explorer/app.py
+@@ -167,6 +167,7 @@ def create_app(
+     from .routes.analytics import router as analytics_router
+     from .routes.annotations import router as annotations_router
+     from .routes.decisions import router as decisions_router
++    from .routes.decision_review import router as decision_review_router
+     from .routes.enrich import router as enrich_router
+     from .routes.export_import import router as export_import_router
+     from .routes.graph import router as graph_router
+@@ -180,6 +181,7 @@ def create_app(
+     app.include_router(graph_router, dependencies=_auth)
+     app.include_router(analytics_router, dependencies=_auth)
+     app.include_router(decisions_router, dependencies=_auth)
++    app.include_router(decision_review_router, dependencies=_auth)
+     app.include_router(temporal_router, dependencies=_auth)
+     app.include_router(enrich_router, dependencies=_auth)
+     app.include_router(export_import_router, dependencies=_auth)
+diff --git a/explorer/src/workspaces/DecisionWorkspace/DecisionNarrativeWorkspace.tsx b/explorer/src/workspaces/DecisionWorkspace/DecisionNarrativeWorkspace.tsx
+new file mode 100644
+index 0000000..569e73f
+--- /dev/null
++++ b/explorer/src/workspaces/DecisionWorkspace/DecisionNarrativeWorkspace.tsx
+@@ -0,0 +1,493 @@
++import { useCallback, useEffect, useState, type ReactNode } from "react";
++import { AlertTriangle, ArrowLeft, ArrowRight, BookOpen, Check, Eye, KeyRound } from "lucide-react";
++
++export type ApiRequest = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
++
++type BundleSummary = {
++  bundle_id: string;
++  title: string;
++  subtitle?: string;
++  step_count: number;
++  has_conclusion: boolean;
++  updated_at?: string;
++};
++
++type NarrativeAction = { name?: string; objective?: string; observation?: string };
++type NarrativeBasis = { kind?: string; label?: string; reference?: string; status?: string };
++type Attention = { code?: string; title?: string; detail?: string; severity?: string };
++type NarrativeStep = {
++  entity_id: string;
++  bundle_id: string;
++  order: number;
++  title?: string;
++  question?: string;
++  known_before?: string[];
++  rationale?: string;
++  actions?: NarrativeAction[];
++  observations?: string[];
++  candidate_changes?: { before?: unknown[]; after?: unknown[] };
++  basis?: NarrativeBasis[];
++  decision?: unknown;
++  why_next_or_stop?: string;
++  attention?: Attention[];
++  trace_links?: { label?: string; href?: string; ref?: string }[];
++  is_conclusion?: boolean;
++};
++
++type StepReview = {
++  verdict: "" | "CORRECT" | "INCORRECT" | "UNSURE";
++  corrected_decision: string;
++  issue_source: "NONE" | "DECISION_JUDGMENT" | "POLICY_GAP" | "EVIDENCE_OR_TOOLING" | "TRACE_INSUFFICIENT";
++  materiality: "NOT_APPLICABLE" | "CHANGES_FINAL" | "DOES_NOT_CHANGE_FINAL" | "UNKNOWN";
++  note: string;
++};
++
++const emptyReview = (): StepReview => ({
++  verdict: "", corrected_decision: "", issue_source: "NONE",
++  materiality: "NOT_APPLICABLE", note: "",
++});
++
++function humanKey(value: string): string {
++  const spaced = value.replaceAll("_", " ");
++  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
++}
++
++function bundleIdentity(row: BundleSummary): string {
++  const analysis = row.subtitle?.match(/analysis ([^ ·]+)/)?.[1];
++  const run = row.subtitle?.match(/run ([^ ·]+)/)?.[1];
++  return analysis && run ? `${run}:${analysis}` : row.bundle_id;
++}
++
++function bundleDetail(row: BundleSummary): string {
++  const analysis = row.subtitle?.match(/analysis ([^ ·]+)/)?.[1];
++  return analysis || row.subtitle || row.bundle_id;
++}
++
++function text(value: unknown): string {
++  if (value === null || value === undefined || value === "") return "—";
++  if (typeof value === "string") return /^\d{8}$/.test(value)
++    ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}` : value;
++  if (typeof value === "number") return String(value);
++  if (typeof value === "boolean") return value ? "yes" : "no";
++  if (Array.isArray(value)) return value.map(text).join(" · ");
++  return Object.entries(value as Record<string, unknown>)
++    .map(([key, item]) => `${humanKey(key)}: ${text(item)}`).join(" · ");
++}
++
++function Section({ title, children }: { title: string; children: ReactNode }) {
++  return (
++    <section style={{ padding: "18px 0", borderTop: "1px solid var(--ws-border)" }}>
++      <div className="ws-label">{title}</div>
++      {children}
++    </section>
++  );
++}
++
++function Bullets({ values }: { values?: string[] }) {
++  if (!values?.length) return <div className="ws-body">Nothing recorded.</div>;
++  return (
++    <ul style={{ margin: 0, paddingLeft: 20, color: "var(--ws-text)", lineHeight: 1.65 }}>
++      {values.map((value, index) => <li key={`${value}-${index}`}>{value}</li>)}
++    </ul>
++  );
++}
++
++function Choice({ name, value, current, label, onChange }: {
++  name: string; value: string; current: string; label: string; onChange: (value: string) => void;
++}) {
++  const active = current === value;
++  return (
++    <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer",
++      padding: "10px 12px", borderRadius: 9,
++      border: `1px solid ${active ? "var(--ws-accent)" : "var(--ws-border)"}`,
++      background: active ? "var(--ws-accent-soft)" : "var(--ws-surface)" }}>
++      <input type="radio" name={name} value={value} checked={active}
++        onChange={() => onChange(value)} />
++      <span style={{ color: "var(--ws-text)", fontSize: 13, fontWeight: 700 }}>{label}</span>
++    </label>
++  );
++}
++
++function StepAdjudication({ step, value, onChange }: {
++  step: NarrativeStep; value: StepReview; onChange: (next: StepReview) => void;
++}) {
++  const setVerdict = (verdict: StepReview["verdict"]) => {
++    if (verdict === "CORRECT") onChange({ ...emptyReview(), verdict });
++    else if (verdict === "UNSURE") onChange({ ...emptyReview(), verdict,
++      issue_source: "TRACE_INSUFFICIENT", materiality: "UNKNOWN" });
++    else onChange({ ...value, verdict, issue_source: value.issue_source === "NONE"
++      ? "DECISION_JUDGMENT" : value.issue_source,
++      materiality: value.materiality === "NOT_APPLICABLE" ? "UNKNOWN" : value.materiality });
++  };
++  return (
++    <Section title="Your judgment">
++      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
++        <Choice name={`verdict-${step.entity_id}`} value="CORRECT" current={value.verdict}
++          label="Correct" onChange={(v) => setVerdict(v as StepReview["verdict"])} />
++        <Choice name={`verdict-${step.entity_id}`} value="INCORRECT" current={value.verdict}
++          label="Incorrect" onChange={(v) => setVerdict(v as StepReview["verdict"])} />
++        <Choice name={`verdict-${step.entity_id}`} value="UNSURE" current={value.verdict}
++          label="Cannot tell" onChange={(v) => setVerdict(v as StepReview["verdict"])} />
++      </div>
++      {value.verdict === "INCORRECT" && (
++        <div style={{ display: "grid", gap: 10, marginTop: 12, padding: 14,
++          borderRadius: 10, background: "var(--ws-red-soft)" }}>
++          <label><span className="ws-label">Correct decision</span>
++            <textarea className="ws-input" value={value.corrected_decision}
++              onChange={(e) => onChange({ ...value, corrected_decision: e.target.value })} />
++          </label>
++          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
++            <label><span className="ws-label">Problem source</span>
++              <select className="ws-input" value={value.issue_source}
++                onChange={(e) => onChange({ ...value,
++                  issue_source: e.target.value as StepReview["issue_source"] })}>
++                <option value="DECISION_JUDGMENT">Decision judgment</option>
++                <option value="POLICY_GAP">Policy / guideline gap</option>
++                <option value="EVIDENCE_OR_TOOLING">Evidence / tooling</option>
++                <option value="TRACE_INSUFFICIENT">Trace insufficient</option>
++              </select>
++            </label>
++            <label><span className="ws-label">Effect on final answer</span>
++              <select className="ws-input" value={value.materiality}
++                onChange={(e) => onChange({ ...value,
++                  materiality: e.target.value as StepReview["materiality"] })}>
++                <option value="UNKNOWN">Unknown</option>
++                <option value="CHANGES_FINAL">Changes final answer</option>
++                <option value="DOES_NOT_CHANGE_FINAL">Does not change final answer</option>
++              </select>
++            </label>
++          </div>
++        </div>
++      )}
++      {value.verdict && (
++        <label style={{ display: "block", marginTop: 12 }}><span className="ws-label">Review note (optional)</span>
++          <textarea className="ws-input" value={value.note}
++            onChange={(e) => onChange({ ...value, note: e.target.value })} />
++        </label>
++      )}
++    </Section>
++  );
++}
++
++function NarrativeCard({ step, index, total, review, onReview }: {
++  step: NarrativeStep; index: number; total: number; review: StepReview;
++  onReview: (value: StepReview) => void;
++}) {
++  const before = step.candidate_changes?.before || [];
++  const after = step.candidate_changes?.after || [];
++  return (
++    <div className="ws-card" style={{ maxWidth: 900, margin: "0 auto", padding: 28 }}>
++      <div className="ws-eyebrow">Step {index + 1} of {total}</div>
++      <h2 className="ws-title" style={{ margin: "7px 0 2px", maxWidth: 760 }}>
++        {step.title || "Decision step"}
++      </h2>
++
++      <Section title="Question still open">
++        <div style={{ color: "var(--ws-text)", fontSize: 18, lineHeight: 1.5 }}>
++          {step.question || "No explicit question was recorded."}
++        </div>
++      </Section>
++      <Section title="Decision made">
++        <div style={{ padding: 16, borderRadius: 10, background: "var(--ws-accent-soft)",
++          borderLeft: "3px solid var(--ws-accent)", color: "var(--ws-text)",
++          fontSize: 17, fontWeight: 700 }}>{text(step.decision)}</div>
++      </Section>
++      <Section title="Why the agent chose it">
++        <div className="ws-body" style={{ color: "var(--ws-text)", fontSize: 14 }}>
++          {step.rationale || "No contemporaneous rationale was recorded."}
++        </div>
++      </Section>
++      {!!step.attention?.length && <Section title="What needs human attention">
++        <div style={{ display: "grid", gap: 8 }}>
++          {step.attention.map((item, i) => <div key={i} style={{ padding: 12,
++            borderRadius: 9, background: "var(--ws-amber-soft)", display: "flex", gap: 9 }}>
++            <AlertTriangle size={16} color="var(--ws-amber)" />
++            <div><strong style={{ color: "var(--ws-text)" }}>{item.title || item.code}</strong>
++              {item.detail && <div className="ws-body">{item.detail}</div>}</div>
++          </div>)}
++        </div>
++      </Section>}
++      <Section title="Evidence available before this decision"><Bullets values={step.known_before} /></Section>
++      {!!step.actions?.length && <Section title="Action → observation">
++        <div style={{ display: "grid", gap: 8 }}>
++          {step.actions.map((action, i) => (
++            <div key={i} style={{ padding: 12, borderRadius: 9, background: "rgba(255,255,255,.025)" }}>
++              <strong style={{ color: "var(--ws-text)" }}>{action.name || "Action"}</strong>
++              {action.objective && <span className="ws-body"> — {action.objective}</span>}
++              {action.observation && <div className="ws-body" style={{ marginTop: 5 }}>
++                Observed: {action.observation}</div>}
++            </div>
++          ))}
++        </div>
++      </Section>}
++      {!!step.observations?.length && <Section title="Evidence added or changed">
++        <Bullets values={step.observations} />
++      </Section>}
++      {(before.length > 0 || after.length > 0) && <Section title="Evidence and alternatives">
++        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 12 }}>
++          <div className="ws-panel--inset" style={{ padding: 12, overflowWrap: "anywhere" }}>
++            <span className="ws-label">Evidence entering this decision</span>{text(before)}</div>
++          <div className="ws-panel--inset" style={{ padding: 12, overflowWrap: "anywhere" }}>
++            <span className="ws-label">Options considered</span>{text(after)}</div>
++        </div>
++      </Section>}
++      {!!step.basis?.length && <Section title="What the decision relied on">
++        <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
++          {step.basis.map((basis, i) => {
++            const own = basis.kind === "own_knowledge";
++            return <span key={i} className="ws-pill" style={own ? {
++              color: "var(--ws-red)", borderColor: "rgba(255,123,114,.35)",
++              background: "var(--ws-red-soft)" } : undefined}>
++              {basis.label || basis.reference || basis.kind || "basis"}
++              {basis.status ? ` · ${basis.status}` : ""}
++            </span>;
++          })}
++        </div>
++      </Section>}
++      {step.why_next_or_stop && <Section title="Why continue or stop">
++        <div className="ws-body" style={{ color: "var(--ws-text)" }}>{step.why_next_or_stop}</div>
++      </Section>}
++      {!!step.trace_links?.length && <Section title="Audit trail">
++        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
++          {step.trace_links.map((link, i) => link.href
++            ? <a className="ws-btn ws-btn--secondary" key={i} href={link.href}
++                target="_blank" rel="noreferrer"><Eye size={13} />{link.label || link.ref || "Open trace"}</a>
++            : <span className="ws-pill ws-pill--mono" key={i}>{link.ref}</span>)}
++        </div>
++      </Section>}
++      <StepAdjudication step={step} value={review} onChange={onReview} />
++    </div>
++  );
++}
++
++function ApiKeyPrompt({ onSubmit, error }: { onSubmit: (key: string) => void; error?: string }) {
++  const [key, setKey] = useState("");
++  return (
++    <div className="ws-page" style={{ display: "grid", placeItems: "center" }}>
++      <form className="ws-card" style={{ width: 440, padding: 28 }} onSubmit={(e) => {
++        e.preventDefault(); if (key.trim()) onSubmit(key.trim());
++      }}>
++        <div style={{ width: 42, height: 42, borderRadius: 12, display: "grid", placeItems: "center",
++          background: "var(--ws-accent-soft)", color: "var(--ws-accent)", marginBottom: 16 }}>
++          <KeyRound size={20} />
++        </div>
++        <h2 className="ws-title">Open Decision Review</h2>
++        <p className="ws-body">Enter the Explorer API key. It stays in this workspace's memory and is sent only as the X-API-Key header.</p>
++        <input className="ws-input" type="password" autoComplete="off" value={key}
++          onChange={(e) => setKey(e.target.value)} placeholder="Semantica API key" />
++        {error && <div style={{ color: "var(--ws-red)", marginTop: 9 }}>{error}</div>}
++        <button className="ws-btn ws-btn--primary" style={{ marginTop: 14 }} type="submit">Continue</button>
++      </form>
++    </div>
++  );
++}
++
++export function DecisionNarrativeWorkspace({ fallback }: {
++  fallback: (request: ApiRequest) => ReactNode;
++}) {
++  const [apiKey, setApiKey] = useState("");
++  const [needsKey, setNeedsKey] = useState(false);
++  const [bundles, setBundles] = useState<BundleSummary[] | null>(null);
++  const [selectedBundle, setSelectedBundle] = useState("");
++  const [steps, setSteps] = useState<NarrativeStep[]>([]);
++  const [stepsLoading, setStepsLoading] = useState(false);
++  const [reviews, setReviews] = useState<Record<string, StepReview>>({});
++  const [stage, setStage] = useState(0);
++  const [reviewer, setReviewer] = useState("");
++  const [finalVerdict, setFinalVerdict] = useState<"" | "CORRECT" | "INCORRECT" | "UNSURE">("");
++  const [finalSource, setFinalSource] = useState("NONE");
++  const [finalRationale, setFinalRationale] = useState("");
++  const [historyCount, setHistoryCount] = useState(0);
++  const [error, setError] = useState("");
++  const [saved, setSaved] = useState<Record<string, unknown> | null>(null);
++
++  const request = useCallback<ApiRequest>((input, init = {}) => {
++    const headers = new Headers(init.headers || {});
++    if (apiKey) headers.set("X-API-Key", apiKey);
++    return fetch(input, { ...init, headers });
++  }, [apiKey]);
++
++  useEffect(() => {
++    const ctrl = new AbortController();
++    setBundles(null); setSelectedBundle(""); setSteps([]); setError("");
++    request("/api/decision-review/bundles", { signal: ctrl.signal })
++      .then(async (response) => {
++        if (response.status === 401 || response.status === 503) {
++          setNeedsKey(true); throw new Error(response.status === 401 ? "Invalid API key" : "Explorer authentication is not configured");
++        }
++        if (!response.ok) throw new Error(`HTTP ${response.status}`);
++        setNeedsKey(false); return response.json();
++      })
++      .then((data: BundleSummary[]) => {
++        if (ctrl.signal.aborted) return;
++        const visible = data.filter((row, index) =>
++          data.findIndex((candidate) => bundleIdentity(candidate) === bundleIdentity(row)) === index);
++        setBundles(visible);
++        const requested = new URLSearchParams(window.location.search).get("bundle_id");
++        const initial = visible.find((row) => row.bundle_id === requested)?.bundle_id || visible[0]?.bundle_id || "";
++        setSelectedBundle(initial);
++      })
++      .catch((cause) => { if (cause?.name !== "AbortError") setError(String(cause.message || cause)); });
++    return () => ctrl.abort();
++  }, [request]);
++
++  useEffect(() => {
++    if (!selectedBundle) return;
++    const ctrl = new AbortController(); setError(""); setSaved(null); setStage(0);
++    setSteps([]); setStepsLoading(true);
++    Promise.all([
++      request(`/api/decision-review/bundles/${encodeURIComponent(selectedBundle)}`, { signal: ctrl.signal }),
++      request(`/api/decision-review/bundles/${encodeURIComponent(selectedBundle)}/reviews`, { signal: ctrl.signal }),
++    ]).then(async ([bundleResponse, historyResponse]) => {
++      if (!bundleResponse.ok || !historyResponse.ok) throw new Error(`HTTP ${bundleResponse.status}/${historyResponse.status}`);
++      return Promise.all([bundleResponse.json(), historyResponse.json()]);
++    }).then(([bundle, history]) => {
++      if (ctrl.signal.aborted) return;
++      setSteps(bundle.steps || []); setStepsLoading(false);
++      setHistoryCount(history.reviews?.length || 0);
++      const next: Record<string, StepReview> = {};
++      (bundle.steps || []).filter((row: NarrativeStep) => !row.is_conclusion)
++        .forEach((row: NarrativeStep) => { next[row.entity_id] = emptyReview(); });
++      setReviews(next);
++    }).catch((cause) => { if (cause?.name !== "AbortError") {
++      setStepsLoading(false); setError(String(cause.message || cause));
++    }});
++    return () => ctrl.abort();
++  }, [request, selectedBundle]);
++
++  if (needsKey) return <ApiKeyPrompt error={apiKey ? error : undefined}
++    onSubmit={(value) => { setApiKey(value); setNeedsKey(false); }} />;
++  if (bundles === null) return <div className="ws-page" style={{ display: "grid", placeItems: "center" }}><div className="ws-skeleton" style={{ width: 380, height: 180 }} /></div>;
++  if (bundles.length === 0) return <>{fallback(request)}</>;
++
++  const narrativeSteps = steps.filter((row) => !row.is_conclusion);
++  const conclusion = steps.find((row) => row.is_conclusion);
++  const onConclusion = stage >= narrativeSteps.length;
++  const current = narrativeSteps[Math.min(stage, Math.max(narrativeSteps.length - 1, 0))];
++  const bundle = bundles.find((row) => row.bundle_id === selectedBundle);
++
++  async function save() {
++    setError("");
++    const verdicts = narrativeSteps.map((row) => ({ step_id: row.entity_id, ...reviews[row.entity_id] }));
++    if (!reviewer.trim() || !finalVerdict || !finalRationale.trim()
++        || verdicts.some((row) => !row.verdict)) {
++      setError("Complete every step verdict, reviewer, final verdict, and final rationale before saving.");
++      return;
++    }
++    const response = await request(`/api/decision-review/bundles/${encodeURIComponent(selectedBundle)}/reviews`, {
++      method: "POST", headers: { "Content-Type": "application/json" },
++      body: JSON.stringify({
++        review_id: globalThis.crypto?.randomUUID?.() || `review-${Date.now()}`,
++        reviewer, step_verdicts: verdicts,
++        final_answer_verdict: finalVerdict, final_issue_source: finalSource,
++        final_rationale: finalRationale,
++      }),
++    });
++    const payload = await response.json();
++    if (!response.ok) { setError(payload.detail || `HTTP ${response.status}`); return; }
++    setSaved(payload.record); setHistoryCount((value) => value + (payload.created ? 1 : 0));
++  }
++
++  return (
++    <div className="ws-page" style={{ flexDirection: "row" }}>
++      <aside className="ws-sidebar" style={{ width: 285 }}>
++        <div className="ws-sidebar-header">
++          <div style={{ display: "flex", gap: 9, alignItems: "center" }}><BookOpen size={17} color="var(--ws-accent)" />
++            <strong style={{ color: "var(--ws-text)" }}>Decision Review</strong></div>
++          <div className="ws-body" style={{ marginTop: 7 }}>Follow the evidence and decisions in reading order.</div>
++        </div>
++        <div className="ws-sidebar-body" style={{ display: "grid", gap: 5, overflowX: "hidden" }}>
++          {bundles.map((row) => <button key={row.bundle_id}
++            className={`ws-list-item${selectedBundle === row.bundle_id ? " ws-list-item--active" : ""}`}
++            style={{ minWidth: 0, maxWidth: "100%", overflow: "hidden" }}
++            onClick={() => setSelectedBundle(row.bundle_id)}>
++            <div style={{ color: "var(--ws-text)", fontWeight: 700, whiteSpace: "normal",
++              overflowWrap: "anywhere", lineHeight: 1.3 }}>{row.title}</div>
++            <div className="ws-body">{row.step_count} decision step{row.step_count === 1 ? "" : "s"}</div>
++            <div className="ws-body" title={row.subtitle} style={{ marginTop: 3,
++              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{bundleDetail(row)}</div>
++          </button>)}
++        </div>
++      </aside>
++      <main style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
++        <header style={{ padding: "16px 24px", borderBottom: "1px solid var(--ws-border)",
++          display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
++          <div><div className="ws-eyebrow">{onConclusion ? "Conclusion" : "Human reading path"}</div>
++            <strong style={{ color: "var(--ws-text)", fontSize: 16 }}>{bundle?.title}</strong>
++            {bundle && <span className="ws-body"> · {bundleDetail(bundle)}</span>}</div>
++          <div style={{ display: "flex", gap: 6 }}>
++            {narrativeSteps.map((row, index) => <button key={row.entity_id}
++              title={`Step ${index + 1}`} onClick={() => setStage(index)}
++              style={{ width: 28, height: 28, borderRadius: 999, cursor: "pointer",
++                border: `1px solid ${stage === index ? "var(--ws-accent)" : "var(--ws-border)"}`,
++                background: reviews[row.entity_id]?.verdict ? "var(--ws-green-soft)" : "var(--ws-surface)",
++                color: reviews[row.entity_id]?.verdict ? "var(--ws-green)" : "var(--ws-text-muted)" }}>
++              {reviews[row.entity_id]?.verdict ? <Check size={13} /> : index + 1}
++            </button>)}
++            <button title="Conclusion" onClick={() => setStage(narrativeSteps.length)}
++              style={{ width: 34, height: 28, borderRadius: 999, cursor: "pointer",
++                border: `1px solid ${onConclusion ? "var(--ws-accent)" : "var(--ws-border)"}`,
++                background: "var(--ws-surface)", color: "var(--ws-text-muted)" }}>Final</button>
++          </div>
++        </header>
++        {error && <div style={{ margin: "12px 24px 0", padding: 10, color: "var(--ws-red)",
++          background: "var(--ws-red-soft)", borderRadius: 8 }}>{error}</div>}
++        <div className="ws-scroll ws-padded">
++          {stepsLoading ? <div className="ws-card" style={{ maxWidth: 900, height: 420,
++            margin: "0 auto" }}><div className="ws-skeleton" style={{ height: "100%" }} /></div>
++          : !onConclusion && current ? <NarrativeCard step={current} index={stage}
++            total={narrativeSteps.length} review={reviews[current.entity_id] || emptyReview()}
++            onReview={(value) => setReviews({ ...reviews, [current.entity_id]: value })} /> : (
++            <div className="ws-card" style={{ maxWidth: 900, margin: "0 auto", padding: 28 }}>
++              <div className="ws-eyebrow">Final conclusion — revealed after the decision path</div>
++              <h2 className="ws-title" style={{ margin: "8px 0 18px" }}>{conclusion?.title || "Conclusion"}</h2>
++              <div style={{ padding: 18, borderRadius: 11, background: "var(--ws-green-soft)",
++                borderLeft: "4px solid var(--ws-green)", color: "var(--ws-text)", fontSize: 20,
++                fontWeight: 800 }}>{text(conclusion?.decision)}</div>
++              {conclusion?.rationale && <Section title="Why"><div className="ws-body"
++                style={{ color: "var(--ws-text)" }}>{conclusion.rationale}</div></Section>}
++              {conclusion?.why_next_or_stop && <Section title="Why the agent stopped"><div
++                className="ws-body" style={{ color: "var(--ws-text)" }}>{conclusion.why_next_or_stop}</div></Section>}
++              <Section title="Final human assessment">
++                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 8 }}>
++                  {(["CORRECT", "INCORRECT", "UNSURE"] as const).map((value) =>
++                    <Choice key={value} name="final-verdict" value={value} current={finalVerdict}
++                      label={{ CORRECT: "Correct", INCORRECT: "Incorrect", UNSURE: "Cannot tell" }[value]}
++                      onChange={(next) => { setFinalVerdict(next as typeof finalVerdict);
++                        setFinalSource(next === "CORRECT" ? "NONE" : next === "UNSURE" ? "TRACE_INSUFFICIENT" : "DECISION_JUDGMENT"); }} />)}
++                </div>
++                {finalVerdict === "INCORRECT" && <label style={{ display: "block", marginTop: 12 }}>
++                  <span className="ws-label">Final problem source</span>
++                  <select className="ws-input" value={finalSource} onChange={(e) => setFinalSource(e.target.value)}>
++                    <option value="DECISION_JUDGMENT">Decision judgment</option>
++                    <option value="POLICY_GAP">Policy / guideline gap</option>
++                    <option value="EVIDENCE_OR_TOOLING">Evidence / tooling</option>
++                    <option value="TRACE_INSUFFICIENT">Trace insufficient</option>
++                  </select></label>}
++                <label style={{ display: "block", marginTop: 12 }}><span className="ws-label">Reviewer</span>
++                  <input className="ws-input" value={reviewer} onChange={(e) => setReviewer(e.target.value)} /></label>
++                <label style={{ display: "block", marginTop: 12 }}><span className="ws-label">Final rationale</span>
++                  <textarea className="ws-input" value={finalRationale}
++                    onChange={(e) => setFinalRationale(e.target.value)} /></label>
++                <button className="ws-btn ws-btn--primary" style={{ marginTop: 14 }} onClick={() => void save()}>
++                  Save to Semantica audit provenance</button>
++                <div className="ws-body" style={{ marginTop: 8 }}>{historyCount} prior durable review{historyCount === 1 ? "" : "s"}.</div>
++                {saved && <div style={{ marginTop: 12, padding: 12, borderRadius: 9,
++                  background: "var(--ws-green-soft)", color: "var(--ws-green)" }}>
++                  Review saved. Root attribution: {text((saved.derived as Record<string, unknown>)?.primary_issue_source)}.
++                </div>}
++              </Section>
++            </div>
++          )}
++        </div>
++        <footer style={{ padding: "12px 24px", borderTop: "1px solid var(--ws-border)",
++          display: "flex", justifyContent: "space-between" }}>
++          <button className="ws-btn ws-btn--secondary" disabled={stage === 0}
++            onClick={() => setStage(Math.max(0, stage - 1))}><ArrowLeft size={14} />Previous</button>
++          <button className="ws-btn ws-btn--primary" disabled={onConclusion}
++            onClick={() => setStage(Math.min(narrativeSteps.length, stage + 1))}>Next<ArrowRight size={14} /></button>
++        </footer>
++      </main>
++    </div>
++  );
++}
+diff --git a/semantica/explorer/decision_review.py b/semantica/explorer/decision_review.py
+new file mode 100644
+index 0000000..9c68442
+--- /dev/null
++++ b/semantica/explorer/decision_review.py
+@@ -0,0 +1,320 @@
++"""Human-readable decision narratives and audit-grade human reviews.
++
++The narrative is a read model projected by an application into Semantica's
++``ProvenanceManager``.  It does not replace Decision nodes or causal edges.  A
++review is another provenance entity generated by a human review activity, so
++review history is durable, append-only, and covered by Semantica's integrity
++chain instead of the Explorer's in-memory annotations.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import json
++import re
++from typing import Any, Literal, Optional
++
++from pydantic import BaseModel, Field, field_validator, model_validator
++
++
++NARRATIVE_SCHEMA = "semantica.decision_narrative.v1"
++REVIEW_SCHEMA = "semantica.decision_review.v1"
++_SAFE_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,240}$")
++
++
++class StepVerdict(BaseModel):
++    """One human verdict over one narrative step."""
++
++    step_id: str
++    verdict: Literal["CORRECT", "INCORRECT", "UNSURE"]
++    corrected_decision: Optional[str] = Field(default=None, max_length=8000)
++    issue_source: Literal[
++        "NONE", "DECISION_JUDGMENT", "POLICY_GAP", "EVIDENCE_OR_TOOLING",
++        "TRACE_INSUFFICIENT",
++    ] = "NONE"
++    materiality: Literal[
++        "NOT_APPLICABLE", "CHANGES_FINAL", "DOES_NOT_CHANGE_FINAL", "UNKNOWN",
++    ] = "NOT_APPLICABLE"
++    note: Optional[str] = Field(default=None, max_length=8000)
++
++    @field_validator("step_id")
++    @classmethod
++    def validate_step_id(cls, value: str) -> str:
++        value = value.strip()
++        if not value or len(value) > 500:
++            raise ValueError("step_id is invalid")
++        return value
++
++    @model_validator(mode="after")
++    def validate_verdict(self) -> "StepVerdict":
++        if self.verdict == "CORRECT":
++            if (self.issue_source != "NONE" or self.materiality != "NOT_APPLICABLE"
++                    or self.corrected_decision):
++                raise ValueError(
++                    "a correct step cannot include an issue source, materiality, or correction"
++                )
++        elif self.verdict == "INCORRECT":
++            if not (self.corrected_decision or "").strip():
++                raise ValueError("an incorrect step requires corrected_decision")
++            if self.issue_source == "NONE":
++                raise ValueError("an incorrect step requires issue_source")
++            if self.materiality == "NOT_APPLICABLE":
++                raise ValueError("an incorrect step requires materiality")
++        else:
++            if self.issue_source not in {"NONE", "TRACE_INSUFFICIENT"}:
++                raise ValueError("an unsure step may only use TRACE_INSUFFICIENT")
++            self.materiality = "UNKNOWN"
++        return self
++
++
++class DecisionReviewSubmission(BaseModel):
++    """A complete human review of one ordered narrative bundle."""
++
++    review_id: str
++    reviewer: str = Field(min_length=1, max_length=300)
++    step_verdicts: list[StepVerdict]
++    final_answer_verdict: Literal["CORRECT", "INCORRECT", "UNSURE"]
++    final_issue_source: Literal[
++        "NONE", "DECISION_JUDGMENT", "POLICY_GAP", "EVIDENCE_OR_TOOLING",
++        "TRACE_INSUFFICIENT",
++    ] = "NONE"
++    final_rationale: str = Field(min_length=1, max_length=8000)
++
++    @field_validator("review_id")
++    @classmethod
++    def validate_review_id(cls, value: str) -> str:
++        value = value.strip()
++        if not _SAFE_ID.fullmatch(value):
++            raise ValueError("review_id must contain only letters, numbers, '.', ':', '_' or '-'")
++        return value
++
++    @field_validator("reviewer", "final_rationale")
++    @classmethod
++    def strip_required_text(cls, value: str) -> str:
++        value = value.strip()
++        if not value:
++            raise ValueError("value must not be blank")
++        return value
++
++
++def _audit_rows(manager: Any, entity_type: str) -> list[dict[str, Any]]:
++    rows = manager.audit_log(format="json")
++    return [row for row in rows if row.get("entity_type") == entity_type
++            and not row.get("invalidated")]
++
++
++def list_narratives(manager: Any, bundle_id: str | None = None) -> list[dict[str, Any]]:
++    """Read current narrative entities from Semantica provenance."""
++    rows: list[dict[str, Any]] = []
++    for entry in _audit_rows(manager, "decision_narrative"):
++        metadata = dict(entry.get("metadata") or {})
++        if metadata.get("schema") != NARRATIVE_SCHEMA:
++            continue
++        if bundle_id is not None and str(metadata.get("bundle_id")) != str(bundle_id):
++            continue
++        rows.append({
++            "entity_id": entry.get("entity_id"),
++            "timestamp": entry.get("timestamp"),
++            "checksum": entry.get("checksum"),
++            **metadata,
++        })
++    rows.sort(key=lambda row: (
++        str(row.get("bundle_id") or ""), int(row.get("order") or 0),
++        str(row.get("entity_id") or ""),
++    ))
++    return rows
++
++
++def list_bundles(manager: Any) -> list[dict[str, Any]]:
++    """Summarise narrative bundles without inventing a second index."""
++    grouped: dict[str, list[dict[str, Any]]] = {}
++    for row in list_narratives(manager):
++        grouped.setdefault(str(row["bundle_id"]), []).append(row)
++    result = []
++    for bundle_id, rows in grouped.items():
++        first = rows[0]
++        result.append({
++            "bundle_id": bundle_id,
++            "title": first.get("bundle_title") or bundle_id,
++            "subtitle": first.get("bundle_subtitle"),
++            "step_count": sum(not bool(row.get("is_conclusion")) for row in rows),
++            "has_conclusion": any(bool(row.get("is_conclusion")) for row in rows),
++            "updated_at": max(str(row.get("timestamp") or "") for row in rows),
++        })
++    result.sort(key=lambda row: (row["updated_at"], row["bundle_id"]), reverse=True)
++    return result
++
++
++def list_reviews(manager: Any, bundle_id: str) -> list[dict[str, Any]]:
++    """Return durable review entries for a narrative bundle."""
++    reviews = []
++    for entry in _audit_rows(manager, "decision_review"):
++        metadata = dict(entry.get("metadata") or {})
++        if metadata.get("schema") != REVIEW_SCHEMA:
++            continue
++        if str(metadata.get("bundle_id")) != str(bundle_id):
++            continue
++        reviews.append({
++            "entity_id": entry.get("entity_id"),
++            "timestamp": entry.get("timestamp"),
++            "checksum": entry.get("checksum"),
++            "sequence_id": entry.get("sequence_id"),
++            **metadata,
++        })
++    reviews.sort(key=lambda row: (str(row.get("timestamp") or ""),
++                                  str(row.get("entity_id") or "")))
++    return reviews
++
++
++def _improvement(issue_source: str) -> dict[str, str]:
++    targets = {
++        "POLICY_GAP": (
++            "POLICY",
++            "Clarify the missing boundary or conflict rule, version the policy, and re-audit "
++            "the affected decisions.",
++        ),
++        "EVIDENCE_OR_TOOLING": (
++            "EVIDENCE_OR_TOOLING",
++            "Improve retrieval or tool behavior, then verify that the needed evidence was "
++            "observable before changing decision policy.",
++        ),
++        "TRACE_INSUFFICIENT": (
++            "TRACE_INSTRUMENTATION",
++            "Capture the missing state, evidence reference, or contemporaneous decision basis.",
++        ),
++        "DECISION_JUDGMENT": (
++            "DECISION_POLICY",
++            "Add a targeted example, constraint, or adjudicated precedent for this decision.",
++        ),
++    }
++    target, recommendation = targets.get(
++        issue_source, ("NONE", "No improvement target was identified."))
++    return {"target": target, "recommendation": recommendation}
++
++
++def derive_attribution(step_verdicts: list[dict[str, Any]], final_verdict: str,
++                       final_issue_source: str) -> dict[str, Any]:
++    """Locate the earliest human-confirmed material problem in reading order."""
++    incorrect = [(index, row) for index, row in enumerate(step_verdicts)
++                 if row["verdict"] == "INCORRECT"]
++    first = incorrect[0] if incorrect else None
++    material = next(((index, row) for index, row in incorrect
++                     if row["materiality"] == "CHANGES_FINAL"), None)
++    primary = material if final_verdict == "INCORRECT" else material or first
++    primary_source = primary[1]["issue_source"] if primary else final_issue_source
++    if final_verdict == "UNSURE" or any(row["verdict"] == "UNSURE"
++                                        for row in step_verdicts):
++        outcome = "UNREVIEWABLE_TRACE_INSUFFICIENT"
++        primary_source = primary_source if primary_source != "NONE" else "TRACE_INSUFFICIENT"
++    elif final_verdict == "CORRECT" and incorrect:
++        outcome = "CORRECT_OUTCOME_FLAWED_REASONING"
++    elif final_verdict == "CORRECT":
++        outcome = "PASS"
++    else:
++        outcome = {
++            "POLICY_GAP": "FAIL_POLICY_GAP",
++            "EVIDENCE_OR_TOOLING": "FAIL_EVIDENCE_OR_TOOLING",
++            "TRACE_INSUFFICIENT": "UNREVIEWABLE_TRACE_INSUFFICIENT",
++        }.get(primary_source, "FAIL_DECISION_JUDGMENT")
++        if primary_source == "NONE":
++            primary_source = "DECISION_JUDGMENT"
++    primary_index = primary[0] if primary else None
++    return {
++        "outcome": outcome,
++        "first_incorrect_step_id": first[1]["step_id"] if first else None,
++        "primary_material_step_id": primary[1]["step_id"] if primary else None,
++        "primary_issue_source": primary_source,
++        "downstream_potentially_contaminated_step_ids": (
++            [row["step_id"] for row in step_verdicts[primary_index + 1:]]
++            if primary_index is not None else []
++        ),
++        "improvement": _improvement(primary_source),
++    }
++
++
++def save_review(manager: Any, bundle_id: str,
++                submission: DecisionReviewSubmission) -> tuple[dict[str, Any], bool]:
++    """Validate and append one review through Semantica's provenance store."""
++    narratives = list_narratives(manager, bundle_id)
++    if not narratives:
++        raise ValueError(f"unknown decision narrative bundle {bundle_id!r}")
++    expected = [str(row["entity_id"]) for row in narratives if not row.get("is_conclusion")]
++    supplied = [row.step_id for row in submission.step_verdicts]
++    if len(supplied) != len(set(supplied)) or set(supplied) != set(expected):
++        raise ValueError(
++            f"step_verdicts must cover the narrative exactly; expected={expected}, "
++            f"supplied={supplied}"
++        )
++    by_id = {row.step_id: row.model_dump() for row in submission.step_verdicts}
++    ordered = [by_id[step_id] for step_id in expected]
++    has_material_error = any(
++        row["verdict"] == "INCORRECT" and row["materiality"] == "CHANGES_FINAL"
++        for row in ordered
++    )
++    if (submission.final_answer_verdict == "INCORRECT"
++            and submission.final_issue_source == "NONE" and not has_material_error):
++        raise ValueError(
++            "an incorrect final answer requires a material step error or final_issue_source"
++        )
++    if submission.final_answer_verdict == "CORRECT" \
++            and submission.final_issue_source != "NONE":
++        raise ValueError("a correct final answer cannot carry final_issue_source")
++    if submission.final_answer_verdict == "UNSURE" \
++            and submission.final_issue_source not in {"NONE", "TRACE_INSUFFICIENT"}:
++        raise ValueError("an unsure final answer may only use TRACE_INSUFFICIENT")
++
++    comparable = {
++        "review_id": submission.review_id,
++        "reviewer": submission.reviewer,
++        "step_verdicts": ordered,
++        "final_answer_verdict": submission.final_answer_verdict,
++        "final_issue_source": submission.final_issue_source,
++        "final_rationale": submission.final_rationale,
++    }
++    existing = next((row for row in list_reviews(manager, bundle_id)
++                     if row.get("review_id") == submission.review_id), None)
++    if existing is not None:
++        if any(existing.get(key) != value for key, value in comparable.items()):
++            raise ValueError("review_id already exists with different content")
++        return existing, False
++
++    derived = derive_attribution(
++        ordered, submission.final_answer_verdict, submission.final_issue_source)
++    entity_id = "decision-review:" + hashlib.sha256(
++        f"{bundle_id}:{submission.review_id}".encode("utf-8")).hexdigest()[:32]
++    conclusion = next((row for row in narratives if row.get("is_conclusion")), narratives[-1])
++    used_entities = list(dict.fromkeys([
++        *(str(row["entity_id"]) for row in narratives),
++        *(str(decision_id) for row in narratives
++          for decision_id in row.get("decision_ids") or []),
++    ]))
++    metadata = {
++        "schema": REVIEW_SCHEMA,
++        "bundle_id": bundle_id,
++        **comparable,
++        "derived": derived,
++    }
++    entry = manager.track_entity(
++        entity_id=entity_id,
++        source=str(conclusion["entity_id"]),
++        metadata=metadata,
++        entity_type="decision_review",
++        activity_id=f"human_review:{submission.review_id}",
++        agent_id=submission.reviewer,
++        agent_type="person",
++        is_automated=False,
++        role="reviewer",
++        parent_entity_id=str(conclusion["entity_id"]),
++        used_entities=used_entities,
++        bundle_id=bundle_id,
++    )
++    if entry is None:
++        raise RuntimeError("Semantica failed to persist the decision review")
++    record = {
++        "entity_id": entry.entity_id,
++        "timestamp": entry.timestamp,
++        "checksum": entry.checksum,
++        "sequence_id": entry.sequence_id,
++        **metadata,
++    }
++    return record, True
+diff --git a/semantica/explorer/routes/decision_review.py b/semantica/explorer/routes/decision_review.py
+new file mode 100644
+index 0000000..c1d9366
+--- /dev/null
++++ b/semantica/explorer/routes/decision_review.py
+@@ -0,0 +1,55 @@
++"""Decision narrative and durable human-review routes."""
++
++from __future__ import annotations
++
++import asyncio
++
++from fastapi import APIRouter, Depends, HTTPException
++
++from ..decision_review import (
++    DecisionReviewSubmission,
++    list_bundles,
++    list_narratives,
++    list_reviews,
++    save_review,
++)
++from ..dependencies import get_session
++from ..session import GraphSession
++
++
++router = APIRouter(prefix="/api/decision-review", tags=["Decision Review"])
++
++
++@router.get("/bundles")
++async def get_bundles(session: GraphSession = Depends(get_session)):
++    return await asyncio.to_thread(list_bundles, session.provenance_manager)
++
++
++@router.get("/bundles/{bundle_id}")
++async def get_bundle(bundle_id: str, session: GraphSession = Depends(get_session)):
++    rows = await asyncio.to_thread(list_narratives, session.provenance_manager, bundle_id)
++    if not rows:
++        raise HTTPException(status_code=404, detail=f"Narrative bundle '{bundle_id}' not found")
++    return {"bundle_id": bundle_id, "steps": rows}
++
++
++@router.get("/bundles/{bundle_id}/reviews")
++async def get_reviews(bundle_id: str, session: GraphSession = Depends(get_session)):
++    return {
++        "bundle_id": bundle_id,
++        "reviews": await asyncio.to_thread(
++            list_reviews, session.provenance_manager, bundle_id),
++    }
++
++
++@router.post("/bundles/{bundle_id}/reviews", status_code=201)
++async def create_review(body: DecisionReviewSubmission, bundle_id: str,
++                        session: GraphSession = Depends(get_session)):
++    try:
++        record, created = await asyncio.to_thread(
++            save_review, session.provenance_manager, bundle_id, body)
++    except ValueError as exc:
++        raise HTTPException(status_code=409 if "already exists" in str(exc) else 422,
++                            detail=str(exc)) from exc
++    return {"record": record, "created": created,
++            "integrity": await asyncio.to_thread(session.provenance_manager.verify_chain)}
+diff --git a/tests/explorer/test_decision_review.py b/tests/explorer/test_decision_review.py
+new file mode 100644
+index 0000000..c72b56a
+--- /dev/null
++++ b/tests/explorer/test_decision_review.py
+@@ -0,0 +1,129 @@
++"""Decision narratives stay readable while human review uses audit provenance."""
++
++from fastapi.testclient import TestClient
++
++from semantica.context import ContextGraph
++from semantica.explorer.app import create_app
++from semantica.explorer.decision_review import NARRATIVE_SCHEMA
++from semantica.explorer.session import GraphSession
++
++
++def _client(tmp_path):
++    graph = ContextGraph(advanced_analytics=False)
++    first = graph.record_decision(
++        category="where_to_look", scenario="An inventory is available",
++        reasoning="Inspect likely evidence sources first", outcome="read pathology",
++        confidence=0.9,
++    )
++    final = graph.record_decision(
++        category="what_to_answer", scenario="Three candidate dates",
++        reasoning="The earliest establishing date wins", outcome="select candidate 2",
++        confidence=0.9,
++    )
++    graph.add_causal_relationship(first, final, "INFLUENCED")
++    session = GraphSession(
++        graph, provenance_storage_path=str(tmp_path / "provenance.sqlite3"))
++    pm = session.provenance_manager
++    bundle = "run-a:analysis-a"
++    step_id = "narrative:step-1"
++    final_id = "narrative:conclusion"
++    pm.track_entity(
++        step_id, source="trace-a", entity_type="decision_narrative",
++        activity_id="narrative_projection", agent_id="reconstructor",
++        used_entities=[first], bundle_id=bundle,
++        metadata={
++            "schema": NARRATIVE_SCHEMA, "bundle_id": bundle, "order": 1,
++            "bundle_title": "First diagnosis date", "title": "Inspect pathology",
++            "question": "Where can an establishing date be found?",
++            "known_before": ["The chart inventory contains pathology and clinical notes"],
++            "rationale": "The policy allows either source type",
++            "actions": [{"name": "read", "objective": "inspect pathology"}],
++            "observations": ["One pathology date became a candidate"],
++            "candidate_changes": {"before": [], "after": ["candidate 1"]},
++            "basis": [{"kind": "policy", "label": "evidence rule 1"}],
++            "decision": "Continue to clinical notes before selecting the earliest date",
++            "why_next_or_stop": "An earlier clinical date could still change the answer",
++            "decision_ids": [first], "is_conclusion": False,
++        },
++    )
++    pm.track_entity(
++        final_id, source="trace-a", entity_type="decision_narrative",
++        activity_id="narrative_projection", agent_id="reconstructor",
++        parent_entity_id=step_id, used_entities=[step_id, final], bundle_id=bundle,
++        metadata={
++            "schema": NARRATIVE_SCHEMA, "bundle_id": bundle, "order": 2,
++            "bundle_title": "First diagnosis date", "title": "Final answer",
++            "question": "Which candidate is earliest?", "known_before": ["Three candidates"],
++            "rationale": "Compare all establishing dates", "actions": [],
++            "observations": [], "candidate_changes": {"before": ["1", "2", "3"],
++                                                        "after": ["2"]},
++            "basis": [{"kind": "policy", "label": "earliest-date rule"}],
++            "decision": "Select candidate 2", "why_next_or_stop": "All source types checked",
++            "decision_ids": [final], "is_conclusion": True,
++        },
++    )
++    return TestClient(create_app(session=session)), session, bundle, step_id
++
++
++def test_narrative_bundle_is_ordered_and_human_readable(tmp_path):
++    client, _session, bundle, _step_id = _client(tmp_path)
++    with client:
++        bundles = client.get("/api/decision-review/bundles")
++        narrative = client.get(f"/api/decision-review/bundles/{bundle}")
++
++    assert bundles.status_code == narrative.status_code == 200
++    assert bundles.json()[0]["title"] == "First diagnosis date"
++    assert bundles.json()[0]["step_count"] == 1
++    steps = narrative.json()["steps"]
++    assert [row["order"] for row in steps] == [1, 2]
++    assert steps[0]["known_before"] == [
++        "The chart inventory contains pathology and clinical notes"]
++    assert steps[0]["why_next_or_stop"].startswith("An earlier clinical date")
++
++
++def test_review_is_idempotent_hash_chained_provenance_not_annotation(tmp_path):
++    client, session, bundle, step_id = _client(tmp_path)
++    payload = {
++        "review_id": "review-a", "reviewer": "domain-expert",
++        "step_verdicts": [{
++            "step_id": step_id, "verdict": "INCORRECT",
++            "corrected_decision": "Inspect both source types before preferring either",
++            "issue_source": "POLICY_GAP", "materiality": "CHANGES_FINAL",
++            "note": "The source-order instruction is ambiguous",
++        }],
++        "final_answer_verdict": "INCORRECT", "final_issue_source": "NONE",
++        "final_rationale": "The conclusion inherited the first material error",
++    }
++    with client:
++        created = client.post(
++            f"/api/decision-review/bundles/{bundle}/reviews", json=payload)
++        duplicate = client.post(
++            f"/api/decision-review/bundles/{bundle}/reviews", json=payload)
++        history = client.get(f"/api/decision-review/bundles/{bundle}/reviews")
++
++    assert created.status_code == duplicate.status_code == 201
++    assert created.json()["created"] is True
++    assert duplicate.json()["created"] is False
++    assert created.json()["integrity"]["valid"] is True
++    assert len(history.json()["reviews"]) == 1
++    record = history.json()["reviews"][0]
++    assert record["derived"]["primary_material_step_id"] == step_id
++    assert record["derived"]["improvement"]["target"] == "POLICY"
++    stored = session.provenance_manager.storage.retrieve(record["entity_id"])
++    assert stored.entity_type == "decision_review"
++    assert stored.agent_type == "person"
++    assert stored.role == "reviewer"
++    assert session.annotations == {}
++
++
++def test_review_must_cover_exactly_the_visible_non_conclusion_steps(tmp_path):
++    client, _session, bundle, _step_id = _client(tmp_path)
++    with client:
++        response = client.post(f"/api/decision-review/bundles/{bundle}/reviews", json={
++            "review_id": "review-incomplete", "reviewer": "domain-expert",
++            "step_verdicts": [], "final_answer_verdict": "CORRECT",
++            "final_issue_source": "NONE", "final_rationale": "Looks right",
++        })
++
++    assert response.status_code == 422
++    assert "cover the narrative exactly" in response.json()["detail"]

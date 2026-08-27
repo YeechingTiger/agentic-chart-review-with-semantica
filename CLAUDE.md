@@ -29,6 +29,7 @@ missing. If the original surfaces, reconcile against it rather than inventing th
 
 ## Where else to look
 
-[`CONTEXT.md`](CONTEXT.md) defines the domain language — Task Contract, Discriminating Fact,
-Coverage, Warrant, Complete Answer — and is the file to read before naming anything new.
-[`README.md`](README.md) is the handover document for the pipeline itself.
+[`CONTEXT.md`](CONTEXT.md) defines the maintained language around runtime testimony, ReAct cycles,
+Decision Episodes, Semantica decisions, policy bindings, provenance, and human adjudication.
+[`README.md`](README.md) is the entry point; [`docs/CORE_STORY.md`](docs/CORE_STORY.md) explains the
+design and [`docs/RUNBOOK.md`](docs/RUNBOOK.md) contains the operational workflow.

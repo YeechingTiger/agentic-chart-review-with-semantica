@@ -1,36 +1,19 @@
-"""The taxonomy a finished run is read back through: what KIND of judgment each point was.
+"""Post-run chart-review decision taxonomy.
 
-This vocabulary is applied **after** a run, by `acr.mvp.reconstruct`, never during one. The
-reason is that it is the one part of this system still being grown from real data: asking a
-model to classify against an unsettled vocabulary at the moment it acts would force every
-judgment that fits nothing into `other` — or worse, into a type that merely looks close — and
-the trace would keep only the forced choice. Applied afterwards, a changed taxonomy costs one
-re-extraction instead of a re-run. What the runtime *does* collect is in
-[`warrants`](warrants.py): what a decision used and where it knew it from, both facts about
-the model's state that no reconstruction can recover.
+The runtime records taxonomy-neutral Decision Testimony and sealed receipts. Reconstruction applies
+this vocabulary afterwards, so a taxonomy change requires only another read of the same Langtrace
+trace rather than another chart review. Functions describe what semantic question was answered;
+subjects describe what the atomic choice acted on.
 
-  * `DECISION_TYPES` — thirteen kinds of judgment, in three groups. The list merges two
-    sources that each cover half the ground. The perception half is the decision-precipitation
-    design's ten families, a faithful decomposition of what a human reviewer decides; the
-    synthesis half is THE_IDEAL_SYSTEM's judgment-layer operators (corroboration, arbitration,
-    dedup/ordering, derivation), which the ten families deliberately EXCLUDE because that
-    document assumes the retrieval operators are deterministic. Here they are not — they are
-    judgments. Taking either source alone drops half the review.
-
-  * `outcomes` — what a decision of each kind may conclude. Six kinds are naturally closed
-    (`standing`'s three values are CONTEXT.md's own domain language; `is_it_absent`'s are the
-    contract's two abstentions plus "found"), which is what makes divergence computable before
-    any situation vocabulary has settled. The rest conclude from this run's candidate set.
-
-The GRANULARITY RULE, because it is what keeps this list from growing: **two types split when
-their divergences go to different people and change different things.** Routing is the only
-reason a taxonomy exists. Fineness does not live here — the full identity of a decision point
-is `{level}:{decision_type}:{situation_slug}`, and comparability lives in the slug, which is
-open and evolves. This vocabulary is closed and meant to stay still.
+The granularity rule is operational: split two functions when their divergences route to different
+owners or require different remedies. The ``other`` escape valve preserves unnamed judgments until
+repeated runs justify a stable new type.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+DECISION_TAXONOMY_SCHEMA = "acr.chart_review_decision_taxonomy.v1"
 
 SMALL = "small"   # 小点: decidable within one action
 BIG = "big"       # 大点: needs several small steps to reach
@@ -51,7 +34,7 @@ DECISION_TYPES: dict[str, DecisionType] = {
     # ---- A · one document or span -------------------------------------------------------
     "where_to_look": DecisionType(
         "A", "去哪找、用什么词、开哪一份、要不要扩", None,
-        "retrieval prior / 检索卡片（工程，自动回归门）"),
+        "retrieval guideline / instrumentation / model behavior"),
     "is_this_it": DecisionType(
         "A", "这段说的是不是目标概念",
         ("is_target", "not_target", "unclear"),
@@ -59,7 +42,7 @@ DECISION_TYPES: dict[str, DecisionType] = {
     "what_it_asserts": DecisionType(
         "A", "断言了什么：否定 / 病史 / 假设 / 转述 / 计划 vs 已执行",
         ("asserted", "negated", "historical", "hypothetical", "planned", "reported_by_other"),
-        "extractor / 先例库（能力）"),
+        "extraction prompt or model capability"),
     "when_it_happened": DecisionType(
         "A", "指向哪个时间：记录时间 vs 事件时间、copy-forward",
         ("event_time_stated", "recorded_time_only", "carried_forward", "undatable"),
@@ -90,11 +73,11 @@ DECISION_TYPES: dict[str, DecisionType] = {
     "is_it_absent": DecisionType(
         "C", "没找到意味着什么",
         ("absent_in_chart", "absent_from_corpus", "found"),
-        "coverage 卡片（可强制那半归闸门）"),
+        "coverage guideline or absence rule"),
     "enough": DecisionType(
         "C", "手上的证据够不够作答",
         ("enough", "not_enough"),
-        "coverage 卡片（已测死，不可强制）"),
+        "coverage guideline or stopping rule"),
     "what_to_answer": DecisionType(
         "C", "满不满足定义、边界、值规范化、怎么拼", None,
         "合同的字段定义 / 格式 / 组合规则（专家）"),
@@ -110,6 +93,59 @@ DECISION_TYPES: dict[str, DecisionType] = {
 BOTH_LEVELS = frozenset({"where_to_look"})
 
 STANDING_VALUES = DECISION_TYPES["standing"].outcomes or ()
+
+
+#: The object of one atomic choice.  ``decision_function`` says what semantic question was
+#: answered; this says what the choice acted on.  In particular, it keeps note-type selection,
+#: a precommitted keyword batch, and selective note opening comparable without pretending they
+#: are the same retrieval situation.
+DECISION_SUBJECTS: dict[str, str] = {
+    "retrieval_inventory": "whether/how to establish the available-note inventory",
+    "retrieval_source": "which note type or source family to include",
+    "retrieval_query_batch": "one keyword/query batch committed before observing its results",
+    "retrieval_document_set": "which surfaced note or note set to open",
+    "evidence_item": "one note or evidence span for one Field",
+    "evidence_relationship": "the relation among two or more evidence candidates",
+    "case_scope": "whether the case/entity/time anchor is in scope",
+    "case_inference": "a case-level inference from witnessed premises",
+    "case_absence": "what an unsuccessful search establishes",
+    "case_sufficiency": "whether the current case state is sufficient to continue or answer",
+    "answer_selection": "the answer value or abstention to return",
+    "other": "a material choice whose subject is not yet named",
+}
+
+_SUBJECTS_BY_FUNCTION: dict[str, frozenset[str]] = {
+    "where_to_look": frozenset({
+        "retrieval_inventory", "retrieval_source", "retrieval_query_batch",
+        "retrieval_document_set", "evidence_item",
+    }),
+    "is_this_it": frozenset({"evidence_item"}),
+    "what_it_asserts": frozenset({"evidence_item"}),
+    "when_it_happened": frozenset({"evidence_item"}),
+    "standing": frozenset({"evidence_item"}),
+    "same_or_ordered": frozenset({"evidence_relationship"}),
+    "corroborate": frozenset({"evidence_relationship"}),
+    "which_wins": frozenset({"evidence_relationship"}),
+    "scope": frozenset({"case_scope"}),
+    "infer": frozenset({"case_inference"}),
+    "is_it_absent": frozenset({"case_absence"}),
+    "enough": frozenset({"case_sufficiency"}),
+    "what_to_answer": frozenset({"answer_selection"}),
+    "other": frozenset({"other"}),
+}
+
+
+def subjects_for(decision_function: str) -> frozenset[str]:
+    """Return coherent subjects while preserving both taxonomy escape valves.
+
+    A reader may know that a choice acts on one evidence item without yet having a settled
+    function name, or know the function while the subject vocabulary is incomplete.  Forcing
+    either known half to ``other`` would throw away useful similarity information.
+    """
+    if decision_function == "other":
+        return frozenset(DECISION_SUBJECTS)
+    allowed = _SUBJECTS_BY_FUNCTION.get(decision_function, frozenset())
+    return frozenset({*allowed, "other"}) if allowed else frozenset()
 
 
 def group_of(decision_type: str) -> str:

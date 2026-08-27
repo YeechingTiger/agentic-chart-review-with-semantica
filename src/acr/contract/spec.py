@@ -1071,9 +1071,8 @@ def load_spec(path: str | Path) -> ExtractionSpec:
     if spec.value_domain:
         # FAIL CLOSED ON A TYPO. A declared table that does not exist would otherwise render an
         # empty value domain into the prompt, and the run would look exactly like one that had
-        # been given the codes. Same reason `acr.contract.skills` raises on a missing skill: a supplier of
-        # guidance that silently supplies none is worse than one that is absent, because the
-        # manifest reports that it was supplied.
+        # been given the codes. Guidance that silently supplies nothing is worse than absent
+        # guidance because the Task Presentation would report that it was supplied.
         from .code_tables import load_table
         load_table(spec.value_domain)
     return spec

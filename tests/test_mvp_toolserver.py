@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from acr.mvp.warrants import GROUNDING_KINDS
 from acr.mvp.toolserver import ChartToolServer
+from acr.mvp.warrants import BASIS_SOURCES, RULE_COVERAGE_CLAIMS
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "assets" / "specs" / "STORE.390.date_of_initial_diagnosis.yaml"
@@ -55,6 +55,19 @@ def test_the_gate_refuses_an_absence_claim_before_an_unfiltered_listing(server: 
     server.call("list_documents", {})
     payload, _ = server.call("submit_answer", {"status": "EVIDENCE_INSUFFICIENT"})
     assert payload["accepted"] is True
+
+
+def test_document_inventory_reports_page_completeness_not_just_returned_rows(
+        server: ChartToolServer):
+    payload, is_error = server.call("list_documents", {"limit": 2, "offset": 0})
+
+    assert not is_error
+    assert payload["returned"] == 2
+    assert payload["total"] > payload["returned"]
+    assert payload["page_complete"] is False
+    assert payload["unreturned"] == payload["total"] - 2
+    assert payload["offset"] == 0 and payload["limit"] == 2
+    assert payload["types"]
 
 
 def test_the_gate_refuses_a_status_the_contract_did_not_declare(server: ChartToolServer):
@@ -158,26 +171,28 @@ def test_note_decision_carries_a_server_context_snapshot(server: ChartToolServer
     assert ctx["evidence_notes"] == [hit["note_id"]]
 
 
-def test_grounding_is_recorded_and_an_unrecognised_one_is_kept_not_refused(
+def test_basis_is_recorded_and_an_unrecognised_one_is_kept_not_refused(
         server: ChartToolServer):
     """Where the reasoning came from is the one thing no later reader can recover, so it is
     collected here — and an off-vocabulary claim is still the model telling us something."""
     payload, is_error = server.call("note_decision", {
         "facing": "f", "decision": "d", "because": "b",
-        "grounding": ["own_knowledge", "a hunch"]})
+        "basis_sources": ["own_knowledge", "a hunch"],
+        "cited_refs": [], "checked_discriminating_fact_refs": [],
+        "rule_coverage_claim": "NO_APPLICABLE_RULE"})
     assert not is_error
-    assert payload["grounding"] == ["own_knowledge"]
-    assert payload["grounding_claimed"] == ["a hunch"]
+    assert payload["basis_sources"] == ["own_knowledge"]
+    assert payload["basis_sources_unrecognised"] == ["a hunch"]
     assert "a hunch" in payload["note"]
 
 
-def test_a_decision_needs_no_grounding_and_no_used(server: ChartToolServer):
-    """Both are optional by design: a required field gets filled with filler, and filler in
-    the one channel a later reader cannot check is worse than a gap it can see."""
+def test_a_malformed_direct_call_is_recorded_as_missing_not_fabricated(server: ChartToolServer):
+    """The MCP schema requires testimony fields; a bypassed schema still does not invent them."""
     payload, is_error = server.call("note_decision", {
         "facing": "f", "decision": "d", "because": "b"})
     assert not is_error and payload["noted"]
-    assert payload["used"] == [] and payload["grounding"] == []
+    assert payload["citation_resolutions"] == [] and payload["basis_sources"] == []
+    assert payload["rule_coverage_claim"] is None
 
 
 def test_the_runtime_does_not_know_the_taxonomy(server: ChartToolServer):
@@ -190,8 +205,11 @@ def test_the_runtime_does_not_know_the_taxonomy(server: ChartToolServer):
     schema = next(t for t in server.schemas() if t["name"] == "note_decision")
     props = schema["inputSchema"]["properties"]
     assert "decision_type" not in props
-    assert set(schema["inputSchema"]["required"]) == {"facing", "decision", "because"}
-    assert set(props["grounding"]["items"]["enum"]) == set(GROUNDING_KINDS)
+    assert set(schema["inputSchema"]["required"]) == {
+        "facing", "decision", "because", "basis_sources", "cited_refs",
+        "checked_discriminating_fact_refs", "rule_coverage_claim"}
+    assert set(props["basis_sources"]["items"]["enum"]) == set(BASIS_SOURCES)
+    assert set(props["rule_coverage_claim"]["enum"]) == set(RULE_COVERAGE_CLAIMS)
 
 
 def test_claimed_inputs_are_checked_against_what_the_run_actually_observed(
@@ -201,11 +219,14 @@ def test_claimed_inputs_are_checked_against_what_the_run_actually_observed(
     hit = _find_span(server)                                   # one search, hits surfaced
     server.call("read", {"note_id": hit["note_id"]})           # one document read in full
     payload, is_error = server.call("note_decision", { "facing": "f", "decision": "d", "because": "b",
-        "used": [f"note:{hit['note_id']}", "search:adenocarcinoma",
+        "basis_sources": ["task_contract", "chart"],
+        "cited_refs": [f"note:{hit['note_id']}", "search:adenocarcinoma",
                  "note:Onc-Med-MD-OP-Progress-Note_2023-04-12",   # surfaced by no search
-                 "search:never ran this", "evidence:1", "rule:conflict_rule.1", "vibes"]})
+                 "search:never ran this", "evidence:1", "rule:conflict_rule.1", "vibes"],
+        "checked_discriminating_fact_refs": [],
+        "rule_coverage_claim": "COVERED_WITH_INTERPRETATION"})
     assert not is_error   # a note is never refused
-    by_ref = {u["ref"]: u for u in payload["used"]}
+    by_ref = {u["ref"]: u for u in payload["citation_resolutions"]}
 
     assert by_ref[f"note:{hit['note_id']}"] == {
         "ref": f"note:{hit['note_id']}", "kind": "note", "verified": True, "depth": "read"}
@@ -213,7 +234,7 @@ def test_claimed_inputs_are_checked_against_what_the_run_actually_observed(
     assert by_ref["note:Onc-Med-MD-OP-Progress-Note_2023-04-12"]["verified"] is False
     assert by_ref["search:never ran this"]["verified"] is False
     assert by_ref["evidence:1"]["verified"] is False           # nothing recorded yet
-    assert by_ref["rule:conflict_rule.1"]["verified"] is None  # not the server's to check
+    assert by_ref["conflict_rule.1"]["status"] == "CLAIMED_AND_VERIFIED"
     assert by_ref["vibes"]["kind"] == "unrecognised"
 
 
@@ -221,9 +242,12 @@ def test_a_document_seen_only_in_search_results_is_marked_as_such(server: ChartT
     """Citing a snippet and citing a document you read are different warrants."""
     hit = _find_span(server)
     payload, _ = server.call("note_decision", { "facing": "f", "decision": "d", "because": "b",
-        "used": [f"note:{hit['note_id']}"]})
-    assert payload["used"][0] == {"ref": f"note:{hit['note_id']}", "kind": "note",
-                                  "verified": True, "depth": "seen_in_results"}
+        "basis_sources": ["chart"], "cited_refs": [f"note:{hit['note_id']}"],
+        "checked_discriminating_fact_refs": [],
+        "rule_coverage_claim": "OPERATIONAL_DISCRETION"})
+    assert payload["citation_resolutions"][0] == {
+        "ref": f"note:{hit['note_id']}", "kind": "note",
+        "verified": True, "depth": "seen_in_results"}
     ctx = payload["context"]
     assert ctx["searches_run"] == ["adenocarcinoma"]
     assert ctx["documents_read"] == []
@@ -256,7 +280,7 @@ def test_stdio_transport_end_to_end(tmp_path: Path):
     assert by_id[1]["result"]["protocolVersion"] == "2025-06-18"
     names = {t["name"] for t in by_id[2]["result"]["tools"]}
     assert names == {"list_documents", "search", "read", "note_decision",
-                     "record_evidence", "submit_answer"}
+                     "record_finding", "record_evidence", "submit_answer"}
     search = json.loads(by_id[3]["result"]["content"][0]["text"])
     assert search["n"] > 0 and by_id[3]["result"]["isError"] is False
     verdict = json.loads(by_id[4]["result"]["content"][0]["text"])

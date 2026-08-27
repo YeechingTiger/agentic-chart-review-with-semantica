@@ -23,15 +23,19 @@ def _write_layers(run_dir: Path, with_layer2: bool = True) -> None:
         {"seq": 3, "ts": "t", "kind": "tool_call", "tool": "note_decision",
          "args": {"facing": "cytology 04-12 vs biopsy 04-27", "decision": "read the cytology",
                   "because": "earlier document governs if unambiguous",
-                  "used": ["search:adenocarcinoma", "note:SPD_2023-04-12"],
-                  "grounding": ["contract", "own_knowledge"],
-                  "options": ["date by the biopsy unread"]},
+                  "cited_refs": ["search:adenocarcinoma", "note:SPD_2023-04-12"],
+                  "basis_sources": ["task_contract", "own_knowledge"],
+                  "checked_discriminating_fact_refs": [],
+                  "rule_coverage_claim": "COVERED_WITH_INTERPRETATION",
+                  "alternatives": ["date by the biopsy unread"]},
          "result": {"noted": True, "n_decisions": 1,
-                    "grounding": ["contract", "own_knowledge"],
-                    "used": [{"ref": "search:adenocarcinoma", "kind": "search",
-                              "verified": True},
-                             {"ref": "note:SPD_2023-04-12", "kind": "note", "verified": False,
-                              "why": "this run never read or surfaced it"}],
+                    "testimony_ref": "decision:3",
+                    "basis_sources": ["task_contract", "own_knowledge"],
+                    "citation_resolutions": [
+                        {"ref": "search:adenocarcinoma", "kind": "search", "verified": True},
+                        {"ref": "note:SPD_2023-04-12", "kind": "note", "verified": False,
+                         "why": "this run never read or surfaced it"}],
+                    "checked_fact_resolutions": [],
                     "context": {"n_searches": 1, "n_evidence": 0}}, "ok": True},
         {"seq": 4, "ts": "t", "kind": "tool_call", "tool": "record_evidence",
          "args": {"note_id": "SPD_2023-04-12", "start": 310, "end": 324, "supports": "histology"},
@@ -47,7 +51,7 @@ def _write_layers(run_dir: Path, with_layer2: bool = True) -> None:
         "\n".join(json.dumps(e) for e in layer1) + "\n", encoding="utf-8")
     if not with_layer2:
         return
-    # codex --json shapes, as observed against 0.149.1: reasoning items complete BEFORE the
+    # codex --json shapes, as observed against 0.150.0: reasoning items complete BEFORE the
     # mcp_tool_call they precede starts.
     layer2 = [
         {"type": "thread.started", "thread_id": "x"},
@@ -93,12 +97,13 @@ def test_thoughts_interleave_before_the_calls_they_preceded(tmp_path: Path):
     ]
     decision = next(s for s in trace["steps"] if s["kind"] == "decision")
     assert decision["facing"] == "cytology 04-12 vs biopsy 04-27"
-    assert decision["options"] == ["date by the biopsy unread"]
+    assert decision["alternatives"] == ["date by the biopsy unread"]
     assert "decision_type" not in decision   # the trace carries no taxonomy
-    assert decision["grounding"] == ["contract", "own_knowledge"]
+    assert decision["basis_sources"] == ["task_contract", "own_knowledge"]
+    assert decision["rule_coverage_claim"] == "COVERED_WITH_INTERPRETATION"
     assert decision["context"] == {"n_searches": 1, "n_evidence": 0}
-    assert [u["ref"] for u in decision["used"]] == ["search:adenocarcinoma",
-                                                    "note:SPD_2023-04-12"]
+    assert [u["ref"] for u in decision["citation_resolutions"]] == [
+        "search:adenocarcinoma", "note:SPD_2023-04-12"]
     action = next(s for s in trace["steps"] if s["kind"] == "action")
     assert action["objective"] == "find the diagnosing pathology"
     assert action["observed"] == "2 hit(s)"
@@ -125,7 +130,7 @@ def test_render_reads_top_to_bottom_and_tags_self_report(tmp_path: Path):
     assert "facing: cytology 04-12 vs biopsy 04-27" in text
     assert "ACCEPTED" in text and "FOUND" in text
     # The false citation is shown as false, not quietly dropped.
-    assert "note:SPD_2023-04-12 (UNVERIFIED)" in text
+    assert "note:SPD_2023-04-12 [UNVERIFIED]" in text
     # own_knowledge on the page is the point of collecting it: it names where the contract
     # ran out, which is the question this instrument exists to raise.
-    assert "grounding: contract, own_knowledge" in text
+    assert "basis: task_contract, own_knowledge" in text

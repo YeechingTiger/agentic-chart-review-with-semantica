@@ -98,9 +98,8 @@ ANSWER_CHECK_KINDS: frozenset[str] = frozenset()
 def answer_check_rule_id(chk, position: int | None = None) -> str:
     """`answer_check.<field>.<kind>[.<first nos value>]`, from the check's CONTENT.
 
-    Retained although no kind is implemented: traces recorded before the clinical checks were
-    removed name these ids, and `acr.diagnosis.attribution` still has to resolve them. Minting ids and
-    running checks were always separate jobs.
+    Retained although no clinical kind is implemented because historical traces name these ids.
+    Minting an id and applying a check are separate concerns.
     """
     if isinstance(chk, dict):
         return f"answer_check.{_answer_check_key(chk)}"
@@ -114,9 +113,8 @@ def field_rule_id(kind: str, name: str) -> str:
 class Violation:
     """One rejection, with everything needed to attribute it without re-reading the run.
 
-    Field order and defaults are UNCHANGED by the removal of the clinical checks. `acr.contract.trace`
-    constructs and serialises these, older traces carry them, and `acr.diagnosis.attribution` reads them,
-    so the shape is a recorded format rather than an internal convenience.
+    Field order and defaults remain compatible with historical trace records, so this shape is a
+    recorded format rather than an internal convenience.
 
     `trigger` and `quote` are set by nothing that survives -- the format checks put the pattern
     in `trigger` and leave `quote` empty -- but they stay in the shape because a trace written
@@ -144,21 +142,11 @@ class Violation:
         return d
 
 def check_answer(checks, value: dict, evidence, searched=()) -> list[str]:
-    """Always empty. No clinical answer_check kind is implemented -- see the module docstring.
-
-    Kept as a published signature because `refine.blast_radius` scores a candidate rule by
-    running the answer through it, and the honest answer to "what would this word list have
-    changed" is now "nothing, because word lists are no longer applied".
-    """
+    """Always empty: no clinical ``answer_check`` kind is implemented."""
     return [v.message for v in check_answer_detail(checks, value, evidence, searched)]
 
 def check_answer_detail(checks, value: dict, evidence, searched=()) -> list[Violation]:
-    """Always empty. See `ANSWER_CHECK_KINDS` and the module docstring.
-
-    Not deleted outright because `answer_gate.gate_answer` composes it with the format checks
-    and `acr.contract.trace` records the composed result; a caller that has to branch on whether the
-    function exists is worse than a function that truthfully returns nothing.
-    """
+    """Typed form of ``check_answer``; retained for the stable contract API."""
     return []
 
 # --------------------------------------------------------------------------- calendars

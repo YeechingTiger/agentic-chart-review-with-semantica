@@ -1,133 +1,128 @@
-# Agentic Chart Review
+# Domain context
 
-An agent reads a patient's record against a formal extraction contract and returns one answer, or a
-justified refusal to answer. The framework is general — cancer-registry abstraction is the first use
-case, not the boundary — so nothing here names a disease, an organ or a coding system.
+## Goal
 
-## Language
+Help a human audit a chart-review agent, locate the decision that caused a bad answer or weak
+coverage, and decide whether the remedy belongs in the guideline, retrieval behavior,
+instrumentation, or model capability.
 
-### The question being asked
+The system does not attempt to expose private chain-of-thought. It records concise, reviewable
+commitments and preserves the observable trace that supports or contradicts them.
 
-**Task Contract**:
-The frozen statement of one extraction question: its fields, its decision rules, its evidence rules,
-its conflict rules, and what must be true before an answer stands.
-_Avoid_: spec (used in code and filenames; fine there, imprecise in discussion), schema, template
+## Core language
 
-**Field**:
-One output the Task Contract asks for. A contract may declare several, each with its own standing.
+**Task Contract**
+The chart-review requirement: target Field, acceptable evidence, exclusions, conflict rules,
+proof obligations, output shape, and discriminating facts. It is the normative domain artifact.
 
-**Decision Rule**:
-A clause of the Task Contract that selects among admissible answers. Numbered, and a run may cite
-the number.
+**Task Presentation**
+The exact material offered to one run. `task_only` contains the task/output contract;
+`policy_bundle` also contains versioned guideline clauses. Its content hash is part of run identity.
 
-**Conflict Rule**:
-A Decision Rule of the form *if two sources disagree in this specific way, take this one*. Every one
-of them names a **Discriminating Fact**.
+**Semantica Policy**
+A native, versioned Semantica rule object. A Task Contract clause may be projected as a Policy, but
+the concepts are not synonyms: the Contract is the authored domain document; Policy is the graph
+representation used for binding, versioning, and impact queries.
 
-**Discriminating Fact**:
-The thing a Conflict Rule turns on — the fact whose presence or absence selects one competing answer
-over another. Example: *whether a physician's clinical impression accompanies an ambiguous cytology
-on its own date*.
+**Layer-1 event**
+One append-only chart-review event emitted by the tool server: model/run metadata, tool call and
+result, gate result, or accepted answer. Langtrace is the canonical remote store.
 
-### What a document is worth
+**ReAct Cycle**
+A deterministic replay unit containing state before, action, observation, and state after. Cycles
+are immutable during reconstruction: they cannot be added, removed, reordered, duplicated, or
+moved.
 
-**Standing**:
-What one document is worth for one Field, judged against the contract's evidence rules. Three
-values, and the middle one must never be folded into the first.
-- **can establish** — this document satisfies the evidence rules, rendered here by whoever was
-  entitled to render it
-- **merely mentions** — it bears on the question (restates, carries forward, refers to, plans
-  around, argues against) but cannot settle it
-- **neither** — it does not bear on the question
-_Avoid_: relevance, admissibility (used in code; "standing" is the domain word)
+**Runtime Decision Testimony**
+The agent's concise contemporaneous account of a material choice: facing question, selected
+option, alternatives, rationale, claimed basis, cited refs, checked discriminating facts, and
+uncertainty. It is `SELF_REPORTED`, not automatically correct.
 
-**Answer-Bearing Note**:
-A document whose Standing for a Field is *can establish*. The denominator for anything called a
-yield.
+**Runtime Decision Receipt**
+The server-sealed envelope around testimony plus server facts: resolved refs, state at recording,
+source event, schema, and content hash. It proves what was said and what refs resolved; it does not
+prove that the rule semantically entailed the choice.
 
-### What a run produces
+**Atomic Decision**
+One material commitment among meaningful alternatives that one reviewer can judge with one
+verdict. If the first half can be right while the second is wrong, they are two Atomic Decisions.
+Choosing a keyword batch, selecting a note set to open, judging one note's standing, resolving a
+conflict, and deciding to stop are different decisions.
 
-**Answer**:
-A value for each Field, or a declared abstention. Which abstention matters: "no document in this
-chart establishes it" and "this chart contains no document from the relevant period" are different
-claims and the contract declares both.
+**Decision Episode**
+The audit envelope for exactly one Atomic Decision: one decision-bearing cycle followed by zero or
+more contiguous support cycles that execute or observe that commitment. Mechanical pagination,
+transport, and termination remain non-decisions.
 
-**Complete Answer**:
-An answer where the run went and looked for the thing that would have changed it — that is, checked
-the **Discriminating Fact** of every Conflict Rule it was subject to.
-Completeness is independent of correctness: an answer can be right and incomplete (arrived at by a
-shortcut that happens to work on this chart), and that is the case worth catching, because the same
-shortcut is wrong on the mirror chart.
-_Avoid_: thorough, exhaustive, high-confidence, well-covered
+**Decision function**
+The post-run semantic kind (`where_to_look`, `standing`, `which_wins`, `enough`, and the other
+controlled types in `decision_types.py`). It is deliberately assigned after the run so the
+taxonomy can evolve without rerunning the agent.
 
-**Coverage**:
-The separate and much stronger claim that enough of the record was reviewed for an ABSENCE to stand.
-Not the same as completeness: coverage is about how much was read, completeness is about whether the
-one thing that mattered was looked for.
-_Avoid_: using "coverage" loosely to mean completeness
+**Decision subject**
+What the choice acted on: inventory, source family, query batch, document set, evidence item,
+evidence relationship, sufficiency, or answer. Function and subject together provide a stable
+similarity key without collapsing distinct retrieval choices.
 
-**Warrant**:
-The cited evidence and rule references a run offers for its answer. A warrant can be articulate and
-false — a run may state that a Discriminating Fact is absent having never searched for it.
+**Decision grounding**
+Three separate audit questions:
 
-### What varies between runs
+1. Did every claimed reference resolve against material actually offered or observed?
+2. Does the referenced clause semantically entail the choice?
+3. What judgment remained for the model, including operational discretion or outside knowledge?
 
-**Arm**:
-One configuration of the system, held fixed while the patient varies. Two runs are the same arm when
-their recorded configuration hashes alike.
+Only the first is mechanically established by reference resolution. The human view must never
+present it as proof of the second.
 
-**Retrieval Prior**:
-A measurement, taken over a development set, of where a Field's answer tends to live: which document
-types can establish it and at what rate, and which terms surface those documents at what cost. It is
-data offered as reference, never a rule and never a filter.
-_Avoid_: experience, knowledge, keyword list (each names a part of it and reads as the whole)
+**Causal assertion**
+An evidenced `CAUSED`, `INFLUENCED`, or `PRECEDENT_FOR` relationship. Temporal adjacency alone is
+not causation. Explicit runtime refs such as `decision:N`, `finding:N`, `search:q`, and `note:id`
+can deterministically establish influence.
 
-**Method Card**:
-Prose guidance assembled into the prompt, which the agent may depart from. It changes what the model
-is told, never what the runtime enforces.
-_Avoid_: policy, tactic, controller, skill — see Flagged ambiguities
+**Analysis selection**
+An append-only choice of which reconstructed analysis is authoritative for one run. A chain query
+must not silently mix episodes from multiple reconstruction passes or verifier versions.
 
-## Relationships
+## Truth and provenance
 
-- A **Task Contract** declares many **Conflict Rules**; each names one **Discriminating Fact**
-- A document has one **Standing** per **Field**, not one per document
-- A **Complete Answer** has checked every **Discriminating Fact** it was subject to; a correct
-  answer need not have
-- **Coverage** is a claim about the record; **completeness** is a claim about the reasoning
-- A **Retrieval Prior** is measured over **Answer-Bearing Notes**, so its denominator is a Standing
-  judgement, not a document count
+Every important field keeps one of these meanings:
 
-## Example dialogue
+- `SERVER_FACT`: tool execution, reference resolution, sealed receipt identity.
+- `SELF_REPORTED`: what the acting agent explicitly testified at runtime.
+- `DETERMINISTIC_DERIVED`: fixed replay, reference checks, cycle boundaries, execution outcomes.
+- `MODEL_RECONSTRUCTED`: Luna's post-run interpretation of the fixed trace.
+- `HUMAN_ADJUDICATED`: a reviewer's explicit disposition or selection.
 
-> **Dev:** The run answered `20230427` and cited the cytology conflict rule. Gold is `20230412`. Is
-> that a retrieval failure?
->
-> **Domain expert:** No. Both documents it needed to compare were in front of it. It said "no
-> physician clinical impression is documented at that date" — but one is, in an oncology note it
-> never opened. It didn't fail to find the answer; it failed to look for the thing that would have
-> changed the answer.
->
-> **Dev:** But on the mirror chart the same run answered correctly.
->
-> **Domain expert:** With the same shortcut. Take the tissue date. That is right when nothing
-> supports the earlier cytology and wrong when something does, and the run has no way to tell those
-> apart because it never checks. The correct answer on that chart is not evidence of anything.
+These sources may be shown together but must not be collapsed into fictional chain-of-thought.
 
-## Flagged ambiguities
+## Semantica projection
 
-- **"policy" vs "tactic"** — the code splits Method Cards into a `policy` slot (one per run, said to
-  be the shape of the whole traversal) and a `tactic` slot (many, each with a precondition).
-  Measured against 75 recorded runs across three policy arms, the traversal shape does not vary:
-  every arm does one search-then-read round, median. And the cards' own descriptions cross the line
-  in both directions — `policy-information-gain` describes choosing the next step "rather than what
-  shape the whole traversal should have", while `tactic-coverage-pool` and
-  `tactic-orient-from-summary` both describe traversal shapes. **Unresolved**: the slot names are
-  retained for now, but the distinction they claim is not one this domain has been shown to have.
+Only verified Decision Episodes become Semantica Decision nodes. Cycles, testimony, state,
+findings, policies, gates, and answers remain ordinary graph nodes linked to them. ACR supplies the
+domain projection and human-readable view; it does not replace ContextGraph analytics with a
+parallel graph implementation.
 
-- **"experience" / "prior" / "keyword list" / "note-type list"** — four names in use for one
-  artifact and its parts. Resolved: the artifact is a **Retrieval Prior**; the keyword half and the
-  document-type half are two measurements inside it, not separate things.
+Semantica similarity returns candidates for human comparison, not proof that two situations are
+equivalent. Policy impact returns historically bound decisions to re-audit, not proof that their
+answers would change under a new policy version.
 
-- **"complete"** — was being used for at least three properties: correct, exhaustively read, and
-  well-justified. Resolved: **Complete Answer** as defined above; "exhaustively read" is
-  **Coverage**; "well-justified" is **Warrant**, which can be false.
+## Human audit order
+
+A useful review reads chronologically:
+
+1. Was the note inventory complete enough?
+2. Were the search terms and source families reasonable?
+3. Did the agent open all material candidates?
+4. Was each note's standing judged correctly?
+5. Were conflicts and dates resolved under the right clauses?
+6. Was stopping justified, and does the submitted answer follow?
+
+Each step must show the question, choice, reason, policy/reference status, remaining model
+judgment, review attention, and a drill-down link to raw Langtrace.
+
+## Scope boundary
+
+The maintained code is limited to chart corpus/spec contracts, Codex chart-review execution,
+enhanced Langtrace capture/replay, Decision Episode reconstruction and verification, Semantica
+projection/queries, and the human review UI/notebook. Legacy labelling, separate audit-agent,
+evaluation, improvement, authoring, and alternate runtime stacks are intentionally out of scope.

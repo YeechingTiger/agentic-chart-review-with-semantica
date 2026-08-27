@@ -21,10 +21,8 @@ This process serves ONE patient against ONE contract, configured by environment:
   ACR_MVP_SPEC          path to the contract YAML
   ACR_MVP_PATIENT_DIR   path to the patient's document directory
   ACR_MVP_RUN_DIR       where trace.jsonl and result.json are written
-  ACR_MVP_LEDGER        optional: a semantica ledger to record judgments into LIVE, at the
-                        moment each happens. Best-effort by construction — a ledger failure
-                        is a stderr line and the run proceeds; the trace can always rebuild
-                        the ledger (ingest_run), never the other way around.
+  ACR_MVP_TASK_PRESENTATION  immutable ContractSnapshot written by the runner.  It is the
+                             only authority for whether a cited rule was actually offered.
 
 stdout speaks JSON-RPC only (the MCP stdio transport); diagnostics go to stderr.
 """
@@ -41,10 +39,21 @@ from typing import Any
 from acr.chartstore.corpus import PatientChart
 from acr.contract.outcomes import declared_statuses, submittable_statuses
 from acr.contract.spec import load_spec
-from acr.mvp.warrants import (GROUNDING_KINDS, INPUT_KINDS, RunFacts,
-                              normalize_grounding)
+from acr.mvp.decision_receipts import make_runtime_decision_receipt
+from acr.mvp.task_presentation import ContractSnapshot, build_task_presentation
+from acr.mvp.warrants import BASIS_SOURCES, RULE_COVERAGE_CLAIMS, RunFacts, normalize_basis_sources
 
 PROTOCOL_VERSION_FALLBACK = "2025-06-18"
+
+# MCP tool descriptions are part of what the agent is actually shown. Material operating
+# rules therefore need a stable Task Presentation identity, not just prose hidden inside the
+# transient tools/list response.
+TOOL_SCHEMA_INSTRUCTIONS = {
+    "list_documents_inventory_gate": (
+        "Call list_documents without filters at least once before asserting that the chart "
+        "does not establish something."
+    ),
+}
 
 
 def _now() -> str:
@@ -54,8 +63,10 @@ def _now() -> str:
 class ToolState:
     """What one review has accumulated: evidence, the listing flag, the accepted answer."""
 
-    def __init__(self) -> None:
+    def __init__(self, task_presentation: ContractSnapshot) -> None:
+        self.task_presentation = task_presentation
         self.evidence: list[dict[str, Any]] = []
+        self.findings: list[dict[str, Any]] = []
         self.listed_documents = False
         self.accepted: dict[str, Any] | None = None
         self.n_decisions = 0
@@ -70,11 +81,14 @@ class ToolState:
         self.documents_read: list[str] = []
         self.documents_seen: set[str] = set()
         self.searches_run: list[str] = []
+        self.finding_refs: set[str] = set()
+        self.decision_refs: set[str] = set()
 
     def facts(self) -> RunFacts:
         """What this run has observed, in the shape the citation check reads."""
         return RunFacts(list(self.documents_read), set(self.documents_seen),
-                        list(self.searches_run), len(self.evidence))
+                        list(self.searches_run), len(self.evidence),
+                        set(self.finding_refs), set(self.decision_refs))
 
     def snapshot(self) -> dict[str, Any]:
         """Server-side facts at this moment — the context a decision point gets for free,
@@ -83,6 +97,7 @@ class ToolState:
         # stay small enough to ride along on every decision node.
         return {"n_searches": self.n_searches, "n_reads": self.n_reads,
                 "n_listings": self.n_listings, "n_evidence": len(self.evidence),
+                "n_findings": len(self.findings),
                 "unfiltered_listing_done": self.listed_documents,
                 "documents_read": self.documents_read[-10:],
                 "searches_run": self.searches_run[-10:],
@@ -91,45 +106,35 @@ class ToolState:
 
 class ChartToolServer:
     def __init__(self, spec_path: Path, patient_dir: Path, run_dir: Path,
-                 ledger_path: Path | None = None) -> None:
+                 task_presentation_path: Path | None = None) -> None:
         self.spec = load_spec(spec_path)
         self.chart = PatientChart(patient_dir)
         self.patient_id = patient_dir.name
         self.run_dir = run_dir
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self.trace_path = self.run_dir / "trace.jsonl"
-        self.state = ToolState()
+        if task_presentation_path is not None:
+            self.task_presentation = ContractSnapshot.from_path(task_presentation_path)
+        else:
+            # Direct unit/stdio use has no runner.  It still gets an explicit snapshot rather
+            # than silently treating the canonical spec as if it were presented.
+            _, self.task_presentation = build_task_presentation(
+                self.spec, run_id=self.run_dir.name, arm_id="detailed",
+                operational_preamble="Direct chart-tool invocation.",
+                operational_instructions=TOOL_SCHEMA_INSTRUCTIONS)
+        self.state = ToolState(self.task_presentation)
         self._acceptance_pending = False
         self._seq = 0
-        # The ledger is constructed LAZILY, at the first event worth recording — semantica's
-        # import costs ~2s, and paying it here would delay the MCP initialize handshake past
-        # the model's first tool calls (codex starts the turn without waiting for late
-        # registrations; the calls bounce as "unsupported" and the review starts blind).
-        self._ledger_path = Path(ledger_path) if ledger_path else None
-        self._recorder: Any = None
         self._emit(
             "run_meta",
             spec_id=self.spec.spec_id,
             spec_hash=self.spec.spec_hash,
             patient_id=self.patient_id,
             submittable=list(submittable_statuses(self.spec)),
-            live_ledger=str(ledger_path) if ledger_path else None,
+            task_arm=self.task_presentation.arm_id,
+            task_presentation_hash=self.task_presentation.presentation_hash,
+            live_ledger=None,
         )
-
-    def _live_recorder(self):
-        """Synchronous recording, best-effort: judgments reach the ledger at the moment they
-        happen. Any failure here degrades to trace-only — never to a failed run."""
-        if self._recorder is None and self._ledger_path is not None:
-            try:
-                from acr.mvp.ledger import RunRecorder, SemanticaLedger
-                self._recorder = RunRecorder(SemanticaLedger(self._ledger_path),
-                                             run_id=self.run_dir.name,
-                                             spec_id=self.spec.spec_id,
-                                             case_id=self.patient_id)
-            except Exception as e:  # noqa: BLE001 - survive anything here
-                print(f"acr-chart toolserver: live ledger disabled ({e})", file=sys.stderr)
-                self._ledger_path = None
-        return self._recorder
 
     # ------------------------------------------------------------------ trace (Layer 1)
     def _emit(self, kind: str, **payload: Any) -> int:
@@ -139,29 +144,6 @@ class ChartToolServer:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         return self._seq
 
-    def _record_live(self, name: str, args: dict[str, Any], payload: dict[str, Any],
-                     ok: bool, seq: int) -> None:
-        """Drive the same RunRecorder the replay path drives, one event at a time."""
-        recordable = ((name in ("record_evidence", "note_decision") and ok)
-                      or (name == "submit_answer" and "accepted" in payload))
-        if not recordable:
-            return
-        recorder = self._live_recorder()
-        if recorder is None:
-            return
-        try:
-            if name == "record_evidence":
-                recorder.on_evidence(args, payload.get("quote", ""))
-            elif name == "note_decision":
-                recorder.on_step(args, seq, context=payload.get("context"),
-                                 used=payload.get("used"),
-                                 grounding=payload.get("grounding"))
-            else:
-                recorder.on_submission(args, payload, seq)
-            recorder.ledger.save()
-        except Exception as e:  # noqa: BLE001 - bookkeeping must never fail the run
-            print(f"acr-chart toolserver: live ledger write failed ({e})", file=sys.stderr)
-            self._recorder, self._ledger_path = None, None
 
     # ------------------------------------------------------------------ tool surface
     def schemas(self) -> list[dict[str, Any]]:
@@ -173,8 +155,11 @@ class ChartToolServer:
         return [
             {
                 "name": "list_documents",
-                "description": "List this patient's documents (metadata only). Call it without "
-                "filters at least once before asserting that the chart does not establish something.",
+                "description": (
+                    "List this patient's documents (metadata only). "
+                    + TOOL_SCHEMA_INSTRUCTIONS["list_documents_inventory_gate"]
+                    + " Cite instruction:list_documents_inventory_gate if this rule is a basis."
+                ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -219,12 +204,10 @@ class ChartToolServer:
             },
             {
                 "name": "note_decision",
-                "description": "Note a decision point BEFORE acting on it: the situation you "
-                "face, what you decided, and why. Call it whenever you choose between "
-                "alternatives — what to look for next, which document governs, whether the "
-                "evidence suffices, whether to stop. Notes are recorded, never judged, and "
-                "never refused; they are how your reasoning stays auditable. You are not "
-                "asked to classify the decision — that is done later, by a reader.",
+                "description": "Record concise Decision Testimony BEFORE a decision-bearing "
+                "action. This is an auditable explanation, not private chain-of-thought and "
+                "not a request to classify the decision. Claims are retained even when an "
+                "exact citation is unknown or was not offered.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -240,31 +223,99 @@ class ChartToolServer:
                             "type": "string",
                             "description": "the rationale, naming the evidence or rule it rests on",
                         },
-                        "options": {
+                        "alternatives": {
                             "type": "array",
                             "items": {"type": "string"},
                             "description": "the alternatives you considered and set aside",
                         },
-                        "used": {
+                        "basis_sources": {
+                            "type": "array",
+                            "items": {"type": "string", "enum": list(BASIS_SOURCES)},
+                            "description": "where the rationale came from; orthogonal to whether "
+                            "a Task Contract rule directly covers the situation",
+                        },
+                        "cited_refs": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "the information this decision rests on, each as a "
-                            "reference the record can check: "
-                            + "; ".join(f"{k}:<...> ({v.split(' — ')[0]})"
-                                        for k, v in INPUT_KINDS.items())
-                            + ". Cite what you actually used, not what you could have.",
+                            "description": "exact rule/card/evidence references actually used",
                         },
-                        "grounding": {
-                            "type": "array",
-                            "items": {"type": "string", "enum": list(GROUNDING_KINDS)},
-                            "description": "where this reasoning came from — the one thing "
-                            "nobody can reconstruct afterwards, so only you can report it: "
-                            + "; ".join(f"{k} = {v}" for k, v in GROUNDING_KINDS.items())
-                            + ". `own_knowledge` is never held against you; recording it "
-                            "falsely as `contract` is the failure worth avoiding.",
+                        "checked_discriminating_fact_refs": {
+                            "type": "array", "items": {"type": "string"},
+                            "description": "exact discriminating_fact.<fact_id> values checked",
+                        },
+                        "rule_coverage_claim": {
+                            "type": "string", "enum": list(RULE_COVERAGE_CLAIMS),
+                            "description": "how the supplied rules cover this decision",
+                        },
+                        "provisional_inference": {
+                            "type": ["string", "null"],
+                            "description": "an assumption added beyond the supplied rules, or null",
+                        },
+                        "uncertainty": {
+                            "type": ["string", "null"],
+                            "description": "an unresolved ambiguity or conflict, or null",
                         },
                     },
-                    "required": ["facing", "decision", "because"],
+                    "required": ["facing", "decision", "because", "basis_sources",
+                                 "cited_refs", "checked_discriminating_fact_refs",
+                                 "rule_coverage_claim"],
+                },
+            },
+            {
+                "name": "record_finding",
+                "description": "Judge and record how ONE read note stands for ONE requested "
+                "field. This call is itself the atomic Decision Testimony: state the situation, "
+                "rationale, exact basis, rule coverage, and any inference or uncertainty here. "
+                "Do not precede it with a compound note_decision. Standing and assertion class "
+                "are self-reported; span resolution is a server fact.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "note_id": {"type": "string"},
+                        "field": {"type": "string"},
+                        "standing": {"type": "string", "enum": [
+                            "can_establish", "merely_mentions", "neither"]},
+                        "assertion_class": {"type": "string"},
+                        "source_start": {"type": "integer"},
+                        "source_end": {"type": "integer"},
+                        "event_time": {"type": ["string", "null"]},
+                        "record_time": {"type": ["string", "null"]},
+                        "carried_forward": {"type": ["boolean", "null"]},
+                        "facing": {
+                            "type": "string",
+                            "description": "the open standing question and facts known before "
+                            "this finding is committed",
+                        },
+                        "because": {
+                            "type": "string",
+                            "description": "why this note has the selected standing/assertion",
+                        },
+                        "alternatives": {
+                            "type": "array", "items": {"type": "string"},
+                            "description": "other plausible standings or assertions considered",
+                        },
+                        "basis_sources": {
+                            "type": "array",
+                            "items": {"type": "string", "enum": list(BASIS_SOURCES)},
+                        },
+                        "cited_refs": {
+                            "type": "array", "items": {"type": "string"},
+                            "description": "exact note/rule/finding references actually used",
+                        },
+                        "checked_discriminating_fact_refs": {
+                            "type": "array", "items": {"type": "string"},
+                        },
+                        "rule_coverage_claim": {
+                            "type": "string", "enum": list(RULE_COVERAGE_CLAIMS),
+                        },
+                        "provisional_inference": {"type": ["string", "null"]},
+                        "uncertainty": {"type": ["string", "null"]},
+                    },
+                    "required": [
+                        "note_id", "field", "standing", "assertion_class", "facing",
+                        "because", "basis_sources", "cited_refs",
+                        "checked_discriminating_fact_refs", "rule_coverage_claim",
+                    ],
                 },
             },
             {
@@ -316,6 +367,7 @@ class ChartToolServer:
             payload: dict[str, Any] = {"error": f"unknown tool {name!r}"}
             self._emit("tool_call", tool=name, args=args, result=payload, ok=False)
             return payload, True
+        state_before = self.state.snapshot()
         try:
             payload = handler(**args)
             ok = "error" not in payload
@@ -325,35 +377,37 @@ class ChartToolServer:
         except KeyError as e:  # unknown note_id from PatientChart internals
             payload = {"error": f"unknown note_id {e}"}
             ok = False
-        seq = self._emit("tool_call", tool=name, args=args, result=payload, ok=ok)
-        self._record_live(name, args, payload, ok, seq)
+        trace_payload = dict(payload)
+        if ok:
+            receipt = make_runtime_decision_receipt(
+                name, args, payload, state_before,
+                source_event_ref=f"layer1:{self._seq + 1}")
+            if receipt is not None:
+                trace_payload["decision_receipt"] = receipt
+        self._emit("tool_call", tool=name, args=args, result=trace_payload, ok=ok)
         if name == "submit_answer" and self._acceptance_pending:
             # Emitted here, after the tool_call record, so the trace reads in causal order.
             self._acceptance_pending = False
             self._emit("answer_accepted", status=self.state.accepted["status"],
                        value=self.state.accepted["value"])
-            recorder = self._live_recorder()
-            if recorder is not None:
-                try:
-                    recorder.on_result(self.state.accepted)
-                    recorder.ledger.save()
-                except Exception as e:  # noqa: BLE001
-                    print(f"acr-chart toolserver: live ledger write failed ({e})",
-                          file=sys.stderr)
-                    self._recorder, self._ledger_path = None, None
         return payload, not ok
 
     # ------------------------------------------------------------------ handlers
     def _t_list_documents(self, doc_type_contains=None, date_from=None, date_to=None,
                           limit=200, offset=0, objective=None) -> dict[str, Any]:
+        limit, offset = int(limit), int(offset)
         page, total = self.chart.list_documents(
             doc_type_contains=doc_type_contains, date_from=date_from, date_to=date_to,
-            limit=int(limit), offset=int(offset))
+            limit=limit, offset=offset)
         self.state.n_listings += 1
         self.state.documents_seen.update(d.note_id for d in page)
-        if not any([doc_type_contains, date_from, date_to]) and int(offset) == 0:
+        if not any([doc_type_contains, date_from, date_to]) and offset == 0:
             self.state.listed_documents = True
+        returned = len(page)
         return {"documents": [d.to_dict() for d in page], "total": total,
+                "returned": returned, "offset": offset, "limit": limit,
+                "page_complete": offset + returned >= total,
+                "unreturned": max(total - (offset + returned), 0),
                 "types": self.chart.type_summary(), "objective": objective,
                 "context": self.state.snapshot()}
 
@@ -378,21 +432,70 @@ class ChartToolServer:
         self.state.documents_seen.add(note_id)
         return {**page, "objective": objective, "context": self.state.snapshot()}
 
-    def _t_note_decision(self, facing, decision, because,
-                         used=None, options=None, grounding=None) -> dict[str, Any]:
+    def _testimony_result(self, *, basis_sources: Any, cited_refs: Any,
+                          checked_discriminating_fact_refs: Any,
+                          rule_coverage_claim: Any,
+                          legacy_grounding: Any = None) -> dict[str, Any]:
+        """Resolve one atomic self-report against server-owned facts.
+
+        The semantic content remains the agent's claim. Its occurrence, order, available
+        context, and reference availability are deterministic facts shared by both generic
+        decisions and structured note findings.
+        """
+        self.state.n_decisions += 1
+        if basis_sources is None and legacy_grounding is not None:
+            basis_sources = legacy_grounding
+        kinds, unrecognised = normalize_basis_sources(basis_sources)
+        cited_refs = cited_refs if isinstance(cited_refs, list) else []
+        checked = (checked_discriminating_fact_refs
+                   if isinstance(checked_discriminating_fact_refs, list) else [])
+        citations: list[dict[str, Any]] = []
+        for ref in cited_refs:
+            raw = str(ref)
+            candidate = raw.removeprefix("rule:")
+            if candidate.startswith(("decision_rule.", "conflict_rule.", "evidence_rule.",
+                                     "answer_check.", "field_", "abstention.",
+                                     "proof_obligation.", "discriminating_fact.")):
+                citations.append(self.task_presentation.resolve_rule(raw))
+            elif raw.startswith(("card:", "instruction:")):
+                citations.append(self.task_presentation.resolve_asset(raw))
+            else:
+                citations.append(self.state.facts().resolve(raw))
+        fact_resolutions = [self.task_presentation.resolve_rule(ref) for ref in checked]
+        claim = (str(rule_coverage_claim) if rule_coverage_claim in RULE_COVERAGE_CLAIMS
+                 else None)
+        testimony_ref = f"decision:{self._seq + 1}"
+        self.state.decision_refs.add(testimony_ref)
+        context = self.state.snapshot()
+        out: dict[str, Any] = {"noted": True, "n_decisions": self.state.n_decisions,
+                               "testimony_ref": testimony_ref,
+                               "basis_sources": kinds,
+                               "rule_coverage_claim": claim,
+                               "citation_resolutions": citations,
+                               "checked_fact_resolutions": fact_resolutions,
+                               "context": context}
+        if unrecognised:
+            out["note"] = f"unrecognised basis source {unrecognised!r} recorded as claimed"
+            out["basis_sources_unrecognised"] = unrecognised
+        if claim is None:
+            out["rule_coverage_note"] = "missing or unrecognised claim recorded, not refused"
+        return out
+
+    def _t_note_decision(self, facing, decision, because, basis_sources=None,
+                         cited_refs=None, checked_discriminating_fact_refs=None,
+                         rule_coverage_claim=None, provisional_inference=None,
+                         alternatives=None, uncertainty=None, **legacy: Any) -> dict[str, Any]:
         # Self-reported content on the deterministic channel: WHAT was said is the model's
         # claim, but that it was said, when, in what order, against which server-side state,
         # and whether the information it cites was ever actually observed, are recorded fact.
-        del facing, decision, because, options
-        self.state.n_decisions += 1
-        kinds, unrecognised = normalize_grounding(grounding)
-        out: dict[str, Any] = {"noted": True, "n_decisions": self.state.n_decisions,
-                               "used": self._resolve_used(used), "grounding": kinds,
-                               "context": self.state.snapshot()}
-        if unrecognised:
-            out["note"] = f"unrecognised grounding {unrecognised!r} recorded as claimed"
-            out["grounding_claimed"] = unrecognised
-        return out
+        # Old artifacts can still be replayed through this boundary, but the current tool schema
+        # exposes only the new names. Never upgrade an old `contract` claim into a verified rule.
+        return self._testimony_result(
+            basis_sources=basis_sources, cited_refs=cited_refs,
+            checked_discriminating_fact_refs=checked_discriminating_fact_refs,
+            rule_coverage_claim=rule_coverage_claim,
+            legacy_grounding=legacy.get("grounding"),
+        )
 
     def _resolve_used(self, used: Any) -> list[dict[str, Any]]:
         """Each claimed input, checked against what this run actually observed — by the same
@@ -415,6 +518,89 @@ class ChartToolServer:
               "quote": quote, "supports": supports, "field": field}
         self.state.evidence.append(ev)
         return {"recorded": True, "n_evidence": len(self.state.evidence), "quote": quote}
+
+    def _t_record_finding(self, note_id, field, standing, assertion_class,
+                          source_start=None, source_end=None, event_time=None,
+                          record_time=None, carried_forward=None,
+                          facing=None, because=None, basis_sources=None, cited_refs=None,
+                          checked_discriminating_fact_refs=None, rule_coverage_claim=None,
+                          provisional_inference=None, alternatives=None, uncertainty=None,
+                          decision_testimony_ref=None) -> dict[str, Any]:
+        if note_id not in self.state.documents_read:
+            return {"error": "record_finding requires the note to have been read first"}
+        if standing not in {"can_establish", "merely_mentions", "neither"}:
+            return {"error": f"unknown standing {standing!r}"}
+        if standing in {"can_establish", "merely_mentions"} and (
+                source_start is None or source_end is None):
+            return {"error": f"{standing} requires source_start and source_end"}
+        if standing == "neither" and assertion_class != "not_applicable":
+            return {"error": "neither requires assertion_class='not_applicable'"}
+        if standing != "neither" and assertion_class == "not_applicable":
+            return {"error": f"{standing} requires a substantive assertion_class"}
+
+        span: list[int] | None = None
+        quote: str | None = None
+        if source_start is not None or source_end is not None:
+            try:
+                start, end = int(source_start), int(source_end)
+                total = self.chart.read(note_id, 0, 0)["total_chars"]
+            except (TypeError, ValueError):
+                return {"error": "source_start and source_end must be integers"}
+            if start < 0 or end <= start or end > total:
+                return {"error": f"span [{start},{end}) is outside the document (0..{total})"}
+            span = [start, end]
+            quote = self.chart.quote(note_id, start, end)
+
+        # Compatibility note: old direct callers may omit the new audit fields or carry an
+        # earlier decision_testimony_ref. The current MCP schema never offers that legacy link;
+        # a new run records a self-contained testimony on this same atomic call.
+        has_atomic_testimony = all(value is not None for value in (
+            facing, because, basis_sources, cited_refs,
+            checked_discriminating_fact_refs, rule_coverage_claim))
+        testimony: dict[str, Any] = {}
+        if has_atomic_testimony:
+            testimony = self._testimony_result(
+                basis_sources=basis_sources, cited_refs=cited_refs,
+                checked_discriminating_fact_refs=checked_discriminating_fact_refs,
+                rule_coverage_claim=rule_coverage_claim,
+            )
+
+        finding_ref = f"finding:{len(self.state.findings) + 1}"
+        finding = {
+            "note_id": note_id, "field": field, "standing": standing,
+            "assertion_class": assertion_class, "event_time": event_time,
+            "record_time": record_time, "carried_forward": carried_forward,
+            "span": span, "quote": quote,
+            "finding_ref": finding_ref,
+            "decision_testimony_ref": (
+                testimony.get("testimony_ref") or decision_testimony_ref),
+        }
+        self.state.findings.append(finding)
+        self.state.finding_refs.add(finding_ref)
+        out = {
+            "recorded": True, "finding_ref": finding_ref,
+            "server_fact": {"note_read": True, "span_resolved": span is not None,
+                            "span": span},
+            "self_reported": {
+                "facing": facing,
+                "decision": f"{note_id} is {standing} for {field} ({assertion_class})",
+                "because": because,
+                "standing": standing,
+                "assertion_class": assertion_class,
+                "alternatives": alternatives or [],
+                "provisional_inference": provisional_inference,
+                "uncertainty": uncertainty,
+            },
+            "quote": quote,
+        }
+        if testimony:
+            out |= testimony
+        elif decision_testimony_ref:
+            out["decision_testimony_ref"] = decision_testimony_ref
+            out["instrumentation_status"] = "LEGACY_SHARED_TESTIMONY"
+        else:
+            out["instrumentation_status"] = "MISSING_ATOMIC_TESTIMONY"
+        return out
 
     def _t_submit_answer(self, status, value=None, reasoning=None) -> dict[str, Any]:
         if self.state.accepted is not None:
@@ -505,9 +691,9 @@ def main() -> None:
     spec_path = Path(os.environ["ACR_MVP_SPEC"])
     patient_dir = Path(os.environ["ACR_MVP_PATIENT_DIR"])
     run_dir = Path(os.environ["ACR_MVP_RUN_DIR"])
-    ledger = os.environ.get("ACR_MVP_LEDGER")
+    presentation = os.environ.get("ACR_MVP_TASK_PRESENTATION")
     server = ChartToolServer(spec_path, patient_dir, run_dir,
-                             ledger_path=Path(ledger) if ledger else None)
+                             task_presentation_path=Path(presentation) if presentation else None)
     print(f"acr-chart toolserver: {patient_dir.name} / {server.spec.spec_id}", file=sys.stderr)
     serve(server)
     # The harness closes stdin when the session ends; nothing to finalize here — result.json

@@ -212,7 +212,7 @@ def load_table(name: str, codes_dir: str | None = None) -> CodeTable:
         raise CodeTableError(
             f"{path} declares no axes. An empty value domain renders an empty block into the "
             f"prompt, and the run then looks exactly like one that was given the codes — the "
-            f"same reason `acr.contract.skills` raises on a missing skill instead of returning ''.")
+            f"loader must fail rather than silently claim that guidance was supplied.")
     norm = dict(d.get("normalization") or {})
     return CodeTable(
         table_id=str(d["table_id"]),

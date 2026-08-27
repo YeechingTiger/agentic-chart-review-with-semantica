@@ -7,7 +7,7 @@ speaks just enough of the Responses API's SSE dialect for codex to run a full se
 it, replaying a scripted trajectory of tool calls.
 
 THE WIRE FORMAT IS TAKEN FROM CODEX'S OWN PARSER, not guessed:
-`codex-rs/codex-api/src/sse/responses.rs` (checked at codex-cli 0.149.1) accepts frames of
+`codex-rs/codex-api/src/sse/responses.rs` (checked at codex-cli 0.150.0) accepts frames of
 `event: <kind>\\ndata: <json>\\n\\n` and needs only three kinds for a turn —
 
     response.created            {"type":"response.created","response":{}}
@@ -19,7 +19,7 @@ where a tool call is the ResponseItem
 and a final message is
     {"type":"message","role":"assistant","content":[{"type":"output_text","text":"..."}]}.
 
-MCP tools arrive in the request's tool list as a NAMESPACE entry (observed against 0.149.1;
+MCP tools arrive in the request's tool list as a NAMESPACE entry (observed against 0.150.0;
 matches `ToolName::namespaced("mcp__chart", tool)` in `core/src/tools/handlers/mcp.rs`):
     {"type":"namespace","name":"mcp__chart","tools":[{"type":"function","name":"search",...}]}
 and the function_call item must carry that namespace in its own `namespace` field — a bare or

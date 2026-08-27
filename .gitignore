@@ -25,6 +25,10 @@ runs/
 *.jsonl
 *.jsonl.gz
 
+# Generated experiment databases, exports, and visual-QA screenshots stay local. The maintained
+# executed notebooks are the portable, redacted walkthrough evidence checked into Git.
+artifacts/
+
 # Real corpora must never be committed. Synthetic dev corpus IS committed
 # (corpus/patients/) because it is fabricated and PHI-free.
 corpus_real/

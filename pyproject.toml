@@ -1,33 +1,43 @@
 [project]
 name = "agentic-chart-review"
 version = "0.1.0"
-description = "Agentic EHR chart review: a ReAct-with-replanning agent that reviews clinical notes the way a human abstractor does, under a frozen, machine-checkable extraction specification."
+description = "Auditable chart review with the Codex harness, Langtrace, and Semantica decision intelligence."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "Xing He" }]
-keywords = ["ehr", "chart-review", "clinical-nlp", "agents", "langgraph", "litellm"]
+keywords = ["ehr", "chart-review", "decision-intelligence", "langtrace", "semantica"]
 
 dependencies = [
-    "deepagents>=0.7.4,<0.8",
-    "langchain>=1.3.11,<2",
-    "langchain-openai>=1.4.1,<2",
     "litellm>=1.55",
-    "langgraph>=1.2.5,<1.3",
     "pydantic>=2.9",
     "pyyaml>=6.0",
-    "typer>=0.15",
-    "rich>=13.9",
+    "requests>=2.32,<3",
+    "opentelemetry-api>=1.27,<2",
+    # The MVP harness is the open-source Codex App Server API.  The Python SDK's stable
+    # release currently trails the runtime; runner.py deliberately points it at the separately
+    # pinned codex-cli 0.150.1 instead of using the SDK's bundled 0.147 runtime.
+    "openai-codex==0.147.0",
+    # Langtrace is the trace store and the read source for decision reconstruction.
+    "langtrace-python-sdk==3.8.21",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3", "pytest-cov>=6.0", "ruff>=0.8"]
-reports = ["openpyxl>=3.1"]
+notebook = [
+    "jupyterlab>=4.2,<5",
+    "nbclient>=0.10,<1",
+    "nbconvert>=7.16,<8",
+    "nbformat>=5.10,<6",
+    "ipykernel>=6.29,<7",
+]
 # THE JUDGMENT LEDGER. semantica itself is deliberately NOT listed here, because it cannot be
 # installed from this file: it declares 124 dependencies — torch, spacy, transformers, opencv,
-# faiss, librosa — for features we switch off at construction (no embeddings, no entity
-# extraction, no analytics, no Explorer). We use its ContextGraph, and that needs the five
-# packages below. So the install is two commands, and the second one is why:
+# faiss, librosa — for features we switch off at graph construction (no embeddings or automatic
+# entity/relationship extraction). Explorer is an optional separately built UI and does not need
+# those model families. We do enable graph-native decision and NetworkX/SciPy analytics.
+# ContextGraph needs the five packages below for that profile. So the
+# install is two commands, and the second one is why:
 #
 #   uv pip install -e ".[ledger]"
 #   uv pip install --no-deps semantica==0.6.6
@@ -42,9 +52,18 @@ ledger = [
     "scipy>=1.13.1",
     "python-dateutil>=2.9",
 ]
+# Private, localhost-only reviewer UI. These are exactly Semantica 0.6.6's Explorer runtime
+# dependencies; keeping them in a separate extra preserves the lean ledger-only install.
+ledger-ui = [
+    "fastapi>=0.109.2,<1",
+    "uvicorn[standard]>=0.22.0,<1",
+    "websockets>=15.0.1,<16",
+    "python-multipart>=0.0.7,<1",
+    "defusedxml>=0.7.1,<1",
+]
 
 [project.scripts]
-acr = "acr.commands.cli:app"
+acr = "acr.mvp.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -71,12 +90,10 @@ target-version = "py312"
 select = ["E4", "E7", "E9", "F", "I"]
 
 [tool.ruff.lint.per-file-ignores]
-# Every script in tools/ inserts `src` on `sys.path` before importing `acr`, because they run
-# against a checkout rather than an install. The import genuinely cannot come first.
 "tools/*" = ["E402"]
-# Same reason, stated in the file: the imports sit below a header explaining what may not be
-# imported there.
-"tests/test_replan.py" = ["E402"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "live_openrouter: paid end-to-end test using real OpenRouter Luna and Terra plus Langtrace",
+]

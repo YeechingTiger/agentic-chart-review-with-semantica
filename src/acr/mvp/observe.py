@@ -15,10 +15,10 @@ audit's reading view.
 
 Step kinds:
     thought     (L2, self-reported)  a reasoning summary the model emitted
-    decision    (L1) a note_decision call: facing / decision / because /
-                     used / grounding / options — UNCLASSIFIED, by design
+    decision    (L1) a Decision Testimony call with claimed basis/rule coverage — UNCLASSIFIED
     action      (L1) search / read / list_documents, with objective and a result digest
     evidence    (L1) a recorded span, with the server-resolved quote
+    finding     (L1) a runtime Standing/assertion claim plus server-resolved span
     submission  (L1) a submit_answer call
     verdict     (L1) the gate's answer to that submission
     remark      (L2, self-reported)  a final assistant message
@@ -102,9 +102,17 @@ def decision_trace(run_dir: Path) -> dict[str, Any]:
         if tool == "note_decision":
             add("decision", 1, seq, facing=args.get("facing"),
                 decision=args.get("decision"), because=args.get("because"),
-                options=args.get("options"), context=result.get("context"),
-                grounding=result.get("grounding") or args.get("grounding") or [],
-                used=result.get("used") or [{"ref": r} for r in (args.get("used") or [])])
+                alternatives=args.get("alternatives") or args.get("options"),
+                uncertainty=args.get("uncertainty"),
+                provisional_inference=args.get("provisional_inference"),
+                rule_coverage_claim=args.get("rule_coverage_claim"),
+                basis_sources=(result.get("basis_sources") or args.get("basis_sources")
+                               or args.get("grounding") or []),
+                citation_resolutions=(result.get("citation_resolutions")
+                                      or result.get("used") or []),
+                checked_fact_resolutions=result.get("checked_fact_resolutions") or [],
+                testimony_ref=result.get("testimony_ref") or f"decision:{seq}",
+                context=result.get("context"))
         elif tool in _ACTIONS:
             shown = {a: v for a, v in args.items() if a != "objective" and v is not None}
             add("action", 1, seq, tool=tool, objective=args.get("objective"),
@@ -113,6 +121,28 @@ def decision_trace(run_dir: Path) -> dict[str, Any]:
             add("evidence", 1, seq, note_id=args.get("note_id"),
                 span=[args.get("start"), args.get("end")], quote=result.get("quote"),
                 supports=args.get("supports"), error=result.get("error"))
+        elif tool == "record_finding":
+            if result.get("testimony_ref"):
+                reported = result.get("self_reported") or {}
+                add("decision", 1, seq, facing=args.get("facing"),
+                    decision=(reported.get("decision") or
+                              f"{args.get('note_id')} is {args.get('standing')} for "
+                              f"{args.get('field')}"),
+                    because=args.get("because"), alternatives=args.get("alternatives"),
+                    uncertainty=args.get("uncertainty"),
+                    provisional_inference=args.get("provisional_inference"),
+                    rule_coverage_claim=args.get("rule_coverage_claim"),
+                    basis_sources=result.get("basis_sources") or args.get("basis_sources") or [],
+                    citation_resolutions=result.get("citation_resolutions") or [],
+                    checked_fact_resolutions=result.get("checked_fact_resolutions") or [],
+                    testimony_ref=result.get("testimony_ref"), context=result.get("context"))
+            add("finding", 1, seq, note_id=args.get("note_id"), field=args.get("field"),
+                standing=args.get("standing"), assertion_class=args.get("assertion_class"),
+                span=(result.get("server_fact") or {}).get("span"),
+                quote=result.get("quote"), finding_ref=result.get("finding_ref"),
+                testimony_ref=(result.get("testimony_ref")
+                               or args.get("decision_testimony_ref")),
+                error=result.get("error"))
         elif tool == "submit_answer":
             add("submission", 1, seq, status=args.get("status"), value=args.get("value"),
                 reasoning=args.get("reasoning"))
@@ -132,7 +162,8 @@ def decision_trace(run_dir: Path) -> dict[str, Any]:
 
 
 _MARKS = {"thought": "~ thought   ", "decision": "* DECISION  ", "action": "> action    ",
-          "evidence": "+ evidence  ", "submission": "! submit    ", "verdict": "= verdict   ",
+          "evidence": "+ evidence  ", "finding": "+ finding   ",
+          "submission": "! submit    ", "verdict": "= verdict   ",
           "result": "# RESULT    ", "remark": "~ remark    "}
 
 
@@ -150,20 +181,30 @@ def render(trace: dict[str, Any]) -> str:
             out.append(f"{head}facing: {s['facing']}")
             out.append(f"{pad}decided: {s['decision']}")
             out.append(f"{pad}because: {s['because']}")
-            if s.get("grounding"):
-                out.append(f"{pad}grounding: {', '.join(s['grounding'])}")
-            if s.get("used"):
-                # An unverified citation is marked here rather than dropped: the claim IS
-                # the finding, and hiding it would hide the falsest kind of warrant.
+            if s.get("basis_sources"):
+                out.append(f"{pad}basis: {', '.join(s['basis_sources'])}")
+            if s.get("rule_coverage_claim"):
+                out.append(f"{pad}rule coverage (claimed): {s['rule_coverage_claim']}")
+            if s.get("citation_resolutions"):
                 marks = []
-                for u in s["used"]:
-                    v = u.get("verified")
-                    tag = ("" if v is True else " (UNVERIFIED)" if v is False else " (claimed)")
-                    depth = f" [{u['depth']}]" if u.get("depth") else ""
-                    marks.append(f"{u.get('ref')}{depth}{tag}")
-                out.append(f"{pad}used: {', '.join(marks)}")
-            if s.get("options"):
-                out.append(f"{pad}set aside: {'; '.join(s['options'])}")
+                for row in s["citation_resolutions"]:
+                    status = row.get("status")
+                    if not status:
+                        verified = row.get("verified")
+                        status = ("VERIFIED" if verified is True else
+                                  "UNVERIFIED" if verified is False else "CLAIMED")
+                    marks.append(f"{row.get('ref')} [{status}]")
+                out.append(f"{pad}citations: {', '.join(marks)}")
+            if s.get("checked_fact_resolutions"):
+                marks = [f"{u.get('ref')} [{u.get('status')}]"
+                         for u in s["checked_fact_resolutions"]]
+                out.append(f"{pad}checked facts: {', '.join(marks)}")
+            if s.get("alternatives"):
+                out.append(f"{pad}set aside: {'; '.join(s['alternatives'])}")
+            if s.get("provisional_inference"):
+                out.append(f"{pad}provisional inference: {s['provisional_inference']}")
+            if s.get("uncertainty"):
+                out.append(f"{pad}uncertainty: {s['uncertainty']}")
             if s.get("context"):
                 out.append(f"{pad}server state: {json.dumps(s['context'], ensure_ascii=False)}")
         elif s["kind"] == "action":
@@ -176,6 +217,13 @@ def render(trace: dict[str, Any]) -> str:
             else:
                 out.append(f"{head}{s['note_id']} [{s['span'][0]},{s['span'][1]})"
                            f' "{s["quote"]}" — {s["supports"]}')
+        elif s["kind"] == "finding":
+            if s.get("error"):
+                out.append(f"{head}REFUSED: {s['error']}")
+            else:
+                span = f" span={s['span']}" if s.get("span") else ""
+                out.append(f"{head}{s['field']} {s['standing']} / {s['assertion_class']}"
+                           f" note={s['note_id']}{span} [self-reported standing]")
         elif s["kind"] == "submission":
             out.append(f"{head}{s['status']} {json.dumps(s.get('value'), ensure_ascii=False)}")
             if s.get("reasoning"):
